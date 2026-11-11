@@ -580,4 +580,20 @@
     <string name="catalog_incomplete">تعذّر تحميل بعض قوائم العرض</string>
     <string name="progress_saved_on_tv">تم حفظ تقدّم المشاهدة على هذا التلفزيون. سيحاول Alder مزامنته مجددًا.</string>
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>
+    <string name="setup_check">فحص الإعداد</string>
+    <string name="setup_check_hint">تحقق من قدرة الإضافات على تشغيل الفيديو على هذا التلفزيون.</string>
+    <string name="setup_checking">جارٍ فحص الإضافات</string>
+    <string name="setup_checking_desc">يطلب ألدر من كل إضافة بث فيلمًا معروفًا للتحقق من إمكانية تشغيل الفيديو على هذا التلفزيون.</string>
+    <string name="setup_account">تم تسجيل الدخول إلى Stremio باسم %1$s</string>
+    <string name="setup_account_apple">تم تسجيل الدخول إلى Stremio باستخدام Apple (%1$s)</string>
+    <string name="setup_problem">لا يمكن تشغيل أي فيديو بعد</string>
+    <string name="setup_no_addons">تعرض الإضافات عناوين، لكن لا توجد إضافة تعثر على فيديو. يحتاج الحساب إلى إضافة بث.</string>
+    <string name="setup_other_account">ترتبط الإضافات بحساب Stremio واحد. إذا ظهرت إضافات مختلفة على جهاز آخر، فتحقق من الحساب هناك.</string>
+    <string name="setup_scan_addons">امسح الرمز بهاتفك لإضافة بث</string>
+    <string name="setup_scan_addons_steps">ثبّت إضافة بث في Stremio على هذا الحساب. ثم اختر إعادة المحاولة.</string>
+    <string name="setup_use_other_account">استخدام حساب آخر</string>
+    <string name="setup_nothing_played">لم تعثر الإضافات على فيديو يمكن تشغيله على هذا التلفزيون للفيلم التجريبي.</string>
+    <string name="setup_ready">جاهز للتشغيل</string>
+    <string name="setup_ready_desc">عثرت %1$s على فيديو للفيلم التجريبي.</string>
+    <string name="setup_done">تم</string>
 </resources>
