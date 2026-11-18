@@ -843,6 +843,7 @@ class MainActivity : Screen() {
         // A page opens as soon as the remote rests on its name. OK on Shows or Movies goes to its genres. Live shows only
         // once the profile's add-ons have a live catalog; order and hidden tabs come from Settings › Tabs ([arrangeTabs]).
         Page.fixed.forEach { p -> navItem(p).inNav() }
+        pill(R.string.nav_discover).apply { setOnClickListener { openDiscover() } }.inNav(height = dp(30))
         arrangeTabs()
         nav.background = glassOver(nav, NAV_R + 4, shade = 0.22f, keepPrevious = false)
         header.addView(avatarBox, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.START or Gravity.CENTER_VERTICAL))
@@ -857,6 +858,8 @@ class MainActivity : Screen() {
         styleNav()
         return header
     }
+
+    private fun openDiscover() = startActivity(Intent(this, DiscoverActivity::class.java))
 
     private var lastAddons: List<Addon> = emptyList()
     private lateinit var navBar: LinearLayout
@@ -1341,9 +1344,10 @@ class MainActivity : Screen() {
             else if (hasEpisodes(item.type, meta?.videos)) meta?.videos?.map { it.season }?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }
                 ?.let { plural(R.plurals.seasons, it) }
             else meta?.runtime
-        cardCaption.text = item.timeLeft
+        val captionText = item.timeLeft
             ?: getString(R.string.player_next_episode).takeIf { item.nextEpisodePending }
             ?: listOfNotNull(item.name, detail).joinToString(DOT)
+        cardCaption.text = listOf(captionText, getString(R.string.card_hold_options)).joinToString(DOT)
         val progress = item.progress.takeIf { page == Page.HOME && item.timeLeft != null && it > 0f }
         val line = progress?.let {
             val fill = android.graphics.drawable.ClipDrawable(rounded(TUNGSTEN, 2), Gravity.LEFT,
@@ -1477,18 +1481,20 @@ class MainActivity : Screen() {
 
         // Keep cached rows visible if a refresh fails.
         var failure: View? = null
-        fun failedToLoad(error: Throwable) {
+        fun failedToLoad(error: Throwable, retry: () -> Unit) {
             forgetIfSessionGone(error)
             if (failure != null || isFinishing) return
             val view = failed(failureMessage(if (p == Page.HOME || grid) R.string.library_load_failed else R.string.home_unreachable,
-                failureOf(error))) { showPage(page) }
+                failureOf(error)), retry)
             failure = view
             content.addView(view, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
             view.post { if (view.isAttachedToWindow && !focusedSomething && !header.hasFocus()) view.getChildAt(2).requestFocus() }
         }
         fun clearFailure() {
+            val focused = failure?.hasFocus() == true
             failure?.let(content::removeView)
             failure = null
+            if (focused && firstRow()?.focusFirst() != true) navItems[p]?.requestFocus()
         }
 
         if (p == Page.HOME || p == Page.LIBRARY) {
@@ -1517,9 +1523,14 @@ class MainActivity : Screen() {
                 if (p == Page.HOME) {
                     val items = cw.map(::libraryItem)
                     if (items.isNotEmpty()) {
-                        slot.addView(row(getString(R.string.row_continue), items.take(initialRowCards(false)), later(items), continueRow = true).view)
+                        val visible = maxOf(initialRowCards(false), items.indexOfFirst { "card:${it.id}" == was } + 1)
+                        slot.addView(row(getString(R.string.row_continue), items.take(visible), later(items), continueRow = true).view)
                         android.util.Log.d("Alder", "page ${p.label}: Continue in ${android.os.SystemClock.uptimeMillis() - opened} ms")
                         startCinema(items.take(CINEMA_MAX))
+                    } else {
+                        slot.addView(pill(R.string.nav_discover).apply {
+                            setOnClickListener { openDiscover() }
+                        }, FrameLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD); topMargin = dp(12) })
                     }
                 } else {
                     showLibrary(slot, was)
@@ -1545,9 +1556,9 @@ class MainActivity : Screen() {
                     if (g != generation || request != libraryRequest) return@background
                     result.fold({
                         fresh = true
-                        clearFailure()
                         show(it, force = true)
-                    }) { failedToLoad(it) }
+                        clearFailure()
+                    }) { failedToLoad(it, ::ask) }
                 }
             }
             ask()
@@ -1561,6 +1572,8 @@ class MainActivity : Screen() {
         var catalogWarning: View? = null
         val catalogFailures = linkedMapOf<String, Failure>()
         var builtFrom: List<Pair<String, String>>? = null
+        var builtPin: String? = null
+        var retryCatalogs: () -> Unit = {}
         fun catalogStatus(key: String, failure: Failure?) {
             val oldReason = catalogFailures.values.firstOrNull()
             val previous = if (failure == null) catalogFailures.remove(key) else catalogFailures.put(key, failure)
@@ -1572,18 +1585,20 @@ class MainActivity : Screen() {
             val restoreFocus = catalogWarning?.hasFocus() == true
             catalogWarning?.let(content::removeView)
             catalogWarning = reason?.let {
-                failed(failureMessage(R.string.catalog_incomplete, it)) { showPage(p) }.also { card ->
+                failed(failureMessage(R.string.catalog_incomplete, it), retryCatalogs).also { card ->
                     content.addView(card, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
                     if (restoreFocus) card.getChildAt(2).requestFocus()
                 }
             }
         }
-        fun build(addons: List<Addon>) {
+        fun build(addons: List<Addon>, retryFailed: Boolean = false) {
             if (g != generation) return
             showLiveTab(addons)
             val ids = addons.map { it.id to it.transportUrl }
-            if (builtFrom == ids) return
+            val pin = Settings.pinnedCatalog(this).takeIf { p == Page.HOME }
+            if (builtFrom == ids && builtPin == pin && !retryFailed) return
             builtFrom = ids
+            builtPin = pin
             val build = ++catalogBuild
             loadMoreSections = null
             val oldSlots = catalogSlots.toMutableMap()
@@ -1602,7 +1617,8 @@ class MainActivity : Screen() {
                 shelf(c)?.takeIf { it.page == p || (featuredHome && (it.page == Page.MOVIES || it.page == Page.SHOWS) && it.rank <= 2) }?.let { c to it }
             }.sortedBy { it.second.rank }
             val catalogs = shelves.map { it.first }
-            if (catalogs.isEmpty()) {
+            val pinned = addons.asSequence().flatMap { it.catalogs.asSequence() }.firstOrNull { it.key == pin }
+            if (catalogs.isEmpty() && pinned == null) {
                 val none = when (p) {
                     Page.HOME -> R.string.home_no_picks
                     Page.MOVIES -> R.string.page_no_movie_catalogs
@@ -1617,7 +1633,9 @@ class MainActivity : Screen() {
             }
             val genres = catalogGenres(catalogs.flatMap { it.genres }.map { if (p.hasGenreShortcuts) genreLabel(it) else it })
             val hiddenRows = Settings.hiddenRows(this@MainActivity)
-            val sections = sections(p, shelves, featuredHome).filterNot { it.first in hiddenRows }
+            val pinSection = pinned?.let { Triple(it.name, listOf(it to Shelf(p, it.name, -1)), null) }
+            val sections = listOfNotNull(pinSection) + sections(p, shelves, featuredHome)
+                .filterNot { (title, sources, _) -> title in hiddenRows || sources.size == 1 && sources[0].first.key == pin }
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
             val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
                 else emptyList()).toMutableList()
@@ -1677,29 +1695,13 @@ class MainActivity : Screen() {
                     }
                     // The rest of the first page first, then the addon's next pages when it takes `skip`.
                     // shortcut: genre rows use each source's first page; add genre-aware paging if those rows feel short.
-                    val more: ((Int) -> List<Item>)? = if (rowCatalogs.size == 1) {
-                        val catalog = rowCatalogs[0]
-                        if (catalog.pages && picked == null) { from ->
-                            if (from < items.size) items.drop(from).take(PAGE)
-                            else catalog.addon.catalog(catalog, from).filterNot { isAddonMessage(it.name) }.map(::metaItem)
-                        } else later(items)
-                    } else {
-                        val all = items.toMutableList()
-                        val counts = results.map { it.first.size }.toMutableList()
-                        val exhausted = BooleanArray(rowCatalogs.size)
-                        val nextPage: (Int) -> List<Item> = { from ->
-                            if (from >= all.size && picked == null) for (j in rowCatalogs.indices) {
-                                val catalog = rowCatalogs[j]
-                                if (!catalog.pages || exhausted[j]) continue
-                                val next = catalog.addon.catalog(catalog, counts[j])
-                                counts[j] += next.size
-                                exhausted[j] = next.isEmpty()
-                                val known = all.map { it.id }.toSet()
-                                all += next.filter { it.id !in known && !isAddonMessage(it.name) }.distinctBy { it.id }.map(::metaItem)
-                                if (all.size > from) break
-                            }
-                            all.drop(from).take(PAGE)
+                    val more = if (picked != null || rowCatalogs.none { it.pages }) later(items) else {
+                        val pager = CatalogPager(results.map { it.first }, rowCatalogs.map { it.pages }, Meta::id,
+                            { !isAddonMessage(it.name) }) { source, skip ->
+                            val catalog = rowCatalogs[source]
+                            catalog.addon.filteredCatalog(catalog, emptyMap(), skip)
                         }
+                        val nextPage: (Int) -> List<Item> = { from -> pager.slice(from, PAGE).map(::metaItem) }
                         nextPage
                     }
                     // Build nearby rows first, spacing the others within this small batch across frames.
@@ -1715,6 +1717,7 @@ class MainActivity : Screen() {
                             items.indexOfFirst { "card:${it.id}" == focusedTag } else -1
                         val initial = maxOf(initialRowCards(p == Page.LIVE), restoreIndex + 1)
                         val made = row(title, items.take(maxOf(initial, old?.items?.size ?: initial)), more, wide = (p == Page.LIVE))
+                        made.pinned = section === pinSection
                         slot.addView(made.view)
                         restoreCatalogFocus?.invoke()
                         updateNextRow()
@@ -1855,16 +1858,20 @@ class MainActivity : Screen() {
                 }
             }
         }
-        background({ Stremio.savedAddons(key) }, cacheReads) { r -> if (builtFrom == null) r.getOrNull()?.let(::build) }
+        background({ Stremio.savedAddons(key) }, cacheReads) { r -> if (builtFrom == null) r.getOrNull()?.let { build(it) } }
         var addonRequest = 0
-        fun checkAddons() {
+        fun checkAddons(retry: Boolean = false) {
             val request = ++addonRequest
             background({ Stremio.addons(key, refresh = true) }) { r ->
                 if (g == generation && request == addonRequest) r.fold({
+                    val retryFocused = catalogWarning?.hasFocus() == true
                     catalogStatus("add-ons", null)
-                    build(it)
+                    build(it, retry && catalogFailures.isNotEmpty())
+                    if (p != Page.HOME) clearFailure()
+                    if (retryFocused && catalogWarning?.hasFocus() != true && firstRow()?.focusFirst() != true)
+                        navItems[p]?.requestFocus()
                 }) {
-                    if (builtFrom == null && p != Page.HOME) failedToLoad(it)
+                    if (builtFrom == null && p != Page.HOME) failedToLoad(it) { checkAddons(retry = true) }
                     else {
                         forgetIfSessionGone(it)
                         if (!isFinishing) catalogStatus("add-ons", failureOf(it))
@@ -1873,7 +1880,11 @@ class MainActivity : Screen() {
             }
         }
         checkAddons()
-        refreshAddons = ::checkAddons
+        retryCatalogs = { checkAddons(retry = true) }
+        refreshAddons = {
+            if (builtFrom != null && p == Page.HOME && builtPin != Settings.pinnedCatalog(this)) build(lastAddons)
+            checkAddons()
+        }
     }
 
     private class Shelf(val page: Page, val title: String, val rank: Int)
@@ -2151,11 +2162,17 @@ class MainActivity : Screen() {
 
     /** Hold OK on a catalog card: choose a source yourself, or take the whole row off the page. */
     private fun rowMenu(row: Row, item: Item) {
-        val options = listOf(getString(R.string.action_choose_source)) +
-            (if (row.title.isNotEmpty()) listOf(getString(R.string.action_hide_row, row.title)) else emptyList())
+        val options = listOf(getString(R.string.action_choose_source)) + listOfNotNull(when {
+            row.pinned -> getString(R.string.discover_unpin)
+            row.title.isNotEmpty() -> getString(R.string.action_hide_row, row.title)
+            else -> null
+        })
         choose(item.name, options) { selected ->
             if (selected == 0) play(item, pick = true)
-            else {
+            else if (row.pinned) {
+                Settings.pinCatalog(this, null)
+                refreshAddons?.invoke()
+            } else {
                 Settings.hideRow(this, row.title)
                 showPage(page)
             }
@@ -2266,6 +2283,7 @@ class MainActivity : Screen() {
         val cards = items.mapIndexed { i, item -> Card(item, i) }.toMutableList()
         private var fetching = false
         var selected = 0
+        var pinned = false
         var pendingUpdate: (() -> Unit)? = null
         var active = false
         var loaded = false
@@ -2507,9 +2525,10 @@ class MainActivity : Screen() {
                 }, LayoutParams(dp(24), dp(24), Gravity.TOP or Gravity.END).apply { setMargins(0, dp(6), dp(6), 0) })
                 addView(shade, LayoutParams(-1, -1))
                 isFocusable = true
-                if (grid) contentDescription = item.name
                 tag = "card:${item.id}"
+                updateAccessibleName()
                 item.onFill += {
+                    updateAccessibleName()
                     if (wide && item.newEpisode && face.findViewWithTag<View>("new_badge") == null) addBadge()
                     if (wanted) load()
                 }
@@ -2525,6 +2544,10 @@ class MainActivity : Screen() {
                 if (grid) setOnLongClickListener { listMenu(item); true }
                 else if (continueRow) setOnLongClickListener { continueMenu(item); true }
                 else setOnLongClickListener { rowMenu(this@Row, item); true }
+            }
+
+            private fun updateAccessibleName() {
+                contentDescription = listOfNotNull(item.name, episodeLabel(item), item.timeLeft).joinToString(DOT)
             }
 
             private var showing: Boolean? = null
@@ -2889,6 +2912,13 @@ class MainActivity : Screen() {
         const val ADVANCE = 20_000L // ms each cinema title shows
         const val REVEAL_WAIT = 1200L // ms the cinema waits for a title's art and logo before showing its words anyway
     }
+}
+
+internal fun catalogTypeLabel(c: Context, type: String): String = when {
+    type == "movie" -> c.getString(R.string.tab_movies)
+    type == "series" -> c.getString(R.string.tab_shows)
+    isLiveType(type) -> c.getString(R.string.tab_live)
+    else -> typeTabName(c, type)
 }
 
 /** A catalog type's tab name: Anime in the viewer's language, any other type as the add-on writes it. */

@@ -377,7 +377,7 @@
 
     <!-- Search -->
     <string name="search_clear">Suche löschen</string>
-    <string name="search_voice_unavailable">Sprachsuche nicht verfügbar</string>
+    <string name="search_system_keyboard">TV-Tastatur</string>
     <string name="search_space">Leertaste</string>
     <string name="search_recent">Zuletzt</string>
     <string name="search_recent_hint">%1$s. OK gedrückt halten, um es aus den letzten Suchen zu entfernen</string>
@@ -568,4 +568,16 @@
     <string name="setup_ready">Bereit zum Abspielen</string>
     <string name="setup_ready_desc">%1$s hat Videos fÃ¼r einen Testfilm gefunden. Titel, die du wÃ¤hlst, sind auf diesem Fernseher abspielbar.</string>
     <string name="setup_done">Fertig</string>
+    <string name="nav_discover">Entdecken</string>
+    <string name="discover_catalog">Katalog wählen</string>
+    <string name="discover_filters">Filter</string>
+    <string name="discover_filter_count">Filter · %1$d</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_pin">An Startseite anheften</string>
+    <string name="discover_unpin">Von Startseite lösen</string>
+    <string name="discover_load_more">Mehr laden</string>
+    <string name="discover_no_catalogs">Keine Kataloge verfügbar. Füge einen Katalog in Stremio hinzu.</string>
+    <string name="discover_no_titles">Keine Titel in diesem Katalog.</string>
+    <string name="card_hold_options">OK für Optionen gedrückt halten</string>
+    <string name="setup_no_probe">Diese Add-ons unterstützen die Testtitel nicht. Wähle einen Titel, um die Wiedergabe zu prüfen.</string>
 </resources>

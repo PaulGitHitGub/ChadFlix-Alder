@@ -18,6 +18,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 ## Unreleased
 
 ### New
+- **Discover.** Select **Discover** to open a catalog and use its filters. Select **Pin to Home** to show that catalog on Home.
 - **Arabic interface.** Select **Settings → Language → App language → العربية**. Alder shows menus, buttons and settings in Arabic.
 <!-- Spotlight -->
 - **P2P sources.** Alder can play torrents from your add-ons without a debrid account. Sources with the **P2P** label are at the end of the source list. When no other source plays, Alder tries a P2P source. Seek, pause and Back work as with other sources. P2P sources are available on Android 7 and later.
@@ -38,6 +39,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Search.** Find titles in all catalogs that support Search. Select **TV keyboard** to enter text with the TV keyboard.
+- **Poster options.** Hold OK on a poster for more options. The TV screen reader can read poster names.
 - **Choose your tabs.** Select **Settings → Profile → Tabs**. Select a tab to show it, hide it or move it left or right. This includes the tabs of add-ons, for example **Trakt**. A hidden tab keeps its add-on installed. **Home** is always the first tab. Each profile has its own tabs. **Tabs** replaces the **Movies tab**, **Shows tab** and **Live tab** settings and keeps your choices.
 - **Faster Home.** Alder shows saved rows while it gets new data. When add-ons change, focus returns to the same title if it is still available.
 - **My List.** Two full rows of posters show at once. Move down to see more titles. The title shows while Alder gets the poster.
@@ -63,6 +66,11 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Home and catalogs.** Select **Try again** to load new data without a full page reload. Continue Watching keeps the selected title when the row changes.
+- **My List.** Alder checks the current Stremio list before it adds or removes a title.
+- **Sources after an error.** The source list uses the results that Alder already has. It shows sources that failed below other sources.
+- **Check setup.** Alder tells you when your add-ons do not support the test titles.
+- **Catalog pages.** Alder can show more titles when a catalog sends the same titles again.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
 - **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.

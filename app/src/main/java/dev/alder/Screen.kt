@@ -1,6 +1,7 @@
 package dev.alder
 
 import android.app.Activity
+import android.content.Intent
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -225,6 +226,17 @@ abstract class Screen : Activity() {
     }
 
     protected fun <V : View> V.marginTop(top: Int) = apply { layoutParams = wrap().apply { topMargin = dp(top) } }
+
+    protected fun openCatalogTitle(meta: Meta) {
+        val intent = Intent(this, DetailsActivity::class.java)
+            .putExtra("type", meta.type).putExtra("id", meta.id).putExtra("name", meta.name)
+            .putExtra("poster", meta.poster).putExtra("background", meta.background)
+        if (isLiveType(meta.type)) {
+            intent.setClass(this, if (Settings.alwaysList(this)) StreamsActivity::class.java else PlayerActivity::class.java)
+                .putExtra("videoId", meta.id).putExtra("label", meta.name)
+        }
+        startActivity(intent)
+    }
 
     protected fun wrap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
 

@@ -771,9 +771,12 @@ open class ProfilesActivity : Screen() {
                 again, onboardingButton(getString(R.string.setup_use_other_account)).apply {
                     setOnClickListener { showSignIn(profile.name, profile) }
                 }, done)
-            // ponytail: an add-on that knows neither test title (anime only) can't be tested here, so it passes.
             val tested = addons.mapNotNull { a -> setupProbe { type, id -> a.serves("stream", type, id) }?.let { a to it } }
-            if (tested.isEmpty()) return@background ready(addons.map { it.name })
+            if (tested.isEmpty()) {
+                if (quiet) next()
+                else draw(R.string.setup_check, account, listOf(getString(R.string.setup_no_probe)), null, done)
+                return@background
+            }
             val failures = arrayOfNulls<Throwable>(tested.size)
             val torrents = IntArray(tested.size)
             val links = IntArray(tested.size)
@@ -781,7 +784,7 @@ open class ProfilesActivity : Screen() {
             var unplayable = 0
             var answered = 0
             tested.forEachIndexed { i, (addon, probe) ->
-                background({ addon.streams(probe.first, probe.second) }) { answer ->
+                background({ addon.streams(probe.first, probe.second, allowTorrents = supportsTorrentPlayback) }) { answer ->
                     if (generation != checkGeneration) return@background
                     answer.onSuccess { s ->
                         torrents[i] = s.torrents

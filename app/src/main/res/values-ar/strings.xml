@@ -394,7 +394,7 @@
 
     <!-- Search -->
     <string name="search_clear">مسح البحث</string>
-    <string name="search_voice_unavailable">البحث الصوتي غير متاح</string>
+    <string name="search_system_keyboard">لوحة مفاتيح التلفزيون</string>
     <string name="search_space">مسافة</string>
     <string name="search_recent">الأخيرة</string>
     <string name="search_recent_hint">%1$s. اضغط مطولًا على موافق لإزالته من عمليات البحث الأخيرة</string>
@@ -596,4 +596,16 @@
     <string name="setup_ready">جاهز للتشغيل</string>
     <string name="setup_ready_desc">عثرت %1$s على فيديو للفيلم التجريبي.</string>
     <string name="setup_done">تم</string>
+    <string name="nav_discover">اكتشف</string>
+    <string name="discover_catalog">اختر كتالوجًا</string>
+    <string name="discover_filters">الفلاتر</string>
+    <string name="discover_filter_count">الفلاتر · %1$d</string>
+    <string name="discover_genre">النوع</string>
+    <string name="discover_pin">تثبيت في الرئيسية</string>
+    <string name="discover_unpin">إلغاء التثبيت من الرئيسية</string>
+    <string name="discover_load_more">تحميل المزيد</string>
+    <string name="discover_no_catalogs">لا توجد كتالوجات للتصفح. أضف كتالوجًا في Stremio.</string>
+    <string name="discover_no_titles">لا توجد عناوين في هذا الكتالوج.</string>
+    <string name="card_hold_options">اضغط مطولًا على OK للخيارات</string>
+    <string name="setup_no_probe">لا تدعم هذه الإضافات العناوين التجريبية. اختر عنوانًا للتحقق من إمكانية تشغيله.</string>
 </resources>

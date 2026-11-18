@@ -380,7 +380,7 @@
 
     <!-- Search -->
     <string name="search_clear">Clear search</string>
-    <string name="search_voice_unavailable">Voice search unavailable</string>
+    <string name="search_system_keyboard">TV keyboard</string>
     <string name="search_space">Space</string>
     <string name="search_recent">Recent</string>
     <string name="search_recent_hint">%1$s. Hold OK to remove from recent searches</string>
@@ -570,4 +570,16 @@
     <string name="setup_ready">Ready to play</string>
     <string name="setup_ready_desc">%1$s found video for a test film. Titles you pick can play on this TV.</string>
     <string name="setup_done">Done</string>
+    <string name="nav_discover">Discover</string>
+    <string name="discover_catalog">Choose catalog</string>
+    <string name="discover_filters">Filters</string>
+    <string name="discover_filter_count">Filters · %1$d</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_pin">Pin to Home</string>
+    <string name="discover_unpin">Unpin from Home</string>
+    <string name="discover_load_more">Load more</string>
+    <string name="discover_no_catalogs">No catalogs to browse. Add a catalog in Stremio.</string>
+    <string name="discover_no_titles">No titles in this catalog.</string>
+    <string name="card_hold_options">Hold OK for options</string>
+    <string name="setup_no_probe">These add-ons do not support the test titles. Select a title to check if it plays.</string>
 </resources>

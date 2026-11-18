@@ -31,7 +31,7 @@ import java.util.concurrent.Future
 /** More complete title matches lead; ties retain the installed add-ons' order. */
 internal fun <T> rankSearchTitles(items: List<T>, query: String, title: (T) -> String): List<T> {
     fun words(s: String) = Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "").split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
+        .replace(Regex("(?<=[A-Za-z])\\p{M}+"), "").split(Regex("[^\\p{L}\\p{M}\\p{N}]+")).filter { it.isNotEmpty() }
     val wanted = words(query)
     if (wanted.isEmpty()) return items
     return items.sortedBy { item ->
@@ -162,6 +162,7 @@ class SearchActivity : Screen() {
                 })) else fieldRest
             placeCursor()
             if (!has) {
+                input.showSoftInputOnFocus = false
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
             }
         }
@@ -225,6 +226,7 @@ class SearchActivity : Screen() {
             }
         })
         input.setOnEditorActionListener { _, _, _ ->
+            (lastKeyboardFocus ?: firstKey)?.requestFocus()
             main.removeCallbacks(typed)
             search(true)
             true
@@ -358,16 +360,16 @@ class SearchActivity : Screen() {
         key("−", controls, 2, false) { append("-") }
         key("⌫", controls, 5, true) { delete() }
         val last = keyRow()
-        key(getString(R.string.search_space).uppercase(), last, 8, true) { append(" ") }
-        last.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_mic)
-            imageTintList = ColorStateList.valueOf(TEXT_3)
-            scaleType = ImageView.ScaleType.CENTER
-            alpha = 0.45f
-            contentDescription = getString(R.string.search_voice_unavailable)
-            isFocusable = false
-            isClickable = false
-        }, LinearLayout.LayoutParams(dp(49), -1).apply { marginStart = dp(3) })
+        key(getString(R.string.search_space), last, 4, false) { append(" ") }
+        key(getString(R.string.search_system_keyboard), last, 6, true) {
+            input.showSoftInputOnFocus = true
+            input.requestFocus()
+            input.setSelection(input.length())
+            input.post {
+                if (input.hasFocus()) (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     private var modeLabel: TextView? = null
@@ -532,7 +534,7 @@ class SearchActivity : Screen() {
                 results.removeAllViews()
                 results.addView(failed(failureMessage(R.string.search_unavailable, failure)) { search(true, failure) })
                 return@background
-            }
+            }.filter { it.canSearch }
             val answers = arrayOfNulls<List<Meta>>(addons.size)
             var completed = 0
             val failures = arrayOfNulls<Failure>(addons.size)
@@ -540,12 +542,14 @@ class SearchActivity : Screen() {
             fun update(final: Boolean = false) {
                 if (token != request || finished) return
                 val found = searchAnswersInAddonOrder(answers)
-                    .filter { it.type == "movie" || it.type == "series" }
                     .filterNot { isAddonMessage(it.name) }
                     .distinctBy { it.type to it.id }
                 val ranked = rankSearchTitles(found, query) { it.name }
-                val sections = linkedMapOf(getString(R.string.tab_movies) to ranked.filter { it.type == "movie" }.take(PER_TYPE),
-                    getString(R.string.tab_shows) to ranked.filter { it.type == "series" }.take(PER_TYPE)).filterValues { it.isNotEmpty() }
+                val sections = ranked.groupBy { it.type.lowercase(Locale.ROOT) }.entries
+                    .sortedBy { (type, _) -> when (type) { "movie" -> 0; "series" -> 1; else -> 2 } }
+                    .flatMap { it.value }
+                    .groupBy { catalogTypeLabel(this, it.type.lowercase(Locale.ROOT)) }
+                    .mapValues { it.value.take(PER_TYPE) }
                 val settled = final || completed == addons.size
                 if (sections.isNotEmpty()) render(sections, query, moveFocus && settled)
                 if (!settled) return
@@ -654,6 +658,7 @@ class SearchActivity : Screen() {
         val shade = View(this).apply { setBackgroundColor(Color.BLACK); alpha = 0.5f }
         val card = FrameLayout(this).apply {
             tag = "${meta.type}:${meta.id}"
+            contentDescription = meta.name
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) =
                     outline.setRoundRect(0, 0, view.width, view.height, dp(6).toFloat())
@@ -693,9 +698,7 @@ class SearchActivity : Screen() {
             setOnClickListener {
                 val query = input.text.toString().trim()
                 if (query.isNotEmpty()) remember(query)
-                startActivity(Intent(this@SearchActivity, DetailsActivity::class.java)
-                    .putExtra("type", meta.type).putExtra("id", meta.id).putExtra("name", meta.name)
-                    .putExtra("poster", meta.poster).putExtra("background", meta.background))
+                openCatalogTitle(meta)
             }
             if (firstInRow) setOnKeyListener { _, code, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)

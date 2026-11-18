@@ -381,7 +381,7 @@
 
     <!-- Search -->
     <string name="search_clear">Limpar busca</string>
-    <string name="search_voice_unavailable">Busca por voz indisponível</string>
+    <string name="search_system_keyboard">Teclado da TV</string>
     <string name="search_space">Espaço</string>
     <string name="search_recent">Recentes</string>
     <string name="search_recent_hint">%1$s. Segure OK para remover das buscas recentes</string>
@@ -575,4 +575,16 @@
     <string name="setup_ready">Pronto para reproduzir</string>
     <string name="setup_ready_desc">%1$s encontrou vÃ­deo para um filme de teste. Os tÃ­tulos que vocÃª escolher podem ser reproduzidos nesta TV.</string>
     <string name="setup_done">ConcluÃ­do</string>
+    <string name="nav_discover">Descobrir</string>
+    <string name="discover_catalog">Escolher catálogo</string>
+    <string name="discover_filters">Filtros</string>
+    <string name="discover_filter_count">Filtros · %1$d</string>
+    <string name="discover_genre">Gênero</string>
+    <string name="discover_pin">Fixar no Início</string>
+    <string name="discover_unpin">Desafixar do Início</string>
+    <string name="discover_load_more">Carregar mais</string>
+    <string name="discover_no_catalogs">Não há catálogos para explorar. Adicione um catálogo no Stremio.</string>
+    <string name="discover_no_titles">Não há títulos neste catálogo.</string>
+    <string name="card_hold_options">Segure OK para ver as opções</string>
+    <string name="setup_no_probe">Esses complementos não são compatíveis com os títulos de teste. Selecione um título para testar a reprodução.</string>
 </resources>

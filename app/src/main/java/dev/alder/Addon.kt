@@ -42,7 +42,9 @@ class Addon(val descriptor: JSONObject) {
      * [required]: extras it can't be asked without, with the value Stremio would pick (`genre` → "None").
      */
     class Catalog(val addon: Addon, val type: String, val id: String, val name: String, val pages: Boolean, val genres: List<String>,
-                  val required: Map<String, String> = emptyMap())
+                  val required: Map<String, String> = emptyMap(), val filters: Map<String, List<String>> = emptyMap()) {
+        val key get() = JSONArray(listOf(addon.id, type, id)).toString()
+    }
 
     /**
      * Catalogs Home can show. One with a required extra is asked with that extra's default or first option, as
@@ -52,7 +54,7 @@ class Addon(val descriptor: JSONObject) {
      */
     val catalogs: List<Catalog> = manifest.optJSONArray("catalogs").objects().mapNotNull { c ->
         val extra = c.optJSONArray("extra").objects()
-        val extras = c.optJSONArray("extraSupported").strings() + extra.map { it.optString("name") }
+        val extras = c.optJSONArray("extraSupported").strings() + c.optJSONArray("extraRequired").strings() + extra.map { it.optString("name") }
         // The genres it can filter by: the protocol's `genre` extra options, or the older `genres` list.
         val options = extra.firstOrNull { it.optString("name") == "genre" }?.optJSONArray("options").strings()
             .ifEmpty { c.optJSONArray("genres").strings() }
@@ -62,8 +64,12 @@ class Addon(val descriptor: JSONObject) {
             val choices = own?.optJSONArray("options").strings().ifEmpty { if (name == "genre") options else emptyList() }
             own?.text("default")?.takeIf { it in choices } ?: choices.firstOrNull() ?: return@mapNotNull null
         }
+        val filters = extra.filter { it.optString("name") !in setOf("", "skip", "search") }
+            .associate { it.optString("name") to it.optJSONArray("options").strings().distinct() }
+            .filterValues { it.isNotEmpty() }.toMutableMap()
+        if (options.isNotEmpty()) filters["genre"] = options.distinct()
         Catalog(this, c.getString("type"), c.getString("id"), c.optString("name").ifEmpty { c.getString("id") }, "skip" in extras,
-            options.filterNot { it.equals("None", ignoreCase = true) }, required) // "None" is no filter, not a genre
+            options.filterNot { it.equals("None", ignoreCase = true) }, required, filters) // "None" is no filter, not a genre
     }
 
     /** Whether this addon answers [resource] ("meta", "stream", …) for this type and id. */
@@ -78,25 +84,35 @@ class Addon(val descriptor: JSONObject) {
         return type in types && (prefixes.isNullOrEmpty() || prefixes.any { id.startsWith(it) })
     }
 
-    // Catalogs (one [genre] of them with Stremio's `genre` extra) and details are kept on disk as they arrive; the saved*
-    // versions read last time's answer, no network.
     fun catalog(c: Catalog, genre: String? = null, timeoutMs: Int = 20_000): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, genre), true, timeoutMs, strict = true)).getJSONArray("metas").objects().map(::Meta)
+        filteredCatalog(c, genre?.let { mapOf("genre" to it) }.orEmpty(), timeoutMs = timeoutMs)
 
-    /** The titles after the first [skip] (Stremio's paging extra); not kept on disk. */
-    fun catalog(c: Catalog, skip: Int): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, null, skip), strict = true)).getJSONArray("metas").objects().map(::Meta)
+    internal fun filteredCatalog(c: Catalog, filters: Map<String, String>, skip: Int = 0, timeoutMs: Int = 20_000): List<Meta> =
+        JSONObject(Http.get(catalogUrl(c, filters, skip), skip == 0, timeoutMs, strict = true))
+            .getJSONArray("metas").objects().map(::Meta)
 
     fun savedCatalog(c: Catalog, genre: String? = null): List<Meta>? =
-        Http.savedAnswer(catalogUrl(c, genre))?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.map(::Meta)
+        Http.savedAnswer(catalogUrl(c, genre?.let { mapOf("genre" to it) }.orEmpty()))
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.map(::Meta)
 
-    /** /catalog/type/id/genre=Drama&skip=20.json: the catalog's required extras, the [genre] picked, and the page. */
-    private fun catalogUrl(c: Catalog, genre: String?, skip: Int = 0): String {
-        val extras = c.required + listOfNotNull(genre?.let { "genre" to it }, ("skip" to "$skip").takeIf { skip > 0 })
+    private fun catalogUrl(c: Catalog, filters: Map<String, String>, skip: Int = 0): String {
+        val extras = c.required + filters + (("skip" to "$skip").takeIf { skip > 0 }?.let { mapOf(it) }.orEmpty())
         val path = url(arrayOf("catalog", c.type, c.id))
         if (extras.isEmpty()) return path
         return path.removeSuffix(".json") + "/" + extras.entries.joinToString("&") { (k, v) -> "$k=${Uri.encode(v)}" } + ".json"
     }
+
+    private val searchableCatalogs = manifest.optJSONArray("catalogs").objects()
+        .filter { c ->
+            c.optString("type").isNotBlank() &&
+                "search" in (c.optJSONArray("extraRequired").strings() + c.optJSONArray("extraSupported").strings() +
+                    c.optJSONArray("extra").objects().map { it.optString("name") }) &&
+                c.optJSONArray("extraRequired").strings().all { it == "search" } &&
+                c.optJSONArray("extra").objects().none { it.optBoolean("isRequired") && it.optString("name") != "search" }
+        }
+        .distinctBy { it.optString("type") to it.optString("id") }
+
+    internal val canSearch get() = searchableCatalogs.isNotEmpty()
 
     /** Every search catalog the addon advertises, as Stremio's catalog protocol specifies. */
     fun search(query: String): List<Meta> = searchCatalogs(query).let { (titles, failure) ->
@@ -106,15 +122,7 @@ class Addon(val descriptor: JSONObject) {
 
     internal fun searchCatalogs(query: String): Pair<List<Meta>, Throwable?> {
         require(query.isNotBlank())
-        val catalogs = manifest.optJSONArray("catalogs").objects()
-            .filter { c ->
-                c.optString("type") in listOf("movie", "series") &&
-                    "search" in (c.optJSONArray("extraRequired").strings() + c.optJSONArray("extraSupported").strings() +
-                        c.optJSONArray("extra").objects().map { it.optString("name") }) &&
-                    c.optJSONArray("extraRequired").strings().all { it == "search" } &&
-                    c.optJSONArray("extra").objects().none { it.optBoolean("isRequired") && it.optString("name") != "search" }
-            }
-            .distinctBy { it.optString("type") to it.optString("id") }
+        val catalogs = searchableCatalogs
         fun fetch(c: JSONObject): List<Meta> {
             val path = url(arrayOf("catalog", c.getString("type"), c.getString("id"))).removeSuffix(".json")
             val searchUrl = "$path/search=${Uri.encode(query)}.json"

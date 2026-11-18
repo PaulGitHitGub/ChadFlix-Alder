@@ -550,8 +550,12 @@ class DetailsActivity : Screen() {
     }
 
     private fun toggleList() {
-        val add = !Library.inList(item)
-        editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed) {
+        var target: Boolean? = null
+        editLibrary({ entry ->
+            val add = target ?: (!Library.inList(entry)).also { target = it }
+            Library.setInList(entry, add)
+        }, R.string.list_update_failed) {
+            val add = Library.inList(item)
             listButton.text = if (add) "✓" else "+"
             listButton.contentDescription = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
         }

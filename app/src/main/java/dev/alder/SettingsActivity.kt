@@ -81,6 +81,8 @@ object Settings {
     fun tabOrder(c: Context): List<String> =
         runCatching { org.json.JSONArray(prefs(c).getString(profileKey(c, "tabOrder"), "[]")).strings() }.getOrDefault(emptyList())
     fun setTabOrder(c: Context, ids: List<String>) = prefs(c).edit().putString(profileKey(c, "tabOrder"), org.json.JSONArray(ids).toString()).apply()
+    fun pinnedCatalog(c: Context) = prefs(c).getString(profileKey(c, "pinnedCatalog"), null)
+    fun pinCatalog(c: Context, key: String?) = prefs(c).edit().putString(profileKey(c, "pinnedCatalog"), key).apply()
     fun featuredHome(c: Context) = prefs(c).getBoolean(profileKey(c, "featuredHome"), false)
     /** "imdb", "letterboxd" or "both"; Letterboxd needs [mdblistKey] and covers films only. */
     fun ratings(c: Context) = prefs(c).getString("ratings", "imdb").orEmpty().ifEmpty { "imdb" }
@@ -91,7 +93,7 @@ object Settings {
         type == "movie" && id.startsWith("tt") && ratings(c) != "imdb" && mdblistKey(c).isNotEmpty()
     /** A removed profile's taste goes with it, so a new profile in its place starts with none. */
     fun forget(c: Context, profileId: String) = prefs(c).edit().apply {
-        listOf("release", "dub", "audioLang", "subLang", "hidden", "blurThumbnails", "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary", "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs").forEach { remove("$it@$profileId") }
+        listOf("release", "dub", "audioLang", "subLang", "hidden", "blurThumbnails", "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary", "tabOrder", "featuredHome", "pinnedCatalog", "recentSubLangs", "recentAudioLangs").forEach { remove("$it@$profileId") }
         prefs(c).all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 

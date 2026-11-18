@@ -381,7 +381,7 @@
 
     <!-- Search -->
     <string name="search_clear">Cancella ricerca</string>
-    <string name="search_voice_unavailable">Ricerca vocale non disponibile</string>
+    <string name="search_system_keyboard">Tastiera TV</string>
     <string name="search_space">Spazio</string>
     <string name="search_recent">Recenti</string>
     <string name="search_recent_hint">%1$s. Tieni premuto OK per rimuoverla dalle ricerche recenti</string>
@@ -575,4 +575,16 @@
     <string name="setup_ready">Pronto per la riproduzione</string>
     <string name="setup_ready_desc">%1$s ha trovato video per un film di prova. I titoli che scegli si possono riprodurre su questa TV.</string>
     <string name="setup_done">Fatto</string>
+    <string name="nav_discover">Scopri</string>
+    <string name="discover_catalog">Scegli catalogo</string>
+    <string name="discover_filters">Filtri</string>
+    <string name="discover_filter_count">Filtri · %1$d</string>
+    <string name="discover_genre">Genere</string>
+    <string name="discover_pin">Fissa nella Home</string>
+    <string name="discover_unpin">Rimuovi dalla Home</string>
+    <string name="discover_load_more">Carica altri</string>
+    <string name="discover_no_catalogs">Nessun catalogo da sfogliare. Aggiungi un catalogo in Stremio.</string>
+    <string name="discover_no_titles">Nessun titolo in questo catalogo.</string>
+    <string name="card_hold_options">Tieni premuto OK per le opzioni</string>
+    <string name="setup_no_probe">Questi add-on non supportano i titoli di prova. Scegli un titolo per verificare la riproduzione.</string>
 </resources>

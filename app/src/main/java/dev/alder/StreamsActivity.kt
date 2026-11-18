@@ -22,6 +22,8 @@ internal fun readyStreams(answers: Array<List<Stream>?>, allowGaps: Boolean): Li
     (if (allowGaps) answers.asList() else answers.takeWhile { it != null }).flatMap { it.orEmpty() }
 
 class StreamsActivity : Screen() {
+    private lateinit var lookup: SourceLookup
+    private var sourceUpdates: Cancellable? = null
     private val pick by lazy { intent.getBooleanExtra("pick", false) || Settings.alwaysList(this) }
 
     private lateinit var art: ImageView
@@ -149,29 +151,27 @@ class StreamsActivity : Screen() {
         })
         val tv = Device.of(this)
 
-        val lenders = Profiles.streamLenders(this)
         // Asks every add-on again (a fixed connection, or an add-on set up again on the phone); a source found plays.
         fun tryAgain(focus: Boolean = true) {
-            val again = pill(R.string.action_try_again).apply { setOnClickListener { recreate() } }
+            val again = pill(R.string.action_try_again).apply {
+                setOnClickListener {
+                    intent.putExtra("refreshSources", true)
+                    recreate()
+                }
+            }
             rows.addView(again, wrap().apply { marginStart = dp(12); topMargin = dp(16); bottomMargin = dp(12) })
             if (focus) again.requestFocus()
         }
-        background({
-            val own = Stremio.addons(key).filter { it.providesStreams }
-            val lent = lenders.flatMap { lender ->
-                runCatching {
-                    (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable }
-                }.getOrDefault(emptyList())
-            }
-            val household = lent.filter { it.serves("stream", type, videoId) }.distinctBy { it.id }
-            // Whether any stream add-on is installed besides Stremio's own (Local Files has a stream resource): if so, none
-            // of them knows this kind of title.
-            (household + own.filter { it.serves("stream", type, videoId) }.filterNot { mine -> household.any { it.id == mine.id } }) to
-                (own.any { !it.official } || lent.isNotEmpty())
-        }) { result ->
+        val refresh = intent.getBooleanExtra("refreshSources", false)
+        intent.removeExtra("refreshSources")
+        lookup = SourceLookup.take(intent) ?: SourceLookup(this, key, type, videoId, refresh)
+        var providerUpdates: Cancellable? = null
+        providerUpdates = lookup.listen {
+            val result = lookup.providers ?: return@listen
+            providerUpdates?.cancel()
             val (addons, anyStreams) = result.getOrElse {
                 status.text = failureMessage(R.string.streams_load_failed, failureOf(it))
-                return@background tryAgain()
+                return@listen tryAgain()
             }
             if (addons.isEmpty()) {
                 status.text = getString(if (anyStreams) R.string.streams_none_for_kind else R.string.streams_no_addons)
@@ -180,7 +180,7 @@ class StreamsActivity : Screen() {
                 if (!anyStreams) rows.addView(pill(R.string.setup_check).apply {
                     setOnClickListener { startActivity(Intent(this@StreamsActivity, SetupCheckActivity::class.java)) }
                 }, wrap().apply { marginStart = dp(12); bottomMargin = dp(12) })
-                return@background
+                return@listen
             }
             val answers = arrayOfNulls<List<Stream>>(addons.size)
             // Why an add-on gave nothing to play, so an empty list can say so instead of blaming the TV.
@@ -238,8 +238,8 @@ class StreamsActivity : Screen() {
                     .filter { it.isVideo && it.playableOn(tv) }.map { it to addon.name } }
                 providers = available.toMap()
                 val ranked = rank(available.map { it.first }, videoId)
-                eligible = ranked.filter(::wanted)
-                ordered = eligible + ranked.filterNot(::wanted)
+                eligible = ranked.filter { wanted(it) && !lookup.wasTried(it) }
+                ordered = eligible + ranked.filter { it !in eligible && !lookup.wasTried(it) } + ranked.filter(lookup::wasTried)
                 showLanguages(ordered) { drawRows(focusList = false) }
                 drawRows(focusList = true)
             }
@@ -252,32 +252,38 @@ class StreamsActivity : Screen() {
                 if (best.isEmpty() && answers.any { it == null }) return
                 if (best.isEmpty()) return showList()
                 started = true
-                startActivity(Intent(this, PlayerActivity::class.java).putExtras(intent)
-                    .putExtra("sources", JSONArray(best.take(TRY).map { it.toJson() }).toString()))
+                startActivity(lookup.handoff(Intent(this, PlayerActivity::class.java).putExtras(intent)
+                    .putExtra("sources", JSONArray(best.take(StreamsResolver.TRY).map { it.toJson() }).toString())))
                 finish()
             }
 
-            addons.forEachIndexed { i, addon ->
-                background({ addon.streams(type, videoId, allowTorrents = supportsTorrentPlayback) }) { streams ->
-                    streams.exceptionOrNull()?.let { e ->
-                        failures[i] = e
-                        android.util.Log.w("Alder", "streams from ${addon.name} failed", e)
-                    }
+            sourceUpdates = lookup.listen updates@{
+                if (isFinishing) return@updates
+                lookup.answers.forEachIndexed { i, streams ->
+                    if (streams == null || answers[i] != null) return@forEachIndexed
+                    failures[i] = streams.exceptionOrNull()
                     torrents[i] = streams.getOrNull()?.torrents ?: 0
                     links[i] = streams.getOrNull()?.links ?: 0
                     answers[i] = streams.getOrNull()?.playable.orEmpty()
-                    if (answers.all { it != null }) {
-                        if (pick || listed) showList() else tryStart()
-                    } else if (!pick) {
-                        tryStart()
-                        if (!started && !waitingForEarlier && readyStreams(answers, true).any { it.isVideo && it.playableOn(tv) && wanted(it) }) {
-                            waitingForEarlier = true
-                            main.postDelayed({ tryStart(allowGaps = true) }, 800)
-                        }
+                }
+                if (answers.all { it != null }) {
+                    sourceUpdates?.cancel()
+                    if (pick || listed) showList() else tryStart()
+                } else if (!pick) {
+                    tryStart()
+                    if (!started && !waitingForEarlier && readyStreams(answers, true).any { it.isVideo && it.playableOn(tv) && wanted(it) }) {
+                        waitingForEarlier = true
+                        main.postDelayed({ if (!isFinishing && !isDestroyed) tryStart(allowGaps = true) }, 800)
                     }
                 }
             }
         }
+        sourceUpdates = providerUpdates
+    }
+
+    override fun onDestroy() {
+        sourceUpdates?.cancel()
+        super.onDestroy()
     }
 
     /**
@@ -358,11 +364,11 @@ class StreamsActivity : Screen() {
                 val chosen = JSONArray(listOf(s.toJson())).toString()
                 // Opened from the player (Change stream): it's still there, paused, and plays this from the same second.
                 if (intent.getBooleanExtra("fromPlayer", false)) {
-                    setResult(RESULT_OK, Intent().putExtra("sources", chosen))
+                    setResult(RESULT_OK, lookup.handoff(Intent().putExtra("sources", chosen)))
                     return@setOnClickListener finish()
                 }
-                startActivity(Intent(this@StreamsActivity, PlayerActivity::class.java).putExtras(intent)
-                    .putExtra("sources", chosen).putExtra("picked", true))
+                startActivity(lookup.handoff(Intent(this@StreamsActivity, PlayerActivity::class.java).putExtras(intent)
+                    .putExtra("sources", chosen).putExtra("picked", true)))
             }
         }
     }
@@ -435,7 +441,6 @@ class StreamsActivity : Screen() {
     }
 
     private companion object {
-        const val TRY = 3
         const val NAME_SIZE = 23f // sp, the title or episode name in the header
         const val QUALITY_W = 76 // dp, wide enough for "QUALITY" in spaced capitals
         const val ROW_H = 38 // dp a source row: eight fit above the help line, as on the mock

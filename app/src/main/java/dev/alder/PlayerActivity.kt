@@ -281,6 +281,7 @@ class PlayerActivity : Screen() {
 
     private var sources: List<Stream> = emptyList()
     private var resolvingStreams: Cancellable? = null
+    private var sourceLookup: SourceLookup? = null
     private lateinit var backdropArt: ImageView
     private lateinit var backdropShade: FrameLayout
     private var at = 0 // the source playing
@@ -362,6 +363,7 @@ class PlayerActivity : Screen() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val key = authKey ?: return finish()
+        sourceLookup = SourceLookup.take(intent)
         val sourcesJson = intent.getStringExtra("sources")
         if (!sourcesJson.isNullOrBlank()) {
             sources = JSONArray(sourcesJson).objects().map(Stream::read)
@@ -724,12 +726,12 @@ class PlayerActivity : Screen() {
             pauseFacts.visibility = View.VISIBLE
             bar.isIndeterminate = true
             showControls(null)
+            val lookup = SourceLookup(this, key, type, videoId).also { sourceLookup = it }
             resolvingStreams = StreamsResolver.resolve(
                 context = this,
-                type = type,
+                lookup = lookup,
                 videoId = videoId,
                 metaId = metaId,
-                authKey = key,
                 onReady = { best ->
                     resolvingStreams = null
                     if (isFinishing || isDestroyed) return@resolve
@@ -743,7 +745,7 @@ class PlayerActivity : Screen() {
                 onFallback = {
                     resolvingStreams = null
                     if (isFinishing || isDestroyed) return@resolve
-                    startActivity(Intent(this, StreamsActivity::class.java).putExtras(intent))
+                    startActivity(lookup.handoff(Intent(this, StreamsActivity::class.java).putExtras(intent)))
                     finish()
                 }
             )
@@ -1046,6 +1048,7 @@ class PlayerActivity : Screen() {
             finish()
             return
         }
+        sourceLookup?.markFailed(sources.take(at + 1))
         if (intent.getBooleanExtra("picked", false)) {
             if (started) record()
             startAt = position
@@ -1055,10 +1058,11 @@ class PlayerActivity : Screen() {
             showLoading(failureMessage(R.string.player_source_failed_choose, reason))
             return
         }
-        startActivity(Intent(this, StreamsActivity::class.java).putExtras(intent).putExtra("pick", true)
+        val fallback = Intent(this, StreamsActivity::class.java).putExtras(intent).putExtra("pick", true)
             .putExtra("message", failureMessage(R.string.player_source_failed_choose, reason))
             .putExtra("startOver", false)
-            .putExtra("resumeAt", position))
+            .putExtra("resumeAt", position)
+        startActivity(sourceLookup?.handoff(fallback) ?: fallback)
         finish()
     }
 
@@ -2154,11 +2158,13 @@ class PlayerActivity : Screen() {
     private fun changeStream() {
         playAfterSources = player.playWhenReady
         player.pause()
-        startActivityForResult(Intent(this, StreamsActivity::class.java).putExtras(intent).apply {
+        val picker = Intent(this, StreamsActivity::class.java).putExtras(intent).apply {
             removeExtra("picked"); removeExtra("maxHeight")
             putExtra("pick", true); putExtra("fromPlayer", true)
             if (!player.isCurrentMediaItemLive) putExtra("resumeAt", position())
-        }, SOURCES_REQUEST)
+        }
+        if (lastSourceFailure != null) sourceLookup?.handoff(picker)
+        startActivityForResult(picker, SOURCES_REQUEST)
     }
     private var playAfterSources = false
 
@@ -2170,6 +2176,7 @@ class PlayerActivity : Screen() {
             if (playAfterSources) player.play()
             return
         }
+        data?.let { SourceLookup.take(it) }?.let { sourceLookup = it }
         sources = JSONArray(picked).objects().map(Stream::read)
         at = 0
         intent.putExtra("picked", true) // as before: if it fails, say so and offer the list again

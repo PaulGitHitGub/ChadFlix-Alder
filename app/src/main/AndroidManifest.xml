@@ -52,6 +52,7 @@
         </activity>
         <activity android:name=".MainActivity" android:screenOrientation="landscape" />
         <activity android:name=".SetupCheckActivity" android:exported="false" android:screenOrientation="landscape" />
+        <activity android:name=".DiscoverActivity" android:exported="false" android:screenOrientation="landscape" />
         <activity android:name=".SearchActivity" android:screenOrientation="landscape" />
         <activity android:name=".SettingsActivity" android:screenOrientation="landscape" />
         <activity android:name=".AddonsActivity" android:screenOrientation="landscape" />

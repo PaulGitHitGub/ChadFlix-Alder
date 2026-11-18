@@ -19,4 +19,34 @@ class CatalogTypesTest {
         assertFalse(hasEpisodes("anime", emptyList()))
         assertFalse(hasEpisodes("anime", null))
     }
+
+    @Test fun includesSearchableCustomTypesAndKeepsSearchOnlyCatalogsOutOfBrowse() {
+        val addon = Addon(org.json.JSONObject("""
+            {
+              "transportUrl": "https://example.com/manifest.json",
+              "manifest": {
+                "id": "test",
+                "catalogs": [
+                  {"type": "anime", "id": "find", "extra": [{"name": "search", "isRequired": true}]},
+                  {"type": "anime", "id": "browse", "extra": [
+                    {"name": "genre", "options": ["Action", "Drama"]},
+                    {"name": "language", "options": ["Japanese", "English"], "default": "English", "isRequired": true},
+                    {"name": "skip"}
+                  ]}
+                ]
+              }
+            }
+        """.trimIndent()))
+        assertTrue(addon.canSearch)
+        val catalog = addon.catalogs.single()
+        assertEquals("browse", catalog.id)
+        assertEquals(mapOf("genre" to listOf("Action", "Drama"), "language" to listOf("Japanese", "English")), catalog.filters)
+        assertEquals(mapOf("language" to "English"), catalog.required)
+        assertTrue(catalog.pages)
+    }
+
+    @Test fun ranksTitlesInNonLatinScripts() {
+        assertEquals(listOf("كثيب", "كثيب الجزء الثاني", "عنوان آخر"),
+            rankSearchTitles(listOf("عنوان آخر", "كثيب الجزء الثاني", "كثيب"), "كثيب") { it })
+    }
 }

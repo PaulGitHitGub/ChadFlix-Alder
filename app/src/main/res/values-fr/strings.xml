@@ -381,7 +381,7 @@
 
     <!-- Search -->
     <string name="search_clear">Effacer la recherche</string>
-    <string name="search_voice_unavailable">Recherche vocale indisponible</string>
+    <string name="search_system_keyboard">Clavier du téléviseur</string>
     <string name="search_space">Espace</string>
     <string name="search_recent">Récentes</string>
     <string name="search_recent_hint">%1$s. Maintenez OK pour la retirer des recherches récentes</string>
@@ -575,4 +575,16 @@
     <string name="setup_ready">PrÃªt Ã  lire</string>
     <string name="setup_ready_desc">%1$s a trouvÃ© une vidÃ©o pour un film test. Les titres que vous choisissez peuvent Ãªtre lus sur ce tÃ©lÃ©viseur.</string>
     <string name="setup_done">TerminÃ©</string>
+    <string name="nav_discover">Découvrir</string>
+    <string name="discover_catalog">Choisir un catalogue</string>
+    <string name="discover_filters">Filtres</string>
+    <string name="discover_filter_count">Filtres · %1$d</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_pin">Épingler à l’accueil</string>
+    <string name="discover_unpin">Retirer de l’accueil</string>
+    <string name="discover_load_more">Charger plus</string>
+    <string name="discover_no_catalogs">Aucun catalogue à parcourir. Ajoutez un catalogue dans Stremio.</string>
+    <string name="discover_no_titles">Aucun titre dans ce catalogue.</string>
+    <string name="card_hold_options">Maintenez OK pour afficher les options</string>
+    <string name="setup_no_probe">Ces extensions ne prennent pas en charge les titres de test. Choisissez un titre pour tester la lecture.</string>
 </resources>
