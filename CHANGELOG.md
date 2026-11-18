@@ -38,6 +38,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Genre and year in My List.** Select **Genre** or **Year** in **My List** to show only those titles. The first time, Alder gets the details of each title, so the lists can take some seconds to fill.
+- **Lists that open.** On **Discover** and **My List**, the **Genre**, **Year**, **On** and **Sort** buttons show an arrow. A long list stays clear of the screen edges, and the next item always shows when you move down. The item in use shows in the accent colour with a tick. The page name and the title count do not show next to the buttons now. The posters start at the same distance below the buttons on both pages.
 - **Choose your tabs.** Select **Settings → Profile → Tabs**. Select a tab to show it, hide it or move it left or right. This includes the tabs of add-ons, for example **Trakt**. A hidden tab keeps its add-on installed. **Home** is always the first tab. Each profile has its own tabs. **Tabs** replaces the **Movies tab**, **Shows tab** and **Live tab** settings and keeps your choices.
 - **Faster Home.** Alder shows saved rows while it gets new data. When add-ons change, focus returns to the same title if it is still available.
 - **My List.** Two full rows of posters show at once. Move down to see more titles. The title shows while Alder gets the poster.
@@ -62,6 +64,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, press Down from the top bar to go to **Try again**.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
 - **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.

@@ -12,8 +12,9 @@ class DiscoverTest {
         discoverUrl(q, 2, "CA", "en-CA", "2026-11-18", "k").substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
 
     @Test fun popularMoviesAreTheStart() {
-        val p = params(DiscoverQuery())
-        assertTrue(discoverUrl(DiscoverQuery(), 1, "CA", "en", "2026-11-18", "k").contains("/discover/movie?"))
+        assertEquals("movie", DiscoverQuery().type)
+        val p = params(DiscoverQuery(type = "movie"))
+        assertTrue(discoverUrl(DiscoverQuery(type = "movie"), 1, "CA", "en", "2026-11-18", "k").contains("/discover/movie?"))
         assertEquals("popularity.desc", p["sort_by"])
         assertEquals("false", p["include_adult"])
         assertEquals("2", p["page"])
@@ -36,9 +37,9 @@ class DiscoverTest {
         assertEquals("CA", p["watch_region"])
         assertEquals("first_air_date.desc", p["sort_by"])
         // Newest in this decade: nothing later than today, which is already past the decade's end.
-        assertEquals("2026-11-18", params(DiscoverQuery(sort = "new"))["primary_release_date.lte"])
-        assertEquals("1979-12-31", params(DiscoverQuery(decade = 0))["primary_release_date.lte"])
-        assertEquals("300", params(DiscoverQuery(sort = "top"))["vote_count.gte"])
+        assertEquals("2026-11-18", params(DiscoverQuery(type = "movie", sort = "new"))["primary_release_date.lte"])
+        assertEquals("1979-12-31", params(DiscoverQuery(type = "movie", decade = 0))["primary_release_date.lte"])
+        assertEquals("300", params(DiscoverQuery(type = "movie", sort = "top"))["vote_count.gte"])
     }
 
     @Test fun aResultBecomesATitleUnderItsImdbId() {
@@ -52,5 +53,14 @@ class DiscoverTest {
         assertEquals("https://image.tmdb.org/t/p/w1280/b.jpg", m.background)
         assertEquals("1999", m.year)
         assertEquals(listOf("Action", "Science Fiction"), m.genres)
+    }
+
+    @Test fun myListYearsGoInTheirDecade() {
+        assertTrue(inDecade("2019", 2010))
+        assertTrue(inDecade("2019–2023", 2010))
+        assertFalse(inDecade("2020", 2010))
+        assertTrue(inDecade("1975", 0))
+        assertFalse(inDecade("1980", 0))
+        assertFalse(inDecade(null, 2010))
     }
 }

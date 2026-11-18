@@ -85,11 +85,6 @@
     <string name="list_sort_recent">Adicionados recentemente</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Não assistidos primeiro</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d título</item>
-        <item quantity="many">%1$d títulos</item>
-        <item quantity="other">%1$d títulos</item>
-    </plurals>
     <string name="list_empty">Os títulos que você salvar com + aparecem aqui</string>
     <string name="list_empty_movies">Nenhum filme na Minha lista</string>
     <string name="list_empty_shows">Nenhuma série na Minha lista</string>

@@ -95,14 +95,6 @@
     <string name="list_sort_recent">المضافة مؤخرًا</string>
     <string name="list_sort_name">أبجديًا</string>
     <string name="list_sort_unwatched">غير المشاهَد أولًا</string>
-    <plurals name="list_title_count">
-        <item quantity="zero">لا عناوين</item>
-        <item quantity="one">عنوان واحد</item>
-        <item quantity="two">عنوانان</item>
-        <item quantity="few">%1$d عناوين</item>
-        <item quantity="many">%1$d عنوانًا</item>
-        <item quantity="other">%1$d عنوان</item>
-    </plurals>
     <string name="list_empty">تظهر هنا العناوين التي تحفظها بزر +</string>
     <string name="list_empty_movies">لا توجد أفلام في قائمتي</string>
     <string name="list_empty_shows">لا توجد مسلسلات في قائمتي</string>

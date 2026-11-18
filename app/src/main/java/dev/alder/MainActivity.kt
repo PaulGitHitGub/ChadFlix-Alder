@@ -247,6 +247,7 @@ class MainActivity : Screen() {
     private var discover = DiscoverQuery()
     private var discoverLoaded = false // the profile's saved choice has been read
     private val discoverChips = mutableListOf<TextView>()
+    private var pageWarning: View? = null
     private var mode = Mode.BROWSE
     private var library: List<JSONObject> = emptyList()
     // ponytail: row answers this session, including their catalogs; unbounded, but a few hundred titles per page.
@@ -255,9 +256,10 @@ class MainActivity : Screen() {
     private var jumpTo: String? = null // a chip's row that wasn't made yet when OK was pressed
     private var listFilter = ListFilter.ALL
     private var listSort = ListSort.RECENT
+    private var listGenre: String? = null // My List's Genre and Year chips; null is All
+    private var listDecade: Int? = null
     private var librarySlot: FrameLayout? = null
     private var listBuild = 0
-    private lateinit var listCount: TextView
     private lateinit var listShade: View
     private var listPosterWidth = 0
     private var search: ImageView? = null
@@ -493,7 +495,6 @@ class MainActivity : Screen() {
             addView(nextRowHint, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(PAD); bottomMargin = dp(CAPTION_BOTTOM + 5)
             })
-            listCount = text("", SMALL, color = TEXT)
             // Sits on the row band, so a larger font size grows it upwards into the art, never down into the rows.
             addView(browseInfo(), FrameLayout.LayoutParams(dp(HERO_W + 2 * FOCUS_ROOM), -2, Gravity.BOTTOM).apply {
                 heroBottom = screenH - rowTop + dp(HERO_GAP)
@@ -728,7 +729,7 @@ class MainActivity : Screen() {
         if (event.action == KeyEvent.ACTION_DOWN && (page.isCatalog || page.isGrid) && mode == Mode.BROWSE) {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && header.hasFocus()) {
                 pageChip()?.requestFocus()?.let { if (it) return true }
-                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
+                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && (warning()?.requestFocus() ?: firstRow()?.focusFirst()) == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && genreStrip.hasFocus()) {
                 (last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull())
@@ -738,7 +739,7 @@ class MainActivity : Screen() {
                     firstRow()?.view?.let { isInside(focused, it) }
                 } == true) {
                 pageChip()?.requestFocus()?.let { if (it) return true }
-                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && navItems[page]?.requestFocus() == true) return true
+                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && (warning() ?: navItems[page])?.requestFocus() == true) return true
             }
         }
         if (event.action == KeyEvent.ACTION_DOWN && scroller.hasFocus() && mode == Mode.BROWSE &&
@@ -778,7 +779,6 @@ class MainActivity : Screen() {
         cardCaption.animate().alpha(alpha).setDuration(IDLE_MS).start()
         nextRowHint.animate().alpha(alpha).setDuration(IDLE_MS).start()
         genreStrip.animate().alpha(alpha).setDuration(IDLE_MS).start()
-        listCount.animate().alpha(alpha).setDuration(IDLE_MS).start()
     }
 
     private fun switchProfile() {
@@ -884,7 +884,7 @@ class MainActivity : Screen() {
             main.removeCallbacks(switchPage)
             when {
                 p != page -> { jump = true; showPage(p) }
-                p.isCatalog -> (genreChips[genre] ?: firstRow()?.cards?.firstOrNull())?.requestFocus()
+                p.isCatalog -> (genreChips[genre] ?: warning() ?: firstRow()?.cards?.firstOrNull())?.requestFocus()
                 p.isGrid -> pageChip()?.requestFocus()
                 else -> firstRow()?.focusFirst()
             }
@@ -1067,7 +1067,6 @@ class MainActivity : Screen() {
         cardCaption.alpha = if (cinemaOn || page.isGrid) 0f else 1f
         nextRowHint.alpha = if (cinemaOn || page.isGrid) 0f else 1f
         genreStrip.alpha = if (cinemaOn) 0f else 1f
-        listCount.alpha = if (cinemaOn) 0f else 1f
         if (cinemaOn) {
             moreHint.exit(ENTER_MS).alpha(0f).start()
         }
@@ -1588,6 +1587,7 @@ class MainActivity : Screen() {
                     if (restoreFocus) card.getChildAt(2).requestFocus()
                 }
             }
+            pageWarning = catalogWarning?.let { (it as android.view.ViewGroup).getChildAt(2) }
         }
         fun build(addons: List<Addon>) {
             if (g != generation) return
@@ -1894,12 +1894,9 @@ class MainActivity : Screen() {
         genreChips.clear()
         listFilterChips.clear()
         lastListChip = null
-        listCount.text = ""
         val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(PAD), dp(2), dp(PAD), dp(2)) }
-        line.addView(text(R.string.tab_my_list, BODY, bold = true),
-            LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(12) })
-        fun add(label: String, selected: Boolean, margin: Int = 6, click: () -> Unit): TextView {
-            val control = chip(label, selected).apply {
+        fun add(label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit): TextView {
+            val control = (if (list) dropdown(label) else chip(label, selected)).apply {
                 setOnFocusChangeListener { v, has ->
                     v.background = listChipBackground(has)
                     if (has) lastListChip = this
@@ -1907,7 +1904,7 @@ class MainActivity : Screen() {
                 background = listChipBackground(false)
                 setOnClickListener { click() }
             }
-            line.addView(control, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { marginStart = dp(margin) })
+            line.addView(control, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
             return control
         }
         listOf(ListFilter.ALL to getString(R.string.filter_all), ListFilter.MOVIES to getString(R.string.tab_movies),
@@ -1916,7 +1913,30 @@ class MainActivity : Screen() {
                 if (listFilter != value) { listFilter = value; styleListChips(); redrawLibrary() }
             }
         }
-        listSortChip = add(listSortLabel(), false, margin = 24) {
+        // Genre and Year come from each title's details (on disk after the first visit), read in the background.
+        fun pick(name: Int, value: Any?, options: () -> List<Pair<String, Any?>>, margin: Int, set: (Any?) -> Unit) {
+            val current = options().firstOrNull { it.second == value }?.first
+            add(if (value == null || current == null) getString(name) else "${getString(name)}: $current", false, margin, list = true) {
+                val shown = options()
+                choose(getString(name), shown.map { it.first }, checked = shown.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
+                    if (shown[i].second != value) {
+                        set(shown[i].second)
+                        val at = line.indexOfChild(lastListChip)
+                        showListChips()
+                        ((genreStrip.getChildAt(0) as? LinearLayout)?.getChildAt(at))?.requestFocus()
+                        redrawLibrary()
+                    }
+                }
+            }
+        }
+        val all = getString(R.string.filter_all)
+        pick(R.string.discover_genre, listGenre, {
+            listOf(all to null) + listTitles().flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
+                .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.key }
+        }, margin = 24) { listGenre = it as String? }
+        pick(R.string.discover_year, listDecade, ::decadeOptions, margin = 6) { listDecade = it as Int? }
+        fillListDetails()
+        listSortChip = add(listSortLabel(), false, margin = 6, list = true) {
             val options = ListSort.entries
             choose(getString(R.string.list_sort), options.map { getString(it.label) }, checked = listSort.ordinal) { index ->
                 val value = options[index]
@@ -1926,12 +1946,35 @@ class MainActivity : Screen() {
                     redrawLibrary()
                 }
             }
-        }.apply { setTextColor(TEXT) }
-        (listCount.parent as? android.view.ViewGroup)?.removeView(listCount)
-        line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        line.addView(listCount, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(22) })
+        }
         genreStrip.addView(line)
     }
+
+    /** Discover's and My List's Year choices: All, the 2020s back to the 1980s, then before 1980 (0). */
+    private fun decadeOptions(): List<Pair<String, Any?>> = listOf(getString(R.string.filter_all) to null) +
+        listOf(2020, 2010, 2000, 1990, 1980).map { "${it}s" to it } + (getString(R.string.discover_before_1980) to 0)
+
+    private fun listTitles() = library.filter { !it.optBoolean("removed") && !isLiveType(it.optString("type")) }
+
+    /**
+     * My List's titles' details for Genre and Year: from disk when Alder has seen the title, else from the add-ons.
+     * ponytail: one title at a time on one thread; the first visit to a long list takes a while, later ones read disk.
+     */
+    private fun fillListDetails() {
+        val missing = listTitles().filter { it.optString("_id") !in metas }
+        if (missing.isEmpty()) return
+        val key = profile.authKey
+        background({
+            val addons = Stremio.addons(key)
+            missing.mapNotNull { t ->
+                val id = t.optString("_id"); val type = t.optString("type")
+                runCatching { addons.savedMeta(type, id) ?: addons.meta(type, id) }.getOrNull()?.let { id to it }
+            }
+        }, metaPool) { r -> r.getOrNull()?.forEach { (id, m) -> metas.putIfAbsent(id, m) } }
+    }
+
+    /** The open page's "Some catalogs couldn't load" Try again, while it shows: Down from the top bar goes there first. */
+    private fun warning() = pageWarning?.takeIf { it.isAttachedToWindow && it.isShown }
 
     /** Where Up from a page's first row, Down from the top bar and Back from the rows go: the page's chips. */
     private fun pageChip(): View? = when (page) {
@@ -1957,7 +2000,7 @@ class MainActivity : Screen() {
             discoverLoaded = true
             getSharedPreferences("home", MODE_PRIVATE).getString(discoverKey(), null)?.let { saved ->
                 runCatching { JSONObject(saved) }.getOrNull()?.let { j ->
-                    discover = DiscoverQuery(j.optString("type", "movie"), j.optInt("genre").takeIf { it > 0 },
+                    discover = DiscoverQuery(j.optString("type").takeIf { it in setOf("movie", "series", "anime") } ?: "movie", j.optInt("genre").takeIf { it > 0 },
                         j.optInt("decade", -1).takeIf { it >= 0 }, j.optInt("service").takeIf { it > 0 }, j.optString("sort", "popular"))
                 }
             }
@@ -1990,27 +2033,26 @@ class MainActivity : Screen() {
         genreStrip.removeAllViews()
         genreChips.clear()
         discoverChips.clear()
-        listCount.text = ""
         val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(PAD), dp(2), dp(PAD), dp(2)) }
-        line.addView(text(R.string.tab_discover, BODY, bold = true), LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(12) })
-        fun add(label: String, selected: Boolean, margin: Int = 6, click: () -> Unit) = chip(label, selected).apply {
+        fun add(label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit) =
+            (if (list) dropdown(label) else chip(label, selected)).apply {
             setOnFocusChangeListener { v, has ->
                 v.background = listChipBackground(has)
                 if (has) lastListChip = this
             }
             background = listChipBackground(false)
             setOnClickListener { click() }
-            line.addView(this, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { marginStart = dp(margin) })
+            line.addView(this, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
             discoverChips += this
         }
-        // A list chip: its name and the value in use ("Genre: Drama ⌄"), or the name alone while it's All.
+        // A list chip: its name and the value in use ("Genre: Drama"), or the name alone while it's All.
         fun pick(name: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
             val current = options.firstOrNull { it.second == value }?.first
-            add(if (value == null || current == null) "${getString(name)} ⌄" else "${getString(name)}: $current ⌄", false, margin) {
+            add(if (value == null || current == null) getString(name) else "${getString(name)}: $current", false, margin, list = true) {
                 choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
                     chooseDiscover(g, set(options[i].second))
                 }
-            }.apply { setTextColor(TEXT) }
+            }
         }
         listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows, "anime" to R.string.tab_anime).forEach { (type, words) ->
             add(getString(words), type == q.type) {
@@ -2020,21 +2062,17 @@ class MainActivity : Screen() {
         val all = getString(R.string.filter_all)
         val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
         pick(R.string.discover_genre, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
-        val decades = listOf(all to null) + listOf(2020, 2010, 2000, 1990, 1980).map { "${it}s" to it } + (getString(R.string.discover_before_1980) to 0)
-        pick(R.string.discover_year, decades, q.decade) { q.copy(decade = it as Int?) }
+        pick(R.string.discover_year, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
         if (services.isNotEmpty()) pick(R.string.discover_on, listOf(all to null) + services.map { it.second to it.first }, q.service) {
             q.copy(service = it as Int?)
         }
         val sorts = listOf(getString(R.string.discover_sort_popular) to "popular", getString(R.string.discover_sort_top) to "top",
             getString(R.string.discover_sort_new) to "new")
-        add("${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first} ⌄", false) {
+        add("${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
             choose(getString(R.string.list_sort), sorts.map { it.first }, checked = sorts.indexOfFirst { it.second == q.sort }) { i ->
                 chooseDiscover(g, q.copy(sort = sorts[i].second))
             }
-        }.apply { setTextColor(TEXT) }
-        (listCount.parent as? android.view.ViewGroup)?.removeView(listCount)
-        line.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        line.addView(listCount, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(22) })
+        }
         discoverChips.firstOrNull()?.let { it.id = View.generateViewId(); it.nextFocusLeftId = it.id } // Left stops at the first chip
         genreStrip.addView(line)
         genreStrip.visibility = View.VISIBLE
@@ -2056,7 +2094,7 @@ class MainActivity : Screen() {
         val build = ++listBuild
         val query = discover
         val names = genres.toMap()
-        val column = column(Gravity.START)
+        val column = column(Gravity.START).apply { setPadding(0, dp(LIST_TOP_GAP), 0, 0) }
         content.addView(column)
         val known = mutableSetOf<String>()
         val waiting = mutableListOf<Item>() // a short last row, held for the next page
@@ -2075,8 +2113,6 @@ class MainActivity : Screen() {
                 r.fold({ answer ->
                     next = at + 1
                     done = answer.last
-                    // A count in the tens of thousands says nothing; a narrow choice's count does.
-                    if (at == 1 && answer.total < 10_000) listCount.text = resources.getQuantityString(R.plurals.list_title_count, answer.total, answer.total)
                     val fresh = answer.titles.filter { known.add(it.id) }.map(::metaItem)
                     val chunks = (waiting + fresh).chunked(LIST_COLUMNS).toMutableList()
                     waiting.clear()
@@ -2105,19 +2141,13 @@ class MainActivity : Screen() {
         more()
     }
 
-    private fun listChipBackground(focused: Boolean) = GradientDrawable().apply {
-        cornerRadius = dp(CHIP_H / 2).toFloat()
-        setColor(if (focused) 0xFF4C4136.toInt() else 0xE6191512.toInt())
-        setStroke(dp(1), if (focused) TUNGSTEN else GLASS_EDGE)
-    }
-
     private fun styleListChips() {
         listFilterChips.forEach { (value, view) -> view.select(getString(when (value) {
             ListFilter.ALL -> R.string.filter_all; ListFilter.MOVIES -> R.string.tab_movies; ListFilter.SHOWS -> R.string.tab_shows
         }), value == listFilter) }
     }
 
-    private fun listSortLabel() = "${getString(R.string.list_sort)}: ${getString(listSort.label)} ⌄"
+    private fun listSortLabel() = "${getString(R.string.list_sort)}: ${getString(listSort.label)}"
 
     /** All, then one chip per genre row on the page; a chip jumps to its row, and the dot follows the row in use. */
     private fun showGenreChips(names: List<String>) {
@@ -2215,8 +2245,10 @@ class MainActivity : Screen() {
     }
 
     private fun showLibrary(slot: FrameLayout, focusTag: Any? = null, removedIndex: Int? = null) {
-        val all = library.filter { !it.optBoolean("removed") && !isLiveType(it.optString("type")) }
+        val all = listTitles()
             .filter { listFilter == ListFilter.ALL || (it.optString("type") == "movie") == (listFilter == ListFilter.MOVIES) }
+            .filter { t -> listGenre == null || metas[t.optString("_id")]?.genres?.contains(listGenre) == true }
+            .filter { t -> listDecade == null || inDecade(metas[t.optString("_id")]?.year, listDecade!!) }
         val ordered = when (listSort) {
             ListSort.RECENT -> all.sortedByDescending { it.optString("_ctime") }
             ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
@@ -2224,12 +2256,12 @@ class MainActivity : Screen() {
         }
         val items = ordered.map(::libraryItem)
         val build = ++listBuild
-        listCount.text = resources.getQuantityString(R.plurals.list_title_count, items.size, items.size)
         if (items.isEmpty()) {
             cancelBrowseHero()
             heroItem = null
             resetArt()
             val message = when {
+                listGenre != null || listDecade != null -> R.string.discover_empty
                 all.isEmpty() && listFilter == ListFilter.ALL -> R.string.list_empty
                 listFilter == ListFilter.MOVIES -> R.string.list_empty_movies
                 listFilter == ListFilter.SHOWS -> R.string.list_empty_shows
@@ -2239,7 +2271,7 @@ class MainActivity : Screen() {
             if (focusTag != null || removedIndex != null) listFilterChips[listFilter]?.requestFocus()
             return
         }
-        val column = column(Gravity.START)
+        val column = column(Gravity.START).apply { setPadding(0, dp(LIST_TOP_GAP), 0, 0) }
         slot.addView(column)
         val restore = items.indexOfFirst { "card:${it.id}" == focusTag }.takeIf { it >= 0 }
             ?: removedIndex?.coerceIn(items.indices) ?: 0.takeIf { focusTag != null }
@@ -2510,7 +2542,7 @@ class MainActivity : Screen() {
 
         init { if (grid) cards.forEach { it.dim(true) } }
 
-        fun peek(show: Boolean) { heading.visibility = if (show) View.VISIBLE else View.INVISIBLE }
+        fun peek(show: Boolean) { if (!grid) heading.visibility = if (show) View.VISIBLE else View.INVISIBLE } // a grid row has no name
 
 
         /** In or out of this row: its title brightens or quiets, its cards come forward or settle back. */
@@ -3028,6 +3060,7 @@ class MainActivity : Screen() {
         const val LIST_GAP = 12
         const val LIST_COLUMNS = 6
         const val LIST_TOP_ROOM = 8 // dp above a grid row for the focused poster's growth (4% of 180 dp) and rim
+        const val LIST_TOP_GAP = 18 // dp between the chips and a grid's first row, on Discover and My List alike
         const val LIST_TOP = HEADER_H + 38
         const val INFO_W = 360 // the cinema's line
         const val NAV_R = 18 // dp: the top bar's pills
@@ -3110,3 +3143,9 @@ internal fun saveTabOrder(saved: List<String>, reordered: List<String>): List<St
  */
 internal fun extraPageTypes(types: List<String>): List<String> =
     types.map { it.trim().lowercase() }.filter { it.isNotEmpty() && it != "movie" && it != "series" && !isLiveType(it) }.distinct()
+
+/** A title's [year] ("1999", "2019–2023") in [decade]: 2010 is 2010–2019, 0 is before 1980. No year is in none. */
+internal fun inDecade(year: String?, decade: Int): Boolean {
+    val y = year?.take(4)?.toIntOrNull() ?: return false
+    return if (decade == 0) y < 1980 else y in decade..decade + 9
+}

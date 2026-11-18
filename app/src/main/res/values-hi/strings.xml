@@ -82,10 +82,6 @@
     <string name="list_sort_recent">हाल में जोड़े गए</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">पहले बिना देखे</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d टाइटल</item>
-        <item quantity="other">%1$d टाइटल</item>
-    </plurals>
     <string name="list_empty">+ से सहेजे गए टाइटल यहाँ दिखते हैं</string>
     <string name="list_empty_movies">मेरी सूची में कोई फ़िल्म नहीं</string>
     <string name="list_empty_shows">मेरी सूची में कोई शो नहीं</string>
