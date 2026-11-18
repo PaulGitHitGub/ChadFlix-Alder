@@ -437,6 +437,23 @@ abstract class Screen : Activity() {
         setOnFocusChangeListener { v, has -> v.background = glass(CHIP_H / 2, has); v.grow(has, CHIP_GROW).start() }
     }
 
+    /** A chip that opens a list ([choose]): full-strength words, a chevron centred after them, solid glass. */
+    protected fun dropdown(label: String) = chip(label).apply {
+        setTextColor(TEXT)
+        setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_chevron_down)?.mutate()?.apply {
+            setTint(TEXT_2); setBounds(0, 0, dp(14), dp(14))
+        }, null)
+        compoundDrawablePadding = dp(4)
+        setPadding(dp(16), 0, dp(12), 0)
+    }
+
+    /** A filter chip's face on a page of posters: solid enough to read over any art, tungsten rim on focus. */
+    protected fun listChipBackground(focused: Boolean) = GradientDrawable().apply {
+        cornerRadius = dp(CHIP_H / 2).toFloat()
+        setColor(if (focused) CHIP_FOCUSED else CHIP_REST)
+        setStroke(dp(1), if (focused) TUNGSTEN else GLASS_EDGE)
+    }
+
     /** A [chip]'s open state: the tungsten dot and full-strength words. */
     protected fun TextView.select(label: String, selected: Boolean) {
         setTextColor(if (selected) TEXT else TEXT_2)
@@ -786,7 +803,7 @@ abstract class Screen : Activity() {
     protected fun choose(title: String, items: List<String>, message: String? = null, checked: Int = -1,
                          focus: Int = maxOf(checked, 0), pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
-        val list = column(Gravity.START).apply { setPadding(dp(12), dp(16), dp(12), dp(12)) }
+        val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
         val words = column(Gravity.START, text(title, BODY, bold = true)).apply { setPadding(dp(16), 0, dp(16), dp(10)) }
         message?.let { words.addView(text(it, SMALL, color = TEXT_2).marginTop(6)) }
         list.addView(words, LinearLayout.LayoutParams(-1, -2))
@@ -794,20 +811,33 @@ abstract class Screen : Activity() {
             text(label, BODY).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(16), dp(10), dp(16), dp(10))
-                if (i == checked) setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_check)?.mutate()?.apply { setBounds(0, 0, dp(16), dp(16)) }, null)
+                if (i == checked) {
+                    setTextColor(TUNGSTEN)
+                    setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_check)?.mutate()?.apply {
+                        setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))
+                    }, null)
+                }
                 rowFocus()
                 setOnClickListener { dialog.dismiss(); pick(i) }
                 list.addView(this, LinearLayout.LayoutParams(-1, -2))
             }
         }
-        dialog.setContentView(android.widget.ScrollView(this).apply {
+        // A long list (services, genres) stops short of the screen's edges and scrolls; the fading edge is also the
+        // space ScrollView keeps past the focused row, so the next row always shows.
+        val maxHeight = (resources.displayMetrics.heightPixels * 0.72f).toInt()
+        dialog.setContentView(object : android.widget.ScrollView(this) {
+            override fun onMeasure(w: Int, h: Int) =
+                super.onMeasure(w, MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST))
+        }.apply {
             isVerticalScrollBarEnabled = false
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(44))
             background = glassOver(this, 16, shade = FROST_READING)
             addView(list)
         })
         dialog.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
-            setLayout(dp(340), -2)
+            setLayout(dp(if (items.size > 8) 300 else 340), -2) // a long list of names needs less width
             setDimAmount(0.6f)
         }
         dialog.show()
@@ -1127,6 +1157,8 @@ abstract class Screen : Activity() {
         const val VIDEO_GLASS_BASE = 0xD90E0C0A.toInt()
         const val VIDEO_CONTROL_BASE = 0xA60E0C0A.toInt()
         const val ROW_FOCUSED = 0x29F3EEE6
+        const val CHIP_REST = 0xE6191512.toInt() // list chips over posters: near-solid smoked glass
+        const val CHIP_FOCUSED = 0xFF4C4136.toInt()
         const val PROGRESS_TRACK = 0x4DFFFFFF // light enough that a short fill still reads as a bar, not a dash
         internal val pool = Executors.newFixedThreadPool(6)
     }

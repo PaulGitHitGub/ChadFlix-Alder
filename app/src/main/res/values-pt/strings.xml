@@ -39,6 +39,16 @@
 
     <!-- Home -->
     <string name="tab_home">Início</string>
+    <string name="tab_discover">Descobrir</string>
+    <string name="discover_genre">Gênero</string>
+    <string name="discover_year">Ano</string>
+    <string name="discover_before_1980">Antes de 1980</string>
+    <string name="discover_on">Em</string>
+    <string name="discover_sort_popular">Populares</string>
+    <string name="discover_sort_top">Mais bem avaliados</string>
+    <string name="discover_sort_new">Mais recentes</string>
+    <string name="discover_empty">Nada corresponde a estas escolhas. Tente menos filtros.</string>
+    <string name="tmdb_notice">Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.</string>
     <string name="tab_shows">Séries</string>
     <string name="tab_movies">Filmes</string>
     <string name="tab_live">Ao vivo</string>
@@ -75,11 +85,6 @@
     <string name="list_sort_recent">Adicionados recentemente</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Não assistidos primeiro</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d título</item>
-        <item quantity="many">%1$d títulos</item>
-        <item quantity="other">%1$d títulos</item>
-    </plurals>
     <string name="list_empty">Os títulos que você salvar com + aparecem aqui</string>
     <string name="list_empty_movies">Nenhum filme na Minha lista</string>
     <string name="list_empty_shows">Nenhuma série na Minha lista</string>
@@ -545,8 +550,6 @@
     <string name="profiles_all_set">Tudo pronto</string>
     <string name="profiles_ready">O perfil de %1$s está pronto. Você pode adicionar mais complementos depois em Configurações.</string>
     <string name="time_left_under_minute">Falta menos de 1 min</string>
-    <string name="catalog_jump_to">Ir para</string>
-    <string name="catalog_jump_top">Topo</string>
     <string name="display_resolution">Resolução da tela</string>
     <string name="display_resolution_hint">Escolha a resolução da TV que o Alder usa para selecionar uma fonte. Escolha 4K se seu aparelho indicar 1080p, mas emitir em 4K.</string>
     <string name="error_sign_in">entre novamente no Stremio</string>
@@ -556,6 +559,9 @@
     <string name="error_network">erro de rede</string>
     <string name="library_edit_failed">Não foi possível salvar o estado de exibição</string>
     <string name="search_incomplete">Os resultados da busca estão incompletos</string>
+    <string name="catalog_addon_failed">Não foi possível carregar %1$s</string>
+    <string name="catalog_addon_fix">Se continuar, atualize ou remova %1$s no Stremio.</string>
+    <string name="failure_web_page">envia uma página web, não títulos</string>
     <string name="catalog_incomplete">Não foi possível carregar alguns catálogos</string>
     <string name="progress_saved_on_tv">O progresso foi salvo nesta TV. O Alder tentará sincronizá-lo de novo.</string>
     <string name="library_load_failed">Não foi possível carregar sua biblioteca do Stremio</string>

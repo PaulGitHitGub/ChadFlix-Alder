@@ -45,6 +45,16 @@
 
     <!-- Home -->
     <string name="tab_home">الرئيسية</string>
+    <string name="tab_discover">اكتشف</string>
+    <string name="discover_genre">النوع</string>
+    <string name="discover_year">السنة</string>
+    <string name="discover_before_1980">قبل 1980</string>
+    <string name="discover_on">على</string>
+    <string name="discover_sort_popular">الأكثر شعبية</string>
+    <string name="discover_sort_top">الأعلى تقييمًا</string>
+    <string name="discover_sort_new">الأحدث</string>
+    <string name="discover_empty">لا شيء يطابق هذه الاختيارات. جرّب اختيارات أقل.</string>
+    <string name="tmdb_notice">يستخدم هذا المنتج واجهة TMDB البرمجية، لكنه غير معتمد أو مصدّق من TMDB.</string>
     <string name="tab_shows">المسلسلات</string>
     <string name="tab_movies">الأفلام</string>
     <string name="tab_live">البث المباشر</string>
@@ -85,14 +95,6 @@
     <string name="list_sort_recent">المضافة مؤخرًا</string>
     <string name="list_sort_name">أبجديًا</string>
     <string name="list_sort_unwatched">غير المشاهَد أولًا</string>
-    <plurals name="list_title_count">
-        <item quantity="zero">لا عناوين</item>
-        <item quantity="one">عنوان واحد</item>
-        <item quantity="two">عنوانان</item>
-        <item quantity="few">%1$d عناوين</item>
-        <item quantity="many">%1$d عنوانًا</item>
-        <item quantity="other">%1$d عنوان</item>
-    </plurals>
     <string name="list_empty">تظهر هنا العناوين التي تحفظها بزر +</string>
     <string name="list_empty_movies">لا توجد أفلام في قائمتي</string>
     <string name="list_empty_shows">لا توجد مسلسلات في قائمتي</string>
@@ -566,8 +568,6 @@
     <string name="profiles_watchly_steps">"1.  امسح الرمز بهاتف %1$s لفتح Watchly\n2.  اربط حساب Stremio الخاص بـ %1$s هناك\n3.  ثبّت الإضافة في حساب Stremio الخاص بـ %1$s\n\nتظهر بعدها أفضل الاختيارات الخاصة بـ %1$s في الرئيسية. يمكنك إكمال هذه الخطوات لاحقًا."</string>
     <string name="profiles_all_set">أصبح كل شيء جاهزًا</string>
     <string name="profiles_ready">الملف الشخصي لـ %1$s جاهز. يمكنك إضافة المزيد من الإضافات لاحقًا في الإعدادات.</string>
-    <string name="catalog_jump_to">انتقال إلى</string>
-    <string name="catalog_jump_top">الأعلى</string>
     <string name="display_resolution">دقة العرض</string>
     <string name="display_resolution_hint">اختر دقة التلفزيون التي يعتمد عليها Alder لاختيار المصدر. اختر 4K إذا أبلغ جهاز البث عن 1080p بينما يعرض بدقة 4K.</string>
     <string name="error_sign_in">سجّل الدخول إلى Stremio مجددًا</string>
@@ -577,6 +577,9 @@
     <string name="error_network">خطأ في الشبكة</string>
     <string name="library_edit_failed">تعذّر حفظ حالة المشاهدة</string>
     <string name="search_incomplete">نتائج البحث غير مكتملة</string>
+    <string name="catalog_addon_failed">تعذّر تحميل %1$s</string>
+    <string name="catalog_addon_fix">إذا استمر ذلك، فحدّث %1$s أو أزِله في Stremio.</string>
+    <string name="failure_web_page">يرسل صفحة ويب بدلًا من العناوين</string>
     <string name="catalog_incomplete">تعذّر تحميل بعض قوائم العرض</string>
     <string name="progress_saved_on_tv">تم حفظ تقدّم المشاهدة على هذا التلفزيون. سيحاول Alder مزامنته مجددًا.</string>
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>

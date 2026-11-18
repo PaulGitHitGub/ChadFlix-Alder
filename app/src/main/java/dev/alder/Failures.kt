@@ -16,10 +16,11 @@ internal enum class Failure(val message: Int) {
     ADDRESS(R.string.failure_no_address), CONNECTION(R.string.failure_connection), SECURE(R.string.failure_secure),
     BUSY(R.string.failure_too_many), SERVER(R.string.failure_server), RESPONSE(R.string.error_response),
     MISSING(R.string.error_missing), FORMAT(R.string.error_format), NETWORK(R.string.error_network),
-    OTHER(R.string.failure_error),
+    WEB_PAGE(R.string.failure_web_page), OTHER(R.string.failure_error),
 }
 
 internal fun failureOf(error: Throwable): Failure = when (error) {
+    is WebPageAnswer -> Failure.WEB_PAGE
     is Stremio.ApiException -> if (error.code == Stremio.NO_SESSION) Failure.SIGN_IN else Failure.SERVER
     is HttpError -> when (error.code) {
         401, 403 -> Failure.ACCESS

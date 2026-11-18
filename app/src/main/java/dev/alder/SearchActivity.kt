@@ -301,6 +301,7 @@ class SearchActivity : Screen() {
         // The page goes to MainActivity by its English name; the bar shows it in the viewer's language.
         val pages = mapOf(
             "home" to ("Home" to R.string.tab_home),
+            "discover" to ("Discover" to R.string.tab_discover),
             "shows" to ("Shows" to R.string.tab_shows),
             "movies" to ("Movies" to R.string.tab_movies),
             "library" to ("My List" to R.string.tab_my_list),
