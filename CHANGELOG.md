@@ -61,6 +61,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Search posters.** Posters in **Search** no longer go blank when a new add-on answer comes in. The posters on the screen load first. When a poster does not load, Alder tries again, then shows the title name on the card.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
 - **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.
