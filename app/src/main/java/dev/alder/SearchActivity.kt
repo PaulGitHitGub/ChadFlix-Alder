@@ -531,7 +531,7 @@ class SearchActivity : Screen() {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.SEARCH, failure)
                 results.removeAllViews()
-                results.addView(failed(failureMessage(R.string.search_unavailable, failure)) { search(true, failure) })
+                results.addView(failed(failureMessage(R.string.search_unavailable, failure, source = "Stremio")) { search(true, failure) })
                 return@background
             }
             val answers = arrayOfNulls<List<Meta>>(addons.size)

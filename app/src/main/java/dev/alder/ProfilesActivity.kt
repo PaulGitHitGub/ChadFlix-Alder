@@ -572,7 +572,7 @@ class ProfilesActivity : Screen() {
                 fun tick() {
                     if (!signingIn || request != signInGeneration || waitingCode != link.code) return
                     val leftSeconds = ((5 * 60_000L - (SystemClock.elapsedRealtime() - started)).coerceAtLeast(0) / 1000).toInt()
-                    status.text = pollFailure?.let { failureMessage(R.string.profiles_unreachable, it) }
+                    status.text = pollFailure?.let { failureMessage(R.string.profiles_unreachable, it, source = "Stremio", advice = false) }
                         ?: getString(R.string.profiles_waiting, "${leftSeconds / 60}:${"%02d".format(leftSeconds % 60)}")
                     countdown.progress = leftSeconds * 1000 / 300
                     main.postDelayed(::tick, 1_000)
@@ -587,7 +587,7 @@ class ProfilesActivity : Screen() {
             }.onFailure {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.SIGN_IN, failure)
-                status.text = failureMessage(R.string.profiles_unreachable, failure)
+                status.text = failureMessage(R.string.profiles_unreachable, failure, source = "Stremio", advice = false)
                 main.postDelayed({ if (signingIn && request == signInGeneration) showSignIn(name, again) }, 5_000)
             }
         }

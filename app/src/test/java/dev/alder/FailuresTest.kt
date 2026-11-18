@@ -22,6 +22,12 @@ class FailuresTest {
         assertEquals("error", failureReason(IllegalStateException("https://example.org/key")))
     }
 
+    @Test fun everyFailureSaysWhatToDo() {
+        val advice = Failure.entries.map { it.advice }
+        assertEquals(Failure.entries.size, advice.toSet().size) // each kind has its own line
+        assertTrue(Failure.entries.all { it.advice != it.message })
+    }
+
     @Test fun offlineProgressPreservesLibraryFieldsAndResumesFromTheLocalCheckpoint() {
         val remote = JSONObject("""{"_id":"tt1","type":"movie","_mtime":"2026-11-13T10:00:00.000Z","removed":false,
             "state":{"video_id":"tt1","timeOffset":4000,"duration":100000,"timeWatched":4000,"overallTimeWatched":5000,"watched":"existing"}}""")
