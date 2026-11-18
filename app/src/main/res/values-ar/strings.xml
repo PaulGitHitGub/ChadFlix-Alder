@@ -593,6 +593,8 @@
     <string name="failure_advice_network">تحقّق من اتصالك بالإنترنت، ثم حاول مرة أخرى.</string>
     <string name="failure_advice_web_page">ربما انتقلت الإضافة أو أُغلقت: حدّثها أو أزِلها في Stremio.</string>
     <string name="failure_advice_other">حاول مرة أخرى. إذا استمر ذلك، فأرسل تقريرًا من الإعدادات › حول.</string>
+    <string name="filmography_failed">تعذّر الحصول على أعمال هذا الشخص</string>
+    <string name="trailer_no_app">لا يوجد تطبيق على هذا التلفزيون يمكنه تشغيل الإعلان. ثبّت YouTube لمشاهدته.</string>
     <string name="catalog_incomplete">تعذّر تحميل بعض قوائم العرض</string>
     <string name="progress_saved_on_tv">تم حفظ تقدّم المشاهدة على هذا التلفزيون. سيحاول Alder مزامنته مجددًا.</string>
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>

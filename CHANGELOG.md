@@ -65,6 +65,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Errors that did not show.** Alder now tells you when an actor's titles cannot load, when no app on the TV can play a trailer, and when the add-ons of a shared profile cannot load. **Mark as watched** on a show no longer marks only the show when Alder cannot get its episodes: Alder tells you why and lets you try again.
 - **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, Alder shows the name of the add-on and the cause, for example "AIOLists couldn't load · it sends a web page, not titles". It tells you to update or remove that add-on in Stremio. Press Down from the top bar to go to **Try again**.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.

@@ -575,6 +575,8 @@
     <string name="failure_advice_network">Verifique sua conexão com a internet e tente de novo.</string>
     <string name="failure_advice_web_page">O complemento pode ter mudado de endereço ou sido fechado: atualize ou remova-o no Stremio.</string>
     <string name="failure_advice_other">Tente de novo. Se continuar assim, envie um relatório em Configurações › Sobre.</string>
+    <string name="filmography_failed">Não foi possível obter os títulos desta pessoa</string>
+    <string name="trailer_no_app">Nenhum app desta TV pode reproduzir o trailer. Instale o YouTube para assistir.</string>
     <string name="catalog_incomplete">Não foi possível carregar alguns catálogos</string>
     <string name="progress_saved_on_tv">O progresso foi salvo nesta TV. O Alder tentará sincronizá-lo de novo.</string>
     <string name="library_load_failed">Não foi possível carregar sua biblioteca do Stremio</string>

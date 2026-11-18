@@ -1039,9 +1039,9 @@ class PlayerActivity : Screen() {
                 val opened = runCatching {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$ytId")))
                 }.isSuccess
-                if (!opened) runCatching {
+                if (!opened && runCatching {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$ytId")))
-                }
+                }.isFailure) android.widget.Toast.makeText(this, R.string.trailer_no_app, android.widget.Toast.LENGTH_LONG).show()
             }
             finish()
             return

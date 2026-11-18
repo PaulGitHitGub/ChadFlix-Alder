@@ -1363,9 +1363,10 @@ class DetailsActivity : Screen() {
                 Tmdb.personCredits(actor.tmdbId, actor.name, actor.isDirector)
             }.getOrDefault(emptySet())
 
-            val allMetas = Stremio.addons(key).flatMap { addon ->
-                runCatching { addon.search(actor.name) }.getOrNull().orEmpty()
-            }.distinctBy { it.id }.filter { it.id != metaId }
+            val searches = Stremio.addons(key).map { addon -> runCatching { addon.search(actor.name) } }
+            // Every add-on failed: the viewer hears why, not an empty list.
+            searches.takeIf { it.isNotEmpty() && it.all { r -> r.isFailure } }?.let { throw it.first().exceptionOrNull()!! }
+            val allMetas = searches.flatMap { it.getOrNull().orEmpty() }.distinctBy { it.id }.filter { it.id != metaId }
 
             val actorLower = actor.name.lowercase().trim()
 
@@ -1395,6 +1396,12 @@ class DetailsActivity : Screen() {
                 isCredited || allMetas.size <= 4 || !metaTitleLower.contains(actorLower)
             }.take(16)
         }) { result ->
+            result.exceptionOrNull()?.let { error ->
+                val reason = failureOf(error)
+                FailureLog.record(FailureLog.Operation.SEARCH, reason)
+                android.widget.Toast.makeText(this, failureMessage(R.string.filmography_failed, reason, advice = false),
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
             val titles = result.getOrNull().orEmpty()
             if (titles.isEmpty()) {
                 if (!infoOpen) showInfo(focusCast = true)
@@ -1574,9 +1581,9 @@ class DetailsActivity : Screen() {
         val opened = runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id")))
         }.isSuccess
-        if (!opened) runCatching {
+        if (!opened && runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")))
-        }
+        }.isFailure) android.widget.Toast.makeText(this, R.string.trailer_no_app, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private fun openSources(videoId: String, startOver: Boolean, next: String? = null, label: String? = null, pick: Boolean = false) {

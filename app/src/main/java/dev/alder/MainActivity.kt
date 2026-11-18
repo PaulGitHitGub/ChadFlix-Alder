@@ -2317,9 +2317,10 @@ class MainActivity : Screen() {
             val key = profile.authKey
             val known = metas[item.id]
             background({
+                // A show's episodes are needed to mark it watched; without them only the title would be, so say why.
                 val videos = if (remove) emptyList() else (known ?: runCatching {
                         Stremio.addons(key).let { it.savedMeta(item.type, item.id) ?: it.meta(item.type, item.id) }
-                    }.getOrNull())?.videos.orEmpty()
+                    }.getOrElse { if (item.type == "movie") null else throw it })?.videos.orEmpty()
                 Stremio.editLibrary(key, item.id, JSONObject(original.toString())) { updated ->
                     if (remove) Library.setInList(updated, false) else Library.markTitleWatched(updated, videos)
                 }
@@ -2337,7 +2338,8 @@ class MainActivity : Screen() {
                     FailureLog.record(FailureLog.Operation.LIBRARY_EDIT, reason)
                     if (page == Page.LIBRARY && !isFinishing) {
                         choose(getString(if (remove) R.string.list_update_failed else R.string.library_edit_failed),
-                            listOf(getString(R.string.action_try_again), getString(R.string.action_cancel)), getString(reason.message)) {
+                            listOf(getString(R.string.action_try_again), getString(R.string.action_cancel)),
+                            "${getString(reason.message)}\n${getString(reason.advice)}") {
                             if (it == 0) save(remove, reason)
                         }
                     }

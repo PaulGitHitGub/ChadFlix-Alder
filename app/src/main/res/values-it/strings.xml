@@ -575,6 +575,8 @@
     <string name="failure_advice_network">Controlla la connessione a Internet, poi riprova.</string>
     <string name="failure_advice_web_page">L\'add-on potrebbe essersi spostato o chiuso: aggiornalo o rimuovilo in Stremio.</string>
     <string name="failure_advice_other">Riprova. Se continua così, invia una segnalazione da Impostazioni › Informazioni.</string>
+    <string name="filmography_failed">Impossibile ottenere i titoli di questa persona</string>
+    <string name="trailer_no_app">Nessuna app di questa TV può riprodurre il trailer. Installa YouTube per guardarlo.</string>
     <string name="catalog_incomplete">Impossibile caricare alcuni cataloghi</string>
     <string name="progress_saved_on_tv">I progressi sono salvati su questo TV. Alder proverà a sincronizzarli di nuovo.</string>
     <string name="library_load_failed">Impossibile caricare la tua libreria Stremio</string>

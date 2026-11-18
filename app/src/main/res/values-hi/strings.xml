@@ -569,6 +569,8 @@
     <string name="failure_advice_network">इंटरनेट कनेक्शन जाँचें, फिर से कोशिश करें।</string>
     <string name="failure_advice_web_page">ऐड-ऑन शायद चला गया या बंद हो गया है: Stremio में इसे अपडेट करें या हटाएँ।</string>
     <string name="failure_advice_other">फिर से कोशिश करें। अगर ऐसा होता रहे, तो सेटिंग › जानकारी से रिपोर्ट भेजें।</string>
+    <string name="filmography_failed">इस व्यक्ति के शीर्षक नहीं मिल सके</string>
+    <string name="trailer_no_app">इस टीवी पर कोई ऐप ट्रेलर नहीं चला सकता। इसे देखने के लिए YouTube इंस्टॉल करें।</string>
     <string name="catalog_incomplete">कुछ कैटलॉग लोड नहीं हो सके</string>
     <string name="progress_saved_on_tv">प्रगति इस टीवी पर सेव है। Alder इसे फिर से सिंक करने की कोशिश करेगा।</string>
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
