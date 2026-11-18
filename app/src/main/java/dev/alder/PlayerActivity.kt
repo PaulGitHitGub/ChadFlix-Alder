@@ -1032,7 +1032,7 @@ class PlayerActivity : Screen() {
             retries = 0
             asHls = false
             subsPicked = false
-            return load(position, failureMessage(R.string.player_source_failed_next, reason))
+            return load(position, failureMessage(R.string.player_source_failed_next, reason, advice = false))
         }
         if (isTrailer) {
             intent.getStringExtra("trailerYtId")?.takeIf { it.isNotBlank() }?.let { ytId ->
@@ -1052,11 +1052,11 @@ class PlayerActivity : Screen() {
             started = false
             showSourceError(reason)
             player.stop()
-            showLoading(failureMessage(R.string.player_source_failed_choose, reason))
+            showLoading(failureMessage(R.string.player_source_failed_choose, reason, advice = false))
             return
         }
         startActivity(Intent(this, StreamsActivity::class.java).putExtras(intent).putExtra("pick", true)
-            .putExtra("message", failureMessage(R.string.player_source_failed_choose, reason))
+            .putExtra("message", failureMessage(R.string.player_source_failed_choose, reason, advice = false))
             .putExtra("startOver", false)
             .putExtra("resumeAt", position))
         finish()
@@ -1381,7 +1381,7 @@ class PlayerActivity : Screen() {
         ProgressSaves.keep(key, snapshot, provisionalProgress)
         background({ syncWatchProgress(key) }) { result ->
             result.getOrNull()?.let { failure ->
-                android.widget.Toast.makeText(this, failureMessage(R.string.progress_saved_on_tv, failure),
+                android.widget.Toast.makeText(this, failureMessage(R.string.progress_saved_on_tv, failure, source = "Stremio", advice = false),
                     android.widget.Toast.LENGTH_LONG).show()
             }
         }

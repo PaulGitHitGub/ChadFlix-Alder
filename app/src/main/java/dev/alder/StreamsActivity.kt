@@ -170,7 +170,7 @@ class StreamsActivity : Screen() {
                 (own.any { !it.official } || lent.isNotEmpty())
         }) { result ->
             val (addons, anyStreams) = result.getOrElse {
-                status.text = failureMessage(R.string.streams_load_failed, failureOf(it))
+                status.text = failureMessage(R.string.streams_load_failed, failureOf(it), source = "Stremio", advice = false)
                 return@background tryAgain()
             }
             if (addons.isEmpty()) {

@@ -1578,7 +1578,7 @@ class MainActivity : Screen() {
             val names = failedAddons.values.filter { it.isNotBlank() }.distinct().joinToString(", ")
             if (names.isEmpty()) return failureMessage(R.string.catalog_incomplete, reason)
             return "${getString(R.string.catalog_addon_failed, names)} · ${getString(reason.message)}\n" +
-                getString(R.string.catalog_addon_fix, names)
+                getString(reason.advice)
         }
         fun catalogStatus(key: String, failure: Failure?, addon: String? = null) {
             val oldMessage = catalogMessage()
