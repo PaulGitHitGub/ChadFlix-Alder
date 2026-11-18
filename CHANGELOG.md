@@ -18,6 +18,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 ## Unreleased
 
 ### New
+<!-- Spotlight -->
+- **Discover.** Select **Discover** in the top bar to find any movie or show, not only the titles in your add-on catalogs. Select **Movies**, **Shows** or **Anime**. Then select a genre, a decade, a streaming service in your country, or an order: **Popular**, **Top rated** or **Newest**. More titles come when you go down. Each title opens, plays and goes to **My List** as other titles do. Alder keeps your choice for each profile. Discover uses TMDB. To move or hide the tab, select **Settings → Profile → Tabs**.
 - **Arabic interface.** Select **Settings → Language → App language → العربية**. Alder shows menus, buttons and settings in Arabic.
 <!-- Spotlight -->
 - **P2P sources.** Alder can play torrents from your add-ons without a debrid account. Sources with the **P2P** label are at the end of the source list. When no other source plays, Alder tries a P2P source. Seek, pause and Back work as with other sources. P2P sources are available on Android 7 and later.
@@ -43,7 +45,6 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **My List art.** A dark picture of the selected title shows behind the posters.
 - Empty poster slots have a dark background while Alder gets the images.
 - Alder asks for confirmation before it removes a title from **My List**.
-- **Movies.** Select a genre in **Jump to** to go to its shelf. Select **Top** to go to the first shelf.
 - **Movies posters.** A short line marks the selected poster. Alder shows the title while it gets the poster.
 - **Shows.** Select a genre in **Jump to** to go to its shelf. Select **Top** to go to the first shelf.
 - **Shows posters.** The posters are brighter. A short line marks the selected poster. Alder shows the title while it gets the poster.

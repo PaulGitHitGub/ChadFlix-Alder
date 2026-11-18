@@ -38,6 +38,16 @@
 
     <!-- Home -->
     <string name="tab_home">Home</string>
+    <string name="tab_discover">Discover</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_year">Year</string>
+    <string name="discover_before_1980">Before 1980</string>
+    <string name="discover_on">On</string>
+    <string name="discover_sort_popular">Popular</string>
+    <string name="discover_sort_top">Top rated</string>
+    <string name="discover_sort_new">Newest</string>
+    <string name="discover_empty">Nothing matches these choices. Try fewer of them.</string>
+    <string name="tmdb_notice">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="tab_shows">Shows</string>
     <string name="tab_movies">Movies</string>
     <string name="tab_live">Live</string>
@@ -540,8 +550,6 @@
     <string name="profiles_watchly_steps">"1.  Scan with %1$s's phone to open Watchly\n2.  Connect %1$s's Stremio account there\n3.  Install it to %1$s's Stremio account\n\n%1$s's own \"Top Picks\" then show up on Home. You can finish this later."</string>
     <string name="profiles_all_set">You\'re all set</string>
     <string name="profiles_ready">%1$s\'s profile is ready. You can add more add-ons later in Settings.</string>
-    <string name="catalog_jump_to">Jump to</string>
-    <string name="catalog_jump_top">Top</string>
     <string name="display_resolution">Display resolution</string>
     <string name="display_resolution_hint">Choose the TV resolution Alder uses to pick a source. Use 4K if your box reports 1080p but outputs 4K.</string>
     <string name="error_sign_in">sign in to Stremio again</string>

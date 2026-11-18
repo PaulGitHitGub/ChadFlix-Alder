@@ -39,6 +39,16 @@
 
     <!-- Home -->
     <string name="tab_home">Home</string>
+    <string name="tab_discover">Scopri</string>
+    <string name="discover_genre">Genere</string>
+    <string name="discover_year">Anno</string>
+    <string name="discover_before_1980">Prima del 1980</string>
+    <string name="discover_on">Su</string>
+    <string name="discover_sort_popular">Popolari</string>
+    <string name="discover_sort_top">Più votati</string>
+    <string name="discover_sort_new">Più recenti</string>
+    <string name="discover_empty">Niente corrisponde a queste scelte. Prova con meno filtri.</string>
+    <string name="tmdb_notice">Questo prodotto usa l’API di TMDB, ma non è approvato né certificato da TMDB.</string>
     <string name="tab_shows">Serie</string>
     <string name="tab_movies">Film</string>
     <string name="tab_live">Dirette</string>
@@ -545,8 +555,6 @@
     <string name="profiles_all_set">Tutto pronto</string>
     <string name="profiles_ready">Il profilo di %1$s è pronto. Puoi aggiungere altri add-on più tardi in Impostazioni.</string>
     <string name="time_left_under_minute">Meno di 1 min</string>
-    <string name="catalog_jump_to">Vai a</string>
-    <string name="catalog_jump_top">Inizio</string>
     <string name="display_resolution">Risoluzione dello schermo</string>
     <string name="display_resolution_hint">Scegli la risoluzione del TV che Alder usa per selezionare una sorgente. Scegli 4K se il tuo dispositivo indica 1080p ma trasmette in 4K.</string>
     <string name="error_sign_in">accedi di nuovo a Stremio</string>
