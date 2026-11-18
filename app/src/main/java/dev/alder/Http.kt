@@ -39,6 +39,8 @@ object Http {
         val text = String(body, Charsets.UTF_8)
         // Stremio's API answers errors as JSON (read by the caller); anything else failed is an error page: say the code.
         if (code >= 400 && (strict || !text.trimStart().startsWith("{"))) throw HttpError(code)
+        // A closed or moved add-on often sends its host's web page (a redirect followed to docs or a parking page).
+        if (strict && text.trimStart().startsWith("<")) throw WebPageAnswer()
         return text.also { if (keep && code < 400) keep(url, json, it) }
     }
 
@@ -102,6 +104,9 @@ object Http {
         return code to stream.use { it.readBytes() }
     }
 }
+
+/** An add-on answered with a web page, not JSON: it has usually moved or closed. */
+class WebPageAnswer : IOException("web page, not JSON")
 
 /** A failed answer, with its status code: 401 and 403 from an add-on usually mean an expired key or account. */
 class HttpError(val code: Int) : IOException("HTTP $code")

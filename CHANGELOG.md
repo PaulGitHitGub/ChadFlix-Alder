@@ -64,7 +64,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
-- **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, press Down from the top bar to go to **Try again**.
+- **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, Alder shows the name of the add-on and the cause, for example "AIOLists couldn't load · it sends a web page, not titles". It tells you to update or remove that add-on in Stremio. Press Down from the top bar to go to **Try again**.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
 - **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.

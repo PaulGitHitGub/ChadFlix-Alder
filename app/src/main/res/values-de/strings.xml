@@ -553,6 +553,9 @@
     <string name="error_network">Netzwerkfehler</string>
     <string name="library_edit_failed">Wiedergabestatus konnte nicht gespeichert werden</string>
     <string name="search_incomplete">Die Suchergebnisse sind unvollständig</string>
+    <string name="catalog_addon_failed">%1$s konnte nicht geladen werden</string>
+    <string name="catalog_addon_fix">Wenn das so bleibt, aktualisiere oder entferne %1$s in Stremio.</string>
+    <string name="failure_web_page">sendet eine Webseite statt Titeln</string>
     <string name="catalog_incomplete">Einige Kataloge konnten nicht geladen werden</string>
     <string name="progress_saved_on_tv">Der Fortschritt wurde auf diesem Fernseher gespeichert. Alder versucht erneut, ihn zu synchronisieren.</string>
     <string name="library_load_failed">Deine Stremio-Bibliothek konnte nicht geladen werden</string>

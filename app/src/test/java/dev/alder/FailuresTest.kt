@@ -17,6 +17,7 @@ class FailuresTest {
         assertEquals(Failure.SIGN_IN, failureOf(Stremio.ApiException(Stremio.NO_SESSION, "secret")))
         assertEquals(Failure.TIMEOUT, failureOf(SocketTimeoutException("secret")))
         assertEquals(Failure.BUSY, failureOf(HttpError(429)))
+        assertEquals(Failure.WEB_PAGE, failureOf(WebPageAnswer())) // a closed add-on's host page, not "invalid response"
         assertEquals(Failure.FORMAT, playbackFailure(PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED, null))
         assertEquals("error", failureReason(IllegalStateException("https://example.org/key")))
     }

@@ -559,6 +559,9 @@
     <string name="error_network">erro de rede</string>
     <string name="library_edit_failed">Não foi possível salvar o estado de exibição</string>
     <string name="search_incomplete">Os resultados da busca estão incompletos</string>
+    <string name="catalog_addon_failed">Não foi possível carregar %1$s</string>
+    <string name="catalog_addon_fix">Se continuar, atualize ou remova %1$s no Stremio.</string>
+    <string name="failure_web_page">envia uma página web, não títulos</string>
     <string name="catalog_incomplete">Não foi possível carregar alguns catálogos</string>
     <string name="progress_saved_on_tv">O progresso foi salvo nesta TV. O Alder tentará sincronizá-lo de novo.</string>
     <string name="library_load_failed">Não foi possível carregar sua biblioteca do Stremio</string>

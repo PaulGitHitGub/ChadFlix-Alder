@@ -559,6 +559,9 @@
     <string name="error_network">erreur réseau</string>
     <string name="library_edit_failed">Impossible d’enregistrer le statut de visionnage</string>
     <string name="search_incomplete">Les résultats de recherche sont incomplets</string>
+    <string name="catalog_addon_failed">Impossible de charger %1$s</string>
+    <string name="catalog_addon_fix">Si cela continue, mettez à jour ou retirez %1$s dans Stremio.</string>
+    <string name="failure_web_page">envoie une page web, pas des titres</string>
     <string name="catalog_incomplete">Impossible de charger certains catalogues</string>
     <string name="progress_saved_on_tv">La progression est enregistrée sur cette TV. Alder réessaiera de la synchroniser.</string>
     <string name="library_load_failed">Impossible de charger votre bibliothèque Stremio</string>

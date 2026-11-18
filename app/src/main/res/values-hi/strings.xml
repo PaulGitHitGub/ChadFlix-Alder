@@ -553,6 +553,9 @@
     <string name="error_network">नेटवर्क की समस्या</string>
     <string name="library_edit_failed">देखने की स्थिति सेव नहीं हो सकी</string>
     <string name="search_incomplete">खोज के नतीजे अधूरे हैं</string>
+    <string name="catalog_addon_failed">%1$s लोड नहीं हो सका</string>
+    <string name="catalog_addon_fix">अगर ऐसा होता रहे, तो Stremio में %1$s को अपडेट करें या हटाएँ।</string>
+    <string name="failure_web_page">यह शीर्षक नहीं, वेब पेज भेजता है</string>
     <string name="catalog_incomplete">कुछ कैटलॉग लोड नहीं हो सके</string>
     <string name="progress_saved_on_tv">प्रगति इस टीवी पर सेव है। Alder इसे फिर से सिंक करने की कोशिश करेगा।</string>
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>

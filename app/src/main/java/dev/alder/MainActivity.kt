@@ -1570,19 +1570,29 @@ class MainActivity : Screen() {
         var noCatalogs: View? = null
         var catalogWarning: View? = null
         val catalogFailures = linkedMapOf<String, Failure>()
+        val failedAddons = linkedMapOf<String, String>() // row key to the add-on whose catalog failed
         var builtFrom: List<Pair<String, String>>? = null
-        fun catalogStatus(key: String, failure: Failure?) {
-            val oldReason = catalogFailures.values.firstOrNull()
+        // The card names the add-ons that failed and what went wrong, so the viewer knows which one to fix in Stremio.
+        fun catalogMessage(): String? {
+            val reason = catalogFailures.values.firstOrNull() ?: return null
+            val names = failedAddons.values.filter { it.isNotBlank() }.distinct().joinToString(", ")
+            if (names.isEmpty()) return failureMessage(R.string.catalog_incomplete, reason)
+            return "${getString(R.string.catalog_addon_failed, names)} · ${getString(reason.message)}\n" +
+                getString(R.string.catalog_addon_fix, names)
+        }
+        fun catalogStatus(key: String, failure: Failure?, addon: String? = null) {
+            val oldMessage = catalogMessage()
             val previous = if (failure == null) catalogFailures.remove(key) else catalogFailures.put(key, failure)
+            if (failure == null || addon == null) failedAddons.remove(key) else failedAddons[key] = addon
             if (previous == failure) return
             if (failure != null) FailureLog.record(FailureLog.Operation.CATALOG, failure)
             else if (previous != null) FailureLog.record(FailureLog.Operation.CATALOG, previous, recovered = true)
-            val reason = catalogFailures.values.firstOrNull()
-            if (reason == oldReason) return
+            val message = catalogMessage()
+            if (message == oldMessage) return
             val restoreFocus = catalogWarning?.hasFocus() == true
             catalogWarning?.let(content::removeView)
-            catalogWarning = reason?.let {
-                failed(failureMessage(R.string.catalog_incomplete, it)) { showPage(p) }.also { card ->
+            catalogWarning = message?.let {
+                failed(it) { showPage(p) }.also { card ->
                     content.addView(card, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
                     if (restoreFocus) card.getChildAt(2).requestFocus()
                 }
@@ -1607,6 +1617,7 @@ class MainActivity : Screen() {
             catalogWarning?.let(content::removeView)
             catalogWarning = null
             catalogFailures.clear()
+            failedAddons.clear()
             val featuredHome = p == Page.HOME && Settings.featuredHome(this@MainActivity)
             // Each catalog on its page under a plain name, personal rows first; the sort keeps the addons' order within a rank.
             val shelves = addons.flatMap { it.catalogs }.mapNotNull { c ->
@@ -1740,10 +1751,11 @@ class MainActivity : Screen() {
                 // once; after that the row is marked done for the session.
                 fun update() {
                     val current = sourceAnswers.map { it ?: (emptyList<Meta>() to true) }
-                    val failure = failures.firstOrNull { it != null }
+                    val failed = failures.indexOfFirst { it != null }
+                    val failure = failures.getOrNull(failed)
                     if (failure != null) answers.remove(key)
                     else if (current.any { it.first.isNotEmpty() }) answers[key] = current
-                    catalogStatus(key, failure)
+                    catalogStatus(key, failure, rowCatalogs.getOrNull(failed)?.addon?.name)
                     onAnswer(Result.success(current))
                 }
                 fun refresh(index: Int) {
