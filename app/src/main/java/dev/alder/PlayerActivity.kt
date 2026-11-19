@@ -471,6 +471,7 @@ class PlayerActivity : Screen() {
         }) { r ->
             meta = r.getOrNull()
             val m = meta ?: return@background
+            if (!isTrailer) fetchSegments() // anime episode ids get their IntroDB season and number from the meta
             val episode = if (isTrailer) null else m.videos.firstOrNull { it.id == videoId }
             pauseTitle.text = episode?.title?.takeIf { it.isNotBlank() } ?: m.name
             subtitle.text = if (isTrailer) getString(R.string.action_trailer) else episode?.let { "S${it.season} E${it.episode}" } ?: m.year.orEmpty()
@@ -1487,7 +1488,8 @@ class PlayerActivity : Screen() {
     // IntroDB (api.introdb.app, community timings by IMDb id, season and episode; no key, nothing personal sent) says where
     // an episode's intro, recap and credits are. Inside an intro or recap a "Skip intro" pill shows for 10 s, and OK
     // jumps to its end. The credits start, when known, is when Up next appears, rather than the last 4% guess.
-    // ponytail: series with IMDb ids only; anime (AniSkip by MAL id) and films' credits aren't asked for.
+    // ponytail: shows with IMDb ids only (anime episode ids under an IMDb show count); anime with no IMDb id
+    // (AniSkip by MAL id) and films' credits aren't asked for.
     private lateinit var skip: TextView
     private var segments = emptyList<IntroSegment>()
     private var introDbSegments = emptyList<IntroSegment>()
@@ -1497,11 +1499,15 @@ class PlayerActivity : Screen() {
     private val skipped = mutableSetOf<IntroSegment>() // shown once and left alone, or skipped: not offered again this time
     private val skipTask = Runnable { checkSegments() }
 
+    private var introDbAsked = false
+
     private fun fetchSegments() {
-        val parts = videoId.split(":")
-        if (!episodic || !metaId.startsWith("tt") || parts.size < 3) return
+        if (!episodic || introDbAsked) return
+        // A Kitsu or MAL episode id needs the show's videos for its season and number, so it waits for the meta.
+        val (imdbId, season, episode) = introDbEpisode(metaId, videoId, meta?.videos) ?: return
+        introDbAsked = true
         background({
-            val json = JSONObject(Http.get("https://api.introdb.app/segments?imdb_id=${parts[0]}&season=${parts[1]}&episode=${parts[2]}"))
+            val json = JSONObject(Http.get("https://api.introdb.app/segments?imdb_id=$imdbId&season=$season&episode=$episode"))
             fun part(name: String) = json.optJSONObject(name)?.let { seg ->
                 val startSec = seg.optDouble("start_sec", -1.0)
                 val endSec = seg.optDouble("end_sec", -1.0)

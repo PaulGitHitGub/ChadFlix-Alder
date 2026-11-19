@@ -348,6 +348,22 @@ internal fun episodeNumbers(videoId: String?): Pair<Int, Int>? {
 }
 
 /**
+ * The IMDb id, season and episode IntroDB knows an episode by, or null when the show has no IMDb id.
+ * Anime metadata (AIOMetadata, for one) can list Kitsu or MAL episode ids ("kitsu:9965:1") under an IMDb show:
+ * then the show's id and the episode's season and number from the show's own [videos] stand in.
+ */
+internal fun introDbEpisode(metaId: String, videoId: String, videos: List<Video>?): Triple<String, Int, Int>? {
+    if (!metaId.startsWith("tt")) return null
+    val parts = videoId.split(':')
+    if (parts.size >= 3 && parts[0].startsWith("tt")) {
+        val (season, episode) = episodeNumbers(parts.take(3).joinToString(":")) ?: return null
+        return Triple(parts[0], season, episode)
+    }
+    val video = videos?.firstOrNull { it.id == videoId && it.season >= 0 && it.episode > 0 } ?: return null
+    return Triple(metaId, video.season, video.episode)
+}
+
+/**
  * Whether a title has episodes. A type is only a word an add-on picks ("anime", "channel", "podcast"), so for any type
  * but movie, series and live, the title's own videos decide, as stremio-core does.
  */
