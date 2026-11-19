@@ -46,9 +46,13 @@ internal fun <T> rankSearchTitles(items: List<T>, query: String, title: (T) -> S
     }
 }
 
-/** What a render of [sections] shows, in order: the same key means the same rows, so a late add-on that adds nothing redraws nothing. */
-internal fun searchRenderKey(sections: Map<String, List<Pair<String, String>>>, query: String): String =
-    query + "|" + sections.entries.joinToString("|") { (label, ids) -> label + ":" + ids.joinToString(",") { "${it.first}:${it.second}" } }
+/**
+ * What a render of [sections] shows, in order: the same key means the same rows, so a late add-on that adds nothing
+ * redraws nothing. Each card is given by its id, poster and name, so a preferred add-on's answer with another poster
+ * for the same title still redraws.
+ */
+internal fun searchRenderKey(sections: Map<String, List<String>>, query: String): String =
+    query + "|" + sections.entries.joinToString("|") { (label, cards) -> label + ":" + cards.joinToString(",") }
 
 internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = answers.filterNotNull().flatten()
 
@@ -601,7 +605,7 @@ class SearchActivity : Screen() {
         // Each add-on's answer calls this. Rebuilding cards that didn't change cleared their posters (blank tiles while
         // they loaded again) and could move the remote; the same rows stay as they are.
         // ponytail: any change still rebuilds the whole pane; diff rows in place if late add-ons reorder a lot.
-        val key = searchRenderKey(sections.mapValues { (_, list) -> list.map { it.type to it.id } }, query)
+        val key = searchRenderKey(sections.mapValues { (_, list) -> list.map { "${it.type}:${it.id}:${it.poster}:${it.background}:${it.name}" } }, query)
         if (key == rendered) {
             if (selected == null && moveFocus) firstResult?.requestFocus()
             return
@@ -660,9 +664,10 @@ class SearchActivity : Screen() {
             group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
             results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(28) })
         }
-        // Pictures are fetched newest request first: asking for the last card first puts the top row's first posters,
-        // the ones on screen, at the front of the queue.
-        posters.asReversed().forEach { it() }
+        // The first [Images.THREADS] requests start at once on idle threads; the rest wait in a newest-first queue. So the
+        // first cards (the ones on screen) go first, then the rest last card first, which puts the next on-screen card
+        // at the front of the queue.
+        (posters.take(Images.THREADS) + posters.drop(Images.THREADS).asReversed()).forEach { it() }
         sections.values.firstOrNull()?.firstOrNull()?.let(::show)
         if (selected != null) (cards.firstOrNull { it.first.tag == selected }?.first ?: firstResult)?.requestFocus()
         else if (moveFocus) firstResult?.requestFocus()
