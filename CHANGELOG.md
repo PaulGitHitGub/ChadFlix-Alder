@@ -74,6 +74,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Title page.** Before, Alder stopped when you pressed a key on a title page that did not load. Before, the page went blank if new details came while the episode list was open.
 - **Fewer source changes.** Before, after two network problems in one video, the third problem made Alder change the source. Now each problem gets two new tries.
 - **Change stream.** Before, a source that you selected in **Change stream** could fail after a live source. Now Alder also selects the audio and the subtitle for the new source again.
+- **Skip intro.** When you go back into an intro, **Skip intro** shows again. Before, it showed only one time in each video.
 - **Skip intro on more MKV files.** Before, Alder did not find the chapters of an MKV file when they were not at the start of the file.
 - **Subtitles when paused.** Before, the video started when you selected an add-on subtitle while it was paused. Now the video stays paused.
 - **Watch progress from other devices.** Before, if the clock of the TV was fast, the TV could show old progress and write it over newer progress from your phone.
