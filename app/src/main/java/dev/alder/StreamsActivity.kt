@@ -150,6 +150,7 @@ class StreamsActivity : Screen() {
         val tv = Device.of(this)
 
         val lenders = Profiles.streamLenders(this)
+        var lenderFailure: Failure? = null
         // Asks every add-on again (a fixed connection, or an add-on set up again on the phone); a source found plays.
         fun tryAgain(focus: Boolean = true) {
             val again = pill(R.string.action_try_again).apply { setOnClickListener { recreate() } }
@@ -158,11 +159,11 @@ class StreamsActivity : Screen() {
         }
         background({
             val own = Stremio.addons(key).filter { it.providesStreams }
-            val lent = lenders.flatMap { lender ->
-                runCatching {
-                    (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable }
-                }.getOrDefault(emptyList())
+            val lentAnswers = lenders.map { lender ->
+                runCatching { (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable } }
             }
+            lenderFailure = lentAnswers.firstNotNullOfOrNull { it.exceptionOrNull() }?.let(::failureOf)
+            val lent = lentAnswers.flatMap { it.getOrDefault(emptyList()) }
             val household = lent.filter { it.serves("stream", type, videoId) }.distinctBy { it.id }
             // Whether any stream add-on is installed besides Stremio's own (Local Files has a stream resource): if so, none
             // of them knows this kind of title.
@@ -170,11 +171,13 @@ class StreamsActivity : Screen() {
                 (own.any { !it.official } || lent.isNotEmpty())
         }) { result ->
             val (addons, anyStreams) = result.getOrElse {
-                status.text = failureMessage(R.string.streams_load_failed, failureOf(it))
+                status.text = failureMessage(R.string.streams_load_failed, failureOf(it), source = "Stremio", advice = false)
                 return@background tryAgain()
             }
             if (addons.isEmpty()) {
-                status.text = getString(if (anyStreams) R.string.streams_none_for_kind else R.string.streams_no_addons)
+                // A shared profile's add-ons that couldn't be read: say that, not "no add-ons".
+                status.text = lenderFailure?.let { failureMessage(R.string.streams_load_failed, it, source = "Stremio", advice = false) }
+                    ?: getString(if (anyStreams) R.string.streams_none_for_kind else R.string.streams_no_addons)
                 return@background tryAgain()
             }
             val answers = arrayOfNulls<List<Stream>>(addons.size)

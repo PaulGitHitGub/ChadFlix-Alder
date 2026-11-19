@@ -39,6 +39,16 @@
 
     <!-- Home -->
     <string name="tab_home">Accueil</string>
+    <string name="tab_discover">Découvrir</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_year">Année</string>
+    <string name="discover_before_1980">Avant 1980</string>
+    <string name="discover_on">Service</string>
+    <string name="discover_sort_popular">Populaires</string>
+    <string name="discover_sort_top">Les mieux notés</string>
+    <string name="discover_sort_new">Les plus récents</string>
+    <string name="discover_empty">Rien ne correspond à ces choix. Essayez-en moins.</string>
+    <string name="tmdb_notice">Ce produit utilise l’API TMDB, mais n’est ni approuvé ni certifié par TMDB.</string>
     <string name="tab_shows">Séries</string>
     <string name="tab_movies">Films</string>
     <string name="tab_live">Direct</string>
@@ -75,11 +85,6 @@
     <string name="list_sort_recent">Ajoutés récemment</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Non vus d’abord</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d titre</item>
-        <item quantity="many">%1$d titres</item>
-        <item quantity="other">%1$d titres</item>
-    </plurals>
     <string name="list_empty">Les titres que vous enregistrez avec + apparaissent ici</string>
     <string name="list_empty_movies">Aucun film dans Ma liste</string>
     <string name="list_empty_shows">Aucune série dans Ma liste</string>
@@ -545,8 +550,6 @@
     <string name="profiles_all_set">Tout est prêt</string>
     <string name="profiles_ready">Le profil de %1$s est prêt. Vous pourrez ajouter d’autres extensions plus tard dans Paramètres.</string>
     <string name="time_left_under_minute">Moins de 1 min restante</string>
-    <string name="catalog_jump_to">Aller à</string>
-    <string name="catalog_jump_top">Haut</string>
     <string name="display_resolution">Résolution de l’écran</string>
     <string name="display_resolution_hint">Choisissez la résolution du téléviseur utilisée par Alder pour sélectionner une source. Choisissez 4K si votre boîtier indique 1080p mais diffuse en 4K.</string>
     <string name="error_sign_in">reconnectez-vous à Stremio</string>
@@ -556,6 +559,24 @@
     <string name="error_network">erreur réseau</string>
     <string name="library_edit_failed">Impossible d’enregistrer le statut de visionnage</string>
     <string name="search_incomplete">Les résultats de recherche sont incomplets</string>
+    <string name="catalog_addon_failed">Impossible de charger %1$s</string>
+    <string name="failure_web_page">envoie une page web, pas des titres</string>
+    <string name="failure_advice_sign_in">Reconnectez-vous à Stremio.</string>
+    <string name="failure_advice_access">Vérifiez la clé ou le compte dans les paramètres de cette extension dans Stremio.</string>
+    <string name="failure_advice_timeout">Vérifiez votre connexion Internet, puis réessayez.</string>
+    <string name="failure_advice_address">Vérifiez votre connexion Internet. Si elle fonctionne, l\'extension a peut-être changé d\'adresse : mettez-la à jour dans Stremio.</string>
+    <string name="failure_advice_connection">Le service est peut-être en panne. Réessayez plus tard.</string>
+    <string name="failure_advice_secure">Vérifiez la date et l\'heure de votre téléviseur, puis réessayez.</string>
+    <string name="failure_advice_busy">Attendez une minute, puis réessayez.</string>
+    <string name="failure_advice_server">Le service rencontre un problème. Réessayez plus tard.</string>
+    <string name="failure_advice_response">Si cela continue, mettez à jour ou retirez l\'extension dans Stremio.</string>
+    <string name="failure_advice_missing">Essayez une autre extension ou une autre source.</string>
+    <string name="failure_advice_format">Essayez une autre source.</string>
+    <string name="failure_advice_network">Vérifiez votre connexion Internet, puis réessayez.</string>
+    <string name="failure_advice_web_page">L\'extension a peut-être changé d\'adresse ou fermé : mettez-la à jour ou retirez-la dans Stremio.</string>
+    <string name="failure_advice_other">Réessayez. Si cela continue, envoyez un rapport depuis Paramètres › À propos.</string>
+    <string name="filmography_failed">Impossible d\'obtenir les titres de cette personne</string>
+    <string name="trailer_no_app">Aucune application de ce téléviseur ne peut lire la bande-annonce. Installez YouTube pour la regarder.</string>
     <string name="catalog_incomplete">Impossible de charger certains catalogues</string>
     <string name="progress_saved_on_tv">La progression est enregistrée sur cette TV. Alder réessaiera de la synchroniser.</string>
     <string name="library_load_failed">Impossible de charger votre bibliothèque Stremio</string>

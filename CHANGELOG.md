@@ -18,6 +18,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 ## Unreleased
 
 ### New
+<!-- Spotlight -->
+- **Discover.** Select **Discover** in the top bar to find any movie or show, not only the titles in your add-on catalogs. Select **Movies**, **Shows** or **Anime**. Then select a genre, a decade, a streaming service in your country, or an order: **Popular**, **Top rated** or **Newest**. More titles come when you go down. Each title opens, plays and goes to **My List** as other titles do. Alder keeps your choice for each profile. Discover uses TMDB. To move or hide the tab, select **Settings → Profile → Tabs**.
 - **Arabic interface.** Select **Settings → Language → App language → العربية**. Alder shows menus, buttons and settings in Arabic.
 <!-- Spotlight -->
 - **P2P sources.** Alder can play torrents from your add-ons without a debrid account. Sources with the **P2P** label are at the end of the source list. When no other source plays, Alder tries a P2P source. Seek, pause and Back work as with other sources. P2P sources are available on Android 7 and later.
@@ -36,6 +38,13 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Search finds the main title first.** When you search for "matrix", **The Matrix** now comes before a short film with the name "Matrix". When two titles have the same name, the title with the higher IMDb rating comes first.
+- **Search shows all of your tabs.** The top bar in Search now shows **Live** and the tabs for other catalog types, as Home does.
+- **Discover.** The streaming service filter now has the name **Service**. Before, its name was **On**.
+- **Settings.** **Profile**, **Language** and **Storage** now have icons, as the other groups do.
+- **Errors say what to do.** Error messages now tell you what to do next, for example "Check your internet connection, then try again" or "Update or remove the add-on in Stremio". When Alder knows which add-on or service failed, the message shows its name.
+- **Genre and year in My List.** Select **Genre** or **Year** in **My List** to show only those titles. The first time, Alder gets the details of each title, so the lists can take some seconds to fill.
+- **Lists that open.** On **Discover** and **My List**, the **Genre**, **Year**, **On** and **Sort** buttons show an arrow. A long list stays clear of the screen edges, and the next item always shows when you move down. The item in use shows in the accent colour with a tick. The page name and the title count do not show next to the buttons now. The posters start at the same distance below the buttons on both pages.
 - **Choose your tabs.** Select **Settings → Profile → Tabs**. Select a tab to show it, hide it or move it left or right. This includes the tabs of add-ons, for example **Trakt**. A hidden tab keeps its add-on installed. **Home** is always the first tab. Each profile has its own tabs. **Tabs** replaces the **Movies tab**, **Shows tab** and **Live tab** settings and keeps your choices.
 - **Faster Home.** Alder shows saved rows while it gets new data. When add-ons change, focus returns to the same title if it is still available.
 - **My List.** Two full rows of posters show at once. Move down to see more titles. The title shows while Alder gets the poster.
@@ -43,7 +52,6 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **My List art.** A dark picture of the selected title shows behind the posters.
 - Empty poster slots have a dark background while Alder gets the images.
 - Alder asks for confirmation before it removes a title from **My List**.
-- **Movies.** Select a genre in **Jump to** to go to its shelf. Select **Top** to go to the first shelf.
 - **Movies posters.** A short line marks the selected poster. Alder shows the title while it gets the poster.
 - **Shows.** Select a genre in **Jump to** to go to its shelf. Select **Top** to go to the first shelf.
 - **Shows posters.** The posters are brighter. A short line marks the selected poster. Alder shows the title while it gets the poster.
@@ -62,6 +70,20 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Fixes
 - **Search posters.** Posters in **Search** no longer go blank when a new add-on answer comes in. The posters on the screen load first. When a poster does not load, Alder tries again, then shows the title name on the card.
+- **Add-ons stay safe.** Before, if you added an add-on while **My add-ons** loaded, Stremio kept only that add-on. Now **Add by URL** shows after the list loads, and Alder saves one change at a time.
+- **An add-on with errors does not empty Home.** Before, one add-on with a broken manifest stopped all rows. Now Alder shows the rows of the other add-ons and keeps the broken add-on in your list.
+- **Title page.** Before, Alder stopped when you pressed a key on a title page that did not load. Before, the page went blank if new details came while the episode list was open.
+- **Fewer source changes.** Before, after two network problems in one video, the third problem made Alder change the source. Now each problem gets two new tries.
+- **Change stream.** Before, a source that you selected in **Change stream** could fail after a live source. Now Alder also selects the audio and the subtitle for the new source again.
+- **Skip intro.** When you go back into an intro, **Skip intro** shows again. Before, it showed only one time in each video.
+- **Skip intro on more MKV files.** Before, Alder did not find the chapters of an MKV file when they were not at the start of the file.
+- **Subtitles when paused.** Before, the video started when you selected an add-on subtitle while it was paused. Now the video stays paused.
+- **Watch progress from other devices.** Before, if the clock of the TV was fast, the TV could show old progress and write it over newer progress from your phone.
+- **Clear local storage asks for a PIN.** If a profile has a PIN, Alder asks for it before **Settings → Storage → Clear local storage** removes all profiles.
+- **Sign-in.** Before, if you pressed **Back** while Alder examined a new sign-in, Alder still made the profile.
+- **Large subtitle files.** Alder does not open a subtitle file that is larger than 16 MB. Before, a very large file could stop Alder.
+- **Errors that did not show.** Alder now tells you when an actor's titles cannot load, when no app on the TV can play a trailer, and when the add-ons of a shared profile cannot load. **Mark as watched** on a show no longer marks only the show when Alder cannot get its episodes: Alder tells you why and lets you try again.
+- **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, Alder shows the name of the add-on and the cause, for example "AIOLists couldn't load · it sends a web page, not titles". It tells you to update or remove that add-on in Stremio. Press Down from the top bar to go to **Try again**.
 - **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
 - **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
 - **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.

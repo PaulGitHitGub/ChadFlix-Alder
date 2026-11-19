@@ -14,10 +14,12 @@ import java.util.concurrent.TimeUnit
  * [descriptor] is the account's entry for it as Stremio stores it, kept whole so it can be copied to another profile.
  */
 class Addon(val descriptor: JSONObject) {
-    private val manifest: JSONObject = descriptor.getJSONObject("manifest")
+    // An entry with a broken manifest stays in the list with nothing to show: dropping it would drop it from the
+    // account too, the next time My add-ons saves the list.
+    private val manifest: JSONObject = descriptor.optJSONObject("manifest") ?: JSONObject()
     val id: String = manifest.optString("id")
     val name: String = manifest.optString("name")
-    val transportUrl: String = descriptor.getString("transportUrl")
+    val transportUrl: String = descriptor.optString("transportUrl")
     /** Stremio's built-ins (Cinemeta, Local Files), which every account already has. */
     val official = descriptor.optJSONObject("flags")?.optBoolean("official") == true
     /** Stremio's own that can't be removed (Cinemeta, Local Files); they can still be moved. */
@@ -51,6 +53,8 @@ class Addon(val descriptor: JSONObject) {
      * (a search query) still leaves the catalog out.
      */
     val catalogs: List<Catalog> = manifest.optJSONArray("catalogs").objects().mapNotNull { c ->
+        val type = c.text("type") ?: return@mapNotNull null // one broken catalog leaves out only itself
+        val catalogId = c.text("id") ?: return@mapNotNull null
         val extra = c.optJSONArray("extra").objects()
         val extras = c.optJSONArray("extraSupported").strings() + extra.map { it.optString("name") }
         // The genres it can filter by: the protocol's `genre` extra options, or the older `genres` list.
@@ -62,7 +66,7 @@ class Addon(val descriptor: JSONObject) {
             val choices = own?.optJSONArray("options").strings().ifEmpty { if (name == "genre") options else emptyList() }
             own?.text("default")?.takeIf { it in choices } ?: choices.firstOrNull() ?: return@mapNotNull null
         }
-        Catalog(this, c.getString("type"), c.getString("id"), c.optString("name").ifEmpty { c.getString("id") }, "skip" in extras,
+        Catalog(this, type, catalogId, c.optString("name").ifEmpty { catalogId }, "skip" in extras,
             options.filterNot { it.equals("None", ignoreCase = true) }, required) // "None" is no filter, not a genre
     }
 
@@ -81,14 +85,14 @@ class Addon(val descriptor: JSONObject) {
     // Catalogs (one [genre] of them with Stremio's `genre` extra) and details are kept on disk as they arrive; the saved*
     // versions read last time's answer, no network.
     fun catalog(c: Catalog, genre: String? = null, timeoutMs: Int = 20_000): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, genre), true, timeoutMs, strict = true)).getJSONArray("metas").objects().map(::Meta)
+        JSONObject(Http.get(catalogUrl(c, genre), true, timeoutMs, strict = true)).getJSONArray("metas").objects().metas()
 
     /** The titles after the first [skip] (Stremio's paging extra); not kept on disk. */
     fun catalog(c: Catalog, skip: Int): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, null, skip), strict = true)).getJSONArray("metas").objects().map(::Meta)
+        JSONObject(Http.get(catalogUrl(c, null, skip), strict = true)).getJSONArray("metas").objects().metas()
 
     fun savedCatalog(c: Catalog, genre: String? = null): List<Meta>? =
-        Http.savedAnswer(catalogUrl(c, genre))?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.map(::Meta)
+        Http.savedAnswer(catalogUrl(c, genre))?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.metas()
 
     /** /catalog/type/id/genre=Drama&skip=20.json: the catalog's required extras, the [genre] picked, and the page. */
     private fun catalogUrl(c: Catalog, genre: String?, skip: Int = 0): String {
@@ -119,7 +123,7 @@ class Addon(val descriptor: JSONObject) {
             val path = url(arrayOf("catalog", c.getString("type"), c.getString("id"))).removeSuffix(".json")
             val searchUrl = "$path/search=${Uri.encode(query)}.json"
             val answer = JSONObject(Http.get(searchUrl, timeoutMs = 5_000, strict = true))
-            return answer.getJSONArray("metas").objects().map(::Meta)
+            return answer.getJSONArray("metas").objects().metas()
         }
         val completion = ExecutorCompletionService<Pair<Int, Result<List<Meta>>>>(catalogSearchPool)
         val pending = catalogs.mapIndexed { index, catalog -> completion.submit { index to runCatching { fetch(catalog) } } }
@@ -156,7 +160,7 @@ class Addon(val descriptor: JSONObject) {
         } ?: return null
         val path = url(arrayOf("catalog", type, catalog.getString("id"))).removeSuffix(".json")
         return JSONObject(Http.get("$path/similar=${Uri.encode(id, ":")}.json", true))
-            .optJSONArray("metas").objects().map(::Meta)
+            .optJSONArray("metas").objects().metas()
     }
 
     /**
@@ -496,6 +500,9 @@ class Stream(
 fun JSONArray?.items(): List<Any> = if (this == null) emptyList() else (0 until length()).map { get(it) }
 
 fun JSONArray?.objects(): List<JSONObject> = items().filterIsInstance<JSONObject>()
+
+/** A catalog's titles: one without an id is left out, not the whole row. */
+fun List<JSONObject>.metas(): List<Meta> = mapNotNull { runCatching { Meta(it) }.getOrNull() }
 
 fun JSONArray?.strings(): List<String> = items().filterIsInstance<String>()
 

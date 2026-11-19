@@ -38,6 +38,16 @@
 
     <!-- Home -->
     <string name="tab_home">Home</string>
+    <string name="tab_discover">Discover</string>
+    <string name="discover_genre">Genre</string>
+    <string name="discover_year">Year</string>
+    <string name="discover_before_1980">Before 1980</string>
+    <string name="discover_on">Service</string>
+    <string name="discover_sort_popular">Popular</string>
+    <string name="discover_sort_top">Top rated</string>
+    <string name="discover_sort_new">Newest</string>
+    <string name="discover_empty">Nothing matches these choices. Try fewer of them.</string>
+    <string name="tmdb_notice">This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="tab_shows">Shows</string>
     <string name="tab_movies">Movies</string>
     <string name="tab_live">Live</string>
@@ -74,10 +84,6 @@
     <string name="list_sort_recent">Recently added</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Unwatched first</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d title</item>
-        <item quantity="other">%1$d titles</item>
-    </plurals>
     <string name="list_empty">Titles you save with + appear here</string>
     <string name="list_empty_movies">No movies in My List</string>
     <string name="list_empty_shows">No shows in My List</string>
@@ -540,8 +546,6 @@
     <string name="profiles_watchly_steps">"1.  Scan with %1$s's phone to open Watchly\n2.  Connect %1$s's Stremio account there\n3.  Install it to %1$s's Stremio account\n\n%1$s's own \"Top Picks\" then show up on Home. You can finish this later."</string>
     <string name="profiles_all_set">You\'re all set</string>
     <string name="profiles_ready">%1$s\'s profile is ready. You can add more add-ons later in Settings.</string>
-    <string name="catalog_jump_to">Jump to</string>
-    <string name="catalog_jump_top">Top</string>
     <string name="display_resolution">Display resolution</string>
     <string name="display_resolution_hint">Choose the TV resolution Alder uses to pick a source. Use 4K if your box reports 1080p but outputs 4K.</string>
     <string name="error_sign_in">sign in to Stremio again</string>
@@ -551,6 +555,24 @@
     <string name="error_network">network error</string>
     <string name="library_edit_failed">Couldn\'t save the watched status</string>
     <string name="search_incomplete">Search results are incomplete</string>
+    <string name="catalog_addon_failed">%1$s couldn\'t load</string>
+    <string name="failure_web_page">it sends a web page, not titles</string>
+    <string name="failure_advice_sign_in">Sign in to Stremio again.</string>
+    <string name="failure_advice_access">Check the key or account in this add-on\'s settings in Stremio.</string>
+    <string name="failure_advice_timeout">Check your internet connection, then try again.</string>
+    <string name="failure_advice_address">Check your internet connection. If it works, the add-on may have moved: update it in Stremio.</string>
+    <string name="failure_advice_connection">The service may be down. Try again later.</string>
+    <string name="failure_advice_secure">Check the date and time on your TV, then try again.</string>
+    <string name="failure_advice_busy">Wait a minute, then try again.</string>
+    <string name="failure_advice_server">The service has a problem. Try again later.</string>
+    <string name="failure_advice_response">If this goes on, update or remove the add-on in Stremio.</string>
+    <string name="failure_advice_missing">Try another add-on or source.</string>
+    <string name="failure_advice_format">Try another source.</string>
+    <string name="failure_advice_network">Check your internet connection, then try again.</string>
+    <string name="failure_advice_web_page">The add-on may have moved or closed: update or remove it in Stremio.</string>
+    <string name="failure_advice_other">Try again. If this goes on, send a report from Settings › About.</string>
+    <string name="filmography_failed">Couldn\'t get this person\'s titles</string>
+    <string name="trailer_no_app">No app on this TV can play the trailer. Install YouTube to watch it.</string>
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. Alder will try to sync it again.</string>
     <string name="library_load_failed">Couldn\'t load your Stremio library</string>

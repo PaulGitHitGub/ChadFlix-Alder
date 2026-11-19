@@ -17,8 +17,15 @@ class FailuresTest {
         assertEquals(Failure.SIGN_IN, failureOf(Stremio.ApiException(Stremio.NO_SESSION, "secret")))
         assertEquals(Failure.TIMEOUT, failureOf(SocketTimeoutException("secret")))
         assertEquals(Failure.BUSY, failureOf(HttpError(429)))
+        assertEquals(Failure.WEB_PAGE, failureOf(WebPageAnswer())) // a closed add-on's host page, not "invalid response"
         assertEquals(Failure.FORMAT, playbackFailure(PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED, null))
         assertEquals("error", failureReason(IllegalStateException("https://example.org/key")))
+    }
+
+    @Test fun everyFailureSaysWhatToDo() {
+        val advice = Failure.entries.map { it.advice }
+        assertEquals(Failure.entries.size, advice.toSet().size) // each kind has its own line
+        assertTrue(Failure.entries.all { it.advice != it.message })
     }
 
     @Test fun offlineProgressPreservesLibraryFieldsAndResumesFromTheLocalCheckpoint() {

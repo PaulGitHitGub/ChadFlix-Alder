@@ -178,8 +178,9 @@ class DetailsActivity : Screen() {
             }
             richCast = m.castMembers
             certificate = m.certification ?: certificate
+            val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
             showHero(m)
-            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) buildGuide(m.videos)
+            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
             if (!hasEpisodes(type, m.videos) && !similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
             if (!certificateRequested && certificate == null && m.id.startsWith("tt")) {
@@ -1363,9 +1364,10 @@ class DetailsActivity : Screen() {
                 Tmdb.personCredits(actor.tmdbId, actor.name, actor.isDirector)
             }.getOrDefault(emptySet())
 
-            val allMetas = Stremio.addons(key).flatMap { addon ->
-                runCatching { addon.search(actor.name) }.getOrNull().orEmpty()
-            }.distinctBy { it.id }.filter { it.id != metaId }
+            val searches = Stremio.addons(key).map { addon -> runCatching { addon.search(actor.name) } }
+            // Every add-on failed: the viewer hears why, not an empty list.
+            searches.takeIf { it.isNotEmpty() && it.all { r -> r.isFailure } }?.let { throw it.first().exceptionOrNull()!! }
+            val allMetas = searches.flatMap { it.getOrNull().orEmpty() }.distinctBy { it.id }.filter { it.id != metaId }
 
             val actorLower = actor.name.lowercase().trim()
 
@@ -1395,6 +1397,12 @@ class DetailsActivity : Screen() {
                 isCredited || allMetas.size <= 4 || !metaTitleLower.contains(actorLower)
             }.take(16)
         }) { result ->
+            result.exceptionOrNull()?.let { error ->
+                val reason = failureOf(error)
+                FailureLog.record(FailureLog.Operation.SEARCH, reason)
+                android.widget.Toast.makeText(this, failureMessage(R.string.filmography_failed, reason, advice = false),
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
             val titles = result.getOrNull().orEmpty()
             if (titles.isEmpty()) {
                 if (!infoOpen) showInfo(focusCast = true)
@@ -1574,9 +1582,9 @@ class DetailsActivity : Screen() {
         val opened = runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:$id")))
         }.isSuccess
-        if (!opened) runCatching {
+        if (!opened && runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")))
-        }
+        }.isFailure) android.widget.Toast.makeText(this, R.string.trailer_no_app, android.widget.Toast.LENGTH_LONG).show()
     }
 
     private fun openSources(videoId: String, startOver: Boolean, next: String? = null, label: String? = null, pick: Boolean = false) {
@@ -1670,11 +1678,11 @@ class DetailsActivity : Screen() {
                     KeyEvent.KEYCODE_DPAD_RIGHT -> if (chipIndex == castChips.lastIndex) return true
                 }
             } else if (!infoOpen && !similarOpen && !filmographyOpen &&
-                currentFocus?.let { it === playButton || (::buttonRow.isInitialized && isInside(it, buttonRow)) } == true) {
+                currentFocus?.let { (::playButton.isInitialized && it === playButton) || (::buttonRow.isInitialized && isInside(it, buttonRow)) } == true) {
                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                     castChips.firstOrNull()?.requestFocus()
                     return true
-                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && currentFocus === playButton) {
+                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && ::playButton.isInitialized && currentFocus === playButton) {
                     return true
                 } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && ::buttonRow.isInitialized &&
                     currentFocus === (0 until buttonRow.childCount).map { buttonRow.getChildAt(it) }.lastOrNull { it.visibility == View.VISIBLE && it.isFocusable }) {

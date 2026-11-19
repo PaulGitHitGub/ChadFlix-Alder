@@ -39,6 +39,15 @@ class ProfilesActivity : Screen() {
         // The activity is exported, so the extra is untrusted: enter() still asks for the PIN, and a profile that
         // isn't signed out just opens.
         val again = intent.getStringExtra("signIn")?.let { id -> profiles.firstOrNull { it.id == id } }
+        // Settings asks before Clear storage: any locked profile's PIN answers it. Only the result goes back, so
+        // another app that sends this extra gets nothing cleared.
+        if (intent.getBooleanExtra(UNLOCK, false)) {
+            val pins = profiles.mapNotNull { it.pin }
+            if (pins.isEmpty()) { setResult(RESULT_OK); return finish() }
+            return askPin(getString(R.string.clear_storage_title), { setResult(RESULT_CANCELED); finish() }) { typed ->
+                (typed in pins).also { ok -> if (ok) { setResult(RESULT_OK); finish() } }
+            }
+        }
         when {
             again != null -> enter(again)
             profiles.isEmpty() -> showName()
@@ -88,6 +97,7 @@ class ProfilesActivity : Screen() {
     // ---------- who's watching ----------
 
     private fun showPicker() {
+        ++signInGeneration // a sign-in still on the way is left behind
         // Opened from inside a profile (Switch profile, Manage profiles): Back returns to it instead of leaving Alder.
         val current = Profiles.active(this)?.takeIf { intent.getBooleanExtra("pick", false) }
         backTo = current?.let { { openHome(it) } }
@@ -357,6 +367,7 @@ class ProfilesActivity : Screen() {
 
     private fun showName() {
         ++pickerGeneration
+        ++signInGeneration // a sign-in still on the way is left behind
         backTo = if (Profiles.all(this).isEmpty()) null else ::showPicker
         signingIn = false
         waitingCode = null
@@ -572,7 +583,7 @@ class ProfilesActivity : Screen() {
                 fun tick() {
                     if (!signingIn || request != signInGeneration || waitingCode != link.code) return
                     val leftSeconds = ((5 * 60_000L - (SystemClock.elapsedRealtime() - started)).coerceAtLeast(0) / 1000).toInt()
-                    status.text = pollFailure?.let { failureMessage(R.string.profiles_unreachable, it) }
+                    status.text = pollFailure?.let { failureMessage(R.string.profiles_unreachable, it, source = "Stremio", advice = false) }
                         ?: getString(R.string.profiles_waiting, "${leftSeconds / 60}:${"%02d".format(leftSeconds % 60)}")
                     countdown.progress = leftSeconds * 1000 / 300
                     main.postDelayed(::tick, 1_000)
@@ -587,7 +598,7 @@ class ProfilesActivity : Screen() {
             }.onFailure {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.SIGN_IN, failure)
-                status.text = failureMessage(R.string.profiles_unreachable, failure)
+                status.text = failureMessage(R.string.profiles_unreachable, failure, source = "Stremio", advice = false)
                 main.postDelayed({ if (signingIn && request == signInGeneration) showSignIn(name, again) }, 5_000)
             }
         }
@@ -676,11 +687,13 @@ class ProfilesActivity : Screen() {
      */
     private fun approved(name: String, key: String, again: Profile?) {
         val others = Profiles.all(this).filter { it.id != again?.id }
+        val request = signInGeneration
         background({
             others.firstOrNull { it.authKey == key } ?: Stremio.userId(key).let { account ->
                 others.firstOrNull { runCatching { Stremio.userId(it.authKey) }.getOrNull() == account }
             }
         }) { result ->
+            if (request != signInGeneration) return@background // Back during the check: no profile is made
             val same = result.getOrNull() ?: return@background signedIn(name, key, again) // unknown: don't hold anyone up
             choose(getString(R.string.profiles_same_account, same.name),
                 listOf(getString(R.string.profiles_other_account), getString(R.string.profiles_continue_anyway)),
@@ -744,8 +757,10 @@ class ProfilesActivity : Screen() {
         done.requestFocus()
     }
 
-    private companion object {
+    companion object {
+        const val UNLOCK = "unlock"
         const val LIFT_ROOM = 8 // dp above the portraits for the focused one's 10% lift and ring
         const val KEY_H = 25 // dp a key row on the name step, so Continue fits under the colours
     }
+
 }

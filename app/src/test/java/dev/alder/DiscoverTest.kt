@@ -1,0 +1,66 @@
+package dev.alder
+
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Discover's TMDB search: the filters as TMDB takes them, and results as titles under their IMDb ids. */
+class DiscoverTest {
+    private fun params(q: DiscoverQuery) =
+        discoverUrl(q, 2, "CA", "en-CA", "2026-11-18", "k").substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
+
+    @Test fun popularMoviesAreTheStart() {
+        assertEquals("movie", DiscoverQuery().type)
+        val p = params(DiscoverQuery(type = "movie"))
+        assertTrue(discoverUrl(DiscoverQuery(type = "movie"), 1, "CA", "en", "2026-11-18", "k").contains("/discover/movie?"))
+        assertEquals("popularity.desc", p["sort_by"])
+        assertEquals("false", p["include_adult"])
+        assertEquals("2", p["page"])
+        assertFalse("with_genres" in p)
+    }
+
+    @Test fun animeIsJapaneseAnimationShows() {
+        val url = discoverUrl(DiscoverQuery(type = "anime", genre = 10759), 1, "CA", "en", "2026-11-18", "k")
+        assertTrue(url.contains("/discover/tv?"))
+        val p = params(DiscoverQuery(type = "anime", genre = 10759))
+        assertEquals("16%2C10759", p["with_genres"])
+        assertEquals("ja", p["with_original_language"])
+    }
+
+    @Test fun decadeServiceAndNewestUseTheRightDates() {
+        val p = params(DiscoverQuery(type = "series", decade = 2010, service = 8, sort = "new"))
+        assertEquals("2010-01-01", p["first_air_date.gte"])
+        assertEquals("2019-12-31", p["first_air_date.lte"])
+        assertEquals("8", p["with_watch_providers"])
+        assertEquals("CA", p["watch_region"])
+        assertEquals("first_air_date.desc", p["sort_by"])
+        // Newest in this decade: nothing later than today, which is already past the decade's end.
+        assertEquals("2026-11-18", params(DiscoverQuery(type = "movie", sort = "new"))["primary_release_date.lte"])
+        assertEquals("1979-12-31", params(DiscoverQuery(type = "movie", decade = 0))["primary_release_date.lte"])
+        assertEquals("300", params(DiscoverQuery(type = "movie", sort = "top"))["vote_count.gte"])
+    }
+
+    @Test fun aResultBecomesATitleUnderItsImdbId() {
+        val t = JSONObject("""{"id":603,"title":"The Matrix","poster_path":"/p.jpg","backdrop_path":"/b.jpg",
+            "overview":"A hacker.","release_date":"1999-03-30","genre_ids":[28,878]}""")
+        val m = discoverMeta(t, "tt0133093", movie = true, genreNames = mapOf(28 to "Action", 878 to "Science Fiction"))
+        assertEquals("tt0133093", m.id)
+        assertEquals("movie", m.type)
+        assertEquals("The Matrix", m.name)
+        assertEquals("https://image.tmdb.org/t/p/w342/p.jpg", m.poster)
+        assertEquals("https://image.tmdb.org/t/p/w1280/b.jpg", m.background)
+        assertEquals("1999", m.year)
+        assertEquals(listOf("Action", "Science Fiction"), m.genres)
+    }
+
+    @Test fun myListYearsGoInTheirDecade() {
+        assertTrue(inDecade("2019", 2010))
+        assertTrue(inDecade("2019–2023", 2010))
+        assertFalse(inDecade("2020", 2010))
+        assertTrue(inDecade("1975", 0))
+        assertFalse(inDecade("1980", 0))
+        assertFalse(inDecade(null, 2010))
+    }
+}

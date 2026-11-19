@@ -39,6 +39,16 @@
 
     <!-- Home -->
     <string name="tab_home">Home</string>
+    <string name="tab_discover">Scopri</string>
+    <string name="discover_genre">Genere</string>
+    <string name="discover_year">Anno</string>
+    <string name="discover_before_1980">Prima del 1980</string>
+    <string name="discover_on">Servizio</string>
+    <string name="discover_sort_popular">Popolari</string>
+    <string name="discover_sort_top">Più votati</string>
+    <string name="discover_sort_new">Più recenti</string>
+    <string name="discover_empty">Niente corrisponde a queste scelte. Prova con meno filtri.</string>
+    <string name="tmdb_notice">Questo prodotto usa l’API di TMDB, ma non è approvato né certificato da TMDB.</string>
     <string name="tab_shows">Serie</string>
     <string name="tab_movies">Film</string>
     <string name="tab_live">Dirette</string>
@@ -75,11 +85,6 @@
     <string name="list_sort_recent">Aggiunti di recente</string>
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Prima i non visti</string>
-    <plurals name="list_title_count">
-        <item quantity="one">%1$d titolo</item>
-        <item quantity="many">%1$d titoli</item>
-        <item quantity="other">%1$d titoli</item>
-    </plurals>
     <string name="list_empty">I titoli che salvi con + compaiono qui</string>
     <string name="list_empty_movies">Nessun film in La mia lista</string>
     <string name="list_empty_shows">Nessuna serie in La mia lista</string>
@@ -545,8 +550,6 @@
     <string name="profiles_all_set">Tutto pronto</string>
     <string name="profiles_ready">Il profilo di %1$s è pronto. Puoi aggiungere altri add-on più tardi in Impostazioni.</string>
     <string name="time_left_under_minute">Meno di 1 min</string>
-    <string name="catalog_jump_to">Vai a</string>
-    <string name="catalog_jump_top">Inizio</string>
     <string name="display_resolution">Risoluzione dello schermo</string>
     <string name="display_resolution_hint">Scegli la risoluzione del TV che Alder usa per selezionare una sorgente. Scegli 4K se il tuo dispositivo indica 1080p ma trasmette in 4K.</string>
     <string name="error_sign_in">accedi di nuovo a Stremio</string>
@@ -556,6 +559,24 @@
     <string name="error_network">errore di rete</string>
     <string name="library_edit_failed">Impossibile salvare lo stato di visione</string>
     <string name="search_incomplete">I risultati della ricerca sono incompleti</string>
+    <string name="catalog_addon_failed">Impossibile caricare %1$s</string>
+    <string name="failure_web_page">invia una pagina web, non titoli</string>
+    <string name="failure_advice_sign_in">Accedi di nuovo a Stremio.</string>
+    <string name="failure_advice_access">Controlla la chiave o l\'account nelle impostazioni di questo add-on in Stremio.</string>
+    <string name="failure_advice_timeout">Controlla la connessione a Internet, poi riprova.</string>
+    <string name="failure_advice_address">Controlla la connessione a Internet. Se funziona, l\'add-on potrebbe essersi spostato: aggiornalo in Stremio.</string>
+    <string name="failure_advice_connection">Il servizio potrebbe essere non disponibile. Riprova più tardi.</string>
+    <string name="failure_advice_secure">Controlla data e ora sulla TV, poi riprova.</string>
+    <string name="failure_advice_busy">Aspetta un minuto, poi riprova.</string>
+    <string name="failure_advice_server">Il servizio ha un problema. Riprova più tardi.</string>
+    <string name="failure_advice_response">Se continua così, aggiorna o rimuovi l\'add-on in Stremio.</string>
+    <string name="failure_advice_missing">Prova un altro add-on o un\'altra fonte.</string>
+    <string name="failure_advice_format">Prova un\'altra fonte.</string>
+    <string name="failure_advice_network">Controlla la connessione a Internet, poi riprova.</string>
+    <string name="failure_advice_web_page">L\'add-on potrebbe essersi spostato o chiuso: aggiornalo o rimuovilo in Stremio.</string>
+    <string name="failure_advice_other">Riprova. Se continua così, invia una segnalazione da Impostazioni › Informazioni.</string>
+    <string name="filmography_failed">Impossibile ottenere i titoli di questa persona</string>
+    <string name="trailer_no_app">Nessuna app di questa TV può riprodurre il trailer. Installa YouTube per guardarlo.</string>
     <string name="catalog_incomplete">Impossibile caricare alcuni cataloghi</string>
     <string name="progress_saved_on_tv">I progressi sono salvati su questo TV. Alder proverà a sincronizzarli di nuovo.</string>
     <string name="library_load_failed">Impossibile caricare la tua libreria Stremio</string>
