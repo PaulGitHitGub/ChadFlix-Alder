@@ -323,12 +323,8 @@ class PlayerActivity : Screen() {
     private val dialogueProcessor = DialogueAudioProcessor()
     @Volatile private var decodeAudio = false
     @Volatile private var retryWithPcm = false
-    // Playback speed: [speed] is what the audio sink plays at (it decodes to PCM for any but 1x), [wantSpeed] what the
-    // speed button shows. Presses land a moment later, so stepping past 1x doesn't reopen the audio route each time.
-    @Volatile private var speed = 1f
-    private var wantSpeed = 1f
+    @Volatile private var speed = 1f // playback speed: the audio sink decodes to PCM for any but 1x
     @Volatile private var passthroughOut = false // the audio track takes the stream as it is, not decoded PCM
-    private val speedTask = Runnable { applySpeed() }
     private var pickedSub: String? = null // the exact subtitle picked for this video before: "addon:<url>" or "file:<track id>"
     // Timing for subtitles (in the file or from add-ons): offset is applied directly to the TextRenderer live.
     private var subDelay = 0L
@@ -1116,24 +1112,48 @@ class PlayerActivity : Screen() {
         android.util.Log.i("Alder", reason)
     }
 
-    private fun stepSpeed() {
-        wantSpeed = nextSpeed(wantSpeed)
-        speedButton.text = speedLabel(wantSpeed)
-        main.removeCallbacks(speedTask)
-        main.postDelayed(speedTask, SPEED_SETTLE)
+    /** The speeds in a small list over the speed button, the current one focused and lit; OK plays at the one chosen. */
+    private fun openSpeedMenu() {
+        speedMenu.removeAllViews()
+        val rows = SPEEDS.map { s ->
+            text(speedLabel(s), BODY, bold = s == speed, color = if (s == speed) TUNGSTEN else TEXT_2).apply {
+                id = View.generateViewId()
+                gravity = Gravity.CENTER
+                rowFocus(8)
+                setOnClickListener { closeSpeedMenu(); applySpeed(s) }
+            }
+        }
+        // D-pad stays in the list: left and right go nowhere, and up and down stop at its ends.
+        for (row in rows) { row.nextFocusLeftId = row.id; row.nextFocusRightId = row.id }
+        rows.first().nextFocusUpId = rows.first().id
+        rows.last().nextFocusDownId = rows.last().id
+        rows.forEach { speedMenu.addView(it, LinearLayout.LayoutParams(-1, dp(36))) }
+        // Centred over the button; window positions, so it holds in right-to-left layouts too.
+        val button = IntArray(2).also(speedButton::getLocationInWindow)[0]
+        val parent = IntArray(2).also(controls::getLocationInWindow)[0]
+        speedMenu.translationX = (button - parent + (speedButton.width - dp(SPEED_MENU_WIDTH)) / 2).toFloat()
+        speedMenu.visibility = View.VISIBLE
+        rows[SPEEDS.indexOf(speed).coerceAtLeast(0)].requestFocus()
+    }
+
+    private fun closeSpeedMenu() {
+        if (speedMenu.visibility != View.VISIBLE) return
+        speedMenu.visibility = View.GONE
+        speedButton.requestFocus()
     }
 
     /**
-     * Plays at [wantSpeed]. Away from 1x a passthrough stream is reopened as PCM, since the sink can only time-stretch
-     * PCM; back at 1x a stream the route can pass is reopened as it is again.
+     * Plays at [to]. Away from 1x a passthrough stream is reopened as PCM, since the sink can only time-stretch PCM;
+     * back at 1x a stream the route can pass is reopened as it is again.
      */
-    private fun applySpeed() {
-        if (wantSpeed == speed) return
-        val reopen = if (wantSpeed != 1f) passthroughOut
+    private fun applySpeed(to: Float) {
+        speedButton.text = speedLabel(to)
+        if (to == speed) return
+        val reopen = if (to != 1f) passthroughOut
         else !decodeAudio && !retryWithPcm && player.currentTracks.groups
             .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
             ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
-        speed = wantSpeed
+        speed = to
         if (reopen) {
             player.stop()
             retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
@@ -1493,6 +1513,11 @@ class PlayerActivity : Screen() {
             if (!down) wakeKey = 0
             return true
         }
+        // Back with the speed list open closes only the list.
+        if (speedMenu.visibility == View.VISIBLE && event.keyCode == KeyEvent.KEYCODE_BACK) {
+            if (!down) closeSpeedMenu()
+            return true
+        }
         // Back with the controls up closes them; the next Back leaves the player.
         if (shown && event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (chapterSnapMode) {
@@ -1607,6 +1632,7 @@ class PlayerActivity : Screen() {
     private lateinit var playPause: TextView
     private lateinit var audioButton: TextView
     private lateinit var speedButton: TextView
+    private lateinit var speedMenu: LinearLayout
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
@@ -1775,10 +1801,10 @@ class PlayerActivity : Screen() {
 
         audioButton = button(getString(R.string.player_audio_subtitles), R.drawable.ic_subtitles) { openOptions() }
         val streamButton = button(getString(R.string.player_change_stream), R.drawable.ic_layers) { changeStream() }
-        // Shows the speed itself rather than an icon; each press steps to the next one.
-        speedButton = button(getString(R.string.player_speed), R.drawable.ic_layers) { stepSpeed() }.apply {
+        // Shows the speed itself rather than an icon; OK opens the list of speeds above it.
+        speedButton = button(getString(R.string.player_speed), R.drawable.ic_layers) { openSpeedMenu() }.apply {
             foreground = null
-            text = speedLabel(wantSpeed)
+            text = speedLabel(speed)
             textSize = SMALL
             typeface = this@PlayerActivity.text("", SMALL, bold = true).typeface
         }
@@ -1802,12 +1828,12 @@ class PlayerActivity : Screen() {
             if (!isTrailer) {
                 addView(buttonCell(streamButton))
                 addView(buttonCell(audioButton))
-                addView(buttonCell(speedButton))
                 addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
                     LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
             }
             addView(buttonCell(playPause, true))
             if (!isTrailer) {
+                addView(buttonCell(speedButton)) // between the dividers with play: both are about how it plays
                 addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
                     LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
                 addView(nextCell)
@@ -1818,6 +1844,12 @@ class PlayerActivity : Screen() {
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
+        speedMenu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            background = videoGlass(12)
+            visibility = View.GONE
+        }
 
         return FrameLayout(this).apply {
             visibility = View.GONE
@@ -1863,6 +1895,11 @@ class PlayerActivity : Screen() {
             addView(column(Gravity.END, keyHint("OK", getString(R.string.key_play_pause)), keyHint("◀ ▶", getString(R.string.key_seek))),
                 FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(PAD); bottomMargin = dp(35)
+            })
+            // Last, so it's drawn over the seek bar; just above the buttons' circles. LEFT, not START: openSpeedMenu
+            // places it by window position.
+            addView(speedMenu, FrameLayout.LayoutParams(dp(SPEED_MENU_WIDTH), -2, Gravity.BOTTOM or Gravity.LEFT).apply {
+                bottomMargin = dp(95)
             })
         }
     }
@@ -2112,6 +2149,7 @@ class PlayerActivity : Screen() {
     private fun hideControls(force: Boolean = false) {
         if (!force && !player.playWhenReady) return
         setChapterSnapMode(false)
+        speedMenu.visibility = View.GONE
         chapterPill.visibility = View.INVISIBLE
         shown = false
         main.removeCallbacks(hideTask)
@@ -3204,7 +3242,6 @@ class PlayerActivity : Screen() {
         opened?.close()
         opened = null
         main.removeCallbacks(loadingTask)
-        main.removeCallbacks(speedTask)
         if (::status.isInitialized) player.release()
         super.onDestroy()
     }
@@ -3215,7 +3252,7 @@ class PlayerActivity : Screen() {
         const val RESUME_SLACK = 10_000L // how far apart the saved and fresh resume points may be before it jumps
         const val SKIP = 10_000L // ms a Left/Right press on the bar moves
         const val SEEK_SETTLE = 600L // ms after the last skip before seeking
-        const val SPEED_SETTLE = 700L // ms after the last speed press before the speed (and maybe the audio route) changes
+        const val SPEED_MENU_WIDTH = 88 // dp
         const val SKIP_SHOWN = 10_000L // ms the Skip intro pill stays, as in NuvioTV
         const val HIDE = 5_000L // ms the controls stay up while playing
         const val START_WAIT = 12_000L // ms for a source to show a picture before the next is tried (4K DV from debrid took 6 s)

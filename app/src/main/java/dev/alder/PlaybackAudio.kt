@@ -60,9 +60,7 @@ internal fun losslessOutput(context: Context, attributes: AudioAttributes): (For
 }
 
 // Playback speeds offered in the player. Any but 1x needs PCM: a passthrough stream can't be time-stretched.
-internal val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
-
-internal fun nextSpeed(speed: Float): Float = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.size]
+internal val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
 internal fun speedLabel(speed: Float): String = speed.toString().trimEnd('0').trimEnd('.') + "×"
 
