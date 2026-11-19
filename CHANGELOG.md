@@ -69,6 +69,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Search posters.** Posters in **Search** no longer go blank when a new add-on answer comes in. The posters on the screen load first. When a poster does not load, Alder tries again, then shows the title name on the card.
 - **Add-ons stay safe.** Before, if you added an add-on while **My add-ons** loaded, Stremio kept only that add-on. Now **Add by URL** shows after the list loads, and Alder saves one change at a time.
 - **An add-on with errors does not empty Home.** Before, one add-on with a broken manifest stopped all rows. Now Alder shows the rows of the other add-ons and keeps the broken add-on in your list.
 - **Title page.** Before, Alder stopped when you pressed a key on a title page that did not load. Before, the page went blank if new details came while the episode list was open.
