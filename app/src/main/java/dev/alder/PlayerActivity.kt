@@ -594,6 +594,7 @@ class PlayerActivity : Screen() {
                     seekedAt = System.currentTimeMillis()
                     lastPosition = new.positionMs // a jump is not watched time
                     skipped.clear() // back into an intro: offer it again
+                    skip.tag = null // with a new 10 s window, not the old one
                 }
             }
 
