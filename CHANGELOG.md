@@ -77,6 +77,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Change stream.** Before, a source that you selected in **Change stream** could fail after a live source. Now Alder also selects the audio and the subtitle for the new source again.
 - **Skip intro.** When you go back into an intro, **Skip intro** shows again. Before, it showed only one time in each video.
 - **Skip intro on more MKV files.** Before, Alder did not find the chapters of an MKV file when they were not at the start of the file.
+- **Skip intro on anime.** Anime from AIOMetadata shows **Skip intro** when IntroDB has the times. Before, Alder did not find the intro for episodes with Kitsu or MAL ids.
 - **Subtitles when paused.** Before, the video started when you selected an add-on subtitle while it was paused. Now the video stays paused.
 - **Watch progress from other devices.** Before, if the clock of the TV was fast, the TV could show old progress and write it over newer progress from your phone.
 - **Clear local storage asks for a PIN.** If a profile has a PIN, Alder asks for it before **Settings → Storage → Clear local storage** removes all profiles.
