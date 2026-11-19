@@ -161,6 +161,7 @@
     <string name="player_paused">Paused</string>
     <string name="player_seek">Seek</string>
     <string name="player_audio_subtitles">Audio &amp; subtitles</string>
+    <string name="player_speed">Playback speed</string>
     <string name="player_change_stream">Change stream</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Info</string>

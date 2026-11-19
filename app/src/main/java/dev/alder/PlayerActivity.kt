@@ -27,6 +27,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -322,6 +323,12 @@ class PlayerActivity : Screen() {
     private val dialogueProcessor = DialogueAudioProcessor()
     @Volatile private var decodeAudio = false
     @Volatile private var retryWithPcm = false
+    // Playback speed: [speed] is what the audio sink plays at (it decodes to PCM for any but 1x), [wantSpeed] what the
+    // speed button shows. Presses land a moment later, so stepping past 1x doesn't reopen the audio route each time.
+    @Volatile private var speed = 1f
+    private var wantSpeed = 1f
+    @Volatile private var passthroughOut = false // the audio track takes the stream as it is, not decoded PCM
+    private val speedTask = Runnable { applySpeed() }
     private var pickedSub: String? = null // the exact subtitle picked for this video before: "addon:<url>" or "file:<track id>"
     // Timing for subtitles (in the file or from add-ons): offset is applied directly to the TextRenderer live.
     private var subDelay = 0L
@@ -371,7 +378,7 @@ class PlayerActivity : Screen() {
         dialogueProcessor.enabled = Settings.clearDialogue(this)
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                playbackAudioSink(context, dialogueProcessor) { decodeAudio || retryWithPcm }
+                playbackAudioSink(context, dialogueProcessor) { decodeAudio || retryWithPcm || speed != 1f }
 
             override fun buildTextRenderers(
                 context: Context,
@@ -400,6 +407,7 @@ class PlayerActivity : Screen() {
         player = ExoPlayer.Builder(this, renderers).setLoadControl(load).setTrackSelector(selector).build()
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
+                passthroughOut = !Util.isEncodingLinearPcm(audioTrackConfig.encoding)
                 android.util.Log.i("Alder", "Audio output: encoding=${audioTrackConfig.encoding}, sample rate=${audioTrackConfig.sampleRate}, channel mask=${audioTrackConfig.channelConfig}")
             }
         })
@@ -1108,6 +1116,31 @@ class PlayerActivity : Screen() {
         android.util.Log.i("Alder", reason)
     }
 
+    private fun stepSpeed() {
+        wantSpeed = nextSpeed(wantSpeed)
+        speedButton.text = speedLabel(wantSpeed)
+        main.removeCallbacks(speedTask)
+        main.postDelayed(speedTask, SPEED_SETTLE)
+    }
+
+    /**
+     * Plays at [wantSpeed]. Away from 1x a passthrough stream is reopened as PCM, since the sink can only time-stretch
+     * PCM; back at 1x a stream the route can pass is reopened as it is again.
+     */
+    private fun applySpeed() {
+        if (wantSpeed == speed) return
+        val reopen = if (wantSpeed != 1f) passthroughOut
+        else !decodeAudio && !retryWithPcm && player.currentTracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
+        speed = wantSpeed
+        if (reopen) {
+            player.stop()
+            retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
+        }
+        player.setPlaybackSpeed(speed)
+    }
+
     private val tickTask = Runnable { tick() }
 
     // Progress every 10 s, pushed to Stremio every minute (Stremio's own apps push every 3 minutes).
@@ -1573,6 +1606,7 @@ class PlayerActivity : Screen() {
     private lateinit var length: TextView
     private lateinit var playPause: TextView
     private lateinit var audioButton: TextView
+    private lateinit var speedButton: TextView
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
@@ -1741,6 +1775,13 @@ class PlayerActivity : Screen() {
 
         audioButton = button(getString(R.string.player_audio_subtitles), R.drawable.ic_subtitles) { openOptions() }
         val streamButton = button(getString(R.string.player_change_stream), R.drawable.ic_layers) { changeStream() }
+        // Shows the speed itself rather than an icon; each press steps to the next one.
+        speedButton = button(getString(R.string.player_speed), R.drawable.ic_layers) { stepSpeed() }.apply {
+            foreground = null
+            text = speedLabel(wantSpeed)
+            textSize = SMALL
+            typeface = this@PlayerActivity.text("", SMALL, bold = true).typeface
+        }
         playPause = button(getString(R.string.player_pause), R.drawable.ic_pause, primary = true) {
             if (player.playWhenReady) player.pause() else player.play()
         }
@@ -1761,6 +1802,7 @@ class PlayerActivity : Screen() {
             if (!isTrailer) {
                 addView(buttonCell(streamButton))
                 addView(buttonCell(audioButton))
+                addView(buttonCell(speedButton))
                 addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
                     LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
             }
@@ -1772,7 +1814,7 @@ class PlayerActivity : Screen() {
                 addView(buttonCell(infoButton))
             }
         }
-        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton))
+        for (button in listOf(streamButton, audioButton, speedButton, playPause, nextButton, infoButton))
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
@@ -3162,6 +3204,7 @@ class PlayerActivity : Screen() {
         opened?.close()
         opened = null
         main.removeCallbacks(loadingTask)
+        main.removeCallbacks(speedTask)
         if (::status.isInitialized) player.release()
         super.onDestroy()
     }
@@ -3172,6 +3215,7 @@ class PlayerActivity : Screen() {
         const val RESUME_SLACK = 10_000L // how far apart the saved and fresh resume points may be before it jumps
         const val SKIP = 10_000L // ms a Left/Right press on the bar moves
         const val SEEK_SETTLE = 600L // ms after the last skip before seeking
+        const val SPEED_SETTLE = 700L // ms after the last speed press before the speed (and maybe the audio route) changes
         const val SKIP_SHOWN = 10_000L // ms the Skip intro pill stays, as in NuvioTV
         const val HIDE = 5_000L // ms the controls stay up while playing
         const val START_WAIT = 12_000L // ms for a source to show a picture before the next is tried (4K DV from debrid took 6 s)

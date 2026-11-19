@@ -161,6 +161,7 @@
     <string name="player_paused">En pausa</string>
     <string name="player_seek">Avanzar o retroceder</string>
     <string name="player_audio_subtitles">Audio y subtítulos</string>
+    <string name="player_speed">Velocidad de reproducción</string>
     <string name="player_change_stream">Cambiar fuente</string>
     <string name="player_pause">Pausa</string>
     <string name="player_info">Info</string>
