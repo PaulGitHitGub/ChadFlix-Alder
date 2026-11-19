@@ -259,6 +259,13 @@ class ScreenDesignTest {
             rankSearchTitles(listOf("Arrival", "Amélie Returns", "Amelie"), "Amélie") { it })
     }
 
+    @Test fun searchTreatsTheAsOptionalAndPrefersBetterRatedTies() {
+        val titles = listOf("Matrix" to null, "The Matrix" to 8.7, "The Matrix Reloaded" to 7.2)
+        assertEquals(listOf("The Matrix", "Matrix", "The Matrix Reloaded"),
+            rankSearchTitles(titles, "matrix", rating = { it.second }) { it.first }.map { it.first })
+        assertEquals(listOf("The Thing", "Thing"), rankSearchTitles(listOf("Thing", "The Thing"), "the thing") { it })
+    }
+
     @Test fun partialSearchAnswersKeepAddonOrder() {
         val answers = arrayOf<List<String>?>(null, listOf("later"))
         assertEquals(listOf("later"), searchAnswersInAddonOrder(answers))

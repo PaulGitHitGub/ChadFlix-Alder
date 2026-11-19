@@ -47,7 +47,10 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             // -PdebugKey: an optimised build that installs over a debug one on a test TV (same key, data kept).
             signingConfig = signingConfigs.findByName("release")?.takeUnless { project.hasProperty("debugKey") }
-                ?: signingConfigs.getByName("debug")
+                ?: signingConfigs.getByName("debug").also {
+                    // A release with the debug key can't update the published app: say so, so it isn't published by mistake.
+                    if (keys == null) logger.warn("keystore.properties not found: release builds use the debug key")
+                }
         }
     }
 }

@@ -178,8 +178,9 @@ class DetailsActivity : Screen() {
             }
             richCast = m.castMembers
             certificate = m.certification ?: certificate
+            val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
             showHero(m)
-            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) buildGuide(m.videos)
+            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
             if (!hasEpisodes(type, m.videos) && !similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
             if (!certificateRequested && certificate == null && m.id.startsWith("tt")) {
@@ -1677,11 +1678,11 @@ class DetailsActivity : Screen() {
                     KeyEvent.KEYCODE_DPAD_RIGHT -> if (chipIndex == castChips.lastIndex) return true
                 }
             } else if (!infoOpen && !similarOpen && !filmographyOpen &&
-                currentFocus?.let { it === playButton || (::buttonRow.isInitialized && isInside(it, buttonRow)) } == true) {
+                currentFocus?.let { (::playButton.isInitialized && it === playButton) || (::buttonRow.isInitialized && isInside(it, buttonRow)) } == true) {
                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                     castChips.firstOrNull()?.requestFocus()
                     return true
-                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && currentFocus === playButton) {
+                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && ::playButton.isInitialized && currentFocus === playButton) {
                     return true
                 } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && ::buttonRow.isInitialized &&
                     currentFocus === (0 until buttonRow.childCount).map { buttonRow.getChildAt(it) }.lastOrNull { it.visibility == View.VISIBLE && it.isFocusable }) {

@@ -29,13 +29,15 @@ import java.text.Normalizer
 import java.util.concurrent.Future
 
 /** More complete title matches lead; ties retain the installed add-ons' order. */
-internal fun <T> rankSearchTitles(items: List<T>, query: String, title: (T) -> String): List<T> {
+internal fun <T> rankSearchTitles(items: List<T>, query: String, rating: (T) -> Double? = { null }, title: (T) -> String): List<T> {
     fun words(s: String) = Normalizer.normalize(s.lowercase(Locale.ROOT), Normalizer.Form.NFD)
         .replace(Regex("\\p{M}+"), "").split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
     val wanted = words(query)
     if (wanted.isEmpty()) return items
-    return items.sortedBy { item ->
-        val actual = words(title(item))
+    val articles = setOf("the", "a", "an")
+    // "matrix" finds "The Matrix" as fully as the short film "Matrix"; then the better-rated title goes first.
+    return items.sortedWith(compareBy<T> { item ->
+        val actual = words(title(item)).let { if (wanted.first() !in articles && it.firstOrNull() in articles) it.drop(1) else it }
         when {
             actual == wanted -> 0
             actual.take(wanted.size) == wanted -> 1
@@ -43,7 +45,7 @@ internal fun <T> rankSearchTitles(items: List<T>, query: String, title: (T) -> S
             actual.joinToString(" ").contains(wanted.joinToString(" ")) -> 3
             else -> 4
         }
-    }
+    }.thenByDescending { rating(it) ?: 0.0 })
 }
 
 internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = answers.filterNotNull().flatten()
@@ -247,6 +249,9 @@ class SearchActivity : Screen() {
         if (::nav.isInitialized) updateNavTabs()
     }
 
+    // The add-ons' catalog types, for Live and the per-type tabs that Home shows too.
+    private var catalogTypes: List<String> = emptyList()
+
     private fun header(): View {
         val profile = Profiles.active(this)
         val bar = FrameLayout(this).apply { setPadding(dp(48), 0, dp(48), 0) }
@@ -285,6 +290,9 @@ class SearchActivity : Screen() {
         }
         nav.addView(searchTab, LinearLayout.LayoutParams(dp(44), dp(30)))
         updateNavTabs()
+        background({ Stremio.savedAddons(authKey.orEmpty()).orEmpty().flatMap { a -> a.catalogs.map { it.type } } }) { r ->
+            r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = it; updateNavTabs() }
+        }
         nav.background = glassOver(nav, 20, shade = FROST_READING)
         bar.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         bar.addView(TextClock(this).apply {
@@ -300,20 +308,22 @@ class SearchActivity : Screen() {
     private fun updateNavTabs() {
         // The page goes to MainActivity by its English name; the bar shows it in the viewer's language.
         val pages = mapOf(
-            "home" to ("Home" to R.string.tab_home),
-            "discover" to ("Discover" to R.string.tab_discover),
-            "shows" to ("Shows" to R.string.tab_shows),
-            "movies" to ("Movies" to R.string.tab_movies),
-            "library" to ("My List" to R.string.tab_my_list),
+            "home" to ("Home" to getString(R.string.tab_home)),
+            "discover" to ("Discover" to getString(R.string.tab_discover)),
+            "shows" to ("Shows" to getString(R.string.tab_shows)),
+            "movies" to ("Movies" to getString(R.string.tab_movies)),
+            "live" to ("Live" to getString(R.string.tab_live)),
+            "library" to ("My List" to getString(R.string.tab_my_list)),
         )
-        val visible = orderTabs(Settings.tabOrder(this), tabsFor(emptyList())).filter { Settings.tabShown(this, it) }
+        val visible = orderTabs(Settings.tabOrder(this), tabsFor(catalogTypes)).filter { Settings.tabShown(this, it) }
         val ids = listOf("home") + visible
         if (ids == navTabIds) return
         val focusedId = nav.focusedChild?.let { navTabIds.getOrNull(nav.indexOfChild(it) - 1) }
         navTabIds = ids
         nav.removeViews(1, nav.childCount - 1)
         ids.forEach { id ->
-            val (page, words) = pages.getValue(id)
+            // A per-type tab ("type:anime") goes to Home's page of that type, which Home names by the type.
+            val (page, words) = pages[id] ?: id.removePrefix("type:").let { it to typeTabName(this, it) }
             nav.addView(text(words, BODY, color = TEXT_2).apply {
                 gravity = Gravity.CENTER
                 setPadding(dp(12), 0, dp(12), 0)
@@ -544,7 +554,7 @@ class SearchActivity : Screen() {
                     .filter { it.type == "movie" || it.type == "series" }
                     .filterNot { isAddonMessage(it.name) }
                     .distinctBy { it.type to it.id }
-                val ranked = rankSearchTitles(found, query) { it.name }
+                val ranked = rankSearchTitles(found, query, rating = { it.rating?.toDoubleOrNull() }) { it.name }
                 val sections = linkedMapOf(getString(R.string.tab_movies) to ranked.filter { it.type == "movie" }.take(PER_TYPE),
                     getString(R.string.tab_shows) to ranked.filter { it.type == "series" }.take(PER_TYPE)).filterValues { it.isNotEmpty() }
                 val settled = final || completed == addons.size

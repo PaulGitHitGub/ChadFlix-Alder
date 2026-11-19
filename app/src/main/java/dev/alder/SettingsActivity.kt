@@ -252,14 +252,14 @@ class SettingsActivity : Screen() {
     private class Choice(val key: String, val label: String, val hint: String, val values: List<Pair<Any, String>>, val perProfile: Boolean = false) {
         init { require(values.isNotEmpty() && values.all { it.first.javaClass == values[0].first.javaClass }) }
     }
-    private enum class Group(val words: Int, val icon: Int = 0, val glyph: String = "") {
+    private enum class Group(val words: Int, val icon: Int) {
         STREAMS(R.string.group_streams, R.drawable.ic_play),
         PICTURE(R.string.group_picture, R.drawable.ic_tv),
         SUBTITLES(R.string.group_subtitles, R.drawable.ic_subtitles),
         ADDONS(R.string.group_addons, R.drawable.ic_layers),
-        PROFILE(R.string.group_profile, glyph = "♙"),
-        LANGUAGE(R.string.group_language, glyph = "◎"),
-        STORAGE(R.string.group_storage, glyph = "▤"),
+        PROFILE(R.string.group_profile, R.drawable.ic_person),
+        LANGUAGE(R.string.group_language, R.drawable.ic_language),
+        STORAGE(R.string.group_storage, R.drawable.ic_storage),
         ABOUT(R.string.group_about, R.drawable.ic_info),
     }
 
@@ -467,10 +467,10 @@ class SettingsActivity : Screen() {
 
     private fun addGroup(group: Group) {
         val dot = text("•", SMALL, color = TUNGSTEN).apply { gravity = Gravity.CENTER; visibility = View.INVISIBLE }
-        val icon = if (group.icon != 0) ImageView(this).apply {
+        val icon = ImageView(this).apply {
             setImageResource(group.icon)
             imageTintList = ColorStateList.valueOf(TEXT_3)
-        } else text(group.glyph, BODY, color = TEXT_3).apply { gravity = Gravity.CENTER }
+        }
         val label = text(group.words, BODY, bold = true, color = TEXT_2)
         val badge = View(this).apply {
             background = rounded(TUNGSTEN, 3)
@@ -620,7 +620,9 @@ class SettingsActivity : Screen() {
             Group.STORAGE -> actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
                 choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
                     getString(R.string.clear_storage_desc)) { choice ->
-                    if (choice == 1) (getSystemService(ACTIVITY_SERVICE) as ActivityManager).clearApplicationUserData()
+                    if (choice != 1) return@choose
+                    // Clearing removes every profile, so a PIN-locked one asks for its PIN first, as removing it does.
+                    if (Profiles.all(this).none { it.pin != null }) clearStorage() else askPinToClear()
                 }
             }
             Group.ABOUT -> {
@@ -899,6 +901,7 @@ class SettingsActivity : Screen() {
     }
 
     private companion object {
+        const val UNLOCK_TO_CLEAR = 7
         /** The languages Alder has words for, besides English; res/xml/locales_config.xml lists the same. */
         val APP_LANGUAGES = listOf("en", "es", "pt-BR", "fr", "de", "it", "hi", "ar")
         val PRESETS = listOf(
@@ -908,4 +911,18 @@ class SettingsActivity : Screen() {
             R.string.preset_fast_start to mapOf("release" to "web", "hdrPref" to "", "maxHeight" to 1080, "maxSizeGb" to 10),
         )
     }
+
+    @Suppress("DEPRECATION")
+    private fun askPinToClear() =
+        startActivityForResult(Intent(this, ProfilesActivity::class.java).putExtra(ProfilesActivity.UNLOCK, true), UNLOCK_TO_CLEAR)
+
+    private fun clearStorage() = (getSystemService(ACTIVITY_SERVICE) as ActivityManager).clearApplicationUserData()
+
+    @Deprecated("Activity result callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == UNLOCK_TO_CLEAR && resultCode == RESULT_OK) clearStorage()
+    }
+
 }

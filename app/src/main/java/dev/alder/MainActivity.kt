@@ -213,8 +213,9 @@ class MainActivity : Screen() {
             val LIBRARY = Page("My List", R.string.tab_my_list)
             val fixed = listOf(HOME, DISCOVER, SHOWS, MOVIES, LIVE, LIBRARY)
             private val byType = mutableMapOf<String, Page>()
-            fun of(type: String) = byType.getOrPut(type) { Page(type, 0, type) }
-            fun find(label: String?) = fixed.firstOrNull { it.label == label } ?: byType[label]
+            // warmPages asks for pages off the main thread: one lock, so a type never gets two pages (two tabs).
+            fun of(type: String) = synchronized(byType) { byType.getOrPut(type) { Page(type, 0, type) } }
+            fun find(label: String?) = fixed.firstOrNull { it.label == label } ?: synchronized(byType) { byType[label] }
         }
     }
     private enum class Mode { CINEMA, BROWSE }
