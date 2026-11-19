@@ -570,6 +570,7 @@ class PlayerActivity : Screen() {
                     ?: getString(R.string.player_starting, sources.getOrNull(at)?.label.orEmpty()))
                 if (state == Player.STATE_READY) {
                     if (started) {
+                        retries = 0 // the source recovered: the next network drop gets its own two retries
                         hideLoading()
                         updateMarkers()
                     }
@@ -591,6 +592,7 @@ class PlayerActivity : Screen() {
             override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_SEEK) {
                     seekedAt = System.currentTimeMillis()
+                    lastPosition = new.positionMs // a jump is not watched time
                     skipped.clear() // back into an intro: offer it again
                 }
             }
@@ -679,7 +681,7 @@ class PlayerActivity : Screen() {
             return
         }
         val waitMs = if (pickedSub?.startsWith("addon:") == true) 3_500L else SUB_WAIT
-        val stopWaiting = Runnable { subsAnswered = true; waiting?.let(::begin) }
+        val stopWaiting = Runnable { if (!isDestroyed) { subsAnswered = true; waiting?.let(::begin) } } // left during the wait: no start
         main.postDelayed(stopWaiting, waitMs)
         // Asked with the stream's file name and size when they're known, so the addon puts files for that release
         // first. A stream found here (Continue Watching) asks again once it's known; an older answer never replaces a newer one.
@@ -1020,6 +1022,16 @@ class PlayerActivity : Screen() {
 
     private fun position() = if (started) player.currentPosition else startAt
 
+    /** What one source learned about itself; a new source starts clean. */
+    private fun resetSourceState() {
+        stalls.clear()
+        retries = 0
+        asHls = false
+        audioPicked = false
+        subsPicked = false
+        failedAudio.clear()
+    }
+
     /** This source failed: the next one from the same second or, with none left, the list to choose from. */
     private fun next(reason: Failure) {
         main.removeCallbacks(startTimeout)
@@ -1028,10 +1040,7 @@ class PlayerActivity : Screen() {
         val position = position()
         if (at + 1 < sources.size) {
             at++
-            stalls.clear()
-            retries = 0
-            asHls = false
-            subsPicked = false
+            resetSourceState()
             return load(position, failureMessage(R.string.player_source_failed_next, reason, advice = false))
         }
         if (isTrailer) {
@@ -2172,6 +2181,7 @@ class PlayerActivity : Screen() {
         }
         sources = JSONArray(picked).objects().map(Stream::read)
         at = 0
+        resetSourceState()
         intent.putExtra("picked", true) // as before: if it fails, say so and offer the list again
         dismissStall()
         load(if (player.isCurrentMediaItemLive) 0L else position())
@@ -2655,7 +2665,7 @@ class PlayerActivity : Screen() {
                         .setOverrideForType(TrackSelectionOverride(subs[i - 1].mediaTrackGroup, 0)).build()
                     sub == chosenSub && loaded != null -> p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                         .setOverrideForType(TrackSelectionOverride(loaded.mediaTrackGroup, 0)).build()
-                    else -> { chosenSub = sub; subDelay = 0L; textRenderer?.offsetUs = 0L; selectAddonSub = true; load(position()); return }
+                    else -> { chosenSub = sub; subDelay = 0L; textRenderer?.offsetUs = 0L; selectAddonSub = true; load(position(), play = player.playWhenReady); return }
                 }
                 chosenSubIndex = i
                 currentSelectedSubId = track.id
