@@ -163,9 +163,9 @@ object Tmdb {
     private const val SERVICES = 14
 }
 
-/** Discover's filters: [type] is movie, series or anime; [decade] a year like 2010 (0: before 1980); [sort] popular, top or new. */
+/** Discover's filters: [type] is movie, series or anime; [decade] a year like 2010 (0: before 1980); [year] an exact year; [sort] popular, top or new. */
 data class DiscoverQuery(val type: String = "movie", val genre: Int? = null, val decade: Int? = null,
-                         val service: Int? = null, val sort: String = "popular") {
+                         val service: Int? = null, val sort: String = "popular", val year: Int? = null) {
     val media get() = if (type == "movie") "movie" else "tv"
 }
 
@@ -176,10 +176,10 @@ internal fun discoverUrl(q: DiscoverQuery, page: Int, region: String, language: 
     val params = linkedMapOf<String, String?>("api_key" to key, "language" to language, "include_adult" to "false", "page" to "$page")
     params["with_genres"] = listOfNotNull(16.takeIf { q.type == "anime" }, q.genre).distinct().joinToString(",").ifEmpty { null }
     if (q.type == "anime") params["with_original_language"] = "ja"
-    when (q.decade) {
-        null -> {}
-        0 -> params["$date.lte"] = "1979-12-31"
-        else -> { params["$date.gte"] = "${q.decade}-01-01"; params["$date.lte"] = "${q.decade + 9}-12-31" }
+    when {
+        q.year != null -> { params["$date.gte"] = "${q.year}-01-01"; params["$date.lte"] = "${q.year}-12-31" }
+        q.decade == 0 -> params["$date.lte"] = "1979-12-31"
+        q.decade != null -> { params["$date.gte"] = "${q.decade}-01-01"; params["$date.lte"] = "${q.decade + 9}-12-31" }
     }
     if (q.service != null) { params["with_watch_providers"] = "${q.service}"; params["watch_region"] = region }
     when (q.sort) {

@@ -58,6 +58,9 @@ class DiscoverTest {
         assertEquals("2026-11-18", params(DiscoverQuery(type = "movie", sort = "new"))["primary_release_date.lte"])
         assertEquals("1979-12-31", params(DiscoverQuery(type = "movie", decade = 0))["primary_release_date.lte"])
         assertEquals("300", params(DiscoverQuery(type = "movie", sort = "top"))["vote_count.gte"])
+        val exact = params(DiscoverQuery(type = "movie", year = 2024))
+        assertEquals("2024-01-01", exact["primary_release_date.gte"])
+        assertEquals("2024-12-31", exact["primary_release_date.lte"])
     }
 
     @Test fun aResultBecomesATitleUnderItsImdbId() {
@@ -80,5 +83,8 @@ class DiscoverTest {
         assertTrue(inDecade("1975", 0))
         assertFalse(inDecade("1980", 0))
         assertFalse(inDecade(null, 2010))
+        assertTrue(inYear("2024", 2024))
+        assertTrue(inYear("2024–2026", 2024))
+        assertFalse(inYear("2023", 2024))
     }
 }

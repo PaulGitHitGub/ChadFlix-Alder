@@ -270,8 +270,9 @@ class MainActivity : Screen() {
     private var jumpTo: String? = null // a chip's row that wasn't made yet when OK was pressed
     private var listFilter = ListFilter.ALL
     private var listSort = ListSort.RECENT
-    private var listGenre: String? = null // My List's Genre and Year chips; null is All
+    private var listGenre: String? = null // My Alder's Genre and Year chips; null is All
     private var listDecade: Int? = null
+    private var listYear: Int? = null
     private var librarySlot: FrameLayout? = null
     private var listBuild = 0
     private lateinit var listShade: View
@@ -364,6 +365,7 @@ class MainActivity : Screen() {
     private lateinit var browseInfo: LinearLayout
     private lateinit var heroName: TextView
     private lateinit var heroLogo: ImageView
+    private lateinit var heroYear: TextView
     private lateinit var heroFacts: TextView
     private lateinit var heroRatings: LinearLayout
     private var heroBottom = 0 // px from the screen's foot to the hero block, for a poster row
@@ -1208,6 +1210,7 @@ class MainActivity : Screen() {
         heroName = text("", SERIF_HERO, serif = true).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         // adjustViewBounds resets the scale type to FIT_CENTER, so FIT_START comes after it (logo on the margin).
         heroLogo = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_START; maxHeight = dp(55) }
+        heroYear = text("", SERIF_TITLE * 0.65f, serif = true, color = TEXT_2).onArt().apply { visibility = View.GONE }
         heroFacts = text("", SMALL, color = TEXT_2).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         // Small tags, as tall as the letters: SMALL's leading and font padding made them blocks twice the mock's.
         heroRatings = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -1223,7 +1226,11 @@ class MainActivity : Screen() {
         browseInfo = column(Gravity.START,
             FrameLayout(this).apply {
                 addView(heroName, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL))
-                addView(heroLogo, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL))
+                addView(LinearLayout(this@MainActivity).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(heroLogo, LinearLayout.LayoutParams(-2, -2))
+                    addView(heroYear, LinearLayout.LayoutParams(-2, -2))
+                }, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER_VERTICAL))
             },
             LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -1261,7 +1268,7 @@ class MainActivity : Screen() {
                     setSpan(android.text.style.RelativeSizeSpan(0.65f), start, length, 0)
                 }
             }
-            showHeroTitle(item, title)
+            showHeroTitle(item, title, year?.let { "$DOT$it" })
             browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
             main.post(::placeCaption)
             if (changed) {
@@ -1322,16 +1329,21 @@ class MainActivity : Screen() {
         }.also { main.postDelayed(it, HOME_HERO_WAIT) }
     }
 
-    private fun showHeroTitle(item: Item, title: CharSequence) {
+    private fun showHeroTitle(item: Item, title: CharSequence, logoYear: String? = null) {
         val logoChanged = heroLogo.tag != item.logo
         heroName.text = title
+        heroYear.text = logoYear.orEmpty()
         if (logoChanged || heroLogo.drawable == null) {
             heroName.visibility = View.VISIBLE
             heroLogo.visibility = View.GONE
+            heroYear.visibility = View.GONE
             Images.load(item.logo, heroLogo, dp(LOGO_W)) {
                 heroLogo.visibility = View.VISIBLE
+                heroYear.visibility = if (logoYear != null) View.VISIBLE else View.GONE
                 heroName.visibility = View.INVISIBLE
             }
+        } else {
+            heroYear.visibility = if (heroLogo.visibility == View.VISIBLE && logoYear != null) View.VISIBLE else View.GONE
         }
     }
 
@@ -2019,7 +2031,8 @@ class MainActivity : Screen() {
             // Genre and Year come from each title's details (on disk after the first visit), read in the background.
             fun pick(key: String, name: Int, allLabel: Int, value: Any?, options: () -> List<Pair<String, Any?>>, margin: Int, set: (Any?) -> Unit) {
                 val current = options().firstOrNull { it.second == value }?.first
-                add(key, if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, true) {
+                val unset = value == null || value == (null to null) || current == null
+                add(key, if (unset) getString(allLabel) else "${getString(name)}: $current", false, margin, true) {
                     val shown = options()
                     choose(getString(name), shown.map { it.first }, checked = shown.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
                         if (shown[i].second != value) {
@@ -2035,7 +2048,10 @@ class MainActivity : Screen() {
                 listOf(all to null) + listTitles().flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
                     .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.key }
             }, margin = 24) { listGenre = it as String? }
-            pick("decade", R.string.discover_year, R.string.discover_all_decades, listDecade, ::decadeOptions, margin = 6) { listDecade = it as Int? }
+            pick("decade", R.string.discover_year, R.string.discover_all_decades, listDecade to listYear, ::decadeOptions, margin = 6) {
+                val choice = it as Pair<*, *>
+                listDecade = choice.first as Int?; listYear = choice.second as Int?
+            }
             fillListDetails()
             listSortChip = add("sort", listSortLabel(), false, 6, true) {
                 val options = ListSort.entries
@@ -2051,9 +2067,14 @@ class MainActivity : Screen() {
         }
     }
 
-    /** Discover's and My List's Year choices: All, the 2020s back to the 1980s, then before 1980 (0). */
-    private fun decadeOptions(): List<Pair<String, Any?>> = listOf(getString(R.string.filter_all) to null) +
-        listOf(2020, 2010, 2000, 1990, 1980).map { "${it}s" to it } + (getString(R.string.discover_before_1980) to 0)
+    /** Discover's and My Alder's Year choices: All, recent years, the 2020s back to the 1980s, then before 1980 (0). */
+    private fun decadeOptions(): List<Pair<String, Any?>> {
+        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        return listOf(getString(R.string.filter_all) to (null to null)) +
+            (currentYear downTo 2020).map { "$it" to (null to it) } +
+            listOf(2020, 2010, 2000, 1990, 1980).map { "${it}s" to (it to null) } +
+            (getString(R.string.discover_before_1980) to (0 to null))
+    }
 
     private fun listTitles() = library.filter { !it.optBoolean("removed") && !isLiveType(it.optString("type")) }
 
@@ -2103,7 +2124,8 @@ class MainActivity : Screen() {
             getSharedPreferences("home", MODE_PRIVATE).getString(discoverKey(), null)?.let { saved ->
                 runCatching { JSONObject(saved) }.getOrNull()?.let { j ->
                     discover = DiscoverQuery(j.optString("type").takeIf { it in setOf("movie", "series", "anime") } ?: "movie", j.optInt("genre").takeIf { it > 0 },
-                        j.optInt("decade", -1).takeIf { it >= 0 }, j.optInt("service").takeIf { it > 0 }, j.optString("sort", "popular"))
+                        j.optInt("decade", -1).takeIf { it >= 0 }, j.optInt("service").takeIf { it > 0 }, j.optString("sort", "popular"),
+                        j.optInt("year").takeIf { it > 0 })
                 }
             }
         }
@@ -2125,7 +2147,7 @@ class MainActivity : Screen() {
         discover = query
         getSharedPreferences("home", MODE_PRIVATE).edit().putString(discoverKey(), JSONObject()
             .put("type", query.type).putOpt("genre", query.genre).putOpt("decade", query.decade)
-            .putOpt("service", query.service).put("sort", query.sort).toString()).apply()
+            .putOpt("year", query.year).putOpt("service", query.service).put("sort", query.sort).toString()).apply()
         showDiscover(g)
     }
 
@@ -2139,7 +2161,8 @@ class MainActivity : Screen() {
             }
             fun pick(name: Int, allLabel: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
                 val current = options.firstOrNull { it.second == value }?.first
-                addChip(resources.getResourceEntryName(name), if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
+                val unset = value == null || value == (null to null) || current == null
+                addChip(resources.getResourceEntryName(name), if (unset) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
                     choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
                         chooseDiscover(g, set(options[i].second))
                     }
@@ -2153,7 +2176,10 @@ class MainActivity : Screen() {
             val all = getString(R.string.filter_all)
             val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
             pick(R.string.discover_genre, R.string.discover_all_genres, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
-            pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
+            pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade to q.year) {
+                val choice = it as Pair<*, *>
+                q.copy(decade = choice.first as Int?, year = choice.second as Int?)
+            }
             if (services.isNotEmpty()) pick(R.string.discover_on, R.string.discover_all_services, listOf(all to null) + services.map { it.second to it.first }, q.service) {
                 q.copy(service = it as Int?)
             }
@@ -2344,7 +2370,10 @@ class MainActivity : Screen() {
         val all = listTitles()
             .filter { listFilter == ListFilter.ALL || (it.optString("type") == "movie") == (listFilter == ListFilter.MOVIES) }
             .filter { t -> listGenre == null || metas[t.optString("_id")]?.genres?.contains(listGenre) == true }
-            .filter { t -> listDecade == null || inDecade(metas[t.optString("_id")]?.year, listDecade!!) }
+            .filter { t ->
+                val y = metas[t.optString("_id")]?.year
+                (listYear == null || inYear(y, listYear!!)) && (listDecade == null || inDecade(y, listDecade!!))
+            }
         val ordered = when (listSort) {
             ListSort.RECENT -> all.sortedByDescending { it.optString("_ctime") }
             ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
@@ -2359,7 +2388,7 @@ class MainActivity : Screen() {
             cardUnderline.visibility = View.INVISIBLE
             resetArt()
             val message = when {
-                listGenre != null || listDecade != null -> R.string.discover_empty
+                listGenre != null || listDecade != null || listYear != null -> R.string.discover_empty
                 all.isEmpty() && listFilter == ListFilter.ALL -> R.string.list_empty
                 listFilter == ListFilter.MOVIES -> R.string.list_empty_movies
                 listFilter == ListFilter.SHOWS -> R.string.list_empty_shows
@@ -2367,7 +2396,7 @@ class MainActivity : Screen() {
             }
             val emptyBox = column(Gravity.START).apply { setPadding(dp(PAD), dp(30), dp(PAD), 0) }
             emptyBox.addView(text(message, BODY, color = TEXT_2))
-            if (listFilter != ListFilter.ALL || listGenre != null || listDecade != null) {
+            if (listFilter != ListFilter.ALL || listGenre != null || listDecade != null || listYear != null) {
                 val clear = chip(getString(R.string.list_clear_filters), false).apply {
                     tag = "clear_filters"
                     background = listChipBackground(false)
@@ -2381,6 +2410,7 @@ class MainActivity : Screen() {
                         listFilter = ListFilter.ALL
                         listGenre = null
                         listDecade = null
+                        listYear = null
                         showListChips("all")
                         redrawLibrary()
                     }
@@ -3063,6 +3093,9 @@ internal fun saveTabOrder(saved: List<String>, reordered: List<String>): List<St
  */
 internal fun extraPageTypes(types: List<String>): List<String> =
     types.map { it.trim().lowercase() }.filter { it.isNotEmpty() && it != "movie" && it != "series" && !isLiveType(it) }.distinct()
+
+internal fun inYear(titleYear: String?, year: Int): Boolean =
+    titleYear?.take(4)?.toIntOrNull() == year
 
 /** A title's [year] ("1999", "2019–2023") in [decade]: 2010 is 2010–2019, 0 is before 1980. No year is in none. */
 internal fun inDecade(year: String?, decade: Int): Boolean {
