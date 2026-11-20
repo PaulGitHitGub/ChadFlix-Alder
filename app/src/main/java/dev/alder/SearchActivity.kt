@@ -80,7 +80,7 @@ class SearchActivity : Screen() {
     private var navTabIds = emptyList<String>()
     private val characterKeys = mutableListOf<TextView>()
     private val rightEdgeKeys = mutableSetOf<View>()
-    private val cards = mutableListOf<Pair<View, View>>()
+    private val cards = mutableListOf<MediaCardView>()
     private var firstKey: View? = null
     private var lastKey: View? = null
     private var lastKeyboardFocus: View? = null
@@ -444,8 +444,8 @@ class SearchActivity : Screen() {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys) {
                 if (firstResult?.requestFocus() == true) return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && cards.any { it.first === focus }) {
-                if (firstResult === focus || cards.indexOfFirst { it.first === focus } == 0) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && cards.any { it === focus }) {
+                if (firstResult === focus || cards.indexOfFirst { it === focus } == 0) {
                     if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
                 }
             }
@@ -647,31 +647,21 @@ class SearchActivity : Screen() {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.MIDDLE
             }
-            val row = LinearLayout(this).apply {
-                clipChildren = false
-                clipToPadding = false
-                setPadding(dp(6), dp(8), dp(48), dp(8)) // the last card rests at the screen's margin; 8 dp above and below leave room for the focused card to grow
-            }
-            // Slides like Home's rows (below, on focus) instead of scrolling just far enough, which left cards cut at both edges.
-            val scroller = object : HorizontalScrollView(this) {
-                override fun computeScrollDeltaToGetChildRectOnScreen(rect: android.graphics.Rect) = 0
-
-                // At either end the remote stays put, as on Home, instead of jumping to the row below.
-                override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-                    val key = event.keyCode
-                    if (key == android.view.KeyEvent.KEYCODE_DPAD_RIGHT && row.getChildAt(row.childCount - 1)?.isFocused == true) return true
-                    return super.dispatchKeyEvent(event)
-                }
-            }.apply {
-                isHorizontalScrollBarEnabled = false
-                addView(row)
-            }
+            val rail = HorizontalCardRail(
+                screen = this,
+                cardGapPx = dp(CARD_GAP),
+                paddingStartPx = dp(6),
+                paddingTopPx = dp(8),
+                paddingEndPx = dp(48),
+                paddingBottomPx = dp(8),
+                stopAtStart = false,
+                stopAtEnd = true,
+                cullLeftMargin = false,
+            )
             list.forEachIndexed { index, meta ->
-                row.addView(card(meta, caption, scroller, index == 0, posters), LinearLayout.LayoutParams(dp(88), dp(132)).apply {
-                    if (index > 0) marginStart = dp(14)
-                })
+                rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
             }
-            group.addView(scroller, LinearLayout.LayoutParams(-1, dp(148)))
+            group.addView(rail.scroller, LinearLayout.LayoutParams(-1, dp(148)))
             group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
             results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(28) })
         }
@@ -680,41 +670,41 @@ class SearchActivity : Screen() {
         // at the front of the queue.
         (posters.take(Images.THREADS) + posters.drop(Images.THREADS).asReversed()).forEach { it() }
         sections.values.firstOrNull()?.firstOrNull()?.let(::show)
-        if (selected != null) (cards.firstOrNull { it.first.tag == selected }?.first ?: firstResult)?.requestFocus()
+        if (selected != null) (cards.firstOrNull { it.tag == selected } ?: firstResult)?.requestFocus()
         else if (moveFocus) firstResult?.requestFocus()
     }
 
-    private fun card(meta: Meta, caption: TextView, scroller: HorizontalScrollView, firstInRow: Boolean, posters: MutableList<() -> Unit>): View {
-        val image = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setBackgroundColor(BASE) }
-        // The name, when there's no picture: a dark tile with nothing on it read as a broken result.
-        val name = text(meta.name, SMALL, bold = true).apply {
-            maxLines = 3
-            ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(8), 0, dp(8), dp(10))
-            visibility = View.GONE
-        }
-        val shade = View(this).apply { setBackgroundColor(Color.BLACK); alpha = 0.5f }
-        val card = FrameLayout(this).apply {
+    private fun card(meta: Meta, caption: TextView, rail: HorizontalCardRail, index: Int, firstInRow: Boolean, posters: MutableList<() -> Unit>): MediaCardView {
+        val style = CardStyle(
+            variant = CardVariant.POSTER_RAIL,
+            widthPx = dp(POSTER_W),
+            heightPx = dp(POSTER_H),
+            showRim = true,
+            dimAlpha = CARD_DIM,
+            showProgressOnCard = false,
+            fadeImageIn = false,
+            retryOnFailure = true,
+        )
+        val step = dp(POSTER_W + CARD_GAP)
+        val card = MediaCardView(this, style, CardContent(
+            id = meta.id,
+            name = meta.name,
+            posterUrl = meta.poster,
+            artUrl = meta.background,
+        )).apply {
             tag = "${meta.type}:${meta.id}"
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) =
-                    outline.setRoundRect(0, 0, view.width, view.height, dp(6).toFloat())
-            }
-            clipToOutline = true
-            addView(image, FrameLayout.LayoutParams(-1, -1))
-            addView(name, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-            addView(shade, FrameLayout.LayoutParams(-1, -1))
-            cardFocus(6) { has ->
+            dim(true)
+            setOnFocusChanged { has ->
                 // grow() unclamps ancestors; Search must keep each row inside its result pane.
-                scroller.clipChildren = true
-                scroller.clipToPadding = true
+                rail.scroller.clipChildren = true
+                rail.scroller.clipToPadding = true
                 resultsScroll.clipChildren = true
                 resultsScroll.clipToPadding = true
-                shade.animate().alpha(if (has) 0f else 0.5f).setDuration(FOCUS_MS).start()
+                dim(!has)
                 if (has) {
                     // The focused row snaps to the pane's top, as on Home: scrolling just far enough left Shows cut off.
                     // Rows above it draw nothing: the pane didn't clip them, and they sat over the title's words.
-                    (scroller.parent as? View)?.let { group ->
+                    (rail.scroller.parent as? View)?.let { group ->
                         resultsScroll.smoothScrollTo(0, group.top)
                         for (i in 0 until results.childCount) results.getChildAt(i).let { it.alpha = if (it.top < group.top) 0f else 1f }
                     }
@@ -722,13 +712,13 @@ class SearchActivity : Screen() {
                     caption.visibility = View.VISIBLE
                     // The focused card goes to the row's start; near the end the row stops with the last card at the margin.
                     // Cards that slid past the start hide, so no sliver shows at the pane's edge.
-                    val row = parent as ViewGroup
-                    val target = (left - row.paddingStart).coerceIn(0, (row.width - scroller.width).coerceAtLeast(0))
-                    scroller.smoothScrollTo(target, 0)
-                    for (i in 0 until row.childCount) row.getChildAt(i).let { it.animate().alpha(if (it.left < target + row.paddingStart - 1) 0f else 1f).setDuration(FOCUS_MS).start() }
+                    val target = rail.scrollToCard(index, step)
+                    for (i in 0 until rail.strip.childCount) rail.strip.getChildAt(i).let {
+                        it.animate().alpha(if (it.left < target + rail.strip.paddingStart - 1) 0f else 1f).setDuration(FOCUS_MS).start()
+                    }
                     caption.post {
                         caption.translationX = (left - target).toFloat()
-                            .coerceIn(0f, (scroller.width - dp(48) - caption.width).coerceAtLeast(0).toFloat())
+                            .coerceIn(0f, (rail.scroller.width - dp(48) - caption.width).coerceAtLeast(0).toFloat())
                     }
                     show(meta)
                 } else caption.visibility = View.INVISIBLE
@@ -746,24 +736,10 @@ class SearchActivity : Screen() {
                 else false
             }
         }
-        cards += card to shade
+        cards += card
         if (firstResult == null) firstResult = card
-        posters += { poster(meta, image, name, retry = true) }
+        posters += { card.load() }
         return card
-    }
-
-    /**
-     * The card's poster, else its backdrop. A download that fails (a slow or missing image host) is tried once more a
-     * moment later; after that the card shows the title's name. Failures are logged by host, to trace missing posters.
-     */
-    private fun poster(meta: Meta, image: ImageView, name: TextView, retry: Boolean) {
-        val url = meta.poster ?: meta.background
-        Images.load(url, image, dp(96), orElse = meta.background?.takeIf { it != url }, failed = {
-            android.util.Log.w("Alder", "search poster failed: ${url?.let { android.net.Uri.parse(it).host } ?: "none"}" +
-                if (retry && url != null) ", trying again" else "")
-            if (retry && url != null) main.postDelayed({ if (image.isAttachedToWindow) poster(meta, image, name, retry = false) }, POSTER_RETRY)
-            else name.visibility = View.VISIBLE
-        })
     }
 
     private fun show(meta: Meta) {
@@ -819,7 +795,6 @@ class SearchActivity : Screen() {
         const val PER_TYPE = 12
         const val TYPING_PAUSE = 500L
         const val SEARCH_WAIT = 6000L
-        const val POSTER_RETRY = 2000L // ms before a failed poster is asked for again
         val searchPool = Images.newestFirst(8)
     }
 }

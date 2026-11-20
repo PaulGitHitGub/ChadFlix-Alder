@@ -38,6 +38,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Consistent poster cards.** Poster rows and grids share one card design across **Home**, **Movies**, **Shows**, **My List**, **Discover**, **Search**, and title pages.
 - **Cleaner Home screen.** Home shows each fact once and removes extra button glow and zoom motion. Rows, badges and error cards use even spacing and clear text.
 - **Cleaner player screen.** The player no longer shows extra labels above the title, extra headings in the **Audio & subtitles** menu, or the remote help text in the bottom-right corner. Video and audio badges are darker and easier to read over subtitles. Error messages in the player now use full sentences.
 - **Search finds the main title first.** When you search for "matrix", **The Matrix** now comes before a short film with the name "Matrix". When two titles have the same name, the title with the higher IMDb rating comes first.

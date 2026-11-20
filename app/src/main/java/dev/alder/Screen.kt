@@ -191,7 +191,7 @@ abstract class Screen : Activity() {
     private val fonts get() = loadedFonts ?: Fonts(applicationContext.assets).also { loadedFonts = it }
 
     /** Shared House Lights typography. */
-    protected fun text(value: String, sp: Float, bold: Boolean = false, color: Int = TEXT, serif: Boolean = false) =
+    internal fun text(value: String, sp: Float, bold: Boolean = false, color: Int = TEXT, serif: Boolean = false) =
         TextView(this).apply {
             text = value
             textSize = sp
@@ -203,7 +203,7 @@ abstract class Screen : Activity() {
             }
         }
 
-    protected fun text(words: Int, sp: Float, bold: Boolean = false, color: Int = TEXT, serif: Boolean = false) =
+    internal fun text(words: Int, sp: Float, bold: Boolean = false, color: Int = TEXT, serif: Boolean = false) =
         text(getString(words), sp, bold, color, serif)
 
     protected fun caps(value: String, color: Int = TEXT_2) = text(value.uppercase(), CAPS, bold = true, color = color).apply {
@@ -228,7 +228,7 @@ abstract class Screen : Activity() {
 
     protected fun wrap() = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
 
-    protected fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    internal fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
     private var windowShade: View? = null
     private var windowArt: ImageView? = null
@@ -307,10 +307,10 @@ abstract class Screen : Activity() {
         return bmp
     }
 
-    protected fun rounded(color: Int, radiusDp: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radiusDp).toFloat() }
+    internal fun rounded(color: Int, radiusDp: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radiusDp).toFloat() }
 
     /** House Lights' single glass recipe; focus brightens the face (no rim: dots are the only indicator). */
-    protected fun glass(radiusDp: Int, focused: Boolean = false): Drawable {
+    internal fun glass(radiusDp: Int, focused: Boolean = false): Drawable {
         val face = GradientDrawable().apply {
             setColor(if (focused) GLASS_FOCUSED else GLASS)
             cornerRadius = dp(radiusDp).toFloat()
@@ -400,7 +400,7 @@ abstract class Screen : Activity() {
     }
 
     /** Something arrives (a panel, an overlay, a line of text): [ENTER_MS], easing out. Chain the target values. */
-    protected fun View.enter(ms: Long = ENTER_MS): android.view.ViewPropertyAnimator =
+    internal fun View.enter(ms: Long = ENTER_MS): android.view.ViewPropertyAnimator =
         animate().setDuration(ms).setInterpolator(EASE_OUT)
 
     /** Something leaves: [QUICK_MS], easing in, so it gets out of the way faster than it came. */
@@ -666,7 +666,7 @@ abstract class Screen : Activity() {
         else -> null
     }
 
-    protected fun View.lift(on: Boolean, radiusDp: Int = 6, rim: Boolean = true) {
+    internal fun View.lift(on: Boolean, radiusDp: Int = CARD_RADIUS, rim: Boolean = true) {
         foreground = if (on && rim) GradientDrawable().apply {
             setColor(Color.TRANSPARENT)
             cornerRadius = dp(radiusDp).toFloat()
@@ -770,7 +770,7 @@ abstract class Screen : Activity() {
     }
 
     /** A thin watched-so-far bar over a dark track. */
-    protected fun progressBar(progress: Float, color: Int = TUNGSTEN) = LinearLayout(this).apply {
+    internal fun progressBar(progress: Float, color: Int = TUNGSTEN) = LinearLayout(this).apply {
         val p = progress.coerceIn(0f, 1f)
         setBackgroundColor(PROGRESS_TRACK)
         addView(View(context).apply { setBackgroundColor(color) }, LinearLayout.LayoutParams(0, -1, p))
@@ -1116,6 +1116,8 @@ abstract class Screen : Activity() {
         // Spacing, everywhere rows of pictures appear: between cards, from a row's heading to its cards (plus room for
         // the focused card to grow), and above a heading, so each heading belongs to the row under it.
         const val CARD_GAP = 14
+        const val CARD_GAP_RAIL = 16
+        const val CARD_RADIUS = 6
         const val POSTER_W = 88
         const val POSTER_H = 132
         const val HEADING_GAP = 24
@@ -1136,6 +1138,9 @@ abstract class Screen : Activity() {
         val LEADING = mapOf(SERIF_HERO to 40f, SERIF_TITLE to 30f, SERIF_NAME to 21f, BODY to 20f, SMALL to 17f, CODE to 40f)
 
         const val BASE = 0xFF0E0C0A.toInt()
+        const val CARD_PLACEHOLDER = 0xFF28221E.toInt()
+        const val CARD_DIM = 0.5f
+        const val CARD_CONTINUE_DIM = 0.38f
         const val TEXT = 0xFFF3EEE6.toInt()
         const val TEXT_2 = 0xB8F3EEE6.toInt()
         const val TEXT_3 = 0x73F3EEE6
