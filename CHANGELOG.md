@@ -82,6 +82,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Fixes
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
+- **Watch Next channel logo**: Keeps the Alder channel logo in release builds for the Android TV home screen.
 - **Audio language filter.** Source language filters now ignore subtitle languages and `MULTI` releases that name another language. Dutch tags (`NL`, `NLD`, `Nederlands`, `Vlaams`) now count as Dutch audio, and sources show their audio language tag.
 - **Search screen.** Result rows stay in view when you move down, and posters fade at the edge. Back returns to the keyboard first, and old art clears when there are no results.
 - **Shows and Movies.** Add-on errors no longer cut off the first poster row. Genre chips and the **Resume** button now respond to the remote.

@@ -16,6 +16,11 @@ object WatchNext {
     private const val MAX = 10
     private const val ART_PX = 1280 // the launcher's cards are a few hundred px wide; TMDB's 4K original is wasted there
 
+    internal val LOGO_RES = R.drawable.logo_transparent
+
+    internal fun logoUri(packageName: String, entryName: String = "logo_transparent"): String =
+        "android.resource://$packageName/drawable/$entryName"
+
     fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean) = runCatching {
         if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
         val resolver = context.contentResolver
@@ -23,7 +28,7 @@ object WatchNext {
             while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
         }
         if (locked) return@runCatching
-        val logoUri = "android.resource://${context.packageName}/drawable/logo_transparent"
+        val logoUri = logoUri(context.packageName, context.resources.getResourceEntryName(LOGO_RES))
         items.take(MAX).forEach { item ->
             val state = item.optJSONObject("state") ?: JSONObject()
             // A series' video id is "tt123:1:3": season, then episode. Other types (anime) count as one when theirs is.
