@@ -345,7 +345,7 @@ class DetailsActivity : Screen() {
             playButton = pill(R.string.action_episodes).apply {
                 setOnClickListener { showGuide() }
             }
-            val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_movie) { playTrailer(m) } else null
+            val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
             infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo() }
             listButton = listButton()
             buttonRow = LinearLayout(this).apply {
@@ -377,7 +377,7 @@ class DetailsActivity : Screen() {
             // Held OK: every source, to choose one by hand.
             setOnLongClickListener { openSources(target?.first ?: metaId, startOver = false, pick = true); true }
         }
-        val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_movie) { playTrailer(m) } else null
+        val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
         val startOver = if (resumeAt > 0) iconButton("↺", getString(R.string.action_start_over)) {
             openSources(target?.first ?: metaId, startOver = true)
         } else null

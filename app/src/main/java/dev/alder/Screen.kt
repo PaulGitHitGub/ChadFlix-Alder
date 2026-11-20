@@ -436,7 +436,7 @@ abstract class Screen : Activity() {
         isFocusable = true
         background = glass(ICON_BUTTON_H / 2)
         setOnFocusChangeListener { v, has ->
-            v.background = if (has) rounded(ICON_FOCUSED, ICON_BUTTON_H / 2) else glass(ICON_BUTTON_H / 2)
+            v.background = glass(ICON_BUTTON_H / 2, has)
             setTextColor(if (has) TEXT else TEXT_2)
             v.grow(has, CHIP_GROW).start()
             onFocus(has)
@@ -1232,7 +1232,6 @@ abstract class Screen : Activity() {
         const val TUNGSTEN_GLOW = 0x59F3D9B1
         const val GLASS = 0x4D28221C
         const val GLASS_FOCUSED = 0x3DF3EEE6 // a lit face: with no rim, the fill alone carries focus
-        const val ICON_FOCUSED = 0x52F3EEE6 // brighter circle fill for 38 dp icon buttons without rings or outlines
         const val GLASS_EDGE = 0x24FFF0DC
         const val GLASS_HIGHLIGHT = 0x4DFFF5E6
         const val VIDEO_GLASS_BASE = 0xD90E0C0A.toInt()
