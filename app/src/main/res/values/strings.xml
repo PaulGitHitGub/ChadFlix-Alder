@@ -42,7 +42,10 @@
     <string name="tab_home">Home</string>
     <string name="tab_discover">Discover</string>
     <string name="discover_genre">Genre</string>
-    <string name="discover_year">Year</string>
+    <string name="discover_year">Decade</string>
+    <string name="discover_all_genres">All genres</string>
+    <string name="discover_all_decades">All decades</string>
+    <string name="discover_all_services">All services</string>
     <string name="discover_before_1980">Before 1980</string>
     <string name="discover_on">Service</string>
     <string name="discover_sort_popular">Popular</string>

@@ -41,7 +41,10 @@
     <string name="tab_home">होम</string>
     <string name="tab_discover">खोजें</string>
     <string name="discover_genre">शैली</string>
-    <string name="discover_year">वर्ष</string>
+    <string name="discover_year">दशक</string>
+    <string name="discover_all_genres">सभी शैलियाँ</string>
+    <string name="discover_all_decades">सभी दशक</string>
+    <string name="discover_all_services">सभी सेवाएँ</string>
     <string name="discover_before_1980">1980 से पहले</string>
     <string name="discover_on">सेवा</string>
     <string name="discover_sort_popular">लोकप्रिय</string>

@@ -180,7 +180,7 @@ internal class MediaCardView(
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         face.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         setOnFocusChangeListener { _, has ->
-            screen.run { lift(has) }
+            screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW) }
             onFocusHandler?.invoke(has)
         }
     }
@@ -263,7 +263,7 @@ internal class MediaCardView(
                 image.alpha = 0f
                 screen.run { image.enter(Screen.QUICK_MS) }.alpha(1f).start()
             }
-            if (isFocused) screen.run { lift(true) }
+            if (isFocused) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW) }
         }
         now = false
     }

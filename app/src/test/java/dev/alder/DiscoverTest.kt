@@ -8,6 +8,24 @@ import org.junit.Test
 
 /** Discover's TMDB search: the filters as TMDB takes them, and results as titles under their IMDb ids. */
 class DiscoverTest {
+    @Test fun largerPostersRemainFullyVisibleWithLessThanTwoRowsOfSpace() {
+        assertEquals(442, gridScrollTarget(scrollY = 0, viewportHeight = 696, rowTop = 442, rowHeight = 442))
+        assertEquals(188, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 442, rowHeight = 442))
+        assertEquals(0, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 0, rowHeight = 442))
+        assertEquals(884, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 884, rowHeight = 442))
+        assertEquals(442, gridScrollTarget(scrollY = 0, viewportHeight = 640, rowTop = 442, rowHeight = 442))
+    }
+
+    @Test fun filterFocusSurvivesAServiceListChange() {
+        val withServices = listOf("movie", "series", "anime", "discover_genre", "discover_year", "discover_on", "sort")
+        val withoutServices = withServices - "discover_on"
+        assertEquals(6, discoverChipIndex(withServices, "sort", "movie"))
+        assertEquals(5, discoverChipIndex(withoutServices, "sort", "movie"))
+        assertEquals(1, discoverChipIndex(withoutServices, "discover_on", "series"))
+        assertEquals(2, discoverChipIndex(withServices, null, "anime"))
+        assertEquals(null, discoverChipIndex(emptyList(), "sort", "movie"))
+    }
+
     private fun params(q: DiscoverQuery) =
         discoverUrl(q, 2, "CA", "en-CA", "2026-11-18", "k").substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
 

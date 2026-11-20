@@ -141,6 +141,12 @@ internal fun artDelay(held: Boolean, cached: Boolean, ready: Boolean): Long =
 internal fun libraryPosterWidth(width: Int, height: Int, gap: Int, topRoom: Int, peek: Int): Int =
     minOf((width - gap * 5) / 6, (height - topRoom * 2 - gap * 2 - peek) / 3).coerceAtLeast(1)
 
+internal fun gridScrollTarget(scrollY: Int, viewportHeight: Int, rowTop: Int, rowHeight: Int): Int = when {
+    rowTop < scrollY -> rowTop
+    rowTop + rowHeight > scrollY + viewportHeight -> rowTop
+    else -> scrollY
+}.coerceAtLeast(0)
+
 internal fun nextCatalogSection(total: Int, loaded: Int) = minOf(total, loaded + 4)
 
 /**
@@ -149,6 +155,10 @@ internal fun nextCatalogSection(total: Int, loaded: Int) = minOf(total, loaded +
  */
 internal fun landingCard(from: Int, nextSelected: Int, nextSize: Int, grid: Boolean) =
     if (grid) minOf(from, nextSize - 1) else nextSelected
+
+/** Keep the same filter when a service list appears or disappears; otherwise use the active media type. */
+internal fun discoverChipIndex(keys: List<String>, remembered: String?, type: String): Int? =
+    keys.indexOf(remembered).takeIf { it >= 0 } ?: keys.indexOf(type).takeIf { it >= 0 } ?: keys.indices.firstOrNull()
 
 internal fun homeSectionTitle(title: String, isMovie: Boolean): String {
     if (title.contains("movie", true) || title.contains("film", true) ||
@@ -247,6 +257,7 @@ class MainActivity : Screen() {
     private val Page.isBrowse get() = this == Page.HOME || isCatalog || this == Page.LIVE
     /** A grid of large posters under the focused title's art: My List and Discover. */
     private val Page.isGrid get() = this == Page.LIBRARY || this == Page.DISCOVER
+    private val gridTop get() = if (page == Page.DISCOVER) DISCOVER_TOP else LIST_TOP
     private var discover = DiscoverQuery()
     private var discoverLoaded = false // the profile's saved choice has been read
     private val discoverChips = mutableListOf<TextView>()
@@ -873,6 +884,7 @@ class MainActivity : Screen() {
 
     /** A page's name in the top bar; OK on it opens it, or goes down into it when it's already open. */
     private fun navItem(p: Page) = text(pageName(p), BODY).apply {
+        id = View.generateViewId()
         navItems[p] = this
         gravity = Gravity.CENTER
         compoundDrawablePadding = dp(2)
@@ -1227,6 +1239,20 @@ class MainActivity : Screen() {
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
+            if (page == Page.DISCOVER) {
+                val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
+                heroName.text = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
+                    if (year != null) {
+                        val start = item.name.length
+                        setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
+                        setSpan(android.text.style.RelativeSizeSpan(0.75f), start, length, 0)
+                    }
+                }
+                heroName.visibility = View.VISIBLE
+                heroLogo.visibility = View.GONE
+                browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
+                main.post(::placeCaption)
+            }
             if (changed) {
                 cancelBrowseHero()
                 if (art.drawable == null) art.tag = null
@@ -1371,6 +1397,11 @@ class MainActivity : Screen() {
         captionAnchor.set(0, 0, card.width, card.height)
         parent.offsetDescendantRectToMyCoords(card, captionAnchor)
         cardUnderline.visibility = View.INVISIBLE
+        if (page == Page.DISCOVER && mode == Mode.BROWSE) {
+            cardUnderline.translationX = captionAnchor.exactCenterX() - cardUnderline.width / 2f
+            cardUnderline.translationY = captionAnchor.bottom + dp(6).toFloat()
+            cardUnderline.visibility = View.VISIBLE
+        }
         if (cardCaption.visibility != View.VISIBLE) return
         cardCaption.translationX = (captionAnchor.left - cardCaption.left)
             .coerceIn(0, (parent.width - 2 * dp(PAD) - cardCaption.width).coerceAtLeast(0)).toFloat()
@@ -1428,16 +1459,30 @@ class MainActivity : Screen() {
         val grid = p.isGrid
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
-            topMargin = if (grid) dp(LIST_TOP) else browseRowTop
-            height = if (grid) resources.displayMetrics.heightPixels - dp(LIST_TOP) else browseRowH
+            topMargin = if (grid) dp(gridTop) else browseRowTop
+            height = if (grid) resources.displayMetrics.heightPixels - dp(gridTop) else browseRowH
         }
+        val discoverPage = p == Page.DISCOVER
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
-            bottomMargin = heroBottom
+            gravity = if (discoverPage) Gravity.TOP else Gravity.BOTTOM
+            topMargin = if (discoverPage) dp(DISCOVER_HERO_TOP) else 0
+            bottomMargin = if (discoverPage) 0 else heroBottom
+            width = if (discoverPage) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
+        heroName.textSize = if (discoverPage) SERIF_NAME else SERIF_HERO
+        val heroLeading = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
+            LEADING.getValue(if (discoverPage) SERIF_NAME else SERIF_HERO), resources.displayMetrics)
+        heroName.setLineSpacing(heroLeading - heroName.paint.getFontMetricsInt(null), 1f)
+        heroName.maxLines = 2
+        browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (discoverPage) -1 else -2, -2)
+        for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (discoverPage) View.GONE else View.VISIBLE
         heroAbout.maxWidth = if (p.polishedRail) dp(HOME_SYNOPSIS_W) else Int.MAX_VALUE
         wideRow = false
         librarySlot = null
         listShade.visibility = if (grid) View.VISIBLE else View.GONE
+        listShade.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
+            if (discoverPage) intArrayOf(0xF20E0C0A.toInt(), 0xE6191512.toInt(), 0xF20E0C0A.toInt())
+            else intArrayOf(0xDC2C211B.toInt(), 0xB3171412.toInt(), 0xE60E0C0A.toInt()))
         val g = ++generation
         loadMoreSections = null
         restoreCatalogFocus = null
@@ -1986,7 +2031,8 @@ class MainActivity : Screen() {
     /** Where Up from a page's first row, Down from the top bar and Back from the rows go: the page's chips. */
     private fun pageChip(): View? = when (page) {
         Page.LIBRARY -> lastListChip ?: listFilterChips[listFilter]
-        Page.DISCOVER -> lastListChip?.takeIf { it.isAttachedToWindow } ?: discoverChips.firstOrNull()
+        Page.DISCOVER -> discoverChipIndex(discoverChips.map { it.tag as String },
+            lastListChip?.takeIf { it in discoverChips }?.tag as? String, discover.type)?.let(discoverChips::get)
         else -> genreChips[genre]
     }
 
@@ -2036,15 +2082,20 @@ class MainActivity : Screen() {
 
     private fun showDiscoverChips(g: Int, genres: List<Pair<Int, String>>, services: List<Pair<Int, String>>) {
         val q = discover
-        val focused = discoverChips.indexOfFirst { it.hasFocus() }
+        val focused = lastListChip?.takeIf { it in discoverChips }?.tag as? String
         genreStrip.removeAllViews()
         genreChips.clear()
         discoverChips.clear()
         val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(PAD), dp(2), dp(PAD), dp(2)) }
-        fun add(label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit) =
+        fun add(key: String, label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit) =
             (if (list) dropdown(label) else chip(label, selected)).apply {
+            tag = key
+            id = View.generateViewId()
+            nextFocusUpId = navItems[Page.DISCOVER]?.id ?: View.NO_ID
             setOnFocusChangeListener { v, has ->
                 v.background = listChipBackground(has)
+                v.grow(has, CHIP_GROW).start()
+                setTextColor(if (has || selected || list) TEXT else TEXT_2)
                 if (has) lastListChip = this
             }
             background = listChipBackground(false)
@@ -2052,38 +2103,40 @@ class MainActivity : Screen() {
             line.addView(this, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
             discoverChips += this
         }
-        // A list chip: its name and the value in use ("Genre: Drama"), or the name alone while it's All.
-        fun pick(name: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
+        fun pick(name: Int, allLabel: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
             val current = options.firstOrNull { it.second == value }?.first
-            add(if (value == null || current == null) getString(name) else "${getString(name)}: $current", false, margin, list = true) {
+            add(resources.getResourceEntryName(name), if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
                 choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
                     chooseDiscover(g, set(options[i].second))
                 }
             }
         }
         listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows, "anime" to R.string.tab_anime).forEach { (type, words) ->
-            add(getString(words), type == q.type) {
+            add(type, getString(words), type == q.type) {
                 if (type != q.type) chooseDiscover(g, q.copy(type = type, genre = null, service = null))
             }
         }
         val all = getString(R.string.filter_all)
         val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
-        pick(R.string.discover_genre, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
-        pick(R.string.discover_year, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
-        if (services.isNotEmpty()) pick(R.string.discover_on, listOf(all to null) + services.map { it.second to it.first }, q.service) {
+        pick(R.string.discover_genre, R.string.discover_all_genres, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
+        pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
+        if (services.isNotEmpty()) pick(R.string.discover_on, R.string.discover_all_services, listOf(all to null) + services.map { it.second to it.first }, q.service) {
             q.copy(service = it as Int?)
         }
         val sorts = listOf(getString(R.string.discover_sort_popular) to "popular", getString(R.string.discover_sort_top) to "top",
             getString(R.string.discover_sort_new) to "new")
-        add("${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
+        add("sort", "${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
             choose(getString(R.string.list_sort), sorts.map { it.first }, checked = sorts.indexOfFirst { it.second == q.sort }) { i ->
                 chooseDiscover(g, q.copy(sort = sorts[i].second))
             }
         }
-        discoverChips.firstOrNull()?.let { it.id = View.generateViewId(); it.nextFocusLeftId = it.id } // Left stops at the first chip
+        discoverChips.firstOrNull()?.let { it.nextFocusLeftId = it.id }
+        discoverChips.lastOrNull()?.let { it.nextFocusRightId = it.id }
         genreStrip.addView(line)
         genreStrip.visibility = View.VISIBLE
-        discoverChips.getOrNull(focused)?.let { lastListChip = it; it.requestFocus() }
+        if (focused != null) discoverChipIndex(discoverChips.map { it.tag as String }, focused, q.type)?.let { index ->
+            discoverChips[index].let { lastListChip = it; it.requestFocus() }
+        }
     }
 
     /**
@@ -2098,10 +2151,14 @@ class MainActivity : Screen() {
         content.removeAllViews()
         scroller.scrollTo(0, 0)
         last = null
+        cancelBrowseHero()
+        heroItem = null
+        browseInfo.alpha = 0f
+        resetArt()
         val build = ++listBuild
         val query = discover
         val names = genres.toMap()
-        val column = column(Gravity.START).apply { setPadding(0, dp(LIST_TOP_GAP), 0, 0) }
+        val column = column(Gravity.START).apply { setPadding(0, 0, 0, dp(SAFE_BOTTOM)) }
         content.addView(column)
         val known = mutableSetOf<String>()
         val waiting = mutableListOf<Item>() // a short last row, held for the next page
@@ -2496,7 +2553,7 @@ class MainActivity : Screen() {
             paddingStartPx = inset,
             paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
             paddingEndPx = inset,
-            paddingBottomPx = dp(if (grid) LIST_GAP else ROW_BOTTOM_ROOM),
+            paddingBottomPx = dp(if (page == Page.DISCOVER) DISCOVER_ROW_BOTTOM else if (grid) LIST_GAP else ROW_BOTTOM_ROOM),
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
         ).apply {
@@ -2537,7 +2594,7 @@ class MainActivity : Screen() {
             heightPx = cardHeight,
             wide = wide,
             grid = grid,
-            dimAlpha = if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
+            dimAlpha = if (page == Page.DISCOVER) GRID_DIM else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
             progress = item.progress,
             finished = item.finished,
             live = item.live,
@@ -2770,14 +2827,14 @@ class MainActivity : Screen() {
     private fun snapTo(focused: View) {
         val rowView = rows.firstOrNull { isInside(focused, it.view) }?.view ?: return
         val top = offsetIn(rowView)
-        if (!page.isGrid || top < scroller.scrollY) scroller.smoothScrollTo(0, top.coerceAtLeast(0))
-        else if (top + rowView.height > scroller.scrollY + scroller.height) {
-            scroller.smoothScrollTo(0, (top - rowView.height).coerceAtLeast(0))
-        }
+        val viewportHeight = scroller.height - if (page == Page.DISCOVER) dp(SAFE_BOTTOM) else 0
+        val target = if (page.isGrid) gridScrollTarget(scroller.scrollY, viewportHeight, top, rowView.height) else top.coerceAtLeast(0)
+        scroller.smoothScrollTo(0, target)
     }
 
-    private fun libraryPosterWidth() = libraryPosterWidth(
-        artW - 2 * dp(PAD), resources.displayMetrics.heightPixels - dp(LIST_TOP),
+    private fun libraryPosterWidth() = if (page == Page.DISCOVER) (artW - dp(2 * PAD + LIST_GAP * (LIST_COLUMNS - 1))) / LIST_COLUMNS
+    else libraryPosterWidth(
+        artW - 2 * dp(PAD), resources.displayMetrics.heightPixels - dp(gridTop),
         dp(LIST_GAP), dp(LIST_TOP_ROOM), dp(36)
     )
 
@@ -2873,9 +2930,12 @@ class MainActivity : Screen() {
         const val WIDE_H = WIDE_W * 9 / 16
         const val LIST_GAP = 12
         const val LIST_COLUMNS = 6
-        const val LIST_TOP_ROOM = 8 // dp above a grid row for the focused poster's growth (4% of 180 dp) and rim
-        const val LIST_TOP_GAP = 18 // dp between the chips and a grid's first row, on Discover and My List alike
+        const val LIST_TOP_ROOM = 8 // dp above a grid row for the focused poster's growth
+        const val LIST_TOP_GAP = 18 // dp between My List's chips and its first row
         const val LIST_TOP = HEADER_H + 38
+        const val DISCOVER_HERO_TOP = HEADER_H + 48
+        const val DISCOVER_TOP = DISCOVER_HERO_TOP + 64
+        const val DISCOVER_ROW_BOTTOM = 20
         const val INFO_W = 360 // the cinema's line
         const val NAV_R = 18 // dp: the top bar's pills
         const val NAV_GAP = 4 // dp between them

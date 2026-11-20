@@ -38,6 +38,10 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Discover.** The title and year show above the posters. Long titles use two lines. Larger posters fill six columns at the center of the screen.
+- **Discover posters.** A short light line marks the poster with focus. That poster is larger and brighter than the other posters.
+- **Discover filters.** Select **All genres**, **All decades** or **All services** to open a list. A light surface shows the filter with focus.
+- **Discover controls.** The row with focus moves to the top as you move down. Posters stay below the title and filters. Press Back to return to the last filter. Press Down to return to the last poster.
 - **Consistent poster cards.** Poster rows and grids share one card design across **Home**, **Movies**, **Shows**, **My List**, **Discover**, **Search**, and title pages. The selected card gets bigger, and the other cards get darker. Cards in progress show a thin progress bar without a dark shade. The title shows while the picture loads and stays when a backdrop replaces a poster. In **Search**, the caption moves with the selected card. Cast photos and names stay aligned. Cast preview labels stay on one line. Screen readers announce progress, watched status and live channels.
 - **Cleaner Home screen.** Home shows each fact once and removes extra button glow and zoom motion. Rows, badges and error cards use even spacing and clear text.
 - **Cleaner player screen.** The player no longer shows extra labels above the title, extra headings in the **Audio & subtitles** menu, or the remote help text in the bottom-right corner. Video and audio badges are darker and easier to read over subtitles. Error messages in the player now use full sentences.
