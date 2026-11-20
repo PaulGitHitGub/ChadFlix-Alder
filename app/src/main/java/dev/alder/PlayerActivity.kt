@@ -892,6 +892,8 @@ class PlayerActivity : Screen() {
             audioGroups = emptyList()
             failedAudio.clear()
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
+            closeInFlightOpened()
+            if (opening !== s) opening = null
             opened?.close()
             opened = null
             openedFor = null
@@ -3206,14 +3208,18 @@ class PlayerActivity : Screen() {
         push()
     }
 
-    override fun onDestroy() {
-        resolvingStreams?.cancel()
-        resolvingStreams = null
+    private fun closeInFlightOpened(markDestroyed: Boolean = false) {
         val leftover = synchronized(openLock) {
-            destroyed = true
+            if (markDestroyed) destroyed = true
             inFlightOpened.toList().also { inFlightOpened.clear() }
         }
         leftover.forEach { it.close() }
+    }
+
+    override fun onDestroy() {
+        resolvingStreams?.cancel()
+        resolvingStreams = null
+        closeInFlightOpened(markDestroyed = true)
         main.removeCallbacks(startTimeout)
         opened?.close()
         opened = null

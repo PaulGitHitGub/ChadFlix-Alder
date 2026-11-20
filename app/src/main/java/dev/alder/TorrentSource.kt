@@ -30,6 +30,9 @@ internal val supportsTorrentPlayback get() = Build.VERSION.SDK_INT >= 24
 
 private const val METADATA_NOT_READY = 9 // NUVIO_ENGINE_STATUS_METADATA_NOT_READY
 private const val CANCEL_POLL = 200L
+private fun logInfo(message: String) {
+    runCatching { android.util.Log.i("Alder", message) }
+}
 private val episodeMarker = Regex("""(?i)(?<![a-z0-9])(?:s(\d+)[ ._-]*e(\d+)|(\d{1,2})x(\d+))(?!\d)""")
 private val episodeRange = Regex("""(?i)^(?:[ ._]*e\d+|[ ._]*-[ ._]*e?\d+(?![a-z0-9]))""")
 private val videoExtensions = setOf("mkv", "mp4", "avi", "webm", "mov", "m4v", "ts", "m2ts", "mpg", "mpeg", "wmv", "flv", "ogv", "vob", "3gp")
@@ -136,6 +139,7 @@ class TorrentSource private constructor(val infoHash: String, val fileIndex: Int
                     // near the end, then left the player waiting for bytes that never came. NuvioTV turns it off too.
                     streamInactivityTimeoutMilliseconds = 0,
                 ))
+                logInfo("P2P engine created: $infoHash")
                 val stopped = AtomicBoolean(false)
                 fun stop() {
                     if (!stopped.compareAndSet(false, true)) return
@@ -143,6 +147,7 @@ class TorrentSource private constructor(val infoHash: String, val fileIndex: Int
                         engine.close()
                     } finally {
                         File(cache, "payload").deleteRecursively()
+                        logInfo("P2P engine closed: $infoHash")
                     }
                 }
                 try {
@@ -165,6 +170,7 @@ class TorrentSource private constructor(val infoHash: String, val fileIndex: Int
                             }
                         }
                     }
+                    logInfo("P2P engine ready: $infoHash -> ${stream.url}")
                     val opened = Opened(stream.url, emptyMap(), startWait = START_WAIT, readTimeoutMs = READ_WAIT) {
                         engineThread.execute(::stop)
                     }
