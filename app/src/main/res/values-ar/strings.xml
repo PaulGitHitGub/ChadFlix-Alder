@@ -188,14 +188,11 @@
     <string name="track_preferred">مفضّل</string>
     <string name="track_recent">الأخيرة</string>
     <string name="track_in_file">في الملف</string>
-    <string name="subtitles_heading">الترجمة · %1$s</string>
     <string name="quick_timing">ضبط سريع للتوقيت</string>
     <string name="subtitle_color">لون الترجمة</string>
     <string name="tracks_pinned">مثبّتة</string>
     <string name="all_languages">كل اللغات (%1$d)</string>
-    <string name="audio_heading">الصوت · %1$s</string>
     <string name="all_audio_tracks">كل المسارات الصوتية (%1$d)</string>
-    <string name="audio_enhancement">تحسين الصوت</string>
     <string name="clear_dialogue">حوار واضح</string>
     <string name="clear_dialogue_hint">رفع صوت الحوار فوق الموسيقى والمؤثرات</string>
     <string name="timing_earlier_heading">أبكر</string>
@@ -209,7 +206,6 @@
     <string name="size_extra_large">كبير جدًا</string>
     <string name="color">اللون</string>
     <string name="background_box">مربّع خلفية</string>
-    <string name="playback_sleep">التشغيل والنوم</string>
     <string name="sleep_timer">مؤقت النوم</string>
     <string name="player_change_stream_arrow">تغيير المصدر  →</string>
     <string name="subtitles_off">إيقاف الترجمة</string>

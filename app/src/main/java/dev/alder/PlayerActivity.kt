@@ -1858,7 +1858,7 @@ class PlayerActivity : Screen() {
     private fun badgeView(b: PlayerBadge): View {
         val rim = if (b.accent) 0x80F3D9B1.toInt() else 0x66FFF0DC
         val frame = GradientDrawable().apply {
-            setColor(VIDEO_CONTROL_BASE)
+            setColor(0xEB0E0C0A.toInt())
             cornerRadius = dp(4).toFloat()
             setStroke(dp(1), rim)
         }
@@ -2566,10 +2566,6 @@ class PlayerActivity : Screen() {
             val initialChosenSub = subChoices.getOrNull(chosenSubIndex)
             var currentSelectedSubId = initialChosenSub?.id ?: "sub:0"
 
-            val subActiveHeader = caps(getString(R.string.subtitles_heading,
-                initialChosenSub?.takeIf { currentSelectedSubId != "sub:0" }?.name ?: getString(R.string.state_off)), TUNGSTEN)
-            subtitlesPanel.addView(subActiveHeader, wrap().apply { topMargin = dp(4); bottomMargin = dp(6) })
-
             val timingCard = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(10), dp(8), dp(10), dp(8))
@@ -2599,7 +2595,7 @@ class PlayerActivity : Screen() {
                 addView(plus, LinearLayout.LayoutParams(0, dp(30), 1f))
             }
             timingCard.addView(timingCardButtons, LinearLayout.LayoutParams(-1, dp(30)))
-            timingCard.addView(caps(R.string.subtitle_color, TEXT_3), wrap().apply { topMargin = dp(8); bottomMargin = dp(4) })
+            timingCard.addView(caps(R.string.color, TEXT_3), wrap().apply { topMargin = dp(8); bottomMargin = dp(4) })
             timingCard.addView(createColorRow("subtitles"), LinearLayout.LayoutParams(-1, dp(30)))
 
             val timingDivider = divider().apply {
@@ -2610,8 +2606,6 @@ class PlayerActivity : Screen() {
 
             fun updateSubSelection(selectedId: String) {
                 val selChoice = subChoices.firstOrNull { it.id == selectedId }
-                subActiveHeader.text = getString(R.string.subtitles_heading,
-                    selChoice?.takeIf { !it.isOff }?.name ?: getString(R.string.state_off)).uppercase()
                 val timingVisible = selChoice?.isOff == false
                 timingCard.visibility = if (timingVisible) View.VISIBLE else View.GONE
                 timingDivider.visibility = if (timingVisible) View.VISIBLE else View.GONE
@@ -2742,17 +2736,9 @@ class PlayerActivity : Screen() {
         val initialChosenAudio = audioChoices.getOrNull(chosenAudioIndex)
         var currentSelectedAudioId = initialChosenAudio?.id.orEmpty()
 
-        val audioActiveHeader = caps(if (initialChosenAudio != null) getString(R.string.audio_heading, initialChosenAudio.name)
-            else getString(R.string.tab_audio), TUNGSTEN)
-        audioPanel.addView(audioActiveHeader, wrap().apply { topMargin = dp(4); bottomMargin = dp(6) })
-
         val audioHolders = mutableListOf<TrackRowHolder>()
 
         fun updateAudioSelection(selectedId: String) {
-            val selChoice = audioChoices.firstOrNull { it.id == selectedId }
-            audioActiveHeader.text = (if (selChoice != null) getString(R.string.audio_heading, selChoice.name)
-                else getString(R.string.tab_audio)).uppercase()
-
             audioHolders.forEach { holder ->
                 val track = holder.track
                 val isSel = track.id == selectedId
@@ -2837,7 +2823,6 @@ class PlayerActivity : Screen() {
             audioPanel.addView(divider().apply {
                 layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(0, dp(12), 0, dp(8)) }
             })
-            audioPanel.addView(caps(R.string.audio_enhancement, TEXT_3), wrap().apply { bottomMargin = dp(4) })
             var clearOn = dialogueProcessor.enabled
             val clearStatus = text(if (clearOn) R.string.state_on else R.string.state_off, 10f, bold = true, color = if (clearOn) TUNGSTEN else TEXT_3).apply {
                 setPadding(dp(7), dp(2), dp(7), dp(2))
@@ -2959,7 +2944,6 @@ class PlayerActivity : Screen() {
         syncPanel.addView(divider().apply {
             layoutParams = LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(0, dp(4), 0, dp(10)) }
         })
-        syncPanel.addView(caps(R.string.playback_sleep, TUNGSTEN), wrap().apply { bottomMargin = dp(6) })
 
         val sleepValue = text(sleep(), SMALL, color = TEXT_3)
         val sleepRow = LinearLayout(this).apply {

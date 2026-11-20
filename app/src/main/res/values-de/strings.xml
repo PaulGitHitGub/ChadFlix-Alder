@@ -175,14 +175,11 @@
     <string name="track_preferred">Bevorzugt</string>
     <string name="track_recent">Zuletzt</string>
     <string name="track_in_file">in der Datei</string>
-    <string name="subtitles_heading">Untertitel · %1$s</string>
     <string name="quick_timing">Schnelles Timing</string>
     <string name="subtitle_color">Untertitelfarbe</string>
     <string name="tracks_pinned">Angeheftet</string>
     <string name="all_languages">Alle Sprachen (%1$d)</string>
-    <string name="audio_heading">Audio · %1$s</string>
     <string name="all_audio_tracks">Alle Tonspuren (%1$d)</string>
-    <string name="audio_enhancement">Klangverbesserung</string>
     <string name="clear_dialogue">Klare Dialoge</string>
     <string name="clear_dialogue_hint">Hebt Stimmen über Musik und Effekte</string>
     <string name="timing_earlier_heading">Früher</string>
@@ -196,7 +193,6 @@
     <string name="size_extra_large">Sehr groß</string>
     <string name="color">Farbe</string>
     <string name="background_box">Hintergrund</string>
-    <string name="playback_sleep">Wiedergabe und Sleep-Timer</string>
     <string name="sleep_timer">Sleep-Timer</string>
     <string name="player_change_stream_arrow">Quelle wechseln  →</string>
     <string name="subtitles_off">Untertitel aus</string>

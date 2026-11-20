@@ -175,14 +175,11 @@
     <string name="track_preferred">पसंदीदा</string>
     <string name="track_recent">हाल का</string>
     <string name="track_in_file">फ़ाइल में</string>
-    <string name="subtitles_heading">सबटाइटल · %1$s</string>
     <string name="quick_timing">तुरंत टाइमिंग</string>
     <string name="subtitle_color">सबटाइटल का रंग</string>
     <string name="tracks_pinned">पिन किए गए</string>
     <string name="all_languages">सभी भाषाएँ (%1$d)</string>
-    <string name="audio_heading">ऑडियो · %1$s</string>
     <string name="all_audio_tracks">सभी ऑडियो ट्रैक (%1$d)</string>
-    <string name="audio_enhancement">ऑडियो सुधार</string>
     <string name="clear_dialogue">साफ़ संवाद</string>
     <string name="clear_dialogue_hint">संगीत और इफ़ेक्ट के ऊपर आवाज़ें उभारता है</string>
     <string name="timing_earlier_heading">पहले</string>
@@ -196,7 +193,6 @@
     <string name="size_extra_large">बहुत बड़ा</string>
     <string name="color">रंग</string>
     <string name="background_box">पृष्ठभूमि</string>
-    <string name="playback_sleep">प्लेबैक और स्लीप</string>
     <string name="sleep_timer">स्लीप टाइमर</string>
     <string name="player_change_stream_arrow">स्रोत बदलें  →</string>
     <string name="subtitles_off">सबटाइटल बंद</string>
