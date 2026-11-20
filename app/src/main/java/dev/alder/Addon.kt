@@ -557,15 +557,17 @@ internal fun audioLanguagesIn(text: String): Set<String> {
  * [text] without the languages it names for subtitles only: the flags after 💬, as StremThru writes them
  * ("🎙️ 🇬🇧 💬 🇬🇧 🇳🇱 🇫🇷"), and tags such as "NL subs", "NLSubs" or "Subs ENG". What's left speaks for the audio.
  */
-internal fun withoutSubtitleLanguages(text: String): String =
-    text.replace(subtitleFlags, " ").replace(subtitleTags) { m ->
-        val language = (m.groups[1] ?: m.groups[2])?.value?.lowercase()
-        if (language in languageWords) " " else m.value
+internal fun withoutSubtitleLanguages(text: String): String {
+    fun strip(input: String, pattern: Regex) = pattern.replace(input) { m ->
+        if (m.groupValues[1].lowercase() in languageWords) " " else m.value
     }
+    // Strip "Subs <lang>" before "<lang> subs" so "Audio: English Subtitles: Dutch" and "ENG.Subs.NL" keep English.
+    return strip(strip(text.replace(subtitleFlags, " "), subtitlePrefixTags), subtitleSuffixTags)
+}
 
 private val subtitleFlags = Regex("\\x{1F4AC}\\x{FE0F}?(?:\\s*(?:[\\x{1F1E6}-\\x{1F1FF}]{2}|\\x{1F3F3}\\x{FE0F}?))*")
-private val subtitleTags =
-    Regex("(?i)\\b(\\p{L}+?)[ ._-]?(?:subs?|subtitles?|subbed)\\b|\\b(?:subs?|subtitles?)[ ._:-]+(\\p{L}+)\\b")
+private val subtitlePrefixTags = Regex("(?i)\\b(?:subs?|subtitles?)[ ._:-]+(\\p{L}+)\\b")
+private val subtitleSuffixTags = Regex("(?i)\\b(\\p{L}+?)[ ._-]?(?:subs?|subtitles?|subbed)\\b")
 
 private val flagLanguages = mapOf("gb" to "en", "us" to "en", "au" to "en", "it" to "it", "in" to "hi", "es" to "es",
     "mx" to "es", "fr" to "fr", "de" to "de", "pt" to "pt", "br" to "pt", "ru" to "ru", "jp" to "ja", "kr" to "ko",
