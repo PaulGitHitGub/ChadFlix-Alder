@@ -1287,8 +1287,7 @@ class DetailsActivity : Screen() {
         val room = dp(4)
         return HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
-            isHorizontalFadingEdgeEnabled = true
-            setFadingEdgeLength(dp(24))
+            overScrollMode = View.OVER_SCROLL_NEVER
             clipToPadding = false
             clipChildren = false
             setPadding(room, room, room, room)
