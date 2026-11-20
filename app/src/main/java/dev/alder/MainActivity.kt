@@ -160,6 +160,10 @@ internal fun landingCard(from: Int, nextSelected: Int, nextSize: Int, grid: Bool
 internal fun discoverChipIndex(keys: List<String>, remembered: String?, type: String): Int? =
     keys.indexOf(remembered).takeIf { it >= 0 } ?: keys.indexOf(type).takeIf { it >= 0 } ?: keys.indices.firstOrNull()
 
+/** A horizontal strip only mirrors D-pad edges when the manifest enables RTL layout support. */
+internal fun isStripRtl(supportsRtl: Boolean, configLayoutDirection: Int): Boolean =
+    supportsRtl && configLayoutDirection == View.LAYOUT_DIRECTION_RTL
+
 internal fun homeSectionTitle(title: String, isMovie: Boolean): String {
     if (title.contains("movie", true) || title.contains("film", true) ||
         title.contains("show", true) || title.contains("series", true)) return title
@@ -2003,7 +2007,8 @@ class MainActivity : Screen() {
                 chips += this
             }
         build(::add)
-        val rtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val supportsRtl = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SUPPORTS_RTL) != 0
+        val rtl = isStripRtl(supportsRtl, resources.configuration.layoutDirection)
         chips.firstOrNull()?.let { if (rtl) it.nextFocusRightId = it.id else it.nextFocusLeftId = it.id }
         chips.lastOrNull()?.let { if (rtl) it.nextFocusLeftId = it.id else it.nextFocusRightId = it.id }
         genreStrip.addView(line)

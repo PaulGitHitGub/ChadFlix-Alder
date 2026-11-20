@@ -1,5 +1,6 @@
 package dev.alder
 
+import android.view.View
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +25,12 @@ class DiscoverTest {
         assertEquals(1, discoverChipIndex(withoutServices, "discover_on", "series"))
         assertEquals(2, discoverChipIndex(withServices, null, "anime"))
         assertEquals(null, discoverChipIndex(emptyList(), "sort", "movie"))
+    }
+
+    @Test fun filterStripOnlyUsesRtlFocusWhenAppSupportsRtl() {
+        assertFalse(isStripRtl(supportsRtl = false, configLayoutDirection = View.LAYOUT_DIRECTION_RTL))
+        assertTrue(isStripRtl(supportsRtl = true, configLayoutDirection = View.LAYOUT_DIRECTION_RTL))
+        assertFalse(isStripRtl(supportsRtl = true, configLayoutDirection = View.LAYOUT_DIRECTION_LTR))
     }
 
     private fun params(q: DiscoverQuery) =
