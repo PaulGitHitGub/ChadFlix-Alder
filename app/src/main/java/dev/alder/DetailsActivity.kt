@@ -345,7 +345,7 @@ class DetailsActivity : Screen() {
             playButton = pill(R.string.action_episodes).apply {
                 setOnClickListener { showGuide() }
             }
-            val trailerButton = if (hasTrailer) iconButton("film", getString(R.string.action_trailer)) { playTrailer(m) } else null
+            val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_movie) { playTrailer(m) } else null
             infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo() }
             listButton = listButton()
             buttonRow = LinearLayout(this).apply {

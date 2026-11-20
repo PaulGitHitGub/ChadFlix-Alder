@@ -349,10 +349,12 @@ abstract class Screen : Activity() {
     protected fun iconButton(
         symbol: String,
         description: String,
+        iconRes: Int = 0,
         onFocus: (Boolean) -> Unit = {},
         action: () -> Unit,
     ): TextView = object : TextView(this) {
         private val d = resources.displayMetrics.density
+        private val iconDrawable = if (iconRes != 0) getDrawable(iconRes)?.mutate() else null
         private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = TEXT
             style = Paint.Style.STROKE
@@ -367,6 +369,15 @@ abstract class Screen : Activity() {
         private val glyphBounds = Rect()
 
         override fun onDraw(canvas: Canvas) {
+            if (iconDrawable != null) {
+                val size = (18f * d).toInt()
+                val left = (width - size) / 2
+                val top = (height - size) / 2
+                iconDrawable.setBounds(left, top, left + size, top + size)
+                iconDrawable.setTint(currentTextColor)
+                iconDrawable.draw(canvas)
+                return
+            }
             val s = text?.toString().orEmpty()
             if (s.isEmpty()) return
             val cx = width / 2f
@@ -407,18 +418,6 @@ abstract class Screen : Activity() {
                     strokePaint.strokeWidth = 1.6f * d
                     canvas.drawLine(cx, cy - 0.5f * d, cx, cy + 3.6f * d, strokePaint)
                     canvas.drawCircle(cx, cy - 3.2f * d, 0.95f * d, fillPaint)
-                }
-                "film" -> {
-                    // Minimal geometric clapperboard: clean 13x11 dp frame with a top slate bar and two diagonal ticks.
-                    val hw = 6.5f * d
-                    val hh = 5.2f * d
-                    val topY = cy - hh
-                    val barY = topY + 3.2f * d
-                    strokePaint.strokeWidth = 1.5f * d
-                    canvas.drawRoundRect(RectF(cx - hw, topY, cx + hw, cy + hh), 1.8f * d, 1.8f * d, strokePaint)
-                    canvas.drawLine(cx - hw, barY, cx + hw, barY, strokePaint)
-                    canvas.drawLine(cx - 2.8f * d, topY, cx - 0.8f * d, barY, strokePaint)
-                    canvas.drawLine(cx + 1.4f * d, topY, cx + 3.4f * d, barY, strokePaint)
                 }
                 else -> {
                     paint.color = currentTextColor
