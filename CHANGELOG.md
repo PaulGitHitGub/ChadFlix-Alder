@@ -82,7 +82,6 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Fixes
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
-- **Watch Next channel logo**: Keeps the Alder channel logo in release builds for the Android TV home screen.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.
 - **Offline playback progress.** Alder keeps offline progress until your library loads. Then Alder adds the episodes that you finish to your library. Before, offline progress could replace your library or lose episodes that you finished.
