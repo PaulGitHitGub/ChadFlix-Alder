@@ -353,10 +353,6 @@ abstract class Screen : Activity() {
         fun style(focused: Boolean) {
             val r = dp(BUTTON_H / 2).toFloat()
             background = object : Drawable() {
-                private val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = TEXT
-                    if (focused) setShadowLayer(dp(12).toFloat(), 0f, 0f, TUNGSTEN_GLOW)
-                }
                 private val face = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TEXT }
                 private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     style = Paint.Style.STROKE
@@ -365,17 +361,14 @@ abstract class Screen : Activity() {
                 }
                 override fun draw(canvas: Canvas) {
                     val box = RectF(bounds)
-                    if (focused) canvas.drawRoundRect(box, r, r, glow)
                     canvas.drawRoundRect(box, r, r, face)
                     if (focused) canvas.drawRoundRect(box, r, r, rim)
                 }
                 override fun setAlpha(alpha: Int) {
-                    glow.alpha = alpha
                     face.alpha = alpha
                     rim.alpha = alpha
                 }
                 override fun setColorFilter(colorFilter: ColorFilter?) {
-                    glow.colorFilter = colorFilter
                     face.colorFilter = colorFilter
                     rim.colorFilter = colorFilter
                 }
@@ -403,7 +396,7 @@ abstract class Screen : Activity() {
             .takeWhile { it !is android.widget.ScrollView && it !is android.widget.HorizontalScrollView && it !is android.widget.AbsListView }
             .forEach { it.clipChildren = false; it.clipToPadding = false }
         return animate().scaleX(if (on) by else 1f).scaleY(if (on) by else 1f).setDuration(FOCUS_MS)
-            .setInterpolator(if (on) SETTLE else EASE_OUT)
+            .setInterpolator(EASE_OUT)
     }
 
     /** Something arrives (a panel, an overlay, a line of text): [ENTER_MS], easing out. Chain the target values. */
@@ -1067,8 +1060,7 @@ abstract class Screen : Activity() {
 
     /** One glass error card with a plain message and a next action. */
     protected fun failed(message: String, retry: () -> Unit) = column(Gravity.START,
-        text("!", SERIF_NAME, color = TUNGSTEN, serif = true),
-        text(message, BODY, color = TEXT).marginTop(10),
+        text(message, BODY, color = TEXT),
         pill(R.string.action_try_again).apply { setOnClickListener { retry() } }.marginTop(16),
     ).apply {
         setPadding(dp(18), dp(18), dp(18), dp(18))
