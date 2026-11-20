@@ -47,10 +47,16 @@ internal fun synopsisAtSentence(text: String, limit: Int): String {
 
 /** "Because you watched Crayon Shin-chan: Pursuit" → "More like Crayon Shin-chan". */
 internal fun homeRowName(name: String): String {
+    fun cap(s: String, max: Int): String {
+        val clean = s.trim()
+        if (clean.length <= max) return clean
+        val cut = clean.take(max).substringBeforeLast(' ', "").trimEnd()
+        return (if (cut.isNotEmpty()) cut else clean.take(max).trimEnd()) + "…"
+    }
     val prefix = "Because you watched "
-    if (!name.startsWith(prefix, ignoreCase = true)) return name.trim().take(36).trimEnd()
-    val title = name.substring(prefix.length).substringBefore(":").substringBefore(" (").substringBefore(" - ").trim()
-    return "More like ${title.take(26).trimEnd()}"
+    if (!name.startsWith(prefix, ignoreCase = true)) return cap(name, 36)
+    val title = name.substring(prefix.length).substringBefore(":").substringBefore(" (").substringBefore(" - ")
+    return "More like ${cap(title, 26)}"
 }
 
 internal fun seasons(count: Int) = if (count == 1) "1 season" else "$count seasons"
@@ -330,11 +336,11 @@ class MainActivity : Screen() {
     /** The left darkening behind the words, the long one down to the cards, and a light one under the top bar. */
     private fun shade(canvas: Canvas, w: Int, h: Int, bright: Boolean) {
         val shade = Paint().apply {
-            shader = LinearGradient(0f, 0f, w * 0.59f, 0f,
-                intArrayOf(0xF70E0C0A.toInt(), if (bright) 0xAA0E0C0A.toInt() else 0x800E0C0A.toInt(), 0x000E0C0A),
-                floatArrayOf(0f, 0.68f, 1f), Shader.TileMode.CLAMP)
+            shader = LinearGradient(0f, 0f, w * 0.66f, 0f,
+                intArrayOf(0xF70E0C0A.toInt(), if (bright) 0xBF0E0C0A.toInt() else 0x990E0C0A.toInt(), 0x000E0C0A),
+                floatArrayOf(0f, 0.62f, 1f), Shader.TileMode.CLAMP)
         }
-        canvas.drawRect(0f, 0f, w * 0.59f, h.toFloat(), shade)
+        canvas.drawRect(0f, 0f, w * 0.66f, h.toFloat(), shade)
         shade.shader = LinearGradient(0f, h.toFloat(), 0f, h * 0.55f, 0xF70E0C0A.toInt(), 0x000E0C0A, Shader.TileMode.CLAMP)
         canvas.drawRect(0f, h * 0.55f, w.toFloat(), h.toFloat(), shade)
         shade.shader = LinearGradient(0f, 0f, 0f, h * 0.14f, 0x8C0E0C0A.toInt(), 0x000E0C0A, Shader.TileMode.CLAMP)
@@ -489,7 +495,7 @@ class MainActivity : Screen() {
             addView(cardUnderline, FrameLayout.LayoutParams(dp(28), dp(3)))
             nextRowHint = text("", SMALL, bold = true, color = TEXT).onArt().apply {
                 visibility = View.GONE
-                maxLines = 1
+                setSingleLine()
                 ellipsize = TextUtils.TruncateAt.END
                 maxWidth = artW / 2 - dp(PAD)
             }
@@ -1357,16 +1363,7 @@ class MainActivity : Screen() {
             return
         }
         cardCaption.text = captionText
-        val progress = item.progress.takeIf { page == Page.HOME && item.timeLeft != null && it > 0f }
-        val line = progress?.let {
-            val fill = android.graphics.drawable.ClipDrawable(rounded(TUNGSTEN, 2), Gravity.LEFT,
-                android.graphics.drawable.ClipDrawable.HORIZONTAL).apply { level = (it * 10_000).toInt().coerceAtLeast(650) }
-            android.graphics.drawable.LayerDrawable(arrayOf(rounded(PROGRESS_TRACK, 2), fill)).apply {
-                setBounds(0, 0, dp(28), dp(2))
-            }
-        }
-        cardCaption.compoundDrawablePadding = dp(8)
-        cardCaption.setCompoundDrawablesRelative(null, null, line, null)
+        cardCaption.setCompoundDrawablesRelative(null, null, null, null)
         cardCaption.visibility = View.VISIBLE
         placeCaption()
         cardCaption.post(::placeCaption)
@@ -2551,7 +2548,8 @@ class MainActivity : Screen() {
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         private val heading = text(title, BODY, bold = true).onArt().apply {
             setPadding(dp(PAD), 0, dp(PAD), 0)
-            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            setSingleLine()
+            ellipsize = TextUtils.TruncateAt.END
             maxWidth = dp(PAD + HERO_W) // a long "Because you watched…" stops at the hero's width
             alpha = QUIET
             if (grid) visibility = View.GONE
@@ -2683,7 +2681,7 @@ class MainActivity : Screen() {
                         if (item.live) Gravity.CENTER else Gravity.BOTTOM or Gravity.START
                     ).apply {
                         if (item.live) setMargins(dp(8), dp(8), dp(8), dp(8))
-                        else setMargins(dp(inset), 0, dp(inset), dp(if (item.progress > 0 && !continueRow) 22 else 12))
+                        else setMargins(dp(inset), 0, dp(inset), dp(if (item.progress > 0) 22 else 12))
                     })
                 }
             }
@@ -2696,7 +2694,7 @@ class MainActivity : Screen() {
             // Darkens the cards beside the focused one. A shade, not transparency: a see-through card would let the
             // art behind it show through and look like it was floating on the poster.
             private val shade = View(context).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
-            private val progress = item.progress.takeIf { it > 0f && !continueRow && !grid }?.let { progressBar(it) }
+            private val progress = item.progress.takeIf { it > 0f && !grid }?.let { progressBar(it) }
 
             init {
                 if (grid) setBackgroundColor(0xFF28221E.toInt())
