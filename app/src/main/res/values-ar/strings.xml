@@ -71,7 +71,6 @@
     <string name="menu_settings">الإعدادات</string>
     <string name="action_play">تشغيل</string>
     <string name="action_resume">متابعة</string>
-    <string name="new_episode">حلقة جديدة</string>
     <string name="stopped_at">توقّفت عند %1$s</string>
     <string name="time_left_hours">متبقٍّ %1$d ساعة و%2$d دقيقة</string>
     <string name="time_left_minutes">متبقٍّ %1$d دقيقة</string>

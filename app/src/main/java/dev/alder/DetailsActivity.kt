@@ -1171,18 +1171,7 @@ class DetailsActivity : Screen() {
     }
 
     private fun addPosterRail(content: LinearLayout, titles: List<Meta>, captionPill: TextView): View? {
-        val style = CardStyle(
-            variant = CardVariant.POSTER_RAIL,
-            widthPx = dp(POSTER_W),
-            heightPx = dp(POSTER_H),
-            showRim = true,
-            dimAlpha = 0f,
-            showFallbackImmediately = true,
-            showProgressOnCard = false,
-            fadeImageIn = false,
-        )
         val room = dp(8)
-        val step = dp(POSTER_W + CARD_GAP)
         val rail = HorizontalCardRail(
             screen = this,
             cardGapPx = dp(CARD_GAP),
@@ -1190,19 +1179,14 @@ class DetailsActivity : Screen() {
             paddingTopPx = room,
             paddingEndPx = room,
             paddingBottomPx = room,
-            cullLeftMargin = false,
+            cullLeft = false,
         )
         var firstCard: View? = null
         titles.forEachIndexed { index, title ->
-            val card = MediaCardView(this, style, CardContent(
-                id = title.id,
-                name = title.name,
-                posterUrl = title.poster,
-                artUrl = title.background,
-            )).apply {
+            val card = MediaCardView(this, title.name, title.poster, title.background, dimAlpha = 0f, fadeIn = false).apply {
                 setOnFocusChanged { has ->
                     if (has) {
-                        rail.scrollToCard(index, step)
+                        rail.scrollToCard(index)
                         val yearStr = title.year?.take(4)?.let { "  ·  $it" } ?: ""
                         captionPill.text = "${title.name}$yearStr"
                         captionPill.visibility = View.VISIBLE

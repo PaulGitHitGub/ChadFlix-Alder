@@ -3,7 +3,6 @@ package dev.alder
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.Editable
@@ -12,13 +11,10 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewGroup
-import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -655,8 +651,7 @@ class SearchActivity : Screen() {
                 paddingEndPx = dp(48),
                 paddingBottomPx = dp(8),
                 stopAtStart = false,
-                stopAtEnd = true,
-                cullLeftMargin = false,
+                cullLeft = false,
             )
             list.forEachIndexed { index, meta ->
                 rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
@@ -675,31 +670,10 @@ class SearchActivity : Screen() {
     }
 
     private fun card(meta: Meta, caption: TextView, rail: HorizontalCardRail, index: Int, firstInRow: Boolean, posters: MutableList<() -> Unit>): MediaCardView {
-        val style = CardStyle(
-            variant = CardVariant.POSTER_RAIL,
-            widthPx = dp(POSTER_W),
-            heightPx = dp(POSTER_H),
-            showRim = true,
-            dimAlpha = CARD_DIM,
-            showProgressOnCard = false,
-            fadeImageIn = false,
-            retryOnFailure = true,
-        )
-        val step = dp(POSTER_W + CARD_GAP)
-        val card = MediaCardView(this, style, CardContent(
-            id = meta.id,
-            name = meta.name,
-            posterUrl = meta.poster,
-            artUrl = meta.background,
-        )).apply {
+        val card = MediaCardView(this, meta.name, meta.poster, meta.background, fadeIn = false, retryOnFailure = true).apply {
             tag = "${meta.type}:${meta.id}"
-            dim(true)
+            dim(true, animate = false)
             setOnFocusChanged { has ->
-                // grow() unclamps ancestors; Search must keep each row inside its result pane.
-                rail.scroller.clipChildren = true
-                rail.scroller.clipToPadding = true
-                resultsScroll.clipChildren = true
-                resultsScroll.clipToPadding = true
                 dim(!has)
                 if (has) {
                     // The focused row snaps to the pane's top, as on Home: scrolling just far enough left Shows cut off.
@@ -710,10 +684,8 @@ class SearchActivity : Screen() {
                     }
                     caption.text = meta.name + (meta.year?.let { "  ·  " + it.take(4) } ?: "")
                     caption.visibility = View.VISIBLE
-                    // The focused card goes to the row's start; near the end the row stops with the last card at the margin.
-                    // Cards that slid past the start hide, so no sliver shows at the pane's edge.
-                    val target = rail.scrollToCard(index, step)
-                    for (i in 0 until rail.strip.childCount) rail.strip.getChildAt(i).let {
+                    val target = rail.scrollToCard(index)
+                    rail.cards.forEach {
                         it.animate().alpha(if (it.left < target + rail.strip.paddingStart - 1) 0f else 1f).setDuration(FOCUS_MS).start()
                     }
                     caption.post {

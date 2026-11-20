@@ -1,6 +1,5 @@
 package dev.alder
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -18,10 +17,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewTreeObserver
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -387,7 +383,6 @@ class MainActivity : Screen() {
         val resumeAt: Long = 0,
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
-        var newEpisode: Boolean = false,
     ) {
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
@@ -2496,21 +2491,6 @@ class MainActivity : Screen() {
         var active = false
         var loaded = false
 
-        private val variant = when {
-            grid -> CardVariant.GRID_POSTER
-            wide -> CardVariant.WIDE_CHANNEL
-            continueRow -> CardVariant.CONTINUE_POSTER
-            else -> CardVariant.POSTER_RAIL
-        }
-        private val cardStyle = CardStyle(
-            variant = variant,
-            widthPx = cardWidth,
-            heightPx = cardHeight,
-            showRim = !polishedRail,
-            dimAlpha = if (grid) 0f else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
-            showFallbackImmediately = grid || page.hasGenreShortcuts,
-        )
-
         private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(PAD)
         val rail = HorizontalCardRail(
             screen = this@MainActivity,
@@ -2520,10 +2500,7 @@ class MainActivity : Screen() {
             paddingEndPx = inset,
             paddingBottomPx = dp(if (grid) LIST_GAP else ROW_BOTTOM_ROOM),
             wideMotion = wide,
-            fadingEdgePx = if (polishedRail) dp(30) else 0,
-            hideLeftFadingEdge = polishedRail,
-            cullLeftMargin = true,
-            cullThresholdPx = dp(PAD),
+            rightFadePx = if (polishedRail) dp(30) else 0,
         ).apply {
             onScroll = {
                 if (scroller.hasFocus()) placeCaption()
@@ -2554,23 +2531,27 @@ class MainActivity : Screen() {
             if (grid) cards.forEach { it.dim(true) }
         }
 
-        private fun Item.toCardContent() = CardContent(
-            id = id,
-            name = name,
-            posterUrl = poster,
-            artUrl = art,
-            progress = progress,
-            finished = finished,
-            live = live,
-            settled = settled,
-            newEpisode = newEpisode,
-        )
-
-        private fun makeCard(item: Item, index: Int) = MediaCardView(this@MainActivity, cardStyle, item.toCardContent()).apply {
+        private fun makeCard(item: Item, index: Int) = MediaCardView(
+            screen = this@MainActivity,
+            titleName = item.name,
+            posterUrl = item.poster,
+            artUrl = item.art,
+            widthPx = cardWidth,
+            heightPx = cardHeight,
+            wide = wide,
+            grid = grid,
+            showRim = !polishedRail,
+            dimAlpha = if (grid) 0f else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
+            eagerFallback = grid || page.hasGenreShortcuts,
+            progress = item.progress,
+            finished = item.finished,
+            live = item.live,
+            settled = item.settled,
+        ).apply {
             payload = item
             tag = "card:${item.id}"
             onRequestMeta = { fill(item) }
-            item.onFill += { updateContent(item.toCardContent()) }
+            item.onFill += { refresh(item.poster, item.art, item.settled) }
             setOnFocusChanged { has ->
                 if (has) {
                     focus(index)
@@ -2590,7 +2571,7 @@ class MainActivity : Screen() {
         fun light(on: Boolean) {
             if (active == on) return
             active = on
-            if (on) peek(true)
+            if (on) peek(true) else rail.clearHeld()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
             cards.forEachIndexed { i, c -> c.dim(if (grid) !on || i != selected else on && i != selected) }
         }
@@ -2623,7 +2604,7 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            val targetScroll = rail.scrollToCard(index, cardStep)
+            val targetScroll = rail.scrollToCard(index)
             loadRest(this@Row)
             val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
@@ -2650,8 +2631,8 @@ class MainActivity : Screen() {
                     val card = makeCard(item, items.size)
                     items += item
                     rail.appendCard(card)
-                    card.alpha = 0f // shows once focus moves near, like the cards past the right margin
-                    card.dim(active)
+                    card.show(false) // shows once focus moves near, like the cards past the right margin
+                    card.dim(active, animate = false)
                 }
                 if (loaded) loadRest(this@Row)
                 if (active && !grid) rail.strip.post {
@@ -2692,10 +2673,6 @@ class MainActivity : Screen() {
         if (item.logo == null) item.logo = m.logo
         if (item.about.isEmpty()) item.about = m.description ?: ""
         if (item.facts.isEmpty() || item.resume) item.facts = facts(m)
-        if (item.nextEpisodePending && item.videoId != null) {
-            val v = m.videos.firstOrNull { it.id == item.videoId }
-            if (v != null && isRecentlyAired(v.released)) item.newEpisode = true
-        }
         // Home's first title (the first card the remote lands on): next launch starts on its art and logo.
         if (cinema.firstOrNull() === item && item.art != null) getSharedPreferences("home", MODE_PRIVATE).edit()
             .putString("art:${profile.id}", item.art).putString("logo:${profile.id}", item.logo).apply()
@@ -2752,16 +2729,11 @@ class MainActivity : Screen() {
         val progress = if (duration > 0) offset.toFloat() / duration else 0f
         val id = item.getString("_id")
         val type = item.optString("type")
-        val newEpisode = if (pending) {
-            val v = metas[id]?.videos?.firstOrNull { it.id == videoId }
-            v != null && isRecentlyAired(v.released)
-        } else false
         return Item(
             id, type, item.text("name")?.takeIf { it.isNotBlank() } ?: getString(R.string.addons_unavailable), item.text("poster"),
             null, Images.logoFor(id), "", emptyList(), videoId, progress,
             resume = offset > 0, timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
-            newEpisode = newEpisode,
         )
     }
 

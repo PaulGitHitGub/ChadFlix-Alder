@@ -649,15 +649,6 @@ abstract class Screen : Activity() {
         }
     }
 
-    /** One poster/portrait focus treatment; the poster itself supplies its glow colour. */
-    protected fun View.cardFocus(radiusDp: Int = 6, also: (Boolean) -> Unit = {}) {
-        isFocusable = true
-        setOnFocusChangeListener { v, has ->
-            v.lift(has, radiusDp)
-            also(has)
-        }
-    }
-
     private val glowCache = java.util.WeakHashMap<View, Pair<Bitmap, Int>>()
 
     private fun posterBitmap(view: View): Bitmap? = when (view) {

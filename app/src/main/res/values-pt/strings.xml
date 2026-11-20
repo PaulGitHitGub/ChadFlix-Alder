@@ -65,7 +65,6 @@
     <string name="menu_settings">Configurações</string>
     <string name="action_play">Assistir</string>
     <string name="action_resume">Continuar</string>
-    <string name="new_episode">Novo episódio</string>
     <string name="stopped_at">Parou em %1$s</string>
     <string name="time_left_hours">Faltam %1$d h %2$d min</string>
     <string name="time_left_minutes">Faltam %1$d min</string>
