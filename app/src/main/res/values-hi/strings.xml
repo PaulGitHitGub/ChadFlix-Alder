@@ -138,7 +138,6 @@
     <string name="player_starting_stream">स्ट्रीम शुरू हो रही है…</string>
     <string name="player_source_failed_next">वह स्रोत नहीं चला · अगला आज़माया जा रहा है</string>
     <string name="player_source_failed_choose">वह स्रोत नहीं चला · कोई दूसरा स्रोत चुनें</string>
-    <string name="player_keeps_buffering">बार-बार बफ़र हो रहा है</string>
     <string name="player_switch_prompt">%1$dp पर जाएँ?</string>
     <string name="player_switch_desc">यह %1$dp स्रोत एक मिनट में 3 बार रुका। छोटी फ़ाइल %2$s से ज़्यादा आसानी से चल सकती है।</string>
     <string name="player_switch_to">%1$dp पर जाएँ</string>
@@ -147,7 +146,6 @@
     <string name="player_source_failed">स्रोत नहीं चला</string>
     <string name="player_try_another">कोई दूसरा स्रोत आज़माएँ</string>
     <string name="player_next_episode">अगला एपिसोड</string>
-    <string name="player_up_next">आगे है</string>
     <string name="player_play_episode">S%1$d E%2$d चलाएँ</string>
     <string name="player_exit_home">होम पर जाएँ</string>
     <string name="player_still_watching">अभी भी देख रहे हैं?</string>
@@ -155,14 +153,11 @@
     <string name="player_sleep_paused">स्लीप टाइमर ने प्लेबैक रोक दिया।</string>
     <string name="skip_intro">इंट्रो छोड़ें</string>
     <string name="skip_recap">रीकैप छोड़ें</string>
-    <string name="player_paused">रुका हुआ</string>
     <string name="player_seek">आगे-पीछे करें</string>
     <string name="player_audio_subtitles">ऑडियो और सबटाइटल</string>
     <string name="player_change_stream">स्रोत बदलें</string>
     <string name="player_pause">रोकें</string>
     <string name="player_info">जानकारी</string>
-    <string name="key_play_pause">चलाएँ / रोकें</string>
-    <string name="key_seek">बार पर आगे-पीछे करें</string>
     <string name="player_live">लाइव</string>
     <string name="player_chapters">%1$s  ·  ▲ चैप्टर</string>
     <string name="player_cannot_seek">यह स्रोत आगे नहीं बढ़ सकता · दूसरा आज़माने के लिए स्रोत बदलें</string>
@@ -180,14 +175,11 @@
     <string name="track_preferred">पसंदीदा</string>
     <string name="track_recent">हाल का</string>
     <string name="track_in_file">फ़ाइल में</string>
-    <string name="subtitles_heading">सबटाइटल · %1$s</string>
     <string name="quick_timing">तुरंत टाइमिंग</string>
     <string name="subtitle_color">सबटाइटल का रंग</string>
     <string name="tracks_pinned">पिन किए गए</string>
     <string name="all_languages">सभी भाषाएँ (%1$d)</string>
-    <string name="audio_heading">ऑडियो · %1$s</string>
     <string name="all_audio_tracks">सभी ऑडियो ट्रैक (%1$d)</string>
-    <string name="audio_enhancement">ऑडियो सुधार</string>
     <string name="clear_dialogue">साफ़ संवाद</string>
     <string name="clear_dialogue_hint">संगीत और इफ़ेक्ट के ऊपर आवाज़ें उभारता है</string>
     <string name="timing_earlier_heading">पहले</string>
@@ -201,7 +193,6 @@
     <string name="size_extra_large">बहुत बड़ा</string>
     <string name="color">रंग</string>
     <string name="background_box">पृष्ठभूमि</string>
-    <string name="playback_sleep">प्लेबैक और स्लीप</string>
     <string name="sleep_timer">स्लीप टाइमर</string>
     <string name="player_change_stream_arrow">स्रोत बदलें  →</string>
     <string name="subtitles_off">सबटाइटल बंद</string>

@@ -151,7 +151,6 @@
     <string name="player_starting_stream">جارٍ بدء البث…</string>
     <string name="player_source_failed_next">تعذّر تشغيل هذا المصدر · جارٍ تجربة المصدر التالي</string>
     <string name="player_source_failed_choose">تعذّر تشغيل هذا المصدر · اختر مصدرًا آخر</string>
-    <string name="player_keeps_buffering">يتوقّف للتحميل باستمرار</string>
     <string name="player_switch_prompt">هل تريد التبديل إلى دقة %1$dp؟</string>
     <string name="player_switch_desc">توقّف هذا المصدر بدقة %1$dp ثلاث مرات خلال دقيقة. قد يعمل ملف أصغر من %2$s بسلاسة أكبر.</string>
     <string name="player_switch_to">التبديل إلى دقة %1$dp</string>
@@ -160,7 +159,6 @@
     <string name="player_source_failed">تعذّر تشغيل المصدر</string>
     <string name="player_try_another">جرّب مصدرًا آخر</string>
     <string name="player_next_episode">الحلقة التالية</string>
-    <string name="player_up_next">التالي</string>
     <string name="player_play_episode">تشغيل الموسم %1$d، الحلقة %2$d</string>
     <string name="player_exit_home">الخروج إلى الرئيسية</string>
     <string name="player_still_watching">هل ما زلت تشاهد؟</string>
@@ -168,14 +166,11 @@
     <string name="player_sleep_paused">أوقف مؤقت النوم التشغيل مؤقتًا.</string>
     <string name="skip_intro">تخطّي المقدّمة</string>
     <string name="skip_recap">تخطّي الملخّص</string>
-    <string name="player_paused">متوقّف مؤقتًا</string>
     <string name="player_seek">تقديم أو ترجيع</string>
     <string name="player_audio_subtitles">الصوت والترجمة</string>
     <string name="player_change_stream">تغيير المصدر</string>
     <string name="player_pause">إيقاف مؤقت</string>
     <string name="player_info">معلومات</string>
-    <string name="key_play_pause">تشغيل / إيقاف مؤقت</string>
-    <string name="key_seek">تقديم أو ترجيع على الشريط</string>
     <string name="player_live">مباشر</string>
     <string name="player_chapters">%1$s  ·  ▲ الفصول</string>
     <string name="player_cannot_seek">هذا المصدر لا يدعم التقديم · اختر تغيير المصدر لتجربة مصدر آخر</string>
@@ -193,14 +188,11 @@
     <string name="track_preferred">مفضّل</string>
     <string name="track_recent">الأخيرة</string>
     <string name="track_in_file">في الملف</string>
-    <string name="subtitles_heading">الترجمة · %1$s</string>
     <string name="quick_timing">ضبط سريع للتوقيت</string>
     <string name="subtitle_color">لون الترجمة</string>
     <string name="tracks_pinned">مثبّتة</string>
     <string name="all_languages">كل اللغات (%1$d)</string>
-    <string name="audio_heading">الصوت · %1$s</string>
     <string name="all_audio_tracks">كل المسارات الصوتية (%1$d)</string>
-    <string name="audio_enhancement">تحسين الصوت</string>
     <string name="clear_dialogue">حوار واضح</string>
     <string name="clear_dialogue_hint">رفع صوت الحوار فوق الموسيقى والمؤثرات</string>
     <string name="timing_earlier_heading">أبكر</string>
@@ -214,7 +206,6 @@
     <string name="size_extra_large">كبير جدًا</string>
     <string name="color">اللون</string>
     <string name="background_box">مربّع خلفية</string>
-    <string name="playback_sleep">التشغيل والنوم</string>
     <string name="sleep_timer">مؤقت النوم</string>
     <string name="player_change_stream_arrow">تغيير المصدر  →</string>
     <string name="subtitles_off">إيقاف الترجمة</string>

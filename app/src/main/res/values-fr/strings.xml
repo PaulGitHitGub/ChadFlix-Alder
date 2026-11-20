@@ -141,7 +141,6 @@
     <string name="player_starting_stream">Démarrage du flux…</string>
     <string name="player_source_failed_next">Cette source a échoué · essai de la suivante</string>
     <string name="player_source_failed_choose">Cette source a échoué · choisissez-en une autre</string>
-    <string name="player_keeps_buffering">Mise en mémoire tampon répétée</string>
     <string name="player_switch_prompt">Passer en %1$dp ?</string>
     <string name="player_switch_desc">Cette source %1$dp s’est arrêtée 3 fois en une minute. Un fichier plus léger pourrait être plus fluide à partir de %2$s.</string>
     <string name="player_switch_to">Passer en %1$dp</string>
@@ -150,7 +149,6 @@
     <string name="player_source_failed">Échec de la source</string>
     <string name="player_try_another">Essayez une autre source</string>
     <string name="player_next_episode">Épisode suivant</string>
-    <string name="player_up_next">À suivre</string>
     <string name="player_play_episode">Lire S%1$d E%2$d</string>
     <string name="player_exit_home">Revenir à l’accueil</string>
     <string name="player_still_watching">Vous regardez toujours ?</string>
@@ -158,14 +156,11 @@
     <string name="player_sleep_paused">La minuterie de veille a mis la lecture en pause.</string>
     <string name="skip_intro">Passer l’intro</string>
     <string name="skip_recap">Passer le récap</string>
-    <string name="player_paused">En pause</string>
     <string name="player_seek">Avancer ou reculer</string>
     <string name="player_audio_subtitles">Audio et sous-titres</string>
     <string name="player_change_stream">Changer de source</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Infos</string>
-    <string name="key_play_pause">Lecture / pause</string>
-    <string name="key_seek">Se déplacer sur la barre</string>
     <string name="player_live">Direct</string>
     <string name="player_chapters">%1$s  ·  ▲ Chapitres</string>
     <string name="player_cannot_seek">Cette source ne permet pas d’avancer · Changez de source pour en essayer une autre</string>
@@ -183,14 +178,11 @@
     <string name="track_preferred">Préféré</string>
     <string name="track_recent">Récent</string>
     <string name="track_in_file">dans le fichier</string>
-    <string name="subtitles_heading">Sous-titres · %1$s</string>
     <string name="quick_timing">Réglage rapide</string>
     <string name="subtitle_color">Couleur des sous-titres</string>
     <string name="tracks_pinned">Épinglés</string>
     <string name="all_languages">Toutes les langues (%1$d)</string>
-    <string name="audio_heading">Audio · %1$s</string>
     <string name="all_audio_tracks">Toutes les pistes audio (%1$d)</string>
-    <string name="audio_enhancement">Amélioration audio</string>
     <string name="clear_dialogue">Dialogues clairs</string>
     <string name="clear_dialogue_hint">Fait ressortir les voix par-dessus la musique et les effets</string>
     <string name="timing_earlier_heading">Plus tôt</string>
@@ -204,7 +196,6 @@
     <string name="size_extra_large">Très grande</string>
     <string name="color">Couleur</string>
     <string name="background_box">Fond</string>
-    <string name="playback_sleep">Lecture et veille</string>
     <string name="sleep_timer">Minuterie de veille</string>
     <string name="player_change_stream_arrow">Changer de source  →</string>
     <string name="subtitles_off">Sous-titres désactivés</string>

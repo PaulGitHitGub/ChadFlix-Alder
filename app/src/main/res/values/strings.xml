@@ -139,9 +139,8 @@
     <string name="player_starting">Starting · %1$s</string>
     <string name="player_starting_stream">Starting stream…</string>
     <string name="streams_tag_p2p" translatable="false">P2P</string>
-    <string name="player_source_failed_next">That source failed · trying the next one</string>
+    <string name="player_source_failed_next">That source failed. Trying the next one.</string>
     <string name="player_source_failed_choose">That source failed · choose another source</string>
-    <string name="player_keeps_buffering">Keeps buffering</string>
     <string name="player_switch_prompt">Switch to %1$dp?</string>
     <string name="player_switch_desc">This %1$dp source stopped 3 times in a minute. A smaller file may play more smoothly from %2$s.</string>
     <string name="player_switch_to">Switch to %1$dp</string>
@@ -150,7 +149,6 @@
     <string name="player_source_failed">Source failed</string>
     <string name="player_try_another">Try another source</string>
     <string name="player_next_episode">Next episode</string>
-    <string name="player_up_next">Up next</string>
     <string name="player_play_episode">Play S%1$d E%2$d</string>
     <string name="player_exit_home">Exit to Home</string>
     <string name="player_still_watching">Still watching?</string>
@@ -158,17 +156,14 @@
     <string name="player_sleep_paused">The sleep timer paused playback.</string>
     <string name="skip_intro">Skip intro</string>
     <string name="skip_recap">Skip recap</string>
-    <string name="player_paused">Paused</string>
     <string name="player_seek">Seek</string>
     <string name="player_audio_subtitles">Audio &amp; subtitles</string>
     <string name="player_change_stream">Change stream</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Info</string>
-    <string name="key_play_pause">Play / pause</string>
-    <string name="key_seek">Seek on the bar</string>
     <string name="player_live">Live</string>
     <string name="player_chapters">%1$s  ·  ▲ Chapters</string>
-    <string name="player_cannot_seek">This source can\'t skip ahead · Change stream to try another</string>
+    <string name="player_cannot_seek">This source can\'t skip ahead. Change stream to try another.</string>
     <string name="tab_subtitles">Subtitles</string>
     <string name="tab_audio">Audio</string>
     <string name="tab_sync_style">Sync &amp; Style</string>
@@ -183,14 +178,11 @@
     <string name="track_preferred">Preferred</string>
     <string name="track_recent">Recent</string>
     <string name="track_in_file">in the file</string>
-    <string name="subtitles_heading">Subtitles · %1$s</string>
     <string name="quick_timing">Quick timing</string>
     <string name="subtitle_color">Subtitle color</string>
     <string name="tracks_pinned">Pinned</string>
     <string name="all_languages">All languages (%1$d)</string>
-    <string name="audio_heading">Audio · %1$s</string>
     <string name="all_audio_tracks">All audio tracks (%1$d)</string>
-    <string name="audio_enhancement">Audio enhancement</string>
     <string name="clear_dialogue">Clear dialogue</string>
     <string name="clear_dialogue_hint">Boost voices above music and effects</string>
     <string name="timing_earlier_heading">Earlier</string>
@@ -204,7 +196,6 @@
     <string name="size_extra_large">Extra large</string>
     <string name="color">Color</string>
     <string name="background_box">Background box</string>
-    <string name="playback_sleep">Playback &amp; sleep</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="player_change_stream_arrow">Change stream  →</string>
     <string name="subtitles_off">Subtitles off</string>
