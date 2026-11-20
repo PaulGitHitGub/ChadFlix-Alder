@@ -798,7 +798,7 @@ class MainActivity : Screen() {
                 if (hasFocus() || direction != View.FOCUS_UP || current == null) super.addFocusables(views, direction, focusableMode)
                 else views.add(current)
             }
-        }.apply { setPadding(dp(PAD), dp(18), dp(PAD), dp(6)) }
+        }.apply { setPadding(dp(PAD), dp(16), dp(PAD), dp(8)) }
 
         // The profile: a small round avatar on the margin. OK opens a small menu (switch profile, settings).
         val avatar = text(profile.name.take(1).uppercase(), SMALL, bold = true, color = TUNGSTEN).apply {
@@ -1012,7 +1012,6 @@ class MainActivity : Screen() {
                 // Once the new art covers it, the old one lets go: otherwise the GPU paints a hidden full screen every frame.
                 art.enter(if (settledBrowse) HOME_ART_MS else if (artBack.drawable == null) LIGHTS_MS else ART_MS).alpha(1f).withEndAction {
                     artBack.setImageDrawable(null)
-                    if (!libraryGrid) art.animate().scaleX(PUSH_IN).scaleY(PUSH_IN).setDuration(PUSH_IN_MS).start()
                 }.start()
                 refrost()
                 ready?.invoke()
@@ -1088,8 +1087,8 @@ class MainActivity : Screen() {
         }
         cinemaInfo = column(Gravity.START,
             FrameLayout(this).apply { addView(cinemaName); addView(cinemaLogo) },
-            cinemaLine.marginTop(14),
-            cinemaPlay.marginTop(22),
+            cinemaLine.marginTop(12),
+            cinemaPlay.marginTop(24),
         ).apply { alpha = 0f }
         // Page dots as tvOS draws them: small and quiet, the current one a short pill.
         dots = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; alpha = 0f }
@@ -1306,7 +1305,6 @@ class MainActivity : Screen() {
         // A show in progress describes its next episode, so the line names that episode rather than the show.
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
-        if (item.newEpisode) factsList += getString(R.string.new_episode)
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() })
         else factsList += listOfNotNull(year, genre, length)
         heroFacts.text = factsList.joinToString(DOT)
@@ -1350,9 +1348,15 @@ class MainActivity : Screen() {
             else if (hasEpisodes(item.type, meta?.videos)) meta?.videos?.map { it.season }?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }
                 ?.let { plural(R.plurals.seasons, it) }
             else meta?.runtime
-        cardCaption.text = item.timeLeft
+        val captionText = item.timeLeft
             ?: getString(R.string.player_next_episode).takeIf { item.nextEpisodePending }
-            ?: listOfNotNull(item.name, detail).joinToString(DOT)
+            ?: if (page == Page.HOME) null else listOfNotNull(item.name, detail).joinToString(DOT)
+        if (captionText == null) {
+            cardCaption.visibility = View.GONE
+            placeCaption()
+            return
+        }
+        cardCaption.text = captionText
         val progress = item.progress.takeIf { page == Page.HOME && item.timeLeft != null && it > 0f }
         val line = progress?.let {
             val fill = android.graphics.drawable.ClipDrawable(rounded(TUNGSTEN, 2), Gravity.LEFT,
@@ -1369,7 +1373,6 @@ class MainActivity : Screen() {
     }
 
     private fun placeCaption() {
-        if (cardCaption.visibility != View.VISIBLE) return
         val card = currentFocus as? Row.Card ?: return
         val parent = cardCaption.parent as FrameLayout
         if (!card.isAttachedToWindow || !isInside(card, parent)) return
@@ -1378,9 +1381,10 @@ class MainActivity : Screen() {
         cardUnderline.visibility = if (page.polishedRail && mode == Mode.BROWSE) View.VISIBLE else View.INVISIBLE
         cardUnderline.translationX = (captionAnchor.centerX() - cardUnderline.width / 2).toFloat()
         cardUnderline.translationY = (captionAnchor.bottom + dp(8)).toFloat()
+        if (cardCaption.visibility != View.VISIBLE) return
         cardCaption.translationX = (captionAnchor.left - cardCaption.left)
             .coerceIn(0, (parent.width - 2 * dp(PAD) - cardCaption.width).coerceAtLeast(0)).toFloat()
-        cardCaption.translationY = (captionAnchor.bottom + dp(17) - cardCaption.top).toFloat()
+        cardCaption.translationY = (captionAnchor.bottom + dp(16) - cardCaption.top).toFloat()
         clearHint()
     }
 
@@ -1494,7 +1498,7 @@ class MainActivity : Screen() {
                 failureOf(error))) { showPage(page) }
             failure = view
             content.addView(view, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
-            view.post { if (view.isAttachedToWindow && !focusedSomething && !header.hasFocus()) view.getChildAt(2).requestFocus() }
+            view.post { if (view.isAttachedToWindow && !focusedSomething && !header.hasFocus()) view.getChildAt(1).requestFocus() }
         }
         fun clearFailure() {
             failure?.let(content::removeView)
@@ -1578,7 +1582,7 @@ class MainActivity : Screen() {
             val reason = catalogFailures.values.firstOrNull() ?: return null
             val names = failedAddons.values.filter { it.isNotBlank() }.distinct().joinToString(", ")
             if (names.isEmpty()) return failureMessage(R.string.catalog_incomplete, reason)
-            return "${getString(R.string.catalog_addon_failed, names)} · ${getString(reason.message)}\n" +
+            return "${getString(R.string.catalog_addon_failed, names)}: ${getString(reason.message)}\n" +
                 getString(reason.advice)
         }
         fun catalogStatus(key: String, failure: Failure?, addon: String? = null) {
@@ -1595,10 +1599,10 @@ class MainActivity : Screen() {
             catalogWarning = message?.let {
                 failed(it) { showPage(p) }.also { card ->
                     content.addView(card, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
-                    if (restoreFocus) card.getChildAt(2).requestFocus()
+                    if (restoreFocus) card.getChildAt(1).requestFocus()
                 }
             }
-            pageWarning = catalogWarning?.let { (it as android.view.ViewGroup).getChildAt(2) }
+            pageWarning = catalogWarning?.let { (it as android.view.ViewGroup).getChildAt(1) }
         }
         fun build(addons: List<Addon>) {
             if (g != generation) return
@@ -1633,7 +1637,7 @@ class MainActivity : Screen() {
                     else -> R.string.page_no_show_catalogs
                 }
                 // Home holds only Continue and Watchly's picks, so a new account sees nothing there without a word.
-                noCatalogs = text(none, BODY, color = TEXT_3).apply {
+                noCatalogs = text(none, BODY, color = TEXT_2).apply {
                     setPadding(dp(PAD), 0, dp(PAD), 0)
                     content.addView(this)
                 }
@@ -2487,7 +2491,7 @@ class MainActivity : Screen() {
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
         private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
         private val polishedRail = page.polishedRail
-        private val gap = if (grid) LIST_GAP else if (polishedRail) 18 else CARD_GAP
+        private val gap = if (grid) LIST_GAP else if (polishedRail) 16 else CARD_GAP
         val cardStep = cardWidth + dp(gap)
         val items = first.toMutableList()
         val cards = items.mapIndexed { i, item -> Card(item, i) }.toMutableList()
@@ -2545,12 +2549,11 @@ class MainActivity : Screen() {
         }
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
-        private val heading = (if (polishedRail) text(title, BODY, bold = true) else caps(title)).onArt().apply {
+        private val heading = text(title, BODY, bold = true).onArt().apply {
             setPadding(dp(PAD), 0, dp(PAD), 0)
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             maxWidth = dp(PAD + HERO_W) // a long "Because you watched…" stops at the hero's width
             alpha = QUIET
-            if (continueRow) translationY = dp(10).toFloat()
             if (grid) visibility = View.GONE
         }
         val view: View = column(Gravity.START, heading, scroller).apply { if (wide) setPadding(0, dp(CARD_H - WIDE_H), 0, 0) }
@@ -2709,17 +2712,11 @@ class MainActivity : Screen() {
                     background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000))
                 }, LayoutParams(-1, cardHeight * (if (wide) 6 else 4) / 10, Gravity.BOTTOM))
                 if (wide && !item.live) name.visibility = View.VISIBLE
-                // Time left as a quiet label in the corner, where the eye checks before choosing what to resume.
-                val timeLeft = item.timeLeft
-                if (wide && timeLeft != null) face.addView(text(timeLeft, SMALL, bold = true).apply {
-                    background = rounded(0x99000000.toInt(), 8)
-                    setPadding(dp(8), dp(3), dp(8), dp(4))
-                }, LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(0, dp(10), dp(10), 0) })
                 val addBadge = {
-                    face.addView(caps(R.string.new_episode, TUNGSTEN).apply {
+                    face.addView(text(R.string.new_episode, SMALL, bold = true, color = TUNGSTEN).apply {
                         tag = "new_badge"
                         background = rounded(0xCC000000.toInt(), 6)
-                        setPadding(dp(8), dp(3), dp(8), dp(4))
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
                     }, LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { setMargins(dp(10), dp(10), 0, 0) })
                 }
                 if (wide && item.newEpisode) addBadge()
@@ -3086,9 +3083,9 @@ class MainActivity : Screen() {
         const val LOGO_H = 100
         const val RADIUS = 6
         const val LOGO_INSET = 14 // dp around a channel logo inside its card
-        const val ROW_TOP_ROOM = HEADING_GAP + 9 // dp between the row title and its cards, plus the focused card's growth (5% of 180 dp a side)
-        const val ROW_BOTTOM_ROOM = 38 // room for the focused caption below the poster
-        const val SAFE_BOTTOM = 27
+        const val ROW_TOP_ROOM = HEADING_GAP + 8 // dp between the row title and its cards, plus the focused card's growth
+        const val ROW_BOTTOM_ROOM = 40 // room for the focused caption below the poster
+        const val SAFE_BOTTOM = 28
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
         const val DIM = 0.5f
         const val CONTINUE_DIM = 0.38f

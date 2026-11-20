@@ -276,7 +276,7 @@ class DetailsActivity : Screen() {
             val error = failed(failure?.let { failureMessage(R.string.details_load_failed, it) }
                 ?: getString(R.string.details_load_failed)) { recreate() }
             stack.addView(error.marginTop(16))
-            error.post { error.getChildAt(2).requestFocus() }
+            error.post { error.getChildAt(1).requestFocus() }
         } else {
             val length = if (hasEpisodes(type, m.videos)) m.videos.map { it.season }.filter { it > 0 }.distinct().size
                 .takeIf { it > 0 }?.let(::seasons) else m.runtime

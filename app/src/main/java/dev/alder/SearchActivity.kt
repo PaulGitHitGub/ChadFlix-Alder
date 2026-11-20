@@ -580,7 +580,7 @@ class SearchActivity : Screen() {
                     val message = if (sections.isEmpty() && answers.all { it == null }) R.string.search_unavailable else R.string.search_incomplete
                     val card = failed(failureMessage(message, failure)) { search(true, failure) }
                     results.addView(card)
-                    if (moveFocus && sections.isEmpty()) card.getChildAt(2).requestFocus()
+                    if (moveFocus && sections.isEmpty()) card.getChildAt(1).requestFocus()
                 } else {
                     previous?.let { FailureLog.record(FailureLog.Operation.SEARCH, it, recovered = true) }
                     if (sections.isEmpty()) results.addView(text(R.string.search_no_matches, BODY, color = TEXT_2))
