@@ -280,11 +280,11 @@ class PlayerActivity : Screen() {
     private var lastPosition = 0L
     private var ticks = 0
 
-    private var sources: List<Stream> = emptyList()
+    @Volatile private var sources: List<Stream> = emptyList()
     private var resolvingStreams: Cancellable? = null
     private lateinit var backdropArt: ImageView
     private lateinit var backdropShade: FrameLayout
-    private var at = 0 // the source playing
+    @Volatile private var at = 0 // the source playing
     private var retries = 0 // network retries on this source
     private var asHls = false // tried as HLS: live and IPTV links often hide the playlist behind a plain URL
     private var started = false // a picture has shown
@@ -298,6 +298,9 @@ class PlayerActivity : Screen() {
     private var opened: Opened? = null
     private var openedFor: Stream? = null
     private var opening: Stream? = null
+    private val openLock = Any()
+    @Volatile private var destroyed = false
+    private val inFlightOpened = mutableListOf<Opened>()
     private var startWait = START_WAIT
     // Stremio's resume point when it differs from the TV's copy; used once the picture shows and the file can seek.
     private var lateResume: Long? = null
@@ -889,6 +892,8 @@ class PlayerActivity : Screen() {
             audioGroups = emptyList()
             failedAudio.clear()
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
+            closeInFlightOpened()
+            if (opening !== s) opening = null
             opened?.close()
             opened = null
             openedFor = null
@@ -969,10 +974,18 @@ class PlayerActivity : Screen() {
                 ?: episodeNumbers(videoId)
                 ?: intent.getStringExtra("episode")?.substringBefore("  ·  ")?.let(::parseEpisodeLabel)
         }
-        background({ s.open(applicationContext, episode) }) { r ->
+        val stale = { destroyed || isFinishing || isDestroyed || sources.getOrNull(at) !== s }
+        background({
+            val o = s.open(applicationContext, episode, stale)
+            synchronized(openLock) {
+                if (closeStaleOpen(o, stale())) null
+                else o.also { inFlightOpened += it }
+            }
+        }) { r ->
             if (opening === s) opening = null
             val o = r.getOrNull()
-            if (isFinishing || isDestroyed || sources.getOrNull(at) !== s) return@background run { o?.close() }
+            if (o != null) synchronized(openLock) { inFlightOpened.remove(o) }
+            if (closeStaleOpen(o, stale())) return@background
             if (o == null) {
                 android.util.Log.w("Alder", "source ${at + 1}/${sources.size} didn't open", r.exceptionOrNull())
                 startAt = position
@@ -3195,9 +3208,18 @@ class PlayerActivity : Screen() {
         push()
     }
 
+    private fun closeInFlightOpened(markDestroyed: Boolean = false) {
+        val leftover = synchronized(openLock) {
+            if (markDestroyed) destroyed = true
+            inFlightOpened.toList().also { inFlightOpened.clear() }
+        }
+        leftover.forEach { it.close() }
+    }
+
     override fun onDestroy() {
         resolvingStreams?.cancel()
         resolvingStreams = null
+        closeInFlightOpened(markDestroyed = true)
         main.removeCallbacks(startTimeout)
         opened?.close()
         opened = null
