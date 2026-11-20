@@ -39,6 +39,9 @@ internal fun needsCardMeta(
     artUrl: String?,
 ): Boolean = (posterUrl == null && artUrl == null) || (!live && wide && artUrl == null)
 
+internal fun cardNeedsTitle(live: Boolean, wide: Boolean, loadedUrl: String?, posterUrl: String?): Boolean =
+    loadedUrl == null || (!live && (wide || loadedUrl != posterUrl))
+
 internal fun isLogoImage(
     hasAlpha: Boolean,
     bitmapWidth: Int,
@@ -78,9 +81,7 @@ internal class MediaCardView(
     val heightPx: Int = screen.dp(Screen.POSTER_H),
     val wide: Boolean = false,
     val grid: Boolean = false,
-    val showRim: Boolean = true,
-    val dimAlpha: Float = if (grid) 0f else Screen.CARD_DIM,
-    val eagerFallback: Boolean = grid,
+    val dimAlpha: Float = Screen.CARD_DIM,
     progress: Float = 0f,
     finished: Boolean = false,
     val live: Boolean = false,
@@ -106,7 +107,17 @@ internal class MediaCardView(
 
     private val hasProgress = !grid && progress > 0f
 
-    // The name in words: always on a wide non-live card, on a poster only when it has no picture.
+    private val titleShadeMade = lazy {
+        View(screen).apply {
+            background = GradientDrawable(
+                GradientDrawable.Orientation.BOTTOM_TOP,
+                intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000),
+            )
+        }.also { face.addView(it, 1, LayoutParams(-1, heightPx * 6 / 10, Gravity.BOTTOM)) }
+    }
+    private val titleShade by titleShadeMade
+
+    // Keep the title on backdrop substitutes: cropped art may have no lettering.
     private val nameMade = lazy {
         screen.text(titleName, if (wide) Screen.BODY else Screen.SMALL, bold = true).apply {
             maxLines = if (wide) 1 else 2
@@ -139,26 +150,20 @@ internal class MediaCardView(
         clipToOutline = true
 
         face.addView(image, LayoutParams(-1, -1))
-        if ((wide && !live) || hasProgress) {
-            face.addView(View(screen).apply {
-                background = GradientDrawable(
-                    GradientDrawable.Orientation.BOTTOM_TOP,
-                    intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000),
-                )
-            }, LayoutParams(-1, heightPx * (if (wide) 6 else 4) / 10, Gravity.BOTTOM))
-        }
+        if (wide && !live) titleShade.visibility = View.VISIBLE
         if (wide && !live) nameView.visibility = View.VISIBLE
 
         addView(face, LayoutParams(-1, -1))
         if (hasProgress) {
             addView(screen.progressBar(progress), LayoutParams(-1, screen.dp(3), Gravity.BOTTOM).apply {
-                setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(11))
+                setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(10))
             })
         }
         if (grid && finished) {
             addView(screen.text("✓", Screen.SMALL, bold = true, color = Screen.TUNGSTEN).apply {
                 gravity = Gravity.CENTER
                 background = screen.rounded(Screen.BASE, 12)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }, LayoutParams(screen.dp(24), screen.dp(24), Gravity.TOP or Gravity.END).apply {
                 setMargins(0, screen.dp(6), screen.dp(6), 0)
             })
@@ -166,9 +171,16 @@ internal class MediaCardView(
         addView(shade, LayoutParams(-1, -1))
 
         isFocusable = true
-        contentDescription = titleName
+        contentDescription = listOfNotNull(
+            titleName,
+            screen.getString(R.string.card_watched).takeIf { finished },
+            screen.getString(R.string.card_progress, (progress.coerceIn(0f, 1f) * 100).toInt()).takeIf { progress > 0f && !finished },
+            screen.getString(R.string.player_live).takeIf { live },
+        ).joinToString(", ")
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        face.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         setOnFocusChangeListener { _, has ->
-            screen.run { lift(has, Screen.CARD_RADIUS, rim = showRim) }
+            screen.run { lift(has) }
             onFocusHandler?.invoke(has)
         }
     }
@@ -199,18 +211,16 @@ internal class MediaCardView(
         else shade.alpha = target
     }
 
-    /** On screen (or nearly): load poster/art, or show fallback title when settled. */
+    /** On screen (or nearly): show the title until its picture is ready. */
     fun load() {
         wanted = true
         if (needsCardMeta(live, wide, posterUrl, artUrl)) {
             onRequestMeta?.invoke()
         }
         val url = pickCardImageUrl(live, wide, settled, posterUrl, artUrl) ?: run {
-            if (settled || live || eagerFallback) {
-                if (live) face.background = screen.glass(Screen.CARD_RADIUS)
-                nameView.visibility = View.VISIBLE
-                face.alpha = 1f
-            }
+            if (live) face.background = screen.glass(Screen.CARD_RADIUS)
+            nameView.visibility = View.VISIBLE
+            face.alpha = 1f
             return
         }
         if (url == shownUrl) return
@@ -222,7 +232,9 @@ internal class MediaCardView(
 
     private fun loadUrl(url: String, retry: Boolean) {
         val imageWidth = (widthPx * Screen.CARD_GROW).toInt()
-        if (eagerFallback && !Images.cached(url, imageWidth)) {
+        image.animate().cancel()
+        image.alpha = 1f
+        if (!Images.cached(url, imageWidth)) {
             nameView.visibility = View.VISIBLE
             face.alpha = 1f
         }
@@ -242,9 +254,16 @@ internal class MediaCardView(
             }
         }) {
             if (live) fitLogo()
-            if (nameMade.isInitialized()) nameView.visibility = if (wide && !live) View.VISIBLE else View.INVISIBLE
-            if (now || !fadeIn) face.alpha = 1f else screen.run { face.enter(Screen.QUICK_MS) }.alpha(1f).start()
-            if (isFocused) screen.run { lift(true, Screen.CARD_RADIUS, rim = showRim) }
+            val showTitle = cardNeedsTitle(live, wide, image.tag as? String, posterUrl)
+            if (showTitle) titleShade.visibility = View.VISIBLE
+            else if (titleShadeMade.isInitialized()) titleShade.visibility = View.GONE
+            if (showTitle || nameMade.isInitialized()) nameView.visibility = if (showTitle) View.VISIBLE else View.INVISIBLE
+            face.alpha = 1f
+            if (!now && fadeIn) {
+                image.alpha = 0f
+                screen.run { image.enter(Screen.QUICK_MS) }.alpha(1f).start()
+            }
+            if (isFocused) screen.run { lift(true) }
         }
         now = false
     }
@@ -255,6 +274,7 @@ internal class MediaCardView(
         wanted = false
         shownUrl = null
         face.animate().cancel()
+        image.animate().cancel()
         image.tag = null
         image.setImageDrawable(null)
         image.setPadding(0, 0, 0, 0)

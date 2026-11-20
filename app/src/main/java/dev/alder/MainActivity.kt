@@ -1370,13 +1370,11 @@ class MainActivity : Screen() {
         if (!card.isAttachedToWindow || !isInside(card, parent)) return
         captionAnchor.set(0, 0, card.width, card.height)
         parent.offsetDescendantRectToMyCoords(card, captionAnchor)
-        cardUnderline.visibility = if (page.polishedRail && mode == Mode.BROWSE) View.VISIBLE else View.INVISIBLE
-        cardUnderline.translationX = (captionAnchor.centerX() - cardUnderline.width / 2).toFloat()
-        cardUnderline.translationY = (captionAnchor.bottom + dp(8)).toFloat()
+        cardUnderline.visibility = View.INVISIBLE
         if (cardCaption.visibility != View.VISIBLE) return
         cardCaption.translationX = (captionAnchor.left - cardCaption.left)
             .coerceIn(0, (parent.width - 2 * dp(PAD) - cardCaption.width).coerceAtLeast(0)).toFloat()
-        cardCaption.translationY = (captionAnchor.bottom + dp(16) - cardCaption.top).toFloat()
+        cardCaption.translationY = (captionAnchor.bottom + dp(12) - cardCaption.top).toFloat()
         clearHint()
     }
 
@@ -2528,7 +2526,6 @@ class MainActivity : Screen() {
 
         init {
             items.forEachIndexed { i, item -> rail.appendCard(makeCard(item, i)) }
-            if (grid) cards.forEach { it.dim(true) }
         }
 
         private fun makeCard(item: Item, index: Int) = MediaCardView(
@@ -2540,14 +2537,13 @@ class MainActivity : Screen() {
             heightPx = cardHeight,
             wide = wide,
             grid = grid,
-            showRim = !polishedRail,
-            dimAlpha = if (grid) 0f else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
-            eagerFallback = grid || page.hasGenreShortcuts,
+            dimAlpha = if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
             progress = item.progress,
             finished = item.finished,
             live = item.live,
             settled = item.settled,
         ).apply {
+            dim(true, animate = false)
             payload = item
             tag = "card:${item.id}"
             onRequestMeta = { fill(item) }
@@ -2573,7 +2569,7 @@ class MainActivity : Screen() {
             active = on
             if (on) peek(true) else rail.clearHeld()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
-            cards.forEachIndexed { i, c -> c.dim(if (grid) !on || i != selected else on && i != selected) }
+            cards.forEachIndexed { i, c -> c.dim(!on || i != selected) }
         }
 
         fun focusFirst() = rail.focusSelected()
@@ -2632,7 +2628,6 @@ class MainActivity : Screen() {
                     items += item
                     rail.appendCard(card)
                     card.show(false) // shows once focus moves near, like the cards past the right margin
-                    card.dim(active, animate = false)
                 }
                 if (loaded) loadRest(this@Row)
                 if (active && !grid) rail.strip.post {

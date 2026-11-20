@@ -649,30 +649,9 @@ abstract class Screen : Activity() {
         }
     }
 
-    private val glowCache = java.util.WeakHashMap<View, Pair<Bitmap, Int>>()
-
-    private fun posterBitmap(view: View): Bitmap? = when (view) {
-        is ImageView -> (view.drawable as? BitmapDrawable)?.bitmap
-        is android.view.ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { posterBitmap(view.getChildAt(it)) }
-        else -> null
-    }
-
-    internal fun View.lift(on: Boolean, radiusDp: Int = CARD_RADIUS, rim: Boolean = true) {
-        foreground = if (on && rim) GradientDrawable().apply {
-            setColor(Color.TRANSPARENT)
-            cornerRadius = dp(radiusDp).toFloat()
-            setStroke(dp(1), TUNGSTEN_RIM)
-        } else null
-        if (on && android.os.Build.VERSION.SDK_INT >= 28) {
-            val poster = posterBitmap(this)
-            val known = if (poster == null) TUNGSTEN_GLOW else glowCache[this]?.takeIf { it.first === poster }?.second
-            outlineSpotShadowColor = known ?: TUNGSTEN_GLOW
-            // Reading a poster's pixels back from the GPU took ~7 ms on the main thread per press: the glow is sampled
-            // off it and tints the shadow a moment later, while the lift is still growing.
-            if (known == null && poster != null) background({ samplePixels(poster, 16, 24)?.let(::filmGlow) }) { r ->
-                r.getOrNull()?.let { glow -> glowCache[this] = poster to glow; if (hasFocus()) outlineSpotShadowColor = glow }
-            }
-        }
+    /** Focus lifts and subtly scales the card above its neighbours with no outline or shadow. */
+    internal fun View.lift(on: Boolean) {
+        foreground = null
         grow(on)
             .translationZ(if (on) dp(CARD_LIFT).toFloat() else 0f).start()
     }
@@ -760,11 +739,13 @@ abstract class Screen : Activity() {
         @Deprecated("Drawable API") override fun getOpacity() = PixelFormat.TRANSLUCENT
     }
 
-    /** A thin watched-so-far bar over a dark track. */
+    /** A thin rounded watched-so-far bar over a dark track. */
     internal fun progressBar(progress: Float, color: Int = TUNGSTEN) = LinearLayout(this).apply {
         val p = progress.coerceIn(0f, 1f)
-        setBackgroundColor(PROGRESS_TRACK)
-        addView(View(context).apply { setBackgroundColor(color) }, LinearLayout.LayoutParams(0, -1, p))
+        background = rounded(PROGRESS_TRACK, 2)
+        outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
+        clipToOutline = true
+        addView(View(context).apply { background = rounded(color, 2) }, LinearLayout.LayoutParams(0, -1, p))
         addView(View(context), LinearLayout.LayoutParams(0, -1, 1f - p))
     }
 
@@ -1084,7 +1065,7 @@ abstract class Screen : Activity() {
         const val SHORT_LIST = 5 // "What's new" entries shown before See all changes
         const val WHATS_NEW_W = 480 // dp
         const val CHIP_H = 24 // the mocks' 46–48 px chips
-        const val CARD_GROW = 1.08f
+        const val CARD_GROW = 1.06f
         const val CHIP_GROW = 1.04f // a wide chip grown as much as a card filled the gap to its neighbour
         const val CARD_LIFT = 8
 
@@ -1130,8 +1111,8 @@ abstract class Screen : Activity() {
 
         const val BASE = 0xFF0E0C0A.toInt()
         const val CARD_PLACEHOLDER = 0xFF28221E.toInt()
-        const val CARD_DIM = 0.5f
-        const val CARD_CONTINUE_DIM = 0.38f
+        const val CARD_DIM = 0.45f
+        const val CARD_CONTINUE_DIM = 0.45f
         const val TEXT = 0xFFF3EEE6.toInt()
         const val TEXT_2 = 0xB8F3EEE6.toInt()
         const val TEXT_3 = 0x73F3EEE6
@@ -1147,7 +1128,7 @@ abstract class Screen : Activity() {
         const val ROW_FOCUSED = 0x29F3EEE6
         const val CHIP_REST = 0xE6191512.toInt() // list chips over posters: near-solid smoked glass
         const val CHIP_FOCUSED = 0xFF4C4136.toInt()
-        const val PROGRESS_TRACK = 0x4DFFFFFF // light enough that a short fill still reads as a bar, not a dash
+        const val PROGRESS_TRACK = 0x9938322C.toInt() // visible over both light and dark poster art without a scrim
         internal val pool = Executors.newFixedThreadPool(6)
     }
 }

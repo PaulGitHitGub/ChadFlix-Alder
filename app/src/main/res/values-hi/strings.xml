@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">देखा गया</string>
+    <string name="card_progress">%1$d%% देखा गया</string>
 
     <!-- Shared -->
     <string name="action_ok">ठीक है</string>

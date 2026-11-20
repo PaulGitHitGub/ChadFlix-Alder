@@ -8,6 +8,17 @@ import org.junit.Test
 
 class CardSystemTest {
     @Test
+    fun backdropSubstitutesKeepTheirTitleWhilePostersAndChannelLogosStayClean() {
+        assertTrue(cardNeedsTitle(live = false, wide = false, loadedUrl = null, posterUrl = "poster"))
+        assertFalse(cardNeedsTitle(live = false, wide = false, loadedUrl = "poster", posterUrl = "poster"))
+        assertTrue(cardNeedsTitle(live = false, wide = false, loadedUrl = "backdrop", posterUrl = "poster"))
+        assertTrue(cardNeedsTitle(live = false, wide = false, loadedUrl = "backdrop", posterUrl = null))
+        assertTrue(cardNeedsTitle(live = false, wide = true, loadedUrl = "backdrop", posterUrl = "poster"))
+        assertFalse(cardNeedsTitle(live = true, wide = true, loadedUrl = "logo", posterUrl = "logo"))
+        assertTrue(cardNeedsTitle(live = true, wide = true, loadedUrl = null, posterUrl = null))
+    }
+
+    @Test
     fun pickCardImageUrlAndMetaRequestsFollowCardType() {
         // Portrait poster prefers posterUrl, falls back to artUrl, requests meta only when both are missing.
         assertEquals("p.jpg", pickCardImageUrl(live = false, wide = false, settled = false, posterUrl = "p.jpg", artUrl = "a.jpg"))

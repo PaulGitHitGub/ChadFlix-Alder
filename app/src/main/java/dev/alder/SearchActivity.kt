@@ -652,7 +652,14 @@ class SearchActivity : Screen() {
                 paddingBottomPx = dp(8),
                 stopAtStart = false,
                 cullLeft = false,
-            )
+            ).apply {
+                onScroll = {
+                    cards.getOrNull(this.selected)?.takeIf { it.hasFocus() }?.let { card ->
+                        caption.translationX = (card.left - scroller.scrollX).toFloat()
+                            .coerceIn(0f, (scroller.width - dp(48) - caption.width).coerceAtLeast(0).toFloat())
+                    }
+                }
+            }
             list.forEachIndexed { index, meta ->
                 rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
             }
@@ -688,10 +695,7 @@ class SearchActivity : Screen() {
                     rail.cards.forEach {
                         it.animate().alpha(if (it.left < target + rail.strip.paddingStart - 1) 0f else 1f).setDuration(FOCUS_MS).start()
                     }
-                    caption.post {
-                        caption.translationX = (left - target).toFloat()
-                            .coerceIn(0f, (rail.scroller.width - dp(48) - caption.width).coerceAtLeast(0).toFloat())
-                    }
+                    caption.post { rail.onScroll?.invoke() }
                     show(meta)
                 } else caption.visibility = View.INVISIBLE
             }
