@@ -1,5 +1,7 @@
 package dev.alder
 
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -72,5 +74,36 @@ class StreamsResolverTest {
         assertFalse(canceled)
         c.cancel()
         assertTrue(canceled)
+    }
+
+    private fun streamAddon(id: String, name: String, transportUrl: String): Addon = Addon(
+        JSONObject()
+            .put("transportUrl", transportUrl)
+            .put(
+                "manifest",
+                JSONObject()
+                    .put("id", id)
+                    .put("name", name)
+                    .put("resources", JSONArray().put("stream"))
+                    .put("types", JSONArray().put("movie"))
+            )
+    )
+
+    @Test
+    fun mergeStreamAddonsPrefersOwnAddonsOverLenderAddons() {
+        val ownTorrentio = streamAddon("com.torrentio", "Own Torrentio", "https://torrentio.example/own/manifest.json")
+        val ownAio = streamAddon("com.aiostreams.own", "Own AIO", "https://aio.example/shared/manifest.json")
+        val lenderTorrentio = streamAddon("com.torrentio", "Lender Torrentio", "https://torrentio.example/lender/manifest.json")
+        val lenderAioSameUrl = streamAddon("com.aiostreams.lender", "Lender AIO", "https://aio.example/shared/manifest.json")
+        val lenderComet = streamAddon("com.comet", "Lender Comet", "https://comet.example/lender/manifest.json")
+
+        val merged = StreamsResolver.mergeStreamAddons(
+            own = listOf(ownTorrentio, ownAio),
+            lent = listOf(lenderTorrentio, lenderAioSameUrl, lenderComet),
+            type = "movie",
+            videoId = "tt1234567"
+        )
+
+        assertEquals(listOf(ownTorrentio, ownAio, lenderComet), merged)
     }
 }

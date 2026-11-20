@@ -81,6 +81,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Source list and audio filter.** Alder now matches Brazilian Portuguese (`pt-BR`) audio and ignores separated subtitle flags after `💬`. Your own stream add-ons now come before shared add-ons. When you pick another source after playback, Alder resumes from your saved position. Source selection stops when you leave the screen.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.
