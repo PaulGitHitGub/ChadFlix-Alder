@@ -88,6 +88,7 @@ internal class MediaCardView(
     var settled: Boolean = true,
     val fadeIn: Boolean = true,
     val retryOnFailure: Boolean = false,
+    val liftShadow: Boolean = true,
 ) : FrameLayout(screen) {
 
     var payload: Any? = null
@@ -142,7 +143,7 @@ internal class MediaCardView(
     private var onFocusHandler: ((Boolean) -> Unit)? = null
 
     init {
-        setBackgroundColor(if (grid) Screen.CARD_PLACEHOLDER else Screen.BASE)
+        setBackgroundColor(if (grid || !wide) Screen.CARD_PLACEHOLDER else Screen.BASE)
         outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) =
                 outline.setRoundRect(0, 0, view.width, view.height, screen.dp(Screen.CARD_RADIUS).toFloat())
@@ -180,7 +181,7 @@ internal class MediaCardView(
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         face.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         setOnFocusChangeListener { _, has ->
-            screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW) }
+            screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
             onFocusHandler?.invoke(has)
         }
     }
@@ -234,7 +235,7 @@ internal class MediaCardView(
         val imageWidth = (widthPx * Screen.CARD_GROW).toInt()
         image.animate().cancel()
         image.alpha = 1f
-        if (!Images.cached(url, imageWidth)) {
+        if (!Images.cached(url, imageWidth) && (grid || live)) {
             nameView.visibility = View.VISIBLE
             face.alpha = 1f
         }
@@ -263,7 +264,7 @@ internal class MediaCardView(
                 image.alpha = 0f
                 screen.run { image.enter(Screen.QUICK_MS) }.alpha(1f).start()
             }
-            if (isFocused) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW) }
+            if (isFocused) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
         }
         now = false
     }
