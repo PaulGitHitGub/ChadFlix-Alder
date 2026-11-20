@@ -87,7 +87,7 @@ internal fun shortRowName(name: String, genres: Collection<String> = emptyList()
         n.contains("pick", true) || n.contains("recommend", true) -> "For you"
         n.contains("popular", true) || n.contains("trending", true) -> "Popular"
         n.length <= 18 -> n
-        else -> genres.filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { n.take(28).trimEnd() }
+        else -> genres.map(::genreLabel).distinct().filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { n.take(28).trimEnd() }
     }
 }
 
@@ -262,6 +262,7 @@ class MainActivity : Screen() {
     private var discoverLoaded = false // the profile's saved choice has been read
     private val discoverChips = mutableListOf<TextView>()
     private var pageWarning: View? = null
+    private lateinit var warningHost: FrameLayout
     private var mode = Mode.BROWSE
     private var library: List<JSONObject> = emptyList()
     // ponytail: row answers this session, including their catalogs; unbounded, but a few hundred titles per page.
@@ -499,7 +500,7 @@ class MainActivity : Screen() {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             }
             addView(cardUnderline, FrameLayout.LayoutParams(dp(28), dp(3)))
-            nextRowHint = text("", SMALL, bold = true, color = TEXT).onArt().apply {
+            nextRowHint = text("", SMALL, bold = true, color = TEXT_2).onArt().apply {
                 visibility = View.GONE
                 setSingleLine()
                 ellipsize = TextUtils.TruncateAt.END
@@ -507,6 +508,10 @@ class MainActivity : Screen() {
             }
             addView(nextRowHint, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(PAD); bottomMargin = dp(CAPTION_BOTTOM + 5)
+            })
+            warningHost = FrameLayout(context).apply { clipChildren = false; clipToPadding = false }
+            addView(warningHost, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(HEADER_H + 54); rightMargin = dp(PAD)
             })
             // Sits on the row band, so a larger font size grows it upwards into the art, never down into the rows.
             addView(browseInfo(), FrameLayout.LayoutParams(dp(HERO_W + 2 * FOCUS_ROOM), -2, Gravity.BOTTOM).apply {
@@ -742,17 +747,25 @@ class MainActivity : Screen() {
         if (event.action == KeyEvent.ACTION_DOWN && (page.isCatalog || page.isGrid) && mode == Mode.BROWSE) {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && header.hasFocus()) {
                 pageChip()?.requestFocus()?.let { if (it) return true }
-                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && (warning()?.requestFocus() ?: firstRow()?.focusFirst()) == true) return true
+                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && genreStrip.hasFocus()) {
                 (last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull())
                     ?.requestFocus()?.let { if (it) return true }
             }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && heroResume.isFocused) {
+                if (firstRow()?.focusFirst() == true) return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP && heroResume.isFocused) {
+                pageChip()?.requestFocus()?.let { if (it) return true }
+                if (navItems[page]?.requestFocus() == true) return true
+            }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP && currentFocus?.let { focused ->
                     firstRow()?.view?.let { isInside(focused, it) }
                 } == true) {
+                if (heroActions.visibility == View.VISIBLE && heroResume.requestFocus()) return true
                 pageChip()?.requestFocus()?.let { if (it) return true }
-                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && (warning() ?: navItems[page])?.requestFocus() == true) return true
+                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && navItems[page]?.requestFocus() == true) return true
             }
         }
         if (event.action == KeyEvent.ACTION_DOWN && scroller.hasFocus() && mode == Mode.BROWSE &&
@@ -1205,7 +1218,7 @@ class MainActivity : Screen() {
         }
         // Only Resume: OK on any card already opens its title page. It shows only for a title in progress, which lives in
         // the first row, so Up from any other row goes straight to the row above.
-        heroActions = LinearLayout(this).apply { clipChildren = false; addView(heroResume) }
+        heroActions = LinearLayout(this).apply { clipChildren = false; visibility = View.GONE; addView(heroResume) }
         // No progress line here: the focused card already shows it, right below.
         browseInfo = column(Gravity.START,
             FrameLayout(this).apply {
@@ -1228,7 +1241,8 @@ class MainActivity : Screen() {
             addOnLayoutChangeListener { _, _, top, _, _, _, _, _, _ ->
                 if (page.isGrid) return@addOnLayoutChangeListener
                 val lines = heroAbout.maxLines
-                if (top < dp(HEADER_H - 12) && lines > 0) heroAbout.post { heroAbout.setLines(lines - 1) }
+                val minTop = if (genreStrip.visibility == View.VISIBLE) dp(HEADER_H + 44) else dp(HEADER_H - 12)
+                if (top < minTop && lines > 2) heroAbout.post { heroAbout.maxLines = lines - 1 }
             }
         }
         return browseInfo
@@ -1333,6 +1347,7 @@ class MainActivity : Screen() {
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() })
+        else if (page.hasGenreShortcuts) factsList += listOfNotNull(year, genre)
         else factsList += listOfNotNull(year, genre, length)
         heroFacts.text = factsList.joinToString(DOT)
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
@@ -1348,18 +1363,21 @@ class MainActivity : Screen() {
         val ratings = shownRatings(Settings.ratings(this), rating, letterboxdScore)
         heroRatings.removeAllViews()
         addRatings(heroRatings, ratings)
-        heroAbout.maxLines = 2
+        val showResume = page != Page.HOME && !page.isGrid && item.resume
+        val synopsisLines = if (page.hasGenreShortcuts && !showResume) 3 else 2
+        heroAbout.maxLines = synopsisLines
         val description = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
         heroAbout.text = description
         heroAbout.post {
             if (heroItem !== item || heroAbout.text.toString() != description) return@post
             val layout = heroAbout.layout ?: return@post
-            if (layout.lineCount >= 2 && layout.getEllipsisCount(1) > 0) {
-                val end = layout.getLineStart(1) + layout.getEllipsisStart(1)
+            val lastLine = (heroAbout.maxLines - 1).coerceAtLeast(0)
+            if (layout.lineCount > lastLine && layout.getEllipsisCount(lastLine) > 0) {
+                val end = layout.getLineStart(lastLine) + layout.getEllipsisStart(lastLine)
                 heroAbout.text = synopsisAtSentence(description, end)
             }
         }
-        heroActions.visibility = if (page != Page.HOME && !page.isGrid && item.resume) View.VISIBLE else View.GONE
+        heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
         if (mode == Mode.BROWSE) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS)
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
     }
@@ -1476,7 +1494,7 @@ class MainActivity : Screen() {
         heroName.maxLines = 2
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (discoverPage) -1 else -2, -2)
         for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (discoverPage) View.GONE else View.VISIBLE
-        heroAbout.maxWidth = if (p.polishedRail) dp(HOME_SYNOPSIS_W) else Int.MAX_VALUE
+        heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
         librarySlot = null
         listShade.visibility = if (grid) View.VISIBLE else View.GONE
@@ -1494,6 +1512,8 @@ class MainActivity : Screen() {
         arrangeTabs()
         styleNav()
         content.removeAllViews()
+        warningHost.removeAllViews()
+        pageWarning = null
         rows.forEach { r -> r.cards.forEach { it.unload() } }
         rows.clear()
         genreStrip.animate().cancel()
@@ -1630,10 +1650,10 @@ class MainActivity : Screen() {
             val message = catalogMessage()
             if (message == oldMessage) return
             val restoreFocus = catalogWarning?.hasFocus() == true
-            catalogWarning?.let(content::removeView)
+            catalogWarning?.let(warningHost::removeView)
             catalogWarning = message?.let {
                 failed(it) { showPage(p) }.also { card ->
-                    content.addView(card, 0, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
+                    warningHost.addView(card, FrameLayout.LayoutParams(dp(320), -2))
                     if (restoreFocus) card.getChildAt(1).requestFocus()
                 }
             }
@@ -1654,7 +1674,7 @@ class MainActivity : Screen() {
             catalogSlots.clear()
             noCatalogs?.let(content::removeView)
             noCatalogs = null
-            catalogWarning?.let(content::removeView)
+            catalogWarning?.let(warningHost::removeView)
             catalogWarning = null
             catalogFailures.clear()
             failedAddons.clear()
@@ -1681,7 +1701,7 @@ class MainActivity : Screen() {
             val hiddenRows = Settings.hiddenRows(this@MainActivity)
             val sections = sections(p, shelves, featuredHome).filterNot { it.first in hiddenRows }
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
-            val genreNames = (if (p.isCatalog && !p.hasGenreShortcuts) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
+            val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
                 else emptyList()).toMutableList()
             val genreResults = mutableMapOf<String, Boolean>()
             if (p.isCatalog && !p.hasGenreShortcuts && genreNames.isEmpty()) {
@@ -1693,7 +1713,7 @@ class MainActivity : Screen() {
             fun buildSection(i: Int) {
                 val section = sections[i]
                 val (title, sources, picked) = section
-                if (p.isCatalog && !p.hasGenreShortcuts && genres.any { it.equals(title, true) } && title !in genreNames) genreNames += title
+                if (p.isCatalog && genres.any { it.equals(title, true) } && title !in genreNames) genreNames += title
                 val rowCatalogs = sources.map { it.first }
                 val genreFallback = p.hasGenreShortcuts && picked != null
                 val key = catalogAnswerKey(p.label, title, picked, rowCatalogs.map { c ->
@@ -2149,6 +2169,8 @@ class MainActivity : Screen() {
         rows.forEach { r -> r.cards.forEach { it.unload() } }
         rows.clear()
         content.removeAllViews()
+        warningHost.removeAllViews()
+        pageWarning = null
         scroller.scrollTo(0, 0)
         last = null
         cancelBrowseHero()
@@ -2599,6 +2621,7 @@ class MainActivity : Screen() {
             finished = item.finished,
             live = item.live,
             settled = item.settled,
+            liftShadow = !page.hasGenreShortcuts,
         ).apply {
             dim(true, animate = false)
             payload = item

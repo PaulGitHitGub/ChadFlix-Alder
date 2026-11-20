@@ -44,7 +44,7 @@ class FadedArt(context: Context, private val bottomFrom: Float = 0.45f, private 
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         // Under the text (the left 60%) only a hint of the picture stays, so bright art can't fight the words.
-        left = LinearGradient(0f, 0f, w * 0.8f, 0f, intArrayOf(0x1F000000, 0x40000000, Color.BLACK), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        left = LinearGradient(0f, 0f, w * 0.85f, 0f, intArrayOf(0x18000000, 0x38000000, 0xB3000000.toInt(), Color.BLACK), floatArrayOf(0f, 0.45f, 0.8f, 1f), Shader.TileMode.CLAMP)
         bottom = LinearGradient(0f, h * bottomFrom, 0f, h * bottomTo, intArrayOf(Color.BLACK, 0x59000000, 0), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
     }
 
@@ -492,8 +492,12 @@ abstract class Screen : Activity() {
     }
 
     /** The source's tag beside a rating ("IMDb", "Letterboxd"), as tall as the letters. */
-    protected fun ratingTag(source: String = "IMDb", sp: Float = SMALL) = text(source, sp, bold = true, color = BASE).apply {
-        background = rounded(TUNGSTEN, 3)
+    protected fun ratingTag(source: String = "IMDb", sp: Float = SMALL) = text(source, sp, bold = true, color = TUNGSTEN).apply {
+        background = GradientDrawable().apply {
+            cornerRadius = dp(3).toFloat()
+            setColor(GLASS)
+            setStroke(dp(1), TUNGSTEN_RIM)
+        }
         includeFontPadding = false
         setLineSpacing(0f, 1f)
         setPadding(dp(4), dp(1), dp(4), dp(1))
@@ -649,11 +653,12 @@ abstract class Screen : Activity() {
         }
     }
 
-    /** Focus lifts and subtly scales the card above its neighbours with no outline or shadow. */
-    internal fun View.lift(on: Boolean, scale: Float = CARD_GROW) {
+    /** Focus lifts and subtly scales the card above its neighbours with no outline or heavy shadow. */
+    internal fun View.lift(on: Boolean, scale: Float = CARD_GROW, shadow: Boolean = true) {
         foreground = null
+        if (android.os.Build.VERSION.SDK_INT >= 28 && !shadow) outlineSpotShadowColor = Color.TRANSPARENT
         grow(on, scale)
-            .translationZ(if (on) dp(CARD_LIFT).toFloat() else 0f).start()
+            .translationZ(if (on) (if (shadow) dp(CARD_LIFT).toFloat() else 1f) else 0f).start()
     }
 
     /** The screen's art, behind its glass: what [glassOver] frosts. Screens with art behind them name it. */
