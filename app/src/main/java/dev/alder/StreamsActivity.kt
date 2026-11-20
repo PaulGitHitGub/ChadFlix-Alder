@@ -312,9 +312,25 @@ class StreamsActivity : Screen() {
         languageStrip.visibility = View.VISIBLE
     }
 
-    /** In [language] by its names: it names that language, it's multi or dual audio, or (English) it names none. */
+    /** In [language] by its names: it names that language, or it's multi/dual audio without naming a different one, or (English) it names none. */
     private fun speaks(s: Stream, language: String) =
-        language in s.audioLanguages || s.multiAudio || (language == "en" && s.audioLanguages.isEmpty())
+        language in s.audioLanguages || (language == "en" && s.audioLanguages.isEmpty()) ||
+            (s.multiAudio && (s.audioLanguages.isEmpty() || language == "en"))
+
+    /**
+     * The audio a source names, the profile's language first: "Dutch", "Dutch + English", "Dutch +3". None for a source
+     * that names only English or nothing, as most English releases do.
+     */
+    private fun spokenTag(s: Stream): String? {
+        val mine = Settings.audioLanguage(this)
+        val codes = s.audioLanguages.sortedWith(compareBy({ it != mine }, { it != "en" }, ::languageName))
+        if (codes.isEmpty() || codes == listOf("en")) return null
+        return languageName(codes[0]) + when (codes.size) {
+            1 -> ""
+            2 -> " + " + languageName(codes[1])
+            else -> " +${codes.size - 1}"
+        }
+    }
 
     private fun languageName(code: String) =
         Locale(code).getDisplayLanguage(Locale.getDefault()).ifBlank { code }.replaceFirstChar { it.titlecase(Locale.getDefault()) }
@@ -415,7 +431,8 @@ class StreamsActivity : Screen() {
         val sourceTag = if (s.torrent != null) getString(R.string.streams_tag_p2p) else s.debrid?.tag
         // Release and audio are in the summary already; seeders follow P2P, as they say whether it will start.
         val shared = listOf("BluRay", "WEB", "Atmos", "TrueHD", "DTS-HD")
-        (listOfNotNull(sourceTag) + s.tags.filter { it !in shared }.take(if (best) 1 else 2)).forEach { tag ->
+        val spoken = spokenTag(s)
+        (listOfNotNull(sourceTag, spoken) + s.tags.filter { it !in shared }.take((if (best) 1 else 2) - (if (spoken != null) 1 else 0))).forEach { tag ->
             val words = when (tag) {
                 "Multi audio" -> getString(R.string.streams_tag_multi_audio)
                 "Dub" -> getString(R.string.streams_tag_dub)

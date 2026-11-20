@@ -77,7 +77,7 @@ object StreamsResolver {
                 else -> 0
             } + when (dub) {
                 "original" -> if (s.dubbed) -2 else 0
-                "mine" -> if (s.mentions(language)) 2 else if (s.multiAudio) 1 else 0
+                "mine" -> if (s.mentions(language)) 2 else if (s.multiAudio && s.audioLanguages.isEmpty()) 1 else 0
                 else -> 0
             } + if ((trueHd && s.trueHdAudio) || (dtsHd && s.dtsHdAudio)) 1 else 0
         }
