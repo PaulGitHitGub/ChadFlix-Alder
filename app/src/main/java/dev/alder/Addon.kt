@@ -146,7 +146,8 @@ class Addon(val descriptor: JSONObject) {
 
     fun meta(type: String, id: String): Meta? = get(true, "meta", type, id, strict = true).optJSONObject("meta")?.let { meta(it, id) }
 
-    fun savedMeta(type: String, id: String): Meta? = saved("meta", type, id)?.optJSONObject("meta")?.let { meta(it, id) }
+    fun savedMeta(type: String, id: String, maxAgeMs: Long? = null): Meta? =
+        saved("meta", type, id, maxAgeMs = maxAgeMs)?.optJSONObject("meta")?.let { meta(it, id) }
 
     /** Some add-ons leave the title's own id out of its details: it's the one asked for. */
     private fun meta(json: JSONObject, id: String) = Meta(if (json.text("id") == null) json.put("id", id) else json)
@@ -204,7 +205,8 @@ class Addon(val descriptor: JSONObject) {
 
     private fun get(keep: Boolean, vararg path: String, strict: Boolean = false) = JSONObject(Http.get(url(path), keep, strict = strict))
 
-    private fun saved(vararg path: String) = Http.savedAnswer(url(path))?.let { runCatching { JSONObject(it) }.getOrNull() }
+    private fun saved(vararg path: String, maxAgeMs: Long? = null) =
+        Http.savedAnswer(url(path), maxAgeMs = maxAgeMs)?.let { runCatching { JSONObject(it) }.getOrNull() }
 
     private companion object {
         val catalogSearchPool by lazy { Images.newestFirst(8) } // lazy: unit tests make Addons without Android
@@ -234,8 +236,8 @@ fun List<Addon>.meta(type: String, id: String, together: Boolean = false, report
 }
 
 /** Last time's details from disk, from the first add-on in the account's order that kept some; no network. */
-fun List<Addon>.savedMeta(type: String, id: String): Meta? =
-    filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { runCatching { it.savedMeta(type, id) }.getOrNull() }
+fun List<Addon>.savedMeta(type: String, id: String, maxAgeMs: Long? = null): Meta? =
+    filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { runCatching { it.savedMeta(type, id, maxAgeMs) }.getOrNull() }
 
 private val metaPool = java.util.concurrent.Executors.newCachedThreadPool()
 

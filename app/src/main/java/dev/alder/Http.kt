@@ -45,8 +45,10 @@ object Http {
     }
 
     /** The last answer kept for this request, or null. Never touches the network. */
-    fun savedAnswer(url: String, json: String? = null): String? =
-        file(url, json)?.takeIf { it.exists() }?.let { runCatching { it.readText() }.getOrNull() }
+    fun savedAnswer(url: String, json: String? = null, maxAgeMs: Long? = null): String? =
+        file(url, json)?.takeIf {
+            it.exists() && (maxAgeMs == null || System.currentTimeMillis() - it.lastModified() <= maxAgeMs)
+        }?.let { runCatching { it.readText() }.getOrNull() }
 
     /** Keeps [body] as the answer to this request, for [savedAnswer] next time. */
     fun keep(url: String, json: String?, body: String) {

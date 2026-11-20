@@ -50,6 +50,24 @@ class ContinueWatchingTest {
         assertNull(episodeNumber(-1, 4))
     }
 
+    @Test
+    fun newEpisodeCountCountsAiredEpisodesAfterLastWatched() {
+        val videos = listOf(
+            Video("s:0:1", "Special", 0, 1, null, null, "2026-01-01"),
+            Video("s:1:1", "Pilot", 1, 1, null, null, "2026-01-01"),
+            Video("s:1:2", "Second", 1, 2, null, null, "2026-01-08"),
+            Video("s:2:1", "Return", 2, 1, null, null, "2026-10-01"),
+            Video("s:2:2", "Next", 2, 2, null, null, "2026-10-08"),
+            Video("s:2:3", "Future", 2, 3, null, null, "2099-01-01"),
+        )
+        val isAired: (String?) -> Boolean = { it == null || it < "2026-11-01" }
+
+        assertEquals(0, Library.newEpisodeCount("series", false, emptySet(), videos, isAired))
+        assertEquals(2, Library.newEpisodeCount("series", false, setOf("s:1:1", "s:1:2"), videos, isAired))
+        assertEquals(0, Library.newEpisodeCount("series", true, setOf("s:1:1", "s:1:2"), videos, isAired))
+        assertEquals(0, Library.newEpisodeCount("movie", false, setOf("s:1:1"), videos, isAired))
+    }
+
     private fun entry(id: String, type: String, offset: Long, duration: Long) =
         Library.newItem(id, type, id, null).apply {
             state.put("lastWatched", "2026-11-12T12:00:00.000Z")

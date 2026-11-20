@@ -175,6 +175,28 @@ object Library {
         return sorted.firstOrNull { it.season > season }
     }
 
+    /**
+     * Unwatched aired regular episodes after the last episode watched in [item], or 0 when the title is a movie,
+     * has notifications muted (`noNotif`), or has no watched episodes yet.
+     */
+    fun newEpisodeCount(item: JSONObject, videos: List<Video>, isAired: (String?) -> Boolean): Int =
+        newEpisodeCount(item.optString("type"), item.state.optBoolean("noNotif"), watched(item, videos), videos, isAired)
+
+    internal fun newEpisodeCount(
+        type: String,
+        noNotif: Boolean,
+        seen: Set<String>,
+        videos: List<Video>,
+        isAired: (String?) -> Boolean,
+    ): Int {
+        if (type == "movie" || noNotif || seen.isEmpty()) return 0
+        val aired = videos.filter { it.season > 0 && isAired(it.released) }
+            .sortedWith(compareBy({ it.season }, { it.episode }))
+        val lastSeen = aired.indexOfLast { it.id in seen }
+        if (lastSeen < 0) return 0
+        return aired.size - lastSeen - 1
+    }
+
     /** Playback progress, called every few seconds. [playedMs] is time actually watched since the last call. */
     fun record(item: JSONObject, videoId: String, positionMs: Long, durationMs: Long, playedMs: Long) {
         val s = item.state
