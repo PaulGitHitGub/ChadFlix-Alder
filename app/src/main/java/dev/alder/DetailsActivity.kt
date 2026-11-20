@@ -320,7 +320,7 @@ class DetailsActivity : Screen() {
                     addView(castStrip)
                 }
                 castStripSlot = slot
-                stack.addView(slot, wrap().apply { topMargin = dp(10) })
+                stack.addView(slot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
             }
             addWatch(m, stack)
         }
@@ -1316,7 +1316,7 @@ class DetailsActivity : Screen() {
                 setOnClickListener { showFilmography(actor, this) }
             }
             castChips.add(chip)
-            container.addView(chip, LinearLayout.LayoutParams(-2, -2).apply {
+            container.addView(chip, LinearLayout.LayoutParams(0, -2, 1f).apply {
                 if (index > 0) marginStart = dp(8)
             })
         }
@@ -1326,6 +1326,7 @@ class DetailsActivity : Screen() {
         if (remainingCount > 0) {
             val moreChip = text(getString(R.string.cast_more, remainingCount), SMALL, color = TEXT).apply {
                 gravity = Gravity.CENTER
+                setSingleLine()
                 includeFontPadding = false
                 minHeight = dp(28)
                 setPadding(dp(12), dp(4), dp(12), dp(4))
