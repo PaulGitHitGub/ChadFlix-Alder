@@ -70,6 +70,12 @@ internal fun isCardVisibleInRail(
     cullLeft: Boolean,
 ): Boolean = !cullLeft || isFocused || (cardRightPx - scrollXPx > paddingStartPx && cardLeftPx - scrollXPx < scrollerWidthPx)
 
+internal fun cardBadgeLabel(grid: Boolean, finished: Boolean, newEpisodes: Int): String? = when {
+    newEpisodes > 0 -> "+$newEpisodes"
+    grid && finished -> "✓"
+    else -> null
+}
+
 /**
  * Shared media card across Home, Movies, Shows, My Lists, Discover, Details, Search, and Live TV.
  */
@@ -200,11 +206,7 @@ internal class MediaCardView(
     }
 
     private fun renderBadge() {
-        val label = when {
-            (grid || wide) && shownNewEpisodes > 0 -> "+$shownNewEpisodes"
-            grid && finished -> "✓"
-            else -> null
-        }
+        val label = cardBadgeLabel(grid, finished, shownNewEpisodes)
         if (label == null) {
             badgeView?.let { removeView(it); badgeView = null }
             return

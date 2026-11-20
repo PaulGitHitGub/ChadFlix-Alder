@@ -78,4 +78,15 @@ class CardSystemTest {
         // When cullLeft is false (Details overlay), cards remain visible regardless of scroll position.
         assertTrue(isCardVisibleInRail(isFocused = false, cardLeftPx = 0, cardRightPx = 88, scrollXPx = 50, scrollerWidthPx = width, paddingStartPx = pad, cullLeft = false))
     }
+
+    @Test
+    fun cardBadgeLabelShowsNewEpisodesOnContinueWatchingRowPosters() {
+        // Continue Watching cards pass grid = false, wide = false, and must still render +N badges.
+        assertEquals("+2", cardBadgeLabel(grid = false, finished = false, newEpisodes = 2))
+        assertEquals("+2", cardBadgeLabel(grid = false, finished = true, newEpisodes = 2))
+        assertEquals("+3", cardBadgeLabel(grid = true, finished = true, newEpisodes = 3))
+        assertEquals("✓", cardBadgeLabel(grid = true, finished = true, newEpisodes = 0))
+        assertNull(cardBadgeLabel(grid = false, finished = true, newEpisodes = 0))
+        assertNull(cardBadgeLabel(grid = true, finished = false, newEpisodes = 0))
+    }
 }
