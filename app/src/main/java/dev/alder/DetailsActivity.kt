@@ -1,11 +1,6 @@
 package dev.alder
 
 import android.content.Intent
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.Rect
-import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.TextUtils
@@ -278,32 +273,7 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { error.getChildAt(1).requestFocus() }
         } else {
-            val length = if (hasEpisodes(type, m.videos)) m.videos.map { it.season }.filter { it > 0 }.distinct().size
-                .takeIf { it > 0 }?.let(::seasons) else m.runtime
-            val facts = listOfNotNull(m.year, m.genres.firstOrNull(), length).joinToString(DOT)
-            val factRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-            // Content rating first, as a hairline-bordered badge: [ TV-MA ] · 2024 · Drama · 2 seasons
-            certificate?.let { cert ->
-                factRow.addView(text(cert, 9.5f, bold = true, color = TEXT_2).apply {
-                    includeFontPadding = false
-                    setLineSpacing(0f, 1f)
-                    setPadding(dp(5), dp(2), dp(5), dp(2))
-                    background = GradientDrawable().apply {
-                        cornerRadius = dp(3).toFloat()
-                        setStroke(dp(1), 0x55FFFFFF)
-                    }
-                })
-                if (facts.isNotBlank()) factRow.addView(text(DOT, SMALL, color = TEXT_2).onArt())
-            }
-            factRow.addView(text(facts, SMALL, color = TEXT_2).onArt().apply {
-                maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-            })
-            val ratings = shownRatings(Settings.ratings(this), m.rating, letterboxdScore)
-            if (ratings.isNotEmpty()) {
-                factRow.addView(text(DOT, SMALL, color = TEXT_2).onArt())
-                addRatings(factRow, ratings, tagSp = 9.5f, firstGap = 0)
-            }
-            stack.addView(factRow, wrap().apply { topMargin = dp(12) })
+            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(12) })
             m.description?.takeIf { it.isNotBlank() }?.let {
                 stack.addView(text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = 3; ellipsize = TextUtils.TruncateAt.END
@@ -375,17 +345,17 @@ class DetailsActivity : Screen() {
             playButton = pill(R.string.action_episodes).apply {
                 setOnClickListener { showGuide() }
             }
-            val trailerButton = if (hasTrailer) trailerPill { playTrailer(m) } else null
+            val trailerButton = if (hasTrailer) iconButton("film", getString(R.string.action_trailer)) { playTrailer(m) } else null
             infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo() }
             listButton = listButton()
             buttonRow = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 clipChildren = false
                 clipToPadding = false
-                addView(playButton, wrap().apply { marginEnd = dp(if (trailerButton != null) 10 else 14) })
-                trailerButton?.let { addView(it, wrap().apply { marginEnd = dp(10) }) }
-                addView(listButton, LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H)).apply { marginEnd = dp(8) })
-                addView(infoButton, LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H)))
+                addView(playButton, wrap().apply { marginEnd = dp(14) })
+                trailerButton?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
+                addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
+                addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
             }
             stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
             playButton.post { if (!guideOpen && !infoOpen && !similarOpen) playButton.requestFocus() }
@@ -407,7 +377,7 @@ class DetailsActivity : Screen() {
             // Held OK: every source, to choose one by hand.
             setOnLongClickListener { openSources(target?.first ?: metaId, startOver = false, pick = true); true }
         }
-        val trailerButton = if (hasTrailer) trailerPill { playTrailer(m) } else null
+        val trailerButton = if (hasTrailer) iconButton("film", getString(R.string.action_trailer)) { playTrailer(m) } else null
         val startOver = if (resumeAt > 0) iconButton("↺", getString(R.string.action_start_over)) {
             openSources(target?.first ?: metaId, startOver = true)
         } else null
@@ -417,117 +387,59 @@ class DetailsActivity : Screen() {
             gravity = Gravity.CENTER_VERTICAL
             clipChildren = false
             clipToPadding = false
-            addView(playButton, wrap().apply { marginEnd = dp(if (trailerButton != null) 10 else 14) })
-            trailerButton?.let { addView(it, wrap().apply { marginEnd = dp(10) }) }
-            startOver?.let { addView(it, LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H)).apply { marginEnd = dp(8) }) }
-            addView(listButton, LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H)).apply { marginEnd = dp(8) })
-            addView(infoButton, LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H)))
+            addView(playButton, wrap().apply { marginEnd = dp(14) })
+            trailerButton?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
+            startOver?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
+            addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
+            addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
         playButton.post { if (!guideOpen && !infoOpen && !similarOpen && !filmographyOpen) playButton.requestFocus() }
     }
 
-    private fun seasonName(season: Int) = if (season == 0) getString(R.string.season_specials) else getString(R.string.season_number, season)
-
-    private fun trailerPill(action: () -> Unit) = text(R.string.action_trailer, SMALL, bold = true).apply {
-        isFocusable = true
-        gravity = Gravity.CENTER_VERTICAL
-        minHeight = dp(BUTTON_H)
-        setPadding(dp(14), 0, dp(16), 0)
-        compoundDrawablePadding = dp(6)
-        val icon = getDrawable(R.drawable.ic_play)?.mutate()?.apply {
-            setBounds(0, 0, dp(15), dp(15))
-            setTint(TEXT)
+    private fun buildMetadataRow(m: Meta, detailed: Boolean): LinearLayout {
+        val seasonCount = if (hasEpisodes(type, m.videos)) {
+            m.videos.map { it.season }.filter { it > 0 }.distinct().size.takeIf { it > 0 }?.let(::seasons)
+        } else null
+        val genreText = if (detailed) {
+            m.genres.take(3).joinToString(" / ").ifEmpty { null }
+        } else {
+            m.genres.firstOrNull()
         }
-        setCompoundDrawablesRelative(icon, null, null, null)
-        background = glass(BUTTON_H / 2)
-        setOnFocusChangeListener { v, has ->
-            v.background = glass(BUTTON_H / 2, has)
-            v.grow(has, CHIP_GROW).start()
+        val lengthParts = if (detailed) {
+            listOfNotNull(seasonCount, m.runtime)
+        } else {
+            listOfNotNull(seasonCount ?: m.runtime)
         }
-        setOnClickListener { action() }
-    }
-
-    private fun iconButton(symbol: String, description: String, action: () -> Unit): TextView = object : TextView(this) {
-        private val d = resources.displayMetrics.density
-        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = TEXT
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = TEXT
-            style = Paint.Style.FILL
-        }
-        private val glyphPath = Path()
-        private val glyphBounds = Rect()
-
-        override fun onDraw(canvas: Canvas) {
-            val s = text?.toString().orEmpty()
-            if (s.isEmpty()) return
-            val cx = width / 2f
-            val cy = height / 2f
-            strokePaint.color = currentTextColor
-            fillPaint.color = currentTextColor
-            when (s) {
-                "+" -> {
-                    val r = 5.5f * d
-                    strokePaint.strokeWidth = 1.8f * d
-                    canvas.drawLine(cx - r, cy, cx + r, cy, strokePaint)
-                    canvas.drawLine(cx, cy - r, cx, cy + r, strokePaint)
-                }
-                "✓" -> {
-                    strokePaint.strokeWidth = 1.8f * d
-                    glyphPath.reset()
-                    glyphPath.moveTo(cx - 5f * d, cy + 0.3f * d)
-                    glyphPath.lineTo(cx - 1.5f * d, cy + 3.8f * d)
-                    glyphPath.lineTo(cx + 5.2f * d, cy - 3.4f * d)
-                    canvas.drawPath(glyphPath, strokePaint)
-                }
-                "↺" -> {
-                    val r = 5.8f * d
-                    strokePaint.strokeWidth = 1.6f * d
-                    canvas.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), -135f, 285f, false, strokePaint)
-                    val ax = cx - 4.1f * d
-                    val ay = cy - 4.1f * d
-                    glyphPath.reset()
-                    glyphPath.moveTo(ax, ay - 2.8f * d)
-                    glyphPath.lineTo(ax, ay + 0.4f * d)
-                    glyphPath.lineTo(ax + 3.2f * d, ay + 0.4f * d)
-                    canvas.drawPath(glyphPath, strokePaint)
-                }
-                "ⓘ" -> {
-                    val r = 6.8f * d
-                    strokePaint.strokeWidth = 1.5f * d
-                    canvas.drawCircle(cx, cy, r, strokePaint)
-                    strokePaint.strokeWidth = 1.6f * d
-                    canvas.drawLine(cx, cy - 0.5f * d, cx, cy + 3.6f * d, strokePaint)
-                    canvas.drawCircle(cx, cy - 3.2f * d, 0.95f * d, fillPaint)
-                }
-                else -> {
-                    paint.color = currentTextColor
-                    paint.getTextBounds(s, 0, s.length, glyphBounds)
-                    canvas.drawText(s, cx - glyphBounds.exactCenterX(), cy - glyphBounds.exactCenterY(), paint)
-                }
+        val facts = (listOfNotNull(m.year, genreText) + lengthParts).joinToString(DOT)
+        return LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            certificate?.let { cert ->
+                addView(text(cert, 9.5f, bold = true, color = TEXT_2).apply {
+                    includeFontPadding = false
+                    setLineSpacing(0f, 1f)
+                    setPadding(dp(5), dp(2), dp(5), dp(2))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(3).toFloat()
+                        setStroke(dp(1), GLASS_EDGE)
+                    }
+                })
+                if (facts.isNotBlank()) addView(text(DOT, SMALL, color = TEXT_2).onArt())
+            }
+            if (facts.isNotBlank()) {
+                addView(text(facts, SMALL, color = TEXT_2).onArt().apply {
+                    maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+                })
+            }
+            val ratings = shownRatings(Settings.ratings(this@DetailsActivity), m.rating, letterboxdScore)
+            if (ratings.isNotEmpty()) {
+                if (facts.isNotBlank() || certificate != null) addView(text(DOT, SMALL, color = TEXT_2).onArt())
+                addRatings(this, ratings, tagSp = 9.5f, firstGap = 0)
             }
         }
-    }.apply {
-        text = symbol
-        textSize = 18f
-        setTextColor(TEXT)
-        gravity = Gravity.CENTER
-        includeFontPadding = false
-        contentDescription = description
-        isFocusable = true
-        background = glass(BUTTON_H / 2)
-        setOnFocusChangeListener { v, has ->
-            v.background = glass(BUTTON_H / 2, has)
-            v.grow(has, CHIP_GROW).start()
-        }
-        setOnClickListener { action() }
-        layoutParams = LinearLayout.LayoutParams(dp(BUTTON_H), dp(BUTTON_H))
     }
+
+    private fun seasonName(season: Int) = if (season == 0) getString(R.string.season_specials) else getString(R.string.season_number, season)
 
     /** What Play opens: the episode Continue Watching points at, or the first episode, or the movie itself. */
     private fun playTarget(m: Meta?): Pair<String, Video?>? {
@@ -546,15 +458,16 @@ class DetailsActivity : Screen() {
 
     private fun listButton(): TextView {
         val inList = Library.inList(item)
-        return iconButton(if (inList) "✓" else "+",
-            getString(if (inList) R.string.action_remove_from_list else R.string.action_add_to_list), ::toggleList)
+        val desc = getString(if (inList) R.string.action_remove_from_list else R.string.action_add_to_list)
+        return iconButton(if (inList) "✓" else "+", desc, action = ::toggleList)
     }
 
     private fun toggleList() {
         val add = !Library.inList(item)
         editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed) {
             listButton.text = if (add) "✓" else "+"
-            listButton.contentDescription = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
+            val desc = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
+            listButton.contentDescription = desc
         }
     }
 
@@ -578,6 +491,10 @@ class DetailsActivity : Screen() {
         val height = resources.displayMetrics.heightPixels - top - dp(27)
         val largeText = resources.configuration.fontScale > 1.15f
         guide = FrameLayout(this).apply { visibility = View.GONE }
+        guide.addView(View(this).apply {
+            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0xD90E0C0A.toInt(), 0x800E0C0A.toInt(), 0x000E0C0A))
+        }, FrameLayout.LayoutParams(-1, dp(136), Gravity.TOP))
         val smallLogo = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_START }
         guide.addView(smallLogo, FrameLayout.LayoutParams(dp(150), dp(42)).apply {
             leftMargin = x; topMargin = dp(27)
@@ -620,31 +537,31 @@ class DetailsActivity : Screen() {
             background = rounded(BASE, 8)
             clipToOutline = true
         }
-        pane.addView(previewImage, FrameLayout.LayoutParams(previewWidth, dp(226)).apply {
+        pane.addView(previewImage, FrameLayout.LayoutParams(previewWidth, dp(200)).apply {
             leftMargin = previewX; topMargin = dp(14)
         })
         previewProgress = FrameLayout(this)
         pane.addView(previewProgress, FrameLayout.LayoutParams(previewWidth - dp(20), dp(3)).apply {
-            leftMargin = previewX + dp(10); topMargin = dp(229)
+            leftMargin = previewX + dp(10); topMargin = dp(203)
         })
         previewTitle = text("", 22f, serif = true).onArt().apply {
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         }
         pane.addView(previewTitle, FrameLayout.LayoutParams(previewWidth, -2).apply {
-            leftMargin = previewX; topMargin = dp(251)
+            leftMargin = previewX; topMargin = dp(225)
         })
         previewFacts = text("", SMALL, color = TEXT_2).onArt().apply {
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
         }
         pane.addView(previewFacts, FrameLayout.LayoutParams(previewWidth, -2).apply {
-            leftMargin = previewX; topMargin = dp(if (largeText) 285 else 280)
+            leftMargin = previewX; topMargin = dp(if (largeText) 259 else 254)
         })
         previewAbout = text("", SMALL, color = TEXT).onArt().apply {
-            maxLines = if (largeText) 2 else 3
+            maxLines = if (largeText) 3 else 5
             ellipsize = TextUtils.TruncateAt.END
         }
         pane.addView(previewAbout, FrameLayout.LayoutParams(previewWidth, -2).apply {
-            leftMargin = previewX; topMargin = dp(if (largeText) 313 else 304)
+            leftMargin = previewX; topMargin = dp(if (largeText) 287 else 278)
         })
         guide.addView(pane, FrameLayout.LayoutParams(width, height).apply {
             leftMargin = x; topMargin = top
@@ -940,10 +857,6 @@ class DetailsActivity : Screen() {
                 intArrayOf(0xEB0E0C0A.toInt(), 0xD90E0C0A.toInt(), 0x990E0C0A.toInt()))
         }, FrameLayout.LayoutParams(-1, -1))
 
-        val facts = (listOfNotNull(m.year, m.runtime,
-            m.genres.take(2).joinToString(" / ").ifEmpty { null }) +
-            shownRatings(Settings.ratings(this), m.rating, letterboxdScore).map { (source, value) -> "$source $value" }).joinToString(DOT)
-
         val content = column(Gravity.START).apply {
             clipChildren = false
             clipToPadding = false
@@ -952,19 +865,26 @@ class DetailsActivity : Screen() {
         content.addView(text(m.name, SERIF_TITLE, bold = true, serif = true).onArt().apply {
             maxLines = 2; ellipsize = TextUtils.TruncateAt.END
         })
-        content.addView(text(facts, SMALL, color = TEXT_2).onArt().apply {
-            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-        }.marginTop(6))
+        content.addView(buildMetadataRow(m, detailed = true), wrap().apply { topMargin = dp(8) })
 
         m.description?.takeIf { it.isNotBlank() }?.let { desc ->
             content.addView(caps(R.string.details_the_story, TEXT_2).onArt().marginTop(14))
             val story = ScrollView(this).apply {
                 isVerticalScrollBarEnabled = false
+                isVerticalFadingEdgeEnabled = true
+                setFadingEdgeLength(dp(20))
                 isFocusable = true
+                setPadding(dp(8), dp(6), dp(8), dp(6))
+                setOnFocusChangeListener { v, has ->
+                    v.background = if (has) rounded(ROW_FOCUSED, 8) else null
+                }
                 addView(text(desc, BODY, color = TEXT).onArt())
             }
             storyScrollView = story
-            content.addView(story, LinearLayout.LayoutParams(dp(HERO_W), dp(110)).apply { topMargin = dp(6) })
+            content.addView(story, LinearLayout.LayoutParams(dp(HERO_W), dp(110)).apply {
+                topMargin = dp(6)
+                leftMargin = -dp(8)
+            })
         }
 
         val fullCast = richCast.ifEmpty {
@@ -990,12 +910,12 @@ class DetailsActivity : Screen() {
                     isFocusable = true
                     clipChildren = false
                     clipToPadding = false
-                    setPadding(dp(4), dp(4), dp(4), dp(6))
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
                 }
 
                 val avatarContainer = FrameLayout(this).apply {
                     clipChildren = false
-                    alpha = 0.55f
+                    alpha = 0.65f
                 }
 
                 val avatarFrame = FrameLayout(this).apply {
@@ -1039,26 +959,27 @@ class DetailsActivity : Screen() {
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 }
-                card.addView(nameView, LinearLayout.LayoutParams(dp(82), -2).apply { topMargin = dp(6) })
+                card.addView(nameView, LinearLayout.LayoutParams(dp(96), -2).apply { topMargin = dp(8) })
 
                 val role = if (actor.isDirector) getString(R.string.cast_director) else actor.character
                 val charView = if (!role.isNullOrBlank()) {
-                    text(role, 11f, color = TEXT_2).apply {
+                    text(role, 11f, color = TEXT_3).apply {
                         gravity = Gravity.CENTER_HORIZONTAL
                         textAlignment = View.TEXT_ALIGNMENT_CENTER
-                        maxLines = 1
+                        maxLines = 2
                         ellipsize = TextUtils.TruncateAt.END
                     }
                 } else null
-                charView?.let { card.addView(it, LinearLayout.LayoutParams(dp(82), -2).apply { topMargin = dp(2) }) }
+                charView?.let { card.addView(it, LinearLayout.LayoutParams(dp(96), -2).apply { topMargin = dp(2) }) }
 
-                card.setOnFocusChangeListener { _, focused ->
+                card.setOnFocusChangeListener { v, focused ->
+                    v.background = if (focused) rounded(ROW_FOCUSED, 10) else null
                     avatarContainer.grow(focused)
                         .translationZ(if (focused) dp(CARD_LIFT).toFloat() else 0f)
-                        .alpha(if (focused) 1f else 0.55f)
+                        .alpha(if (focused) 1f else 0.65f)
                         .start()
                     nameView.setTextColor(if (focused) TEXT else TEXT_2)
-                    charView?.setTextColor(if (focused) TEXT else TEXT_2)
+                    charView?.setTextColor(if (focused) TEXT_2 else TEXT_3)
                 }
 
                 card.setOnClickListener {
@@ -1067,13 +988,15 @@ class DetailsActivity : Screen() {
 
                 infoCastCards.add(card)
                 castRow.addView(card, LinearLayout.LayoutParams(-2, -2).apply {
-                    if (index > 0) marginStart = dp(12)
+                    if (index > 0) marginStart = dp(8)
                 })
             }
 
             val room = dp(8)
             val castScroll = HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
+                isHorizontalFadingEdgeEnabled = true
+                setFadingEdgeLength(dp(32))
                 clipToPadding = false
                 setPadding(room, room, room, room)
                 addView(castRow)
@@ -1094,10 +1017,22 @@ class DetailsActivity : Screen() {
         infoOverlay.translationY = dp(20).toFloat()
         infoOverlay.enter().alpha(1f).translationY(0f).start()
 
+        val story = storyScrollView
         if (focusCast && infoCastCards.isNotEmpty()) {
             infoCastCards.first().requestFocus()
+        } else if (story != null) {
+            story.post {
+                val canScroll = story.canScrollVertically(1) || story.canScrollVertically(-1)
+                if (canScroll || infoCastCards.isEmpty()) {
+                    story.isFocusable = true
+                } else {
+                    story.isFocusable = false
+                    infoCastCards.first().requestFocus()
+                }
+            }
+            story.requestFocus()
         } else {
-            storyScrollView?.requestFocus() ?: infoCastCards.firstOrNull()?.requestFocus()
+            infoCastCards.firstOrNull()?.requestFocus()
         }
     }
 
@@ -1120,9 +1055,10 @@ class DetailsActivity : Screen() {
 
     private fun loadSimilar() {
         background({
-            Stremio.addons(key).firstNotNullOfOrNull { addon ->
+            val fromAddons = Stremio.addons(key).firstNotNullOfOrNull { addon ->
                 runCatching { addon.similar(type, metaId) }.getOrNull()?.takeIf { it.isNotEmpty() }
             }.orEmpty()
+            fromAddons.ifEmpty { Tmdb.similar(metaId, type) }
         }) { result ->
             result.getOrNull()?.let { titles ->
                 titles.asSequence().filter { it.id != metaId && it.type == type }
@@ -1132,11 +1068,10 @@ class DetailsActivity : Screen() {
         }
     }
 
-    /** Movies reveal one Home-sized poster row without moving the title off the screen. */
-    private fun showSimilar(heading: String, titles: List<Meta>) {
-        if (::similarOverlay.isInitialized) root.removeView(similarOverlay)
-        similarOverlay = FrameLayout(this).apply { visibility = View.GONE }
-        similarOverlay.addView(View(this).apply {
+    /** Shared poster-row overlay for "More like this" and cast filmography. */
+    private fun buildPosterRowOverlay(heading: String, titles: List<Meta>, onFirstCard: (View?) -> Unit): FrameLayout {
+        val overlay = FrameLayout(this).apply { visibility = View.GONE }
+        overlay.addView(View(this).apply {
             background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
                 intArrayOf(0xF70E0C0A.toInt(), 0xA60E0C0A.toInt(), 0x000E0C0A))
         }, FrameLayout.LayoutParams(-1, dp(280), Gravity.BOTTOM))
@@ -1156,10 +1091,17 @@ class DetailsActivity : Screen() {
         content.addView(headerRow, LinearLayout.LayoutParams(-1, -2).apply {
             bottomMargin = dp(12)
         })
-        similarFirst = addPosterRail(content, titles, captionPill)
-        similarOverlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+        onFirstCard(addPosterRail(content, titles, captionPill))
+        overlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
             leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
         })
+        return overlay
+    }
+
+    /** Movies reveal one Home-sized poster row without moving the title off the screen. */
+    private fun showSimilar(heading: String, titles: List<Meta>) {
+        if (::similarOverlay.isInitialized) root.removeView(similarOverlay)
+        similarOverlay = buildPosterRowOverlay(heading, titles) { similarFirst = it }
         root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
         showHero(meta)
     }
@@ -1300,23 +1242,21 @@ class DetailsActivity : Screen() {
                 }
                 addView(avatarFrame, LinearLayout.LayoutParams(avatarSize, avatarSize).apply { marginEnd = dp(7) })
 
-                val nameView = text(castChipLabel(actor), SMALL, color = TEXT).apply {
+                val nameView = text(castChipLabel(actor), SMALL, color = TEXT_2).apply {
                     includeFontPadding = false
                     maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                    maxWidth = dp(115)
                 }
                 addView(nameView, wrap())
 
                 setOnFocusChangeListener { v, has ->
                     v.background = if (has) glass(14, true) else rest
                     v.grow(has, CHIP_GROW).start()
-                    nameView.setTextColor(TEXT)
+                    nameView.setTextColor(if (has) TEXT else TEXT_2)
                 }
                 setOnClickListener { showFilmography(actor, this) }
             }
             castChips.add(chip)
-            container.addView(chip, LinearLayout.LayoutParams(0, -2, 1f).apply {
+            container.addView(chip, LinearLayout.LayoutParams(-2, -2).apply {
                 if (index > 0) marginStart = dp(8)
             })
         }
@@ -1324,7 +1264,7 @@ class DetailsActivity : Screen() {
         val totalCastCount = (richCast.ifEmpty { allMembers }).size
         val remainingCount = totalCastCount - members.size
         if (remainingCount > 0) {
-            val moreChip = text(getString(R.string.cast_more, remainingCount), SMALL, color = TEXT).apply {
+            val moreChip = text(getString(R.string.cast_more, remainingCount), SMALL, color = TEXT_2).apply {
                 gravity = Gravity.CENTER
                 setSingleLine()
                 includeFontPadding = false
@@ -1335,6 +1275,7 @@ class DetailsActivity : Screen() {
                 isFocusable = true
                 setOnFocusChangeListener { v, has ->
                     v.background = if (has) glass(14, true) else rest
+                    setTextColor(if (has) TEXT else TEXT_2)
                     v.grow(has, CHIP_GROW).start()
                 }
                 setOnClickListener { showInfo(focusCast = true) }
@@ -1343,11 +1284,32 @@ class DetailsActivity : Screen() {
             container.addView(moreChip, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
         }
 
-        return container
+        val room = dp(4)
+        return HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(24))
+            clipToPadding = false
+            clipChildren = false
+            setPadding(room, room, room, room)
+            addView(container)
+            layoutParams = FrameLayout.LayoutParams(-1, -2).apply {
+                leftMargin = -room
+                rightMargin = -room
+                topMargin = -room
+                bottomMargin = -room
+            }
+        }
     }
 
     private fun showFilmography(actor: CastMember, originView: View) {
+        if (resolvingStreams != null) return
         lastFocusedActor = originView
+        var canceled = false
+        resolvingStreams = object : Cancellable { override fun cancel() { canceled = true } }
+        loadingStatus.text = getString(R.string.filmography_loading)
+        loadingView.visibility = View.VISIBLE
+        loadingView.bringToFront()
         background({
             val creditedTitles = runCatching {
                 Tmdb.personCredits(actor.tmdbId, actor.name, actor.isDirector)
@@ -1386,15 +1348,19 @@ class DetailsActivity : Screen() {
                 isCredited || allMetas.size <= 4 || !metaTitleLower.contains(actorLower)
             }.take(16)
         }) { result ->
+            if (canceled) return@background
+            cancelStreamResolution()
             result.exceptionOrNull()?.let { error ->
                 val reason = failureOf(error)
                 FailureLog.record(FailureLog.Operation.SEARCH, reason)
-                android.widget.Toast.makeText(this, failureMessage(R.string.filmography_failed, reason, advice = false),
-                    android.widget.Toast.LENGTH_LONG).show()
+                choose(actor.name, listOf(getString(R.string.action_ok)),
+                    failureMessage(R.string.filmography_failed, reason, advice = false)) { originView.requestFocus() }
+                return@background
             }
             val titles = result.getOrNull().orEmpty()
             if (titles.isEmpty()) {
-                if (!infoOpen) showInfo(focusCast = true)
+                choose(actor.name, listOf(getString(R.string.action_ok)),
+                    getString(R.string.filmography_empty)) { originView.requestFocus() }
                 return@background
             }
             val heading = if (actor.isDirector) getString(R.string.directed_by, actor.name) else actor.name
@@ -1405,31 +1371,7 @@ class DetailsActivity : Screen() {
 
     private fun buildFilmographyOverlay(heading: String, titles: List<Meta>) {
         if (::filmographyOverlay.isInitialized) root.removeView(filmographyOverlay)
-        filmographyOverlay = FrameLayout(this).apply { visibility = View.GONE }
-        filmographyOverlay.addView(View(this).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
-                intArrayOf(0xF70E0C0A.toInt(), 0xA60E0C0A.toInt(), 0x000E0C0A))
-        }, FrameLayout.LayoutParams(-1, dp(280), Gravity.BOTTOM))
-        val content = column(Gravity.START)
-        val captionPill = caption("").apply {
-            visibility = View.INVISIBLE
-            maxWidth = dp(360)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        val headerRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(caps(heading).onArt())
-            addView(captionPill, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
-        }
-        content.addView(headerRow, LinearLayout.LayoutParams(-1, -2).apply {
-            bottomMargin = dp(12)
-        })
-        filmographyFirst = addPosterRail(content, titles, captionPill)
-        filmographyOverlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-            leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
-        })
+        filmographyOverlay = buildPosterRowOverlay(heading, titles) { filmographyFirst = it }
         root.addView(filmographyOverlay, FrameLayout.LayoutParams(-1, -1))
     }
 
@@ -1524,7 +1466,7 @@ class DetailsActivity : Screen() {
         }.isSuccess
         if (!opened && runCatching {
             startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=$id")))
-        }.isFailure) android.widget.Toast.makeText(this, R.string.trailer_no_app, android.widget.Toast.LENGTH_LONG).show()
+        }.isFailure) choose(getString(R.string.action_trailer), listOf(getString(R.string.action_ok)), getString(R.string.trailer_no_app)) {}
     }
 
     private fun openSources(videoId: String, startOver: Boolean, next: String? = null, label: String? = null, pick: Boolean = false) {
@@ -1565,7 +1507,7 @@ class DetailsActivity : Screen() {
             ?: Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId } }) { result ->
             item = result.getOrNull() ?: item
             val wasGuide = guideOpen
-            if (infoOpen) { root.removeView(infoOverlay); infoOpen = false }
+            if (infoOpen) { root.removeView(infoOverlay); infoOpen = false; storyScrollView = null }
             hero.visibility = View.VISIBLE
             showHero(meta)
             meta?.videos?.takeIf { episodic && it.isNotEmpty() }?.let(::buildGuide)
@@ -1604,7 +1546,8 @@ class DetailsActivity : Screen() {
                         return true
                     }
                 } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                    if (currentFocus?.let { v -> infoCastCards.any { it === v || isInside(v, it) } } == true) {
+                    if (currentFocus?.let { v -> infoCastCards.any { it === v || isInside(v, it) } } == true &&
+                        storyScrollView?.isFocusable == true) {
                         storyScrollView?.requestFocus()
                         return true
                     }
@@ -1650,6 +1593,6 @@ class DetailsActivity : Screen() {
     }
 
     private companion object {
-        const val GUIDE_ART = 0.6f // the film's brightness behind the episode guide
+        const val GUIDE_ART = 0.45f // the film's brightness behind the episode guide
     }
 }

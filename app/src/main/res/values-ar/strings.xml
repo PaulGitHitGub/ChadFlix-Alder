@@ -594,4 +594,6 @@
     <string name="catalog_incomplete">تعذّر تحميل بعض قوائم العرض</string>
     <string name="progress_saved_on_tv">تم حفظ تقدّم المشاهدة على هذا التلفزيون. سيحاول Alder مزامنته مجددًا.</string>
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>
+    <string name="filmography_loading">جارٍ البحث عن العناوين…</string>
+    <string name="filmography_empty">لم يتم العثور على عناوين أخرى في قوائمك.</string>
 </resources>

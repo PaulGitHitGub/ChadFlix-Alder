@@ -11,6 +11,7 @@ object Tmdb {
     private const val BASE = "https://api.themoviedb.org/3"
     private val memoryCache = ConcurrentHashMap<String, List<CastMember>>()
     private val creditsCache = ConcurrentHashMap<String, Set<String>>()
+    private val similarCache = ConcurrentHashMap<String, List<Meta>>()
 
     fun cast(imdbId: String, type: String): List<CastMember> {
         if (!imdbId.startsWith("tt")) return emptyList()
@@ -21,8 +22,9 @@ object Tmdb {
             val isMovie = type != "series"
             val primaryKey = if (isMovie) "movie_results" else "tv_results"
             val fallbackKey = if (isMovie) "tv_results" else "movie_results"
-            val results = findJson.optJSONArray(primaryKey) ?: findJson.optJSONArray(fallbackKey)
-            val target = results?.optJSONObject(0) ?: return emptyList()
+            val target = findJson.optJSONArray(primaryKey)?.optJSONObject(0)
+                ?: findJson.optJSONArray(fallbackKey)?.optJSONObject(0)
+                ?: return emptyList()
             val tmdbId = target.optInt("id").takeIf { it > 0 } ?: return emptyList()
             val mediaType = if (target.has("title")) "movie" else "tv"
             val creditsUrl = "$BASE/$mediaType/$tmdbId/credits?api_key=$KEY"
@@ -161,6 +163,41 @@ object Tmdb {
     }
 
     private const val SERVICES = 14
+
+    /**
+     * Fallback recommendations from TMDB when installed Stremio add-ons do not advertise a `similar` catalog.
+     */
+    fun similar(imdbId: String, type: String): List<Meta> {
+        if (!imdbId.startsWith("tt")) return emptyList()
+        val cacheKey = "${type}_$imdbId"
+        similarCache[cacheKey]?.let { return it }
+        return runCatching {
+            val findUrl = "$BASE/find/$imdbId?api_key=$KEY&external_source=imdb_id"
+            val findJson = JSONObject(Http.get(findUrl, keep = true))
+            val isMovie = type != "series"
+            val primaryKey = if (isMovie) "movie_results" else "tv_results"
+            val fallbackKey = if (isMovie) "tv_results" else "movie_results"
+            val target = findJson.optJSONArray(primaryKey)?.optJSONObject(0)
+                ?: findJson.optJSONArray(fallbackKey)?.optJSONObject(0)
+                ?: return emptyList()
+            val tmdbId = target.optInt("id").takeIf { it > 0 } ?: return emptyList()
+            val media = if (target.has("title")) "movie" else "tv"
+            val recUrl = "$BASE/$media/$tmdbId/recommendations?api_key=$KEY&language=$language&page=1"
+            val found = JSONObject(Http.get(recUrl, keep = true)).optJSONArray("results").objects().take(12)
+            if (found.isEmpty()) return emptyList()
+            val genreNames = runCatching { genres(media).toMap() }.getOrDefault(emptyMap())
+            val ids = pool.invokeAll(found.map { t ->
+                java.util.concurrent.Callable {
+                    runCatching {
+                        JSONObject(Http.get("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", keep = true)).text("imdb_id")
+                    }.getOrNull()?.takeIf { it.startsWith("tt") }
+                }
+            }).map { runCatching { it.get() }.getOrNull() }
+            found.zip(ids).mapNotNull { (t, imdb) ->
+                imdb?.takeIf { it != imdbId }?.let { discoverMeta(t, it, media == "movie", genreNames) }
+            }.also { if (it.isNotEmpty()) similarCache[cacheKey] = it }
+        }.getOrDefault(emptyList())
+    }
 }
 
 /** Discover's filters: [type] is movie, series or anime; [decade] a year like 2010 (0: before 1980); [year] an exact year; [sort] popular, top or new. */

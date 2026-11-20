@@ -570,4 +570,6 @@
     <string name="catalog_incomplete">कुछ कैटलॉग लोड नहीं हो सके</string>
     <string name="progress_saved_on_tv">प्रगति इस टीवी पर सेव है। Alder इसे फिर से सिंक करने की कोशिश करेगा।</string>
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
+    <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
+    <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
 </resources>

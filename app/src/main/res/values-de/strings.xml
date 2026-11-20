@@ -570,4 +570,6 @@
     <string name="catalog_incomplete">Einige Kataloge konnten nicht geladen werden</string>
     <string name="progress_saved_on_tv">Der Fortschritt wurde auf diesem Fernseher gespeichert. Alder versucht erneut, ihn zu synchronisieren.</string>
     <string name="library_load_failed">Deine Stremio-Bibliothek konnte nicht geladen werden</string>
+    <string name="filmography_loading">Suche Titel…</string>
+    <string name="filmography_empty">Keine weiteren Titel in deinen Katalogen gefunden.</string>
 </resources>
