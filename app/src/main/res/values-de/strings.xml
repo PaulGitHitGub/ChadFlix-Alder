@@ -138,7 +138,6 @@
     <string name="player_starting_stream">Stream startet…</string>
     <string name="player_source_failed_next">Diese Quelle ist fehlgeschlagen · die nächste wird versucht</string>
     <string name="player_source_failed_choose">Diese Quelle ist fehlgeschlagen · wähle eine andere Quelle</string>
-    <string name="player_keeps_buffering">Puffert immer wieder</string>
     <string name="player_switch_prompt">Zu %1$dp wechseln?</string>
     <string name="player_switch_desc">Diese %1$dp-Quelle hat in einer Minute 3-mal angehalten. Eine kleinere Datei läuft ab %2$s vielleicht flüssiger.</string>
     <string name="player_switch_to">Zu %1$dp wechseln</string>
@@ -147,7 +146,6 @@
     <string name="player_source_failed">Quelle fehlgeschlagen</string>
     <string name="player_try_another">Versuche eine andere Quelle</string>
     <string name="player_next_episode">Nächste Folge</string>
-    <string name="player_up_next">Als Nächstes</string>
     <string name="player_play_episode">S%1$d F%2$d abspielen</string>
     <string name="player_exit_home">Zur Startseite</string>
     <string name="player_still_watching">Schaust du noch?</string>
@@ -155,14 +153,11 @@
     <string name="player_sleep_paused">Der Sleep-Timer hat die Wiedergabe angehalten.</string>
     <string name="skip_intro">Intro überspringen</string>
     <string name="skip_recap">Rückblick überspringen</string>
-    <string name="player_paused">Pausiert</string>
     <string name="player_seek">Spulen</string>
     <string name="player_audio_subtitles">Audio und Untertitel</string>
     <string name="player_change_stream">Quelle wechseln</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Info</string>
-    <string name="key_play_pause">Abspielen / Pause</string>
-    <string name="key_seek">Auf der Leiste spulen</string>
     <string name="player_live">Live</string>
     <string name="player_chapters">%1$s  ·  ▲ Kapitel</string>
     <string name="player_cannot_seek">Diese Quelle kann nicht vorspulen · Wechsle die Quelle, um eine andere zu versuchen</string>

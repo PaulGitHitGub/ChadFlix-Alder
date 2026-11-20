@@ -141,7 +141,6 @@
     <string name="player_starting_stream">Avvio dello stream…</string>
     <string name="player_source_failed_next">Questa fonte non funziona · provo la successiva</string>
     <string name="player_source_failed_choose">Questa fonte non funziona · scegline un’altra</string>
-    <string name="player_keeps_buffering">Continua a caricare</string>
     <string name="player_switch_prompt">Passare a %1$dp?</string>
     <string name="player_switch_desc">Questa fonte %1$dp si è fermata 3 volte in un minuto. Un file più leggero potrebbe essere più fluido da %2$s.</string>
     <string name="player_switch_to">Passa a %1$dp</string>
@@ -150,7 +149,6 @@
     <string name="player_source_failed">Fonte non riuscita</string>
     <string name="player_try_another">Prova un’altra fonte</string>
     <string name="player_next_episode">Episodio successivo</string>
-    <string name="player_up_next">Prossimo</string>
     <string name="player_play_episode">Riproduci S%1$d E%2$d</string>
     <string name="player_exit_home">Torna alla Home</string>
     <string name="player_still_watching">Stai ancora guardando?</string>
@@ -158,14 +156,11 @@
     <string name="player_sleep_paused">Il timer di spegnimento ha messo in pausa.</string>
     <string name="skip_intro">Salta intro</string>
     <string name="skip_recap">Salta riassunto</string>
-    <string name="player_paused">In pausa</string>
     <string name="player_seek">Avanza o torna indietro</string>
     <string name="player_audio_subtitles">Audio e sottotitoli</string>
     <string name="player_change_stream">Cambia fonte</string>
     <string name="player_pause">Pausa</string>
     <string name="player_info">Info</string>
-    <string name="key_play_pause">Riproduci / pausa</string>
-    <string name="key_seek">Spostati sulla barra</string>
     <string name="player_live">Diretta</string>
     <string name="player_chapters">%1$s  ·  ▲ Capitoli</string>
     <string name="player_cannot_seek">Questa fonte non permette di avanzare · Cambia fonte per provarne un’altra</string>

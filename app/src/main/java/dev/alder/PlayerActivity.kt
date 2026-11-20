@@ -584,7 +584,6 @@ class PlayerActivity : Screen() {
                 playPause.foreground = centred(if (playWhenReady) R.drawable.ic_pause else R.drawable.ic_play, 25, BASE)
                 buttonLabels[playPause]?.text = getString(if (playWhenReady) R.string.player_pause else R.string.action_play)
                 pausedShade.visibility = if (playWhenReady) View.GONE else View.VISIBLE
-                pauseKicker.visibility = if (isTrailer || !playWhenReady) View.VISIBLE else View.GONE
                 if (playWhenReady) { if (shown) showControls(null) }
                 else if (options.visibility != View.VISIBLE && upNextPanel.visibility != View.VISIBLE &&
                     stallPanel.visibility != View.VISIBLE && stillPanel.visibility != View.VISIBLE) showControls(playPause)
@@ -1194,9 +1193,7 @@ class PlayerActivity : Screen() {
         val card = column(Gravity.START).apply {
             setPadding(dp(16), dp(15), dp(16), dp(14))
             background = videoGlass(14)
-            addView(caps(R.string.player_keeps_buffering, TUNGSTEN))
-            addView(text(getString(R.string.player_switch_prompt, lower), SERIF_TITLE, serif = true),
-                wrap().apply { topMargin = dp(4) })
+            addView(text(getString(R.string.player_switch_prompt, lower), SERIF_TITLE, serif = true))
             addView(text(getString(R.string.player_switch_desc, height, clock(position())),
                 SMALL, color = TEXT_2), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
             val actions = LinearLayout(this@PlayerActivity).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -1262,9 +1259,7 @@ class PlayerActivity : Screen() {
             setPadding(dp(18), dp(14), dp(18), dp(14))
             // Video can't be frosted: a dark base under the glass keeps it readable over white end cards.
             background = videoGlass(14)
-            addView(caps(R.string.player_up_next, TUNGSTEN).onArt())
-            addView(text(next.title.ifBlank { getString(R.string.episode_number, next.episode) }, SERIF_TITLE, serif = true).onArt(),
-                wrap().apply { topMargin = dp(6) })
+            addView(text(next.title.ifBlank { getString(R.string.episode_number, next.episode) }, SERIF_TITLE, serif = true).onArt())
             addView(text("S${next.season} E${next.episode}", SMALL, color = TEXT_2).onArt(), wrap().apply { topMargin = dp(5) })
             addView(playNext, wrap().apply { topMargin = dp(16) })
         }
@@ -1583,7 +1578,6 @@ class PlayerActivity : Screen() {
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
     private lateinit var topName: TextView
-    private lateinit var pauseKicker: TextView
     private lateinit var pauseTitle: TextView
     private lateinit var pauseInfo: LinearLayout
     private lateinit var pauseFacts: TextView
@@ -1646,12 +1640,9 @@ class PlayerActivity : Screen() {
             addView(pauseFacts, wrap().apply { marginEnd = dp(10) })
             addView(pauseBadges, wrap())
         }
-        pauseKicker = caps(if (isTrailer) R.string.action_trailer else R.string.player_paused, TUNGSTEN).onArt().apply {
-            visibility = if (isTrailer) View.VISIBLE else View.GONE
-        }
         pauseInfo = column(Gravity.START).apply {
-            addView(pauseKicker)
-            addView(pauseTitle, LinearLayout.LayoutParams(dp(640), -2).apply { topMargin = dp(6) })
+            if (isTrailer) addView(caps(R.string.action_trailer, TUNGSTEN).onArt())
+            addView(pauseTitle, LinearLayout.LayoutParams(dp(640), -2).apply { if (isTrailer) topMargin = dp(6) })
             addView(pauseMetaRow, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
         }
         refreshBadges()
@@ -1823,10 +1814,6 @@ class PlayerActivity : Screen() {
             })
             addView(buttons, FrameLayout.LayoutParams(-1, dp(76), Gravity.BOTTOM).apply {
                 bottomMargin = dp(11)
-            })
-            addView(column(Gravity.END, keyHint("OK", getString(R.string.key_play_pause)), keyHint("◀ ▶", getString(R.string.key_seek))),
-                FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
-                rightMargin = dp(PAD); bottomMargin = dp(35)
             })
         }
     }
