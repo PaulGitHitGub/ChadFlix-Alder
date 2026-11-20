@@ -392,7 +392,6 @@
 
     <!-- Search -->
     <string name="search_clear">مسح البحث</string>
-    <string name="search_voice_unavailable">البحث الصوتي غير متاح</string>
     <string name="search_space">مسافة</string>
     <string name="search_recent">الأخيرة</string>
     <string name="search_recent_hint">%1$s. اضغط مطولًا على موافق لإزالته من عمليات البحث الأخيرة</string>

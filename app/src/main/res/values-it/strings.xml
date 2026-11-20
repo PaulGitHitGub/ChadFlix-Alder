@@ -382,7 +382,6 @@
 
     <!-- Search -->
     <string name="search_clear">Cancella ricerca</string>
-    <string name="search_voice_unavailable">Ricerca vocale non disponibile</string>
     <string name="search_space">Spazio</string>
     <string name="search_recent">Recenti</string>
     <string name="search_recent_hint">%1$s. Tieni premuto OK per rimuoverla dalle ricerche recenti</string>
