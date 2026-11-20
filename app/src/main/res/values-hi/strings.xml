@@ -159,6 +159,7 @@
     <string name="player_seek">आगे-पीछे करें</string>
     <string name="player_audio_subtitles">ऑडियो और सबटाइटल</string>
     <string name="player_speed">प्लेबैक स्पीड</string>
+    <string name="player_speed_passthrough_note">1× पर या उससे बदलने पर ऑडियो थोड़ी देर रुकता है।</string>
     <string name="player_change_stream">स्रोत बदलें</string>
     <string name="player_pause">रोकें</string>
     <string name="player_info">जानकारी</string>

@@ -162,6 +162,7 @@
     <string name="player_seek">Avancer ou reculer</string>
     <string name="player_audio_subtitles">Audio et sous-titres</string>
     <string name="player_speed">Vitesse de lecture</string>
+    <string name="player_speed_passthrough_note">Le son se coupe brièvement lors du passage à 1× ou depuis 1×.</string>
     <string name="player_change_stream">Changer de source</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Infos</string>

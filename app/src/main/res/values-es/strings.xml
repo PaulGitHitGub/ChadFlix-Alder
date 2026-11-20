@@ -162,6 +162,7 @@
     <string name="player_seek">Avanzar o retroceder</string>
     <string name="player_audio_subtitles">Audio y subtítulos</string>
     <string name="player_speed">Velocidad de reproducción</string>
+    <string name="player_speed_passthrough_note">El audio se pausa brevemente al cambiar a o desde 1×.</string>
     <string name="player_change_stream">Cambiar fuente</string>
     <string name="player_pause">Pausa</string>
     <string name="player_info">Info</string>

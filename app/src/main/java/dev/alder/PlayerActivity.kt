@@ -1115,9 +1115,17 @@ class PlayerActivity : Screen() {
         android.util.Log.i("Alder", reason)
     }
 
+    private fun selectedTrackPassesAudio(): Boolean =
+        !decodeAudio && !retryWithPcm && player.currentTracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
+
     /** The speeds in the shared glass list, the one in use ticked and focused; picking one plays at it. */
     private fun openSpeedMenu() {
-        choose(getString(R.string.player_speed), SPEEDS.map(::speedLabel), checked = SPEEDS.indexOf(speed)) { i ->
+        val note = if (passthroughOut || (speed != 1f && selectedTrackPassesAudio()))
+            getString(R.string.player_speed_passthrough_note) else null
+        choose(getString(R.string.player_speed), SPEEDS.map(::speedLabel), message = note,
+            checked = SPEEDS.indexOf(speed), widthDp = 260) { i ->
             applySpeed(SPEEDS[i])
             showControls(speedButton) // focus back on the button, and the controls' hide timer starts again
         }
@@ -1129,11 +1137,9 @@ class PlayerActivity : Screen() {
      */
     private fun applySpeed(to: Float) {
         speedButton.text = speedLabel(to)
+        speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
         if (to == speed) return
-        val reopen = if (to != 1f) passthroughOut
-        else !decodeAudio && !retryWithPcm && player.currentTracks.groups
-            .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
-            ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
+        val reopen = if (to != 1f) passthroughOut else selectedTrackPassesAudio()
         speed = to
         Settings.pickedInPlayer(this, metaId, speed = to)
         if (reopen) {
@@ -1787,6 +1793,13 @@ class PlayerActivity : Screen() {
             text = speedLabel(speed)
             textSize = SMALL
             typeface = text("", SMALL, bold = true).typeface // Screen.fonts is private
+            setTextColor(if (speed != 1f) TUNGSTEN else TEXT)
+            maxLines = 1
+            includeFontPadding = false
+            setPadding(dp(2), 0, dp(2), 0)
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+            }
         }
         playPause = button(getString(R.string.player_pause), R.drawable.ic_pause, primary = true) {
             if (player.playWhenReady) player.pause() else player.play()
@@ -1804,20 +1817,29 @@ class PlayerActivity : Screen() {
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
+            clipToPadding = false
             gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
             if (!isTrailer) {
-                addView(buttonCell(streamButton))
-                addView(buttonCell(audioButton))
-                addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
-                    LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
+                addView(LinearLayout(context).apply {
+                    clipChildren = false; clipToPadding = false
+                    gravity = Gravity.END or Gravity.TOP
+                    addView(buttonCell(streamButton))
+                    addView(buttonCell(audioButton))
+                    addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
+                        LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
             }
             addView(buttonCell(playPause, true))
             if (!isTrailer) {
-                addView(buttonCell(speedButton)) // between the dividers with play: both are about how it plays
-                addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
-                    LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
-                addView(nextCell)
-                addView(buttonCell(infoButton))
+                addView(LinearLayout(context).apply {
+                    clipChildren = false; clipToPadding = false
+                    gravity = Gravity.START or Gravity.TOP
+                    addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
+                        LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
+                    addView(buttonCell(speedButton))
+                    addView(nextCell)
+                    addView(buttonCell(infoButton))
+                }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
         for (button in listOf(streamButton, audioButton, speedButton, playPause, nextButton, infoButton))

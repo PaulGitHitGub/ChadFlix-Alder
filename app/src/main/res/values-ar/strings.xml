@@ -172,6 +172,7 @@
     <string name="player_seek">تقديم أو ترجيع</string>
     <string name="player_audio_subtitles">الصوت والترجمة</string>
     <string name="player_speed">سرعة التشغيل</string>
+    <string name="player_speed_passthrough_note">يتوقف الصوت مؤقتًا عند التبديل إلى 1× أو منها.</string>
     <string name="player_change_stream">تغيير المصدر</string>
     <string name="player_pause">إيقاف مؤقت</string>
     <string name="player_info">معلومات</string>

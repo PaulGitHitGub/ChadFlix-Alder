@@ -801,7 +801,8 @@ abstract class Screen : Activity() {
      * place of Android's grey dialog. [checked] gets a tick (the choice in use); the remote starts on [focus].
      */
     protected fun choose(title: String, items: List<String>, message: String? = null, checked: Int = -1,
-                         focus: Int = maxOf(checked, 0), pick: (Int) -> Unit) {
+                         focus: Int = maxOf(checked, 0), widthDp: Int = if (items.size > 8) 300 else 340,
+                         pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
         val words = column(Gravity.START, text(title, BODY, bold = true)).apply { setPadding(dp(16), 0, dp(16), dp(10)) }
@@ -837,7 +838,7 @@ abstract class Screen : Activity() {
         })
         dialog.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
-            setLayout(dp(if (items.size > 8) 300 else 340), -2) // a long list of names needs less width
+            setLayout(dp(widthDp), -2) // a long list of names needs less width
             setDimAmount(0.6f)
         }
         dialog.show()
