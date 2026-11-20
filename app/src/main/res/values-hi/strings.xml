@@ -56,7 +56,7 @@
     <string name="tab_movies">फ़िल्में</string>
     <string name="tab_live">लाइव</string>
     <string name="tab_anime">एनीमे</string>
-    <string name="tab_my_list">मेरी सूची</string>
+    <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">प्रोफ़ाइल</string>
     <string name="nav_search">खोजें</string>
     <string name="updates_ready">Alder %1$s तैयार है</string>
@@ -87,12 +87,13 @@
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">पहले बिना देखे</string>
     <string name="list_empty">+ से सहेजे गए टाइटल यहाँ दिखते हैं</string>
-    <string name="list_empty_movies">मेरी सूची में कोई फ़िल्म नहीं</string>
-    <string name="list_empty_shows">मेरी सूची में कोई शो नहीं</string>
-    <string name="list_empty_unwatched">मेरी सूची में कोई बिना देखा टाइटल नहीं</string>
-    <string name="action_remove_from_list">मेरी सूची से हटाएँ</string>
+    <string name="list_empty_movies">My Alder में कोई फ़िल्म नहीं</string>
+    <string name="list_empty_shows">My Alder में कोई शो नहीं</string>
+    <string name="list_empty_unwatched">My Alder में कोई बिना देखा टाइटल नहीं</string>
+    <string name="list_clear_filters">फ़िल्टर साफ़ करें</string>
+    <string name="action_remove_from_list">My Alder से हटाएँ</string>
     <string name="action_mark_watched">देखा गया मार्क करें</string>
-    <string name="list_update_failed">मेरी सूची अपडेट नहीं हो सकी</string>
+    <string name="list_update_failed">My Alder अपडेट नहीं हो सकी</string>
     <string name="check_connection">कनेक्शन जाँचें और फिर से कोशिश करें।</string>
     <string name="action_choose_source">स्रोत चुनें</string>
     <string name="action_remove_from_continue">देखना जारी रखें से हटाएँ</string>
@@ -111,7 +112,7 @@
     <string name="action_more_info">ज़्यादा जानकारी</string>
     <string name="action_start_over">शुरू से देखें</string>
     <string name="action_trailer">ट्रेलर</string>
-    <string name="action_add_to_list">मेरी सूची में जोड़ें</string>
+    <string name="action_add_to_list">My Alder में जोड़ें</string>
     <string name="season_specials">स्पेशल</string>
     <string name="season_number">सीज़न %1$d</string>
     <string name="episode_number">एपिसोड %1$d</string>

@@ -318,7 +318,7 @@ class SearchActivity : Screen() {
             "shows" to ("Shows" to getString(R.string.tab_shows)),
             "movies" to ("Movies" to getString(R.string.tab_movies)),
             "live" to ("Live" to getString(R.string.tab_live)),
-            "library" to ("My List" to getString(R.string.tab_my_list)),
+            "library" to ("My Alder" to getString(R.string.tab_my_list)),
         )
         val visible = orderTabs(Settings.tabOrder(this), tabsFor(catalogTypes)).filter { Settings.tabShown(this, it) }
         val ids = listOf("home") + visible

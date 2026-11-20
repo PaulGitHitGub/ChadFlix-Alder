@@ -222,7 +222,7 @@ class MainActivity : Screen() {
             val SHOWS = Page("Shows", R.string.tab_shows)
             val MOVIES = Page("Movies", R.string.tab_movies)
             val LIVE = Page("Live", R.string.tab_live)
-            val LIBRARY = Page("My List", R.string.tab_my_list)
+            val LIBRARY = Page("My Alder", R.string.tab_my_list)
             val fixed = listOf(HOME, DISCOVER, SHOWS, MOVIES, LIVE, LIBRARY)
             private val byType = mutableMapOf<String, Page>()
             // warmPages asks for pages off the main thread: one lock, so a type never gets two pages (two tabs).
@@ -253,11 +253,10 @@ class MainActivity : Screen() {
     private val Page.hasGenreShortcuts get() = this == Page.SHOWS || this == Page.MOVIES
     private val Page.polishedRail get() = this == Page.HOME || hasGenreShortcuts
     private val held get() = rows.any { it.rail.held }
-    /** One row of cards under the focused title's art: every page but My List's grid. */
+    /** One row of cards under the focused title's art: every page but My Alder's and Discover's grids. */
     private val Page.isBrowse get() = this == Page.HOME || isCatalog || this == Page.LIVE
-    /** A grid of large posters under the focused title's art: My List and Discover. */
+    /** A grid of large posters under the focused title's art: My Alder and Discover. */
     private val Page.isGrid get() = this == Page.LIBRARY || this == Page.DISCOVER
-    private val gridTop get() = if (page == Page.DISCOVER) DISCOVER_TOP else LIST_TOP
     private var discover = DiscoverQuery()
     private var discoverLoaded = false // the profile's saved choice has been read
     private val discoverChips = mutableListOf<TextView>()
@@ -750,7 +749,8 @@ class MainActivity : Screen() {
                 if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && genreStrip.hasFocus()) {
-                (last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull())
+                (last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull()
+                    ?: librarySlot?.findViewWithTag<View>("clear_filters"))
                     ?.requestFocus()?.let { if (it) return true }
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && heroResume.isFocused) {
@@ -1253,20 +1253,18 @@ class MainActivity : Screen() {
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
-            if (page == Page.DISCOVER) {
-                val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
-                heroName.text = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
-                    if (year != null) {
-                        val start = item.name.length
-                        setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
-                        setSpan(android.text.style.RelativeSizeSpan(0.75f), start, length, 0)
-                    }
+            val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
+            heroName.text = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
+                if (year != null) {
+                    val start = item.name.length
+                    setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
+                    setSpan(android.text.style.RelativeSizeSpan(0.65f), start, length, 0)
                 }
-                heroName.visibility = View.VISIBLE
-                heroLogo.visibility = View.GONE
-                browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
-                main.post(::placeCaption)
             }
+            heroName.visibility = View.VISIBLE
+            heroLogo.visibility = View.GONE
+            browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
+            main.post(::placeCaption)
             if (changed) {
                 cancelBrowseHero()
                 if (art.drawable == null) art.tag = null
@@ -1415,7 +1413,7 @@ class MainActivity : Screen() {
         captionAnchor.set(0, 0, card.width, card.height)
         parent.offsetDescendantRectToMyCoords(card, captionAnchor)
         cardUnderline.visibility = View.INVISIBLE
-        if (page == Page.DISCOVER && mode == Mode.BROWSE) {
+        if (page.isGrid && mode == Mode.BROWSE) {
             cardUnderline.translationX = captionAnchor.exactCenterX() - cardUnderline.width / 2f
             cardUnderline.translationY = captionAnchor.bottom + dp(6).toFloat()
             cardUnderline.visibility = View.VISIBLE
@@ -1477,30 +1475,29 @@ class MainActivity : Screen() {
         val grid = p.isGrid
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
-            topMargin = if (grid) dp(gridTop) else browseRowTop
-            height = if (grid) resources.displayMetrics.heightPixels - dp(gridTop) else browseRowH
+            topMargin = if (grid) dp(GRID_TOP) else browseRowTop
+            height = if (grid) resources.displayMetrics.heightPixels - dp(GRID_TOP) else browseRowH
         }
-        val discoverPage = p == Page.DISCOVER
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
-            gravity = if (discoverPage) Gravity.TOP else Gravity.BOTTOM
-            topMargin = if (discoverPage) dp(DISCOVER_HERO_TOP) else 0
-            bottomMargin = if (discoverPage) 0 else heroBottom
-            width = if (discoverPage) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
+            gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
+            topMargin = if (grid) dp(GRID_HERO_TOP) else 0
+            bottomMargin = if (grid) 0 else heroBottom
+            width = if (grid) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
-        heroName.textSize = if (discoverPage) SERIF_NAME else SERIF_HERO
+        val titleSize = if (grid) SERIF_TITLE else SERIF_HERO
+        heroName.textSize = titleSize
         val heroLeading = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP,
-            LEADING.getValue(if (discoverPage) SERIF_NAME else SERIF_HERO), resources.displayMetrics)
+            LEADING.getValue(titleSize), resources.displayMetrics)
         heroName.setLineSpacing(heroLeading - heroName.paint.getFontMetricsInt(null), 1f)
         heroName.maxLines = 2
-        browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (discoverPage) -1 else -2, -2)
-        for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (discoverPage) View.GONE else View.VISIBLE
+        browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
+        for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
         librarySlot = null
         listShade.visibility = if (grid) View.VISIBLE else View.GONE
         listShade.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            if (discoverPage) intArrayOf(0xF20E0C0A.toInt(), 0xE6191512.toInt(), 0xF20E0C0A.toInt())
-            else intArrayOf(0xDC2C211B.toInt(), 0xB3171412.toInt(), 0xE60E0C0A.toInt()))
+            intArrayOf(0xF20E0C0A.toInt(), 0xE6191512.toInt(), 0xF20E0C0A.toInt()))
         val g = ++generation
         loadMoreSections = null
         restoreCatalogFocus = null
@@ -1521,7 +1518,7 @@ class MainActivity : Screen() {
         genreStrip.isFillViewport = grid
         genreStrip.visibility = if (p.isCatalog) View.INVISIBLE else if (grid) View.VISIBLE else View.GONE
         if (p == Page.LIBRARY) showListChips()
-        else if (p == Page.DISCOVER) { genreStrip.removeAllViews(); genreChips.clear() }
+        else if (p == Page.DISCOVER) { genreStrip.removeAllViews(); genreChips.clear(); discoverChips.clear() }
         else if (!p.isCatalog) { genreStrip.removeAllViews(); genreChips.clear() }
         cardCaption.visibility = View.GONE
         cardUnderline.visibility = View.INVISIBLE
@@ -1961,65 +1958,92 @@ class MainActivity : Screen() {
 
     private class Shelf(val page: Page, val title: String, val rank: Int)
 
-    private fun showListChips() {
+    private fun buildGridChips(
+        tab: Page,
+        rememberedKey: String? = null,
+        fallbackKey: String? = null,
+        build: (add: (key: String, label: String, selected: Boolean, margin: Int, list: Boolean, click: () -> Unit) -> TextView) -> Unit,
+    ) {
         genreStrip.removeAllViews()
         genreChips.clear()
-        listFilterChips.clear()
-        lastListChip = null
+        val chips = mutableListOf<TextView>()
         val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(PAD), dp(2), dp(PAD), dp(2)) }
-        fun add(label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit): TextView {
-            val control = (if (list) dropdown(label) else chip(label, selected)).apply {
+        fun add(key: String, label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit): TextView =
+            (if (list) dropdown(label) else chip(label, selected)).apply {
+                tag = key
+                id = View.generateViewId()
+                nextFocusUpId = navItems[tab]?.id ?: View.NO_ID
                 setOnFocusChangeListener { v, has ->
                     v.background = listChipBackground(has)
+                    v.grow(has, CHIP_GROW).start()
+                    setTextColor(if (has || v.isSelected || list) TEXT else TEXT_2)
                     if (has) lastListChip = this
                 }
                 background = listChipBackground(false)
                 setOnClickListener { click() }
+                line.addView(this, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
+                chips += this
             }
-            line.addView(control, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
-            return control
-        }
-        listOf(ListFilter.ALL to getString(R.string.filter_all), ListFilter.MOVIES to getString(R.string.tab_movies),
-            ListFilter.SHOWS to getString(R.string.tab_shows)).forEach { (value, label) ->
-            listFilterChips[value] = add(label, value == listFilter) {
-                if (listFilter != value) { listFilter = value; styleListChips(); redrawLibrary() }
+        build(::add)
+        val rtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        chips.firstOrNull()?.let { if (rtl) it.nextFocusRightId = it.id else it.nextFocusLeftId = it.id }
+        chips.lastOrNull()?.let { if (rtl) it.nextFocusLeftId = it.id else it.nextFocusRightId = it.id }
+        genreStrip.addView(line)
+        genreStrip.visibility = View.VISIBLE
+        if (rememberedKey != null) {
+            discoverChipIndex(chips.map { it.tag as String }, rememberedKey, fallbackKey.orEmpty())?.let { index ->
+                chips[index].let { lastListChip = it; it.requestFocus() }
             }
         }
-        // Genre and Year come from each title's details (on disk after the first visit), read in the background.
-        fun pick(name: Int, value: Any?, options: () -> List<Pair<String, Any?>>, margin: Int, set: (Any?) -> Unit) {
-            val current = options().firstOrNull { it.second == value }?.first
-            add(if (value == null || current == null) getString(name) else "${getString(name)}: $current", false, margin, list = true) {
-                val shown = options()
-                choose(getString(name), shown.map { it.first }, checked = shown.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
-                    if (shown[i].second != value) {
-                        set(shown[i].second)
-                        val at = line.indexOfChild(lastListChip)
-                        showListChips()
-                        ((genreStrip.getChildAt(0) as? LinearLayout)?.getChildAt(at))?.requestFocus()
+    }
+
+    private fun showListChips(focusKey: String? = null) {
+        val focused = focusKey ?: lastListChip?.takeIf { it.isAttachedToWindow && it.hasFocus() }?.tag as? String
+        listFilterChips.clear()
+        lastListChip = null
+        buildGridChips(Page.LIBRARY, focused) { add ->
+            listOf(
+                Triple("all", ListFilter.ALL, getString(R.string.filter_all)),
+                Triple("movie", ListFilter.MOVIES, getString(R.string.tab_movies)),
+                Triple("series", ListFilter.SHOWS, getString(R.string.tab_shows)),
+            ).forEach { (key, value, label) ->
+                listFilterChips[value] = add(key, label, value == listFilter, 6, false) {
+                    if (listFilter != value) { listFilter = value; styleListChips(); redrawLibrary() }
+                }
+            }
+            // Genre and Year come from each title's details (on disk after the first visit), read in the background.
+            fun pick(key: String, name: Int, allLabel: Int, value: Any?, options: () -> List<Pair<String, Any?>>, margin: Int, set: (Any?) -> Unit) {
+                val current = options().firstOrNull { it.second == value }?.first
+                add(key, if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, true) {
+                    val shown = options()
+                    choose(getString(name), shown.map { it.first }, checked = shown.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
+                        if (shown[i].second != value) {
+                            set(shown[i].second)
+                            showListChips(key)
+                            redrawLibrary()
+                        }
+                    }
+                }
+            }
+            val all = getString(R.string.filter_all)
+            pick("genre", R.string.discover_genre, R.string.discover_all_genres, listGenre, {
+                listOf(all to null) + listTitles().flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
+                    .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.key }
+            }, margin = 24) { listGenre = it as String? }
+            pick("decade", R.string.discover_year, R.string.discover_all_decades, listDecade, ::decadeOptions, margin = 6) { listDecade = it as Int? }
+            fillListDetails()
+            listSortChip = add("sort", listSortLabel(), false, 6, true) {
+                val options = ListSort.entries
+                choose(getString(R.string.list_sort), options.map { getString(it.label) }, checked = listSort.ordinal) { index ->
+                    val value = options[index]
+                    if (listSort != value) {
+                        listSort = value
+                        listSortChip.text = listSortLabel()
                         redrawLibrary()
                     }
                 }
             }
         }
-        val all = getString(R.string.filter_all)
-        pick(R.string.discover_genre, listGenre, {
-            listOf(all to null) + listTitles().flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
-                .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key to it.key }
-        }, margin = 24) { listGenre = it as String? }
-        pick(R.string.discover_year, listDecade, ::decadeOptions, margin = 6) { listDecade = it as Int? }
-        fillListDetails()
-        listSortChip = add(listSortLabel(), false, margin = 6, list = true) {
-            val options = ListSort.entries
-            choose(getString(R.string.list_sort), options.map { getString(it.label) }, checked = listSort.ordinal) { index ->
-                val value = options[index]
-                if (listSort != value) {
-                    listSort = value
-                    listSortChip.text = listSortLabel()
-                    redrawLibrary()
-                }
-            }
-        }
-        genreStrip.addView(line)
     }
 
     /** Discover's and My List's Year choices: All, the 2020s back to the 1980s, then before 1980 (0). */
@@ -2103,59 +2127,38 @@ class MainActivity : Screen() {
     private fun showDiscoverChips(g: Int, genres: List<Pair<Int, String>>, services: List<Pair<Int, String>>) {
         val q = discover
         val focused = lastListChip?.takeIf { it in discoverChips }?.tag as? String
-        genreStrip.removeAllViews()
-        genreChips.clear()
         discoverChips.clear()
-        val line = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(PAD), dp(2), dp(PAD), dp(2)) }
-        fun add(key: String, label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit) =
-            (if (list) dropdown(label) else chip(label, selected)).apply {
-            tag = key
-            id = View.generateViewId()
-            nextFocusUpId = navItems[Page.DISCOVER]?.id ?: View.NO_ID
-            setOnFocusChangeListener { v, has ->
-                v.background = listChipBackground(has)
-                v.grow(has, CHIP_GROW).start()
-                setTextColor(if (has || selected || list) TEXT else TEXT_2)
-                if (has) lastListChip = this
+        buildGridChips(Page.DISCOVER, focused, q.type) { add ->
+            fun addChip(key: String, label: String, selected: Boolean, margin: Int = 6, list: Boolean = false, click: () -> Unit) {
+                discoverChips += add(key, label, selected, margin, list, click)
             }
-            background = listChipBackground(false)
-            setOnClickListener { click() }
-            line.addView(this, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { if (line.childCount > 0) marginStart = dp(margin) })
-            discoverChips += this
-        }
-        fun pick(name: Int, allLabel: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
-            val current = options.firstOrNull { it.second == value }?.first
-            add(resources.getResourceEntryName(name), if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
-                choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
-                    chooseDiscover(g, set(options[i].second))
+            fun pick(name: Int, allLabel: Int, options: List<Pair<String, Any?>>, value: Any?, margin: Int = 6, set: (Any?) -> DiscoverQuery) {
+                val current = options.firstOrNull { it.second == value }?.first
+                addChip(resources.getResourceEntryName(name), if (value == null || current == null) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
+                    choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
+                        chooseDiscover(g, set(options[i].second))
+                    }
                 }
             }
-        }
-        listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows, "anime" to R.string.tab_anime).forEach { (type, words) ->
-            add(type, getString(words), type == q.type) {
-                if (type != q.type) chooseDiscover(g, q.copy(type = type, genre = null, service = null))
+            listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows, "anime" to R.string.tab_anime).forEach { (type, words) ->
+                addChip(type, getString(words), type == q.type) {
+                    if (type != q.type) chooseDiscover(g, q.copy(type = type, genre = null, service = null))
+                }
             }
-        }
-        val all = getString(R.string.filter_all)
-        val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
-        pick(R.string.discover_genre, R.string.discover_all_genres, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
-        pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
-        if (services.isNotEmpty()) pick(R.string.discover_on, R.string.discover_all_services, listOf(all to null) + services.map { it.second to it.first }, q.service) {
-            q.copy(service = it as Int?)
-        }
-        val sorts = listOf(getString(R.string.discover_sort_popular) to "popular", getString(R.string.discover_sort_top) to "top",
-            getString(R.string.discover_sort_new) to "new")
-        add("sort", "${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
-            choose(getString(R.string.list_sort), sorts.map { it.first }, checked = sorts.indexOfFirst { it.second == q.sort }) { i ->
-                chooseDiscover(g, q.copy(sort = sorts[i].second))
+            val all = getString(R.string.filter_all)
+            val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
+            pick(R.string.discover_genre, R.string.discover_all_genres, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
+            pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade) { q.copy(decade = it as Int?) }
+            if (services.isNotEmpty()) pick(R.string.discover_on, R.string.discover_all_services, listOf(all to null) + services.map { it.second to it.first }, q.service) {
+                q.copy(service = it as Int?)
             }
-        }
-        discoverChips.firstOrNull()?.let { it.nextFocusLeftId = it.id }
-        discoverChips.lastOrNull()?.let { it.nextFocusRightId = it.id }
-        genreStrip.addView(line)
-        genreStrip.visibility = View.VISIBLE
-        if (focused != null) discoverChipIndex(discoverChips.map { it.tag as String }, focused, q.type)?.let { index ->
-            discoverChips[index].let { lastListChip = it; it.requestFocus() }
+            val sorts = listOf(getString(R.string.discover_sort_popular) to "popular", getString(R.string.discover_sort_top) to "top",
+                getString(R.string.discover_sort_new) to "new")
+            addChip("sort", "${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
+                choose(getString(R.string.list_sort), sorts.map { it.first }, checked = sorts.indexOfFirst { it.second == q.sort }) { i ->
+                    chooseDiscover(g, q.copy(sort = sorts[i].second))
+                }
+            }
         }
     }
 
@@ -2173,6 +2176,7 @@ class MainActivity : Screen() {
         pageWarning = null
         scroller.scrollTo(0, 0)
         last = null
+        cardUnderline.visibility = View.INVISIBLE
         cancelBrowseHero()
         heroItem = null
         browseInfo.alpha = 0f
@@ -2327,6 +2331,7 @@ class MainActivity : Screen() {
         rows.filter { isInside(it.view, slot) }.forEach { row -> row.cards.forEach { it.unload() }; rows.remove(row) }
         slot.removeAllViews()
         scroller.scrollTo(0, 0)
+        last = null
         showLibrary(slot, was, removedIndex)
     }
 
@@ -2345,6 +2350,8 @@ class MainActivity : Screen() {
         if (items.isEmpty()) {
             cancelBrowseHero()
             heroItem = null
+            browseInfo.alpha = 0f
+            cardUnderline.visibility = View.INVISIBLE
             resetArt()
             val message = when {
                 listGenre != null || listDecade != null -> R.string.discover_empty
@@ -2353,28 +2360,49 @@ class MainActivity : Screen() {
                 listFilter == ListFilter.SHOWS -> R.string.list_empty_shows
                 else -> R.string.list_empty_unwatched
             }
-            slot.addView(text(message, BODY, color = TEXT_2).apply { setPadding(dp(PAD), dp(30), 0, 0) })
-            if (focusTag != null || removedIndex != null) listFilterChips[listFilter]?.requestFocus()
+            val emptyBox = column(Gravity.START).apply { setPadding(dp(PAD), dp(30), dp(PAD), 0) }
+            emptyBox.addView(text(message, BODY, color = TEXT_2))
+            if (listFilter != ListFilter.ALL || listGenre != null || listDecade != null) {
+                val clear = chip(getString(R.string.list_clear_filters), false).apply {
+                    tag = "clear_filters"
+                    background = listChipBackground(false)
+                    setTextColor(TEXT)
+                    nextFocusUpId = pageChip()?.id ?: View.NO_ID
+                    setOnFocusChangeListener { v, has ->
+                        v.background = listChipBackground(has)
+                        v.grow(has, CHIP_GROW).start()
+                    }
+                    setOnClickListener {
+                        listFilter = ListFilter.ALL
+                        listGenre = null
+                        listDecade = null
+                        showListChips("all")
+                        redrawLibrary()
+                    }
+                }
+                emptyBox.addView(clear, LinearLayout.LayoutParams(-2, dp(CHIP_H)).apply { topMargin = dp(16) })
+                if (focusTag == "clear_filters") clear.requestFocus()
+            }
+            slot.addView(emptyBox)
+            if ((focusTag != null && focusTag != "clear_filters") || removedIndex != null) listFilterChips[listFilter]?.requestFocus()
             return
         }
-        val column = column(Gravity.START).apply { setPadding(0, dp(LIST_TOP_GAP), 0, 0) }
+        val column = column(Gravity.START).apply { setPadding(0, 0, 0, dp(SAFE_BOTTOM)) }
         slot.addView(column)
         val restore = items.indexOfFirst { "card:${it.id}" == focusTag }.takeIf { it >= 0 }
             ?: removedIndex?.coerceIn(items.indices) ?: 0.takeIf { focusTag != null }
         if (restore == null) showHero(items.first())
         val previousFocus = currentFocus
         items.chunked(LIST_COLUMNS).forEachIndexed { index, cards ->
-            fun add() {
-                if (page != Page.LIBRARY || slot !== librarySlot || build != listBuild) return
-                val row = row("", cards, grid = true)
-                column.addView(row.view)
-                if (restore != null && index == restore / LIST_COLUMNS &&
-                    (currentFocus == null || currentFocus === previousFocus)) {
-                    row.cards[restore % LIST_COLUMNS].requestFocus()
-                }
+            if (page != Page.LIBRARY || slot !== librarySlot || build != listBuild) return
+            val row = row("", cards, grid = true)
+            column.addView(row.view)
+            if (restore != null && index == restore / LIST_COLUMNS &&
+                (currentFocus == null || currentFocus === previousFocus)) {
+                row.cards[restore % LIST_COLUMNS].requestFocus()
             }
-            if (index < 3) add() else main.postDelayed(::add, ROW_LATER + index * ROW_STAGGER)
         }
+        main.post(::updateImages)
     }
 
     private fun libraryFinished(item: JSONObject): Boolean {
@@ -2575,7 +2603,7 @@ class MainActivity : Screen() {
             paddingStartPx = inset,
             paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
             paddingEndPx = inset,
-            paddingBottomPx = dp(if (page == Page.DISCOVER) DISCOVER_ROW_BOTTOM else if (grid) LIST_GAP else ROW_BOTTOM_ROOM),
+            paddingBottomPx = dp(if (grid) GRID_ROW_BOTTOM else ROW_BOTTOM_ROOM),
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
         ).apply {
@@ -2616,7 +2644,7 @@ class MainActivity : Screen() {
             heightPx = cardHeight,
             wide = wide,
             grid = grid,
-            dimAlpha = if (page == Page.DISCOVER) GRID_DIM else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
+            dimAlpha = if (grid) GRID_DIM else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
             progress = item.progress,
             finished = item.finished,
             live = item.live,
@@ -2850,16 +2878,12 @@ class MainActivity : Screen() {
     private fun snapTo(focused: View) {
         val rowView = rows.firstOrNull { isInside(focused, it.view) }?.view ?: return
         val top = offsetIn(rowView)
-        val viewportHeight = scroller.height - if (page == Page.DISCOVER) dp(SAFE_BOTTOM) else 0
+        val viewportHeight = scroller.height - if (page.isGrid) dp(SAFE_BOTTOM) else 0
         val target = if (page.isGrid) gridScrollTarget(scroller.scrollY, viewportHeight, top, rowView.height) else top.coerceAtLeast(0)
         scroller.smoothScrollTo(0, target)
     }
 
-    private fun libraryPosterWidth() = if (page == Page.DISCOVER) (artW - dp(2 * PAD + LIST_GAP * (LIST_COLUMNS - 1))) / LIST_COLUMNS
-    else libraryPosterWidth(
-        artW - 2 * dp(PAD), resources.displayMetrics.heightPixels - dp(gridTop),
-        dp(LIST_GAP), dp(LIST_TOP_ROOM), dp(36)
-    )
+    private fun libraryPosterWidth() = (artW - dp(2 * PAD + LIST_GAP * (LIST_COLUMNS - 1))) / LIST_COLUMNS
 
     // ---------- memory: pictures only near the screen ----------
 
@@ -2954,11 +2978,9 @@ class MainActivity : Screen() {
         const val LIST_GAP = 12
         const val LIST_COLUMNS = 6
         const val LIST_TOP_ROOM = 8 // dp above a grid row for the focused poster's growth
-        const val LIST_TOP_GAP = 18 // dp between My List's chips and its first row
-        const val LIST_TOP = HEADER_H + 38
-        const val DISCOVER_HERO_TOP = HEADER_H + 48
-        const val DISCOVER_TOP = DISCOVER_HERO_TOP + 64
-        const val DISCOVER_ROW_BOTTOM = 20
+        const val GRID_HERO_TOP = HEADER_H + 46
+        const val GRID_TOP = GRID_HERO_TOP + 68
+        const val GRID_ROW_BOTTOM = 20
         const val INFO_W = 360 // the cinema's line
         const val NAV_R = 18 // dp: the top bar's pills
         const val NAV_GAP = 4 // dp between them
