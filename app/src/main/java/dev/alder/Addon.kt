@@ -558,15 +558,23 @@ internal fun audioLanguagesIn(text: String): Set<String> {
  * ("🎙️ 🇬🇧 💬 🇬🇧 🇳🇱 🇫🇷"), and tags such as "NL subs", "NLSubs" or "Subs ENG". What's left speaks for the audio.
  */
 internal fun withoutSubtitleLanguages(text: String): String {
-    fun strip(input: String, pattern: Regex) = pattern.replace(input) { m ->
+    // Strip "Subs <lang, ...>" before "<lang> subs" so "Audio: English Subtitles: Dutch" and "ENG.Subs.NL" keep English.
+    val withoutPrefix = subtitlePrefixTags.replace(text.replace(subtitleFlags, " ")) { m ->
+        val wordsAfter = Regex("[a-z]+").findAll(m.value.lowercase()).drop(1).toList()
+        val firstNonLang = wordsAfter.firstOrNull { it.value !in languageWords }
+        when {
+            wordsAfter.isEmpty() || wordsAfter.first().value !in languageWords -> m.value
+            firstNonLang == null -> " "
+            else -> " " + m.value.substring(firstNonLang.range.first)
+        }
+    }
+    return subtitleSuffixTags.replace(withoutPrefix) { m ->
         if (m.groupValues[1].lowercase() in languageWords) " " else m.value
     }
-    // Strip "Subs <lang>" before "<lang> subs" so "Audio: English Subtitles: Dutch" and "ENG.Subs.NL" keep English.
-    return strip(strip(text.replace(subtitleFlags, " "), subtitlePrefixTags), subtitleSuffixTags)
 }
 
 private val subtitleFlags = Regex("\\x{1F4AC}\\x{FE0F}?(?:\\s*(?:[\\x{1F1E6}-\\x{1F1FF}]{2}|\\x{1F3F3}\\x{FE0F}?))*")
-private val subtitlePrefixTags = Regex("(?i)\\b(?:subs?|subtitles?)[ ._:-]+(\\p{L}+)\\b")
+private val subtitlePrefixTags = Regex("(?i)\\b(?:subs?|subtitles?)[ ._:-]+\\p{L}+(?:[ ._,/|&:-]+\\p{L}+)*\\b")
 private val subtitleSuffixTags = Regex("(?i)\\b(\\p{L}+?)[ ._-]?(?:subs?|subtitles?|subbed)\\b")
 
 private val flagLanguages = mapOf("gb" to "en", "us" to "en", "au" to "en", "it" to "it", "in" to "hi", "es" to "es",
