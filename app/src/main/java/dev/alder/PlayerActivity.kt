@@ -241,6 +241,73 @@ internal fun playerBadges(
     return out
 }
 
+internal class PlaybackCheckpoint {
+    var handedOff: Boolean = false
+        private set
+    private var pauseCommitted = false
+    private var externalCommitted = false
+
+    fun onHandOffStarted() {
+        handedOff = true
+    }
+
+    fun onHandOffCancelled() {
+        handedOff = false
+    }
+
+    fun onResume(finishing: Boolean) {
+        if (!handedOff && !externalCommitted && !finishing) {
+            pauseCommitted = false
+        }
+    }
+
+    fun commitOnPause(eligible: Boolean, action: () -> Unit): Boolean {
+        if (!eligible || handedOff || pauseCommitted || externalCommitted) return false
+        pauseCommitted = true
+        action()
+        return true
+    }
+
+    fun commitExternal(eligible: Boolean, action: () -> Unit): Boolean {
+        if (!eligible || externalCommitted) return false
+        externalCommitted = true
+        pauseCommitted = true
+        action()
+        return true
+    }
+}
+
+internal fun commitStopCheckpoint(
+    record: () -> JSONObject?,
+    nextVideoId: String?,
+    push: (JSONObject) -> Unit,
+    stop: (JSONObject, String?) -> Unit = Library::stopped,
+): Boolean {
+    val recorded = record() ?: return false
+    val snapshot = JSONObject(recorded.toString())
+    stop(snapshot, nextVideoId)
+    push(snapshot)
+    return true
+}
+
+internal fun selectedSubtitleTrackIndex(
+    disabled: Boolean,
+    addonSelected: Boolean,
+    embeddedCount: Int,
+    embeddedSelectedIndex: Int,
+    addonSubUrls: List<String>,
+    chosenSubUrl: String?,
+): Int = when {
+    disabled -> 0
+    addonSelected -> {
+        val idx = if (chosenSubUrl == null) -1 else addonSubUrls.indexOfFirst { it == chosenSubUrl }
+        if (idx >= 0) 1 + embeddedCount + idx else -1
+    }
+    embeddedSelectedIndex >= 0 -> 1 + embeddedSelectedIndex
+    else -> 0
+}
+
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal class OffsettableTextRenderer(
     private val delegate: TextRenderer
 ) : Renderer by delegate, RendererCapabilities by delegate {
@@ -290,10 +357,14 @@ class PlayerActivity : Screen() {
     private var started = false // a picture has shown
     private var startMessage: String? = null
     private var watched = false // any source showed a picture this time: only then is progress saved
-    private var handedOff = false // this source went to another video app (Settings › Video player)
+    private val checkpoint = PlaybackCheckpoint()
+    private val handedOff get() = checkpoint.handedOff // this source went to another video app (Settings › Video player)
+    private var externalUnavailable = false
     private var startAt = 0L
     private var prepared = false
+    private var paused = false
     private var stopped = false // Alder is behind another app: a late load must not start the sound
+    private var pendingForegroundAction: (() -> Unit)? = null
     // The current source's link (Stream.open), the source it belongs to, and the one still opening (a torrent's engine).
     private var opened: Opened? = null
     private var openedFor: Stream? = null
@@ -374,7 +445,7 @@ class PlayerActivity : Screen() {
         }
         if (sources.isEmpty() && isTrailer) return finish()
         decodeAudio = Settings.decodeAudio(this)
-        speed = if (isTrailer) 1f else Settings.titleChoice(this, metaId)?.speed?.takeIf { it in SPEEDS } ?: 1f // kept per title, like audio and subtitles
+        speed = if (isTrailer || isLiveType(type)) 1f else Settings.titleChoice(this, metaId)?.speed?.takeIf { it in SPEEDS } ?: 1f // kept per title, like audio and subtitles
         dialogueProcessor.enabled = Settings.clearDialogue(this)
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
@@ -529,8 +600,8 @@ class PlayerActivity : Screen() {
                     // ExoPlayer's own retries already took about 6 s: each of ours gets a fresh START_WAIT, or the
                     // start timeout would move on to the next source before the second retry ran.
                     main.removeCallbacks(startTimeout)
-                    if (!stopped) main.postDelayed(startTimeout, RETRY_WAIT + startWait)
-                    main.postDelayed({ if (!isFinishing) player.prepare() }, RETRY_WAIT)
+                    if (!paused && !stopped) main.postDelayed(startTimeout, RETRY_WAIT + startWait)
+                    main.postDelayed({ if (!isFinishing && !isDestroyed && !paused && !stopped) player.prepare() }, RETRY_WAIT)
                     return
                 }
                 android.util.Log.w("Alder", "source ${at + 1}/${sources.size} failed: ${e.errorCodeName}", e)
@@ -579,6 +650,7 @@ class PlayerActivity : Screen() {
                 if (state == Player.STATE_BUFFERING) showLoading(if (started) getString(R.string.player_loading) else startMessage
                     ?: getString(R.string.player_starting, sources.getOrNull(at)?.label.orEmpty()))
                 if (state == Player.STATE_READY) {
+                    updateSpeedAvailability()
                     if (started) {
                         retries = 0 // the source recovered: the next network drop gets its own two retries
                         hideLoading()
@@ -608,6 +680,7 @@ class PlayerActivity : Screen() {
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                updateSpeedAvailability()
                 trackStatus.text = trackStatus(tracks)
                 refreshBadges(tracks)
                 if (selectAddonSub) tracks.groups.firstOrNull(::isAddonSub)?.let { g ->
@@ -671,20 +744,22 @@ class PlayerActivity : Screen() {
         var subsAnswered = isTrailer || !subsOn
         var waiting: Long? = null
         var pendingResume: Long? = null
+        var beginStarted = false
         fun begin(resume: Long) {
-            if (prepared) return
+            if (prepared || beginStarted) return
             if (sources.isEmpty()) {
                 pendingResume = resume
                 return
             }
             if (!subsAnswered) { waiting = resume; return }
-            load(resume)
-            lastPosition = resume
-            prepared = true
-            if (!isTrailer) {
-                main.postDelayed(tickTask, TICK)
-                main.post(skipTask)
+            if (isFinishing || isDestroyed) return
+            if (paused || stopped) {
+                pendingForegroundAction = { begin(resume) }
+                return
             }
+            beginStarted = true
+            lastPosition = resume
+            load(resume)
         }
         if (isTrailer) {
             begin(0L)
@@ -721,7 +796,12 @@ class PlayerActivity : Screen() {
                     chosenSub = exact
                     if (prepared) {
                         selectAddonSub = true
-                        load(position(), play = player.playWhenReady)
+                        val pos = position()
+                        val play = player.playWhenReady
+                        if (paused || stopped) pendingForegroundAction = { load(pos, play = play) }
+                        else load(pos, play = play)
+                    } else if (beginStarted) {
+                        selectAddonSub = true
                     }
                 }
                 return@background
@@ -755,6 +835,13 @@ class PlayerActivity : Screen() {
                 onFallback = {
                     resolvingStreams = null
                     if (isFinishing || isDestroyed) return@resolve
+                    if (paused || stopped) {
+                        pendingForegroundAction = {
+                            startActivity(Intent(this, StreamsActivity::class.java).putExtras(intent))
+                            finish()
+                        }
+                        return@resolve
+                    }
                     startActivity(Intent(this, StreamsActivity::class.java).putExtras(intent))
                     finish()
                 }
@@ -779,7 +866,7 @@ class PlayerActivity : Screen() {
                 item = Library.newItem(metaId, type, intent.getStringExtra("name") ?: "", intent.getStringExtra("poster"))
             }
             val resume = known ?: item?.let { Library.resumeAt(it, videoId) } ?: 0L
-            if (!prepared) begin(resume)
+            if (!prepared && !beginStarted) begin(resume)
             else if (known == null && fresh != null) { lateResume = resume; applyLateResume() }
         }
     }
@@ -882,11 +969,19 @@ class PlayerActivity : Screen() {
 
     /** Plays the current source from [position], with its own request headers (debrid proxies need them). */
     private fun load(position: Long, message: String? = null, play: Boolean = true) {
-        if (sources.isEmpty()) return
+        if (sources.isEmpty() || isFinishing || isDestroyed) return
+        if (paused || stopped) {
+            pendingForegroundAction = { load(position, message, play) }
+            return
+        }
+        startAt = position
+        started = false
         val s = sources[at]
         // The source's link first (Stream.open). A link is ready at once; a torrent's engine starts on another thread,
         // then load runs again. A new source lets the last one go.
         if (openedFor !== s) {
+            prepared = false
+            if (player.playbackState != Player.STATE_IDLE) player.stop()
             retryWithPcm = false
             audioPicked = false
             audioGroups = emptyList()
@@ -904,7 +999,7 @@ class PlayerActivity : Screen() {
         val src = opened!!
         startWait = src.startWait ?: START_WAIT
         val app = Settings.externalPlayer(this)
-        if (!isTrailer && !handedOff && app != null) {
+        if (!isTrailer && !handedOff && !externalUnavailable && app != null) {
             if (handOff(src, position, app)) return
             // No other video app on this TV: Alder plays it, and says so.
             return load(position, getString(R.string.player_no_other_app), play)
@@ -912,16 +1007,18 @@ class PlayerActivity : Screen() {
         // An add-on subtitle is fetched and made ready first (unpacked, UTF-8): see SubtitleFiles. Once per file.
         chosenSub?.let { sub ->
             if (sub.url !in readySubs) {
+                prepared = false
                 background({ SubtitleFiles.prepare(java.io.File(cacheDir, "subtitles"), sub) }) { r ->
                     r.exceptionOrNull()?.let { android.util.Log.w("Alder", "subtitle from ${sub.addon} not prepared", it) }
                     readySubs[sub.url] = r.getOrNull()
-                    if (!isFinishing && chosenSub === sub) load(position, message, play)
+                    if (!isFinishing && !isDestroyed && chosenSub?.url == sub.url) {
+                        if (paused || stopped) pendingForegroundAction = { load(position, message, play) }
+                        else load(position, message, play)
+                    }
                 }
                 return
             }
         }
-        startAt = position
-        started = false
         toldUnseekable = false
         startMessage = message ?: getString(R.string.player_starting, s.label)
         bar.isIndeterminate = true
@@ -956,10 +1053,18 @@ class PlayerActivity : Screen() {
         val extractors = DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true).setConstantBitrateSeekingAlwaysEnabled(true)
             .setMp3ExtractorFlags(Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING)
         player.setMediaSource(DefaultMediaSourceFactory(DefaultDataSource.Factory(this, http), extractors).createMediaSource(item), position) // files too: shifted subtitles
+        lastPosition = position
+        prepared = true
         player.prepare()
-        player.playWhenReady = play && !stopped
+        player.playWhenReady = play && !stopped && !paused
         main.removeCallbacks(startTimeout)
-        if (!stopped) main.postDelayed(startTimeout, startWait) // else onStart starts it
+        if (!stopped && !paused) main.postDelayed(startTimeout, startWait) // else onResume starts it
+        if (!isTrailer && !stopped && !paused) {
+            main.removeCallbacks(tickTask)
+            main.postDelayed(tickTask, TICK)
+            main.removeCallbacks(skipTask)
+            main.post(skipTask)
+        }
     }
 
     /** Opens [s] off the main thread (a torrent finds peers and its file), then plays it; a failure moves on. */
@@ -990,10 +1095,19 @@ class PlayerActivity : Screen() {
                 android.util.Log.w("Alder", "source ${at + 1}/${sources.size} didn't open", r.exceptionOrNull())
                 startAt = position
                 started = false
-                return@background next(r.exceptionOrNull()?.let(::failureOf) ?: Failure.OTHER)
+                val failure = r.exceptionOrNull()?.let(::failureOf) ?: Failure.OTHER
+                if (paused || stopped) {
+                    pendingForegroundAction = { next(failure) }
+                    return@background
+                }
+                return@background next(failure)
             }
             opened = o
             openedFor = s
+            if (paused || stopped) {
+                pendingForegroundAction = { load(position, message, play) }
+                return@background
+            }
             load(position, message, play)
         }
     }
@@ -1003,7 +1117,7 @@ class PlayerActivity : Screen() {
      * other app plays it. False when no app on the TV opens video. Its answer comes back in [onActivityResult].
      */
     private fun handOff(s: Opened, position: Long, app: String): Boolean {
-        handedOff = true
+        checkpoint.onHandOffStarted()
         startAt = position
         // The chosen app, or Android's Open with list if it was uninstalled since.
         val pick = app.takeIf { a -> ExternalPlayer.installed(this).any { it.first == a } }
@@ -1015,6 +1129,8 @@ class PlayerActivity : Screen() {
             true
         } catch (e: android.content.ActivityNotFoundException) {
             android.util.Log.i("Alder", "no other video player", e)
+            checkpoint.onHandOffCancelled()
+            externalUnavailable = true
             false
         }
     }
@@ -1029,13 +1145,23 @@ class PlayerActivity : Screen() {
         val item = item
         val duration = told.takeIf { it > 0 } ?: item?.optJSONObject("state")?.optLong("duration") ?: 0L
         android.util.Log.i("Alder", "other player stopped at $position of $duration")
-        if (item != null && position > 0 && duration > 0 && !isLiveType(type) && !(episodic && !plausibleEpisode(duration))) {
-            Library.record(item, videoId, position, duration, (position - startAt).coerceAtLeast(0))
-            val videos = meta?.videos
-            if (videos != null && item.optJSONObject("state")?.optInt("flaggedWatched") == 1) Library.markWatched(item, videos, videoId)
-            Library.stopped(item, nextVideo(onlyAired = false)?.id ?: intent.getStringExtra("nextVideoId"))
-            watched = true
-            push()
+        val canCommit = item != null && position > 0 && duration > 0 && !isLiveType(type) && !(episodic && !plausibleEpisode(duration))
+        checkpoint.commitExternal(canCommit) {
+            val current = item!!
+            val nextId = nextVideo(onlyAired = false)?.id ?: intent.getStringExtra("nextVideoId")
+            commitStopCheckpoint(
+                record = {
+                    Library.record(current, videoId, position, duration, (position - startAt).coerceAtLeast(0))
+                    val videos = meta?.videos
+                    if (videos != null && current.optJSONObject("state")?.optInt("flaggedWatched") == 1) Library.markWatched(current, videos, videoId)
+                    current
+                },
+                nextVideoId = nextId,
+                push = { snapshot ->
+                    watched = true
+                    push(snapshot)
+                },
+            )
         }
         finish()
     }
@@ -1054,6 +1180,11 @@ class PlayerActivity : Screen() {
 
     /** This source failed: the next one from the same second or, with none left, the list to choose from. */
     private fun next(reason: Failure) {
+        if (isFinishing || isDestroyed) return
+        if (paused || stopped) {
+            pendingForegroundAction = { next(reason) }
+            return
+        }
         main.removeCallbacks(startTimeout)
         lastSourceFailure = reason
         FailureLog.record(FailureLog.Operation.PLAYBACK, reason)
@@ -1118,9 +1249,11 @@ class PlayerActivity : Screen() {
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                 .setOverrideForType(TrackSelectionOverride(track.mediaTrackGroup, (0 until track.length).toList())).build()
         }
-        if (!player.isCurrentMediaItemLive) player.seekTo(resume)
+        if (shouldSeekOnAudioRetry(player.isCurrentMediaItemLive, player.isCurrentMediaItemSeekable)) {
+            player.seekTo(resume)
+        }
         player.prepare()
-        if (!started && !stopped) {
+        if (!started && !stopped && !paused) {
             main.removeCallbacks(startTimeout)
             main.postDelayed(startTimeout, startWait)
         }
@@ -1132,8 +1265,35 @@ class PlayerActivity : Screen() {
             .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
             ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
 
+    private fun isLive() = isLiveType(type) || player.isCurrentMediaItemLive
+
+    private fun updateSpeedAvailability() {
+        val live = isLive()
+        val available = isSpeedAvailable(isTrailer = isTrailer, isLive = live)
+        if (::speedCell.isInitialized) {
+            if (!available && speedButton.isFocused) playPause.requestFocus()
+            speedCell.visibility = if (available) View.VISIBLE else View.GONE
+            speedButton.isEnabled = available
+            speedButton.isFocusable = available
+        }
+        if (!available && (speed != 1f || player.playbackParameters.speed != 1f)) {
+            val reopen = speed != 1f && selectedTrackPassesAudio() && player.isCurrentMediaItemSeekable && !live
+            speed = 1f
+            player.setPlaybackSpeed(1f)
+            if (::speedButton.isInitialized) {
+                speedButton.text = speedLabel(1f)
+                speedButton.setTextColor(TEXT)
+            }
+            if (reopen) {
+                player.stop()
+                retryAudio(null, "Audio reopened for 1× playback")
+            }
+        }
+    }
+
     /** The speeds in the shared glass list, the one in use ticked and focused; picking one plays at it. */
     private fun openSpeedMenu() {
+        if (!isSpeedAvailable(isTrailer = isTrailer, isLive = isLive())) return
         val note = if (passthroughOut || (speed != 1f && selectedTrackPassesAudio()))
             getString(R.string.player_speed_passthrough_note) else null
         choose(getString(R.string.player_speed), SPEEDS.map(::speedLabel), message = note,
@@ -1148,17 +1308,43 @@ class PlayerActivity : Screen() {
      * back at 1x a stream the route can pass is reopened as it is again.
      */
     private fun applySpeed(to: Float) {
-        speedButton.text = speedLabel(to)
-        speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
-        if (to == speed) return
-        val reopen = if (to != 1f) passthroughOut else selectedTrackPassesAudio()
-        speed = to
-        Settings.pickedInPlayer(this, metaId, speed = to)
-        if (reopen) {
-            player.stop()
-            retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
+        when (resolveSpeedChange(
+            isTrailer = isTrailer,
+            isLive = isLive(),
+            seekable = player.isCurrentMediaItemSeekable,
+            currentSpeed = speed,
+            targetSpeed = to,
+            passthroughOut = passthroughOut,
+            trackPassesAudio = selectedTrackPassesAudio(),
+        )) {
+            SpeedChangeAction.UNAVAILABLE -> {
+                updateSpeedAvailability()
+                return
+            }
+            SpeedChangeAction.BLOCKED_UNSEEKABLE_PASSTHROUGH -> {
+                canSeek()
+                speedButton.text = speedLabel(speed)
+                speedButton.setTextColor(if (speed != 1f) TUNGSTEN else TEXT)
+                return
+            }
+            SpeedChangeAction.APPLY_IN_PLACE -> {
+                speedButton.text = speedLabel(to)
+                speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
+                if (to == speed) return
+                speed = to
+                Settings.pickedInPlayer(this, metaId, speed = to)
+                player.setPlaybackSpeed(speed)
+            }
+            SpeedChangeAction.REOPEN_AUDIO_AND_APPLY -> {
+                speedButton.text = speedLabel(to)
+                speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
+                speed = to
+                Settings.pickedInPlayer(this, metaId, speed = to)
+                player.stop()
+                retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
+                player.setPlaybackSpeed(speed)
+            }
         }
-        player.setPlaybackSpeed(speed)
     }
 
     private val tickTask = Runnable { tick() }
@@ -1177,31 +1363,49 @@ class PlayerActivity : Screen() {
     override fun onStart() {
         super.onStart()
         stopped = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        paused = false
+        stopped = false
+        if (!::status.isInitialized || isFinishing || isDestroyed || handedOff) return
+        checkpoint.onResume(isFinishing)
+        pendingForegroundAction?.let { action ->
+            pendingForegroundAction = null
+            action()
+            return
+        }
         if (prepared) {
-            lastPosition = player.currentPosition
+            lastPosition = position()
             // Left before the picture showed: nothing was seen, so it goes on, with a fresh START_WAIT.
-            if (!started && !handedOff && !isTrailer) {
+            if (!started && !isTrailer) {
+                if (player.playbackState == Player.STATE_IDLE) player.prepare()
                 player.play()
                 main.removeCallbacks(startTimeout)
                 main.postDelayed(startTimeout, startWait)
             }
             if (!isTrailer) {
+                main.removeCallbacks(tickTask)
                 main.postDelayed(tickTask, TICK)
+                main.removeCallbacks(skipTask)
                 main.post(skipTask)
             }
-            if (loading.visibility == View.VISIBLE && player.playbackState == Player.STATE_BUFFERING)
+            if (loading.visibility == View.VISIBLE && player.playbackState == Player.STATE_BUFFERING) {
+                main.removeCallbacks(loadingTask)
                 main.post(loadingTask)
+            }
         }
     }
 
-    private fun record() {
+    private fun record(): JSONObject? {
         // Nothing is saved until a picture shows: a source that never starts would otherwise reset the resume point.
         // Live TV has no progress to keep, nor does a channel or event whose stream doesn't say it's live.
-        if (isTrailer || !started || player.isCurrentMediaItemLive || isLiveType(type)) return
-        if (episodic && !plausibleEpisode(player.duration)) return
-        val item = item ?: return
+        if (isTrailer || !started || player.isCurrentMediaItemLive || isLiveType(type)) return null
+        if (episodic && !plausibleEpisode(player.duration)) return null
+        val item = item ?: return null
         val position = player.currentPosition
-        val duration = player.duration.takeIf { it > 0 } ?: return
+        val duration = player.duration.takeIf { it > 0 } ?: return null
         // Only real viewing counts as watched time: a seek moves the position by more than a tick allows.
         val played = (position - lastPosition).takeIf { it in 1..TICK * 2 } ?: 0
         lastPosition = position
@@ -1215,6 +1419,7 @@ class PlayerActivity : Screen() {
         // If credits timing (outroAt) is known, wait until outroAt before showing Up next.
         val shouldShowUpNext = if (outroAt > 0) position >= outroAt else duration - position < upNextWindow(duration)
         if (!upNextDismissed && upNextPanel.visibility != View.VISIBLE && shouldShowUpNext) showUpNext()
+        return item
     }
 
     /** The episode after this one, or null for a film, the last episode, or before the episode list is in. */
@@ -1272,6 +1477,7 @@ class PlayerActivity : Screen() {
     }
 
     private fun showSourceError(reason: Failure) {
+        prepared = false
         stallPanel.removeAllViews()
         val card = column(Gravity.START,
             caps(R.string.player_source_failed, TUNGSTEN),
@@ -1433,11 +1639,20 @@ class PlayerActivity : Screen() {
         window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
     }
 
-    private fun push() {
+    private fun commitPauseCheckpoint() {
+        val nextId = nextVideo(onlyAired = false)?.id ?: intent.getStringExtra("nextVideoId")
+        commitStopCheckpoint(
+            record = { (if (started) record() else null) ?: item },
+            nextVideoId = nextId,
+            push = ::push,
+        )
+    }
+
+    private fun push(snapshot: JSONObject? = item?.let { JSONObject(it.toString()) }) {
         if (isTrailer || !watched || player.isCurrentMediaItemLive || isLiveType(type)) return
         val key = authKey ?: return
-        val snapshot = item?.let { JSONObject(it.toString()) } ?: return
-        ProgressSaves.keep(key, snapshot, provisionalProgress)
+        val copy = snapshot ?: return
+        ProgressSaves.keep(key, copy, provisionalProgress)
         background({ syncWatchProgress(key) }) { result ->
             result.getOrNull()?.let { failure ->
                 android.widget.Toast.makeText(this, failureMessage(R.string.progress_saved_on_tv, failure, source = "Stremio", advice = false),
@@ -1628,6 +1843,7 @@ class PlayerActivity : Screen() {
     private lateinit var playPause: TextView
     private lateinit var audioButton: TextView
     private lateinit var speedButton: TextView
+    private lateinit var speedCell: FrameLayout
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
@@ -1819,6 +2035,7 @@ class PlayerActivity : Screen() {
             finish()
         }
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
+        speedCell = buttonCell(speedButton)
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
             clipToPadding = false
@@ -1840,7 +2057,7 @@ class PlayerActivity : Screen() {
                     gravity = Gravity.START or Gravity.TOP
                     addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
                         LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
-                    addView(buttonCell(speedButton))
+                    addView(speedCell)
                     addView(nextCell)
                     addView(buttonCell(infoButton))
                 }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -1850,6 +2067,7 @@ class PlayerActivity : Screen() {
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
+        updateSpeedAvailability()
         return FrameLayout(this).apply {
             visibility = View.GONE
             alpha = 0f
@@ -1895,6 +2113,7 @@ class PlayerActivity : Screen() {
     }
 
     private fun refreshBadges(tracks: Tracks = player.currentTracks) {
+        updateSpeedAvailability()
         if (!::pauseBadges.isInitialized) return
         if (isTrailer) {
             pauseBadges.visibility = View.GONE
@@ -2533,7 +2752,8 @@ class PlayerActivity : Screen() {
             val check: View,
             val name: TextView,
             val tagText: TextView,
-            val badge: TextView
+            val badge: TextView,
+            var isSelected: Boolean,
         )
 
         fun createTrackRow(
@@ -2567,6 +2787,7 @@ class PlayerActivity : Screen() {
                 visibility = if (badgeText.isNotEmpty()) View.VISIBLE else View.GONE
             }
 
+            lateinit var holder: TrackRowHolder
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 isFocusable = true
@@ -2583,8 +2804,8 @@ class PlayerActivity : Screen() {
                         setColor(ROW_FOCUSED)
                         cornerRadius = dp(8).toFloat()
                         setStroke(dp(1), TUNGSTEN_RIM)
-                    } else trackRowRest(isSelected)
-                    name.setTextColor(if (hasFocus || isSelected) TEXT else TEXT_2)
+                    } else trackRowRest(holder.isSelected)
+                    name.setTextColor(if (hasFocus || holder.isSelected) TEXT else TEXT_2)
                 }
 
                 setOnKeyListener { _, keyCode, event ->
@@ -2603,7 +2824,8 @@ class PlayerActivity : Screen() {
                 setOnClickListener { onClick() }
             }
 
-            return row to TrackRowHolder(track, row, check, name, tagText, badge)
+            holder = TrackRowHolder(track, row, check, name, tagText, badge, isSelected)
+            return row to holder
         }
 
         // Subtitles tab setup
@@ -2620,11 +2842,14 @@ class PlayerActivity : Screen() {
             val texts = player.currentTracks.groups.filter { it.type == C.TRACK_TYPE_TEXT && it.isTrackSupported(0) }
             val subs = texts.filterNot(::isAddonSub)
             val loaded = texts.firstOrNull(::isAddonSub)
-            var chosenSubIndex = when {
-                C.TRACK_TYPE_TEXT in player.trackSelectionParameters.disabledTrackTypes -> 0
-                loaded?.isSelected == true -> 1 + subs.size + addonSubs.indexOf(chosenSub)
-                else -> subs.indexOfFirst { it.isSelected } + 1
-            }
+            var chosenSubIndex = selectedSubtitleTrackIndex(
+                disabled = C.TRACK_TYPE_TEXT in player.trackSelectionParameters.disabledTrackTypes,
+                addonSelected = loaded?.isSelected == true,
+                embeddedCount = subs.size,
+                embeddedSelectedIndex = subs.indexOfFirst { it.isSelected },
+                addonSubUrls = addonSubs.map { it.url },
+                chosenSubUrl = chosenSub?.url,
+            )
 
             val subChoices = mutableListOf<TrackChoice>()
             subChoices.add(TrackChoice("sub:0", getString(R.string.state_off), isSelected = chosenSubIndex == 0, isOff = true))
@@ -2689,6 +2914,7 @@ class PlayerActivity : Screen() {
                 subHolders.forEach { holder ->
                     val track = holder.track
                     val isSel = track.id == selectedId
+                    holder.isSelected = isSel
                     holder.check.visibility = if (isSel) View.VISIBLE else View.INVISIBLE
                     holder.name.setTextColor(if (isSel || holder.row.isFocused) TEXT else TEXT_2)
 
@@ -2727,7 +2953,7 @@ class PlayerActivity : Screen() {
                     i == 0 -> p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
                     sub == null -> p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                         .setOverrideForType(TrackSelectionOverride(subs[i - 1].mediaTrackGroup, 0)).build()
-                    sub == chosenSub && loaded != null -> p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    sub.url == chosenSub?.url && loaded != null -> p.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                         .setOverrideForType(TrackSelectionOverride(loaded.mediaTrackGroup, 0)).build()
                     else -> { chosenSub = sub; subDelay = 0L; textRenderer?.offsetUs = 0L; selectAddonSub = true; load(position(), play = player.playWhenReady); return }
                 }
@@ -2818,6 +3044,7 @@ class PlayerActivity : Screen() {
             audioHolders.forEach { holder ->
                 val track = holder.track
                 val isSel = track.id == selectedId
+                holder.isSelected = isSel
                 holder.check.visibility = if (isSel) View.VISIBLE else View.INVISIBLE
                 holder.name.setTextColor(if (isSel || holder.row.isFocused) TEXT else TEXT_2)
 
@@ -3189,6 +3416,24 @@ class PlayerActivity : Screen() {
     private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(R.string.sleep_after_episode),
         getString(R.string.sleep_in_minutes), getString(R.string.state_off))
 
+    override fun onPause() {
+        paused = true
+        if (::status.isInitialized) {
+            main.removeCallbacks(tickTask)
+            main.removeCallbacks(progressTask)
+            main.removeCallbacks(skipTask)
+            main.removeCallbacks(loadingTask)
+            main.removeCallbacks(startTimeout)
+            main.removeCallbacks(seekTask)
+            player.pause()
+            val durationMs = player.duration.takeIf { it > 0 } ?: item?.optJSONObject("state")?.optLong("duration") ?: 0L
+            val canCommit = !isTrailer && watched && !player.isCurrentMediaItemLive && !isLiveType(type) &&
+                !(episodic && !plausibleEpisode(durationMs))
+            checkpoint.commitOnPause(canCommit, ::commitPauseCheckpoint)
+        }
+        super.onPause()
+    }
+
     override fun onStop() {
         super.onStop()
         stopped = true
@@ -3199,13 +3444,8 @@ class PlayerActivity : Screen() {
         main.removeCallbacks(loadingTask)
         // A paused source in the background shows no picture: timing it out would skip a good source.
         main.removeCallbacks(startTimeout)
+        main.removeCallbacks(seekTask)
         player.pause()
-        if (isTrailer || !watched || player.isCurrentMediaItemLive || isLiveType(type) || episodic && !plausibleEpisode(player.duration)) return
-        record()
-        // The player's own episode list first: Home's Resume passes no next episode when the title's details weren't in
-        // yet, and a finished episode with no next one drops the title out of Continue Watching.
-        item?.let { Library.stopped(it, nextVideo(onlyAired = false)?.id ?: intent.getStringExtra("nextVideoId")) }
-        push()
     }
 
     private fun closeInFlightOpened(markDestroyed: Boolean = false) {
@@ -3365,6 +3605,7 @@ private class SeekBar(context: Context) : View(context) {
 }
 
 /** Media3's resize mode for Settings' picture fit: Zoom fills the screen and crops, Stretch fills it and changes the shape. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun resizeModeFor(fit: String) = when (fit) {
     "zoom" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     "stretch" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -3376,6 +3617,7 @@ internal fun resizeModeFor(fit: String) = when (fit) {
  * 10 to 17 s of a 4K remux). With the large heap (512 MB on most TV boxes) the buffer can use up to 200 MB, and
  * 250 MB stays free for decoders, pictures and screens. As NuvioTV does it.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun bufferBytesFor(maxHeap: Long): Int? {
     val mb = 1024L * 1024
     return (maxHeap - 250 * mb).coerceAtMost(200 * mb).takeIf { it > DefaultLoadControl.DEFAULT_VIDEO_BUFFER_SIZE }?.toInt()
