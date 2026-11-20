@@ -1218,7 +1218,7 @@ class MainActivity : Screen() {
         }
         // Only Resume: OK on any card already opens its title page. It shows only for a title in progress, which lives in
         // the first row, so Up from any other row goes straight to the row above.
-        heroActions = LinearLayout(this).apply { clipChildren = false; addView(heroResume) }
+        heroActions = LinearLayout(this).apply { clipChildren = false; visibility = View.GONE; addView(heroResume) }
         // No progress line here: the focused card already shows it, right below.
         browseInfo = column(Gravity.START,
             FrameLayout(this).apply {
@@ -1241,8 +1241,8 @@ class MainActivity : Screen() {
             addOnLayoutChangeListener { _, _, top, _, _, _, _, _, _ ->
                 if (page.isGrid) return@addOnLayoutChangeListener
                 val lines = heroAbout.maxLines
-                val minTop = if (genreStrip.visibility == View.VISIBLE) dp(HEADER_H + 52) else dp(HEADER_H - 12)
-                if (top < minTop && lines > 0) heroAbout.post { heroAbout.setLines(lines - 1) }
+                val minTop = if (genreStrip.visibility == View.VISIBLE) dp(HEADER_H + 44) else dp(HEADER_H - 12)
+                if (top < minTop && lines > 2) heroAbout.post { heroAbout.maxLines = lines - 1 }
             }
         }
         return browseInfo
@@ -1371,7 +1371,7 @@ class MainActivity : Screen() {
         heroAbout.post {
             if (heroItem !== item || heroAbout.text.toString() != description) return@post
             val layout = heroAbout.layout ?: return@post
-            val lastLine = synopsisLines - 1
+            val lastLine = (heroAbout.maxLines - 1).coerceAtLeast(0)
             if (layout.lineCount > lastLine && layout.getEllipsisCount(lastLine) > 0) {
                 val end = layout.getLineStart(lastLine) + layout.getEllipsisStart(lastLine)
                 heroAbout.text = synopsisAtSentence(description, end)
