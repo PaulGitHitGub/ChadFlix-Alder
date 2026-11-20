@@ -97,7 +97,7 @@ class ProfilesActivity : Screen() {
         val home = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         // Opened from the Google TV home's Continue Watching: Home, with that title's page on top of it.
         // A fresh task, so an app already open in the background doesn't end up with two Homes.
-        if (intent.hasExtra("id")) startActivities(arrayOf(home,
+        if (hasValidTitleId(intent)) startActivities(arrayOf(home,
             Intent(intent).setClass(this, DetailsActivity::class.java).setFlags(0)))
         else startActivity(home)
         finish()
@@ -782,3 +782,10 @@ class ProfilesActivity : Screen() {
  */
 internal fun pickerReturnProfile(profiles: List<Profile>, originId: String?): Profile? =
     originId?.let { id -> profiles.firstOrNull { it.id == id && it.pin == null } }
+
+/** True only when the launch intent carries a non-blank String title id for [DetailsActivity]. */
+internal fun hasValidTitleId(intent: Intent?): Boolean =
+    isValidTitleId { intent?.getStringExtra("id") }
+
+internal fun isValidTitleId(readId: () -> String?): Boolean =
+    !runCatching { readId() }.getOrNull().isNullOrBlank()

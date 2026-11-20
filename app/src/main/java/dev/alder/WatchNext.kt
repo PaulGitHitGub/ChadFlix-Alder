@@ -21,49 +21,72 @@ object WatchNext {
     internal fun logoUri(packageName: String, entryName: String = "logo_transparent"): String =
         "android.resource://$packageName/drawable/$entryName"
 
+    @Synchronized
     fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean) = runCatching {
         if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
         val resolver = context.contentResolver
-        resolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf(WatchNextPrograms._ID), null, null, null)?.use { c ->
-            while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
-        }
-        if (locked) return@runCatching
-        val logoUri = logoUri(context.packageName, context.resources.getResourceEntryName(LOGO_RES))
-        items.take(MAX).forEach { item ->
-            val state = item.optJSONObject("state") ?: JSONObject()
-            // A series' video id is "tt123:1:3": season, then episode. Other types (anime) count as one when theirs is.
-            val numbers = episodeNumbers(state.text("video_id"))
-            val series = item.optString("type").let { it == "series" || it != "movie" && numbers != null }
-            // Wide, cinematic art for the launcher's wide cards: the meta addon's backdrop (TMDB's, from AIOMetadata or
-            // Cinemeta; last time's answer from disk when there is one), else the library's own, else MetaHub's for the
-            // IMDb id. A poster sent as the art gets cropped to a strip of its middle by the launcher.
-            val art = (backdrop(authKey, item) ?: item.text("background") ?: Images.backgroundFor(item.optString("_id")))
-                ?.let { Images.sized(it, ART_PX) }
-            val poster = item.text("poster")?.let(Images::sharp)
-            val open = Intent(context, ProfilesActivity::class.java)
-                .putExtra("type", item.optString("type")).putExtra("id", item.optString("_id"))
-                .putExtra("name", item.optString("name")).putExtra("poster", poster)
-                .putExtra("background", art).putExtra("videoId", state.text("video_id"))
-            resolver.insert(WatchNextPrograms.CONTENT_URI, ContentValues().apply {
-                put(WatchNextPrograms.COLUMN_TYPE, if (series) WatchNextPrograms.TYPE_TV_EPISODE else WatchNextPrograms.TYPE_MOVIE)
-                put(WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE, WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
-                put(WatchNextPrograms.COLUMN_TITLE, item.optString("name"))
-                if (series && numbers != null) {
-                    put(WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER, numbers.first.toString())
-                    put(WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER, numbers.second.toString())
+        syncRows(
+            items = items,
+            locked = locked,
+            resolveBackdrop = { backdrop(authKey, it) },
+            deleteExisting = {
+                resolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf(WatchNextPrograms._ID), null, null, null)?.use { c ->
+                    while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
                 }
-                put(WatchNextPrograms.COLUMN_POSTER_ART_URI, art ?: poster)
-                put(WatchNextPrograms.COLUMN_POSTER_ART_ASPECT_RATIO,
-                    if (art != null) WatchNextPrograms.ASPECT_RATIO_16_9 else WatchNextPrograms.ASPECT_RATIO_2_3)
-                put(WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS, state.optLong("timeOffset").toInt())
-                put(WatchNextPrograms.COLUMN_DURATION_MILLIS, state.optLong("duration").toInt())
-                put(WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS, lastWatched(state))
-                put(WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID, item.optString("_id"))
-                put(WatchNextPrograms.COLUMN_INTENT_URI, open.toUri(Intent.URI_INTENT_SCHEME))
-                put(WatchNextPrograms.COLUMN_LOGO_URI, logoUri)
-            })
-        }
+            },
+            insertRows = { entries ->
+                val logoUri = logoUri(context.packageName, context.resources.getResourceEntryName(LOGO_RES))
+                entries.forEach { (item, resolvedBackdrop) ->
+                    val state = item.optJSONObject("state") ?: JSONObject()
+                    // A series' video id is "tt123:1:3": season, then episode. Other types (anime) count as one when theirs is.
+                    val numbers = episodeNumbers(state.text("video_id"))
+                    val series = item.optString("type").let { it == "series" || it != "movie" && numbers != null }
+                    // Wide, cinematic art for the launcher's wide cards: the meta addon's backdrop (TMDB's, from AIOMetadata or
+                    // Cinemeta; last time's answer from disk when there is one), else the library's own, else MetaHub's for the
+                    // IMDb id. A poster sent as the art gets cropped to a strip of its middle by the launcher.
+                    val art = (resolvedBackdrop ?: item.text("background") ?: Images.backgroundFor(item.optString("_id")))
+                        ?.let { Images.sized(it, ART_PX) }
+                    val poster = item.text("poster")?.let(Images::sharp)
+                    val open = Intent(context, ProfilesActivity::class.java)
+                        .putExtra("type", item.optString("type")).putExtra("id", item.optString("_id"))
+                        .putExtra("name", item.optString("name")).putExtra("poster", poster)
+                        .putExtra("background", art).putExtra("videoId", state.text("video_id"))
+                    resolver.insert(WatchNextPrograms.CONTENT_URI, ContentValues().apply {
+                        put(WatchNextPrograms.COLUMN_TYPE, if (series) WatchNextPrograms.TYPE_TV_EPISODE else WatchNextPrograms.TYPE_MOVIE)
+                        put(WatchNextPrograms.COLUMN_WATCH_NEXT_TYPE, WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+                        put(WatchNextPrograms.COLUMN_TITLE, item.optString("name"))
+                        if (series && numbers != null) {
+                            put(WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER, numbers.first.toString())
+                            put(WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER, numbers.second.toString())
+                        }
+                        put(WatchNextPrograms.COLUMN_POSTER_ART_URI, art ?: poster)
+                        put(WatchNextPrograms.COLUMN_POSTER_ART_ASPECT_RATIO,
+                            if (art != null) WatchNextPrograms.ASPECT_RATIO_16_9 else WatchNextPrograms.ASPECT_RATIO_2_3)
+                        put(WatchNextPrograms.COLUMN_LAST_PLAYBACK_POSITION_MILLIS, state.optLong("timeOffset").toInt())
+                        put(WatchNextPrograms.COLUMN_DURATION_MILLIS, state.optLong("duration").toInt())
+                        put(WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS, lastWatched(state))
+                        put(WatchNextPrograms.COLUMN_INTERNAL_PROVIDER_ID, item.optString("_id"))
+                        put(WatchNextPrograms.COLUMN_INTENT_URI, open.toUri(Intent.URI_INTENT_SCHEME))
+                        put(WatchNextPrograms.COLUMN_LOGO_URI, logoUri)
+                    })
+                }
+            },
+        )
     }.onFailure { android.util.Log.w("Alder", "Watch Next not updated", it) }
+
+    @Synchronized
+    internal fun syncRows(
+        items: List<JSONObject>,
+        locked: Boolean,
+        resolveBackdrop: (JSONObject) -> String?,
+        deleteExisting: () -> Unit,
+        insertRows: (List<Pair<JSONObject, String?>>) -> Unit,
+    ) {
+        val resolved = if (locked) emptyList() else items.take(MAX).map { it to resolveBackdrop(it) }
+        deleteExisting()
+        if (locked || resolved.isEmpty()) return
+        insertRows(resolved)
+    }
 
     private fun backdrop(authKey: String, item: JSONObject): String? = runCatching {
         val type = item.optString("type")
