@@ -396,6 +396,7 @@ class MainActivity : Screen() {
         val resumeAt: Long = 0,
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
+        var newEpisodeCount: Int = 0,
     ) {
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
@@ -2090,9 +2091,24 @@ class MainActivity : Screen() {
             val addons = Stremio.addons(key)
             missing.mapNotNull { t ->
                 val id = t.optString("_id"); val type = t.optString("type")
-                runCatching { addons.savedMeta(type, id) ?: addons.meta(type, id) }.getOrNull()?.let { id to it }
+                val ttl = if (type != "movie") META_REFRESH_MS else null
+                runCatching { addons.savedMeta(type, id, ttl) ?: addons.meta(type, id) }.getOrNull()?.let { id to it }
             }
-        }, metaPool) { r -> r.getOrNull()?.forEach { (id, m) -> metas.putIfAbsent(id, m) } }
+        }, metaPool) { r ->
+            r.getOrNull()?.forEach { (id, m) ->
+                metas.putIfAbsent(id, m)
+                val count = newEpisodeCount(id, m)
+                rows.forEach { row ->
+                    row.cards.forEach { card ->
+                        val item = card.payload as? Item
+                        if (item?.id == id) {
+                            item.newEpisodeCount = count
+                            card.setNewEpisodes(count)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** The open page's "Some catalogs couldn't load" Try again, while it shows: Down from the top bar goes there first. */
@@ -2682,6 +2698,7 @@ class MainActivity : Screen() {
             dimAlpha = if (grid) GRID_DIM else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
             progress = item.progress,
             finished = item.finished,
+            newEpisodes = item.newEpisodeCount,
             live = item.live,
             settled = item.settled,
             liftShadow = !page.hasGenreShortcuts,
@@ -2690,7 +2707,10 @@ class MainActivity : Screen() {
             payload = item
             tag = "card:${item.id}"
             onRequestMeta = { fill(item) }
-            item.onFill += { refresh(item.poster, item.art, item.settled) }
+            item.onFill += {
+                setNewEpisodes(item.newEpisodeCount)
+                refresh(item.poster, item.art, item.settled)
+            }
             setOnFocusChanged { has ->
                 if (has) {
                     focus(index)
@@ -2793,9 +2813,10 @@ class MainActivity : Screen() {
         metas[item.id]?.let { applyMeta(item, it); return }
         val key = profile.authKey
         metaPool.execute {
-            // Last time's details from disk when there are some; the network only for titles never seen here.
+            // Last time's details from disk when fresh; the network for unseen titles or library series past TTL.
+            val ttl = if (item.resume && item.type != "movie") META_REFRESH_MS else null
             val m = runCatching {
-                Stremio.addons(key).let { it.savedMeta(item.type, item.id) ?: it.meta(item.type, item.id) }
+                Stremio.addons(key).let { it.savedMeta(item.type, item.id, ttl) ?: it.meta(item.type, item.id) }
             }.getOrNull()
             main.post {
                 if (isDestroyed) return@post
@@ -2811,6 +2832,7 @@ class MainActivity : Screen() {
         if (item.logo == null) item.logo = m.logo
         if (item.about.isEmpty()) item.about = m.description ?: ""
         if (item.facts.isEmpty() || item.resume) item.facts = facts(m)
+        if (item.resume) item.newEpisodeCount = newEpisodeCount(item.id, m)
         // Home's first title (the first card the remote lands on): next launch starts on its art and logo.
         if (cinema.firstOrNull() === item && item.art != null) getSharedPreferences("home", MODE_PRIVATE).edit()
             .putString("art:${profile.id}", item.art).putString("logo:${profile.id}", item.logo).apply()
@@ -2870,9 +2892,16 @@ class MainActivity : Screen() {
         return Item(
             id, type, item.text("name")?.takeIf { it.isNotBlank() } ?: getString(R.string.addons_unavailable), item.text("poster"),
             null, Images.logoFor(id), "", emptyList(), videoId, progress,
-            resume = offset > 0, timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
+            resume = offset > 0 || library.any { it.optString("_id") == id },
+            timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
+            newEpisodeCount = newEpisodeCount(id, metas[id], item),
         )
+    }
+
+    private fun newEpisodeCount(id: String, meta: Meta?, entry: JSONObject? = library.firstOrNull { it.optString("_id") == id }): Int {
+        if (meta == null || entry == null) return 0
+        return Library.newEpisodeCount(entry, meta.videos, ::isEpisodeAired)
     }
 
     /** Resume: straight to the sources for the episode Continue Watching points at; with [pick] (held OK) they're all listed. */
@@ -3001,6 +3030,7 @@ class MainActivity : Screen() {
 
     private companion object {
         val cacheReads = java.util.concurrent.Executors.newSingleThreadExecutor()
+        const val META_REFRESH_MS = 6 * 60 * 60 * 1000L // 6h: pick up new seasons/episodes for library series
         const val HEADER_H = 76 // dp
         const val WHATS_NEW_WAIT = 1_500L // ms after Home opens: its first row draws before the pop-up covers it
         // 2:3 posters, six and a bit across (56 + 7 × 120 + 6 × 16 = 992 of 960 dp): the seventh runs off the edge to

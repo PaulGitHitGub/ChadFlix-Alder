@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import kotlin.math.abs
 
 internal fun pickCardImageUrl(
@@ -83,7 +84,8 @@ internal class MediaCardView(
     val grid: Boolean = false,
     val dimAlpha: Float = Screen.CARD_DIM,
     progress: Float = 0f,
-    finished: Boolean = false,
+    private val finished: Boolean = false,
+    newEpisodes: Int = 0,
     val live: Boolean = false,
     var settled: Boolean = true,
     val fadeIn: Boolean = true,
@@ -141,6 +143,8 @@ internal class MediaCardView(
     private var wanted = false
     private var showing: Boolean? = null
     private var onFocusHandler: ((Boolean) -> Unit)? = null
+    private var badgeView: TextView? = null
+    private var shownNewEpisodes = newEpisodes
 
     init {
         setBackgroundColor(if (grid || !wide) Screen.CARD_PLACEHOLDER else Screen.BASE)
@@ -160,15 +164,7 @@ internal class MediaCardView(
                 setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(10))
             })
         }
-        if (grid && finished) {
-            addView(screen.text("✓", Screen.SMALL, bold = true, color = Screen.TUNGSTEN).apply {
-                gravity = Gravity.CENTER
-                background = screen.rounded(Screen.BASE, 12)
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, LayoutParams(screen.dp(24), screen.dp(24), Gravity.TOP or Gravity.END).apply {
-                setMargins(0, screen.dp(6), screen.dp(6), 0)
-            })
-        }
+        renderBadge()
         addView(shade, LayoutParams(-1, -1))
 
         isFocusable = true
@@ -195,6 +191,39 @@ internal class MediaCardView(
         artUrl = art
         settled = isSettled
         if (wanted) load()
+    }
+
+    fun setNewEpisodes(count: Int) {
+        if (shownNewEpisodes == count) return
+        shownNewEpisodes = count
+        renderBadge()
+    }
+
+    private fun renderBadge() {
+        val label = when {
+            (grid || wide) && shownNewEpisodes > 0 -> "+$shownNewEpisodes"
+            grid && finished -> "✓"
+            else -> null
+        }
+        if (label == null) {
+            badgeView?.let { removeView(it); badgeView = null }
+            return
+        }
+        val view = badgeView ?: screen.text("", Screen.SMALL, bold = true, color = Screen.TUNGSTEN).apply {
+            gravity = Gravity.CENTER
+            background = screen.rounded(Screen.BASE, 12)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }.also {
+            badgeView = it
+            val shadeIndex = indexOfChild(shade).takeIf { i -> i >= 0 } ?: childCount
+            addView(it, shadeIndex, LayoutParams(-2, screen.dp(24), Gravity.TOP or Gravity.END).apply {
+                setMargins(0, screen.dp(if (wide) 10 else 6), screen.dp(if (wide) 10 else 6), 0)
+            })
+        }
+        view.text = label
+        view.minWidth = screen.dp(24)
+        val hPad = if (shownNewEpisodes > 0) screen.dp(7) else 0
+        view.setPadding(hPad, 0, hPad, 0)
     }
 
     /** In view or slid into a margin; the row's slide supplies the motion. */
