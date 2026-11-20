@@ -38,6 +38,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Title page.** Cast chips fit each name and scroll across. Trailer is a small circle button. More Like This uses TMDB when add-ons send none.
 - **My Alder.** **My List** now has the name **My Alder**. It uses the same six-column poster grid, focus marker, dark shade and title logo with year as **Discover**.
 - **My Alder filters.** Filter chips keep focus inside the bar. Empty results with active filters show a **Clear filters** button. The year list now includes recent years and decades on **My Alder** and **Discover**.
 - **Discover.** The title and year show above the posters. Long titles use two lines. Larger posters fill six columns at the center of the screen.

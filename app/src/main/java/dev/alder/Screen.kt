@@ -342,6 +342,109 @@ abstract class Screen : Activity() {
 
     protected fun pill(words: Int, icon: Int = 0): TextView = pill(getString(words), icon)
 
+    /**
+     * Compact 38 dp glass circle button for secondary title actions (+, ✓, ↺, ⓘ, trailer).
+     * Focus brightens the glass face and icon without outlines or rings; [onFocus] lets the caller show a label below.
+     */
+    protected fun iconButton(
+        symbol: String,
+        description: String,
+        iconRes: Int = 0,
+        onFocus: (Boolean) -> Unit = {},
+        action: () -> Unit,
+    ): TextView = object : TextView(this) {
+        private val d = resources.displayMetrics.density
+        private val iconDrawable = if (iconRes != 0) getDrawable(iconRes)?.mutate() else null
+        private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = TEXT
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = TEXT
+            style = Paint.Style.FILL
+        }
+        private val glyphPath = Path()
+        private val glyphBounds = Rect()
+
+        override fun onDraw(canvas: Canvas) {
+            if (iconDrawable != null) {
+                val size = (18f * d).toInt()
+                val left = (width - size) / 2
+                val top = (height - size) / 2
+                iconDrawable.setBounds(left, top, left + size, top + size)
+                iconDrawable.setTint(currentTextColor)
+                iconDrawable.draw(canvas)
+                return
+            }
+            val s = text?.toString().orEmpty()
+            if (s.isEmpty()) return
+            val cx = width / 2f
+            val cy = height / 2f
+            strokePaint.color = currentTextColor
+            fillPaint.color = currentTextColor
+            when (s) {
+                "+" -> {
+                    val r = 5.5f * d
+                    strokePaint.strokeWidth = 1.8f * d
+                    canvas.drawLine(cx - r, cy, cx + r, cy, strokePaint)
+                    canvas.drawLine(cx, cy - r, cx, cy + r, strokePaint)
+                }
+                "✓" -> {
+                    strokePaint.strokeWidth = 1.8f * d
+                    glyphPath.reset()
+                    glyphPath.moveTo(cx - 5f * d, cy + 0.3f * d)
+                    glyphPath.lineTo(cx - 1.5f * d, cy + 3.8f * d)
+                    glyphPath.lineTo(cx + 5.2f * d, cy - 3.4f * d)
+                    canvas.drawPath(glyphPath, strokePaint)
+                }
+                "↺" -> {
+                    val r = 5.8f * d
+                    strokePaint.strokeWidth = 1.6f * d
+                    canvas.drawArc(RectF(cx - r, cy - r, cx + r, cy + r), -135f, 285f, false, strokePaint)
+                    val ax = cx - 4.1f * d
+                    val ay = cy - 4.1f * d
+                    glyphPath.reset()
+                    glyphPath.moveTo(ax, ay - 2.8f * d)
+                    glyphPath.lineTo(ax, ay + 0.4f * d)
+                    glyphPath.lineTo(ax + 3.2f * d, ay + 0.4f * d)
+                    canvas.drawPath(glyphPath, strokePaint)
+                }
+                "ⓘ" -> {
+                    val r = 6.8f * d
+                    strokePaint.strokeWidth = 1.5f * d
+                    canvas.drawCircle(cx, cy, r, strokePaint)
+                    strokePaint.strokeWidth = 1.6f * d
+                    canvas.drawLine(cx, cy - 0.5f * d, cx, cy + 3.6f * d, strokePaint)
+                    canvas.drawCircle(cx, cy - 3.2f * d, 0.95f * d, fillPaint)
+                }
+                else -> {
+                    paint.color = currentTextColor
+                    paint.getTextBounds(s, 0, s.length, glyphBounds)
+                    canvas.drawText(s, cx - glyphBounds.exactCenterX(), cy - glyphBounds.exactCenterY(), paint)
+                }
+            }
+        }
+    }.apply {
+        text = symbol
+        textSize = 18f
+        setTextColor(TEXT_2)
+        gravity = Gravity.CENTER
+        includeFontPadding = false
+        contentDescription = description
+        isFocusable = true
+        background = glass(ICON_BUTTON_H / 2)
+        setOnFocusChangeListener { v, has ->
+            v.background = glass(ICON_BUTTON_H / 2, has)
+            setTextColor(if (has) TEXT else TEXT_2)
+            v.grow(has, CHIP_GROW).start()
+            onFocus(has)
+        }
+        setOnClickListener { action() }
+        layoutParams = LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H))
+    }
+
     /** The warm-white primary action; focus lifts and grows it with a centered tungsten glow. */
     protected fun pill(label: String, icon: Int = 0): TextView = text(label, SMALL, bold = true).apply {
         isFocusable = true
@@ -1067,6 +1170,7 @@ abstract class Screen : Activity() {
         const val FROST_DENSE = 0.55f
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
+        const val ICON_BUTTON_H = 38
         const val SHORT_LIST = 5 // "What's new" entries shown before See all changes
         const val WHATS_NEW_W = 480 // dp
         const val CHIP_H = 24 // the mocks' 46–48 px chips

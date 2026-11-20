@@ -568,6 +568,8 @@
     <string name="failure_advice_web_page">The add-on may have moved or closed: update or remove it in Stremio.</string>
     <string name="failure_advice_other">Try again. If this goes on, send a report from Settings › About.</string>
     <string name="filmography_failed">Couldn\'t get this person\'s titles</string>
+    <string name="filmography_loading">Finding titles…</string>
+    <string name="filmography_empty">No other titles found in your catalogs.</string>
     <string name="trailer_no_app">No app on this TV can play the trailer. Install YouTube to watch it.</string>
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. Alder will try to sync it again.</string>

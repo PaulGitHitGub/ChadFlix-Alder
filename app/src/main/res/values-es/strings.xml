@@ -576,4 +576,6 @@
     <string name="catalog_incomplete">No se pudieron cargar algunos catálogos</string>
     <string name="progress_saved_on_tv">El progreso se guardó en este televisor. Alder intentará sincronizarlo de nuevo.</string>
     <string name="library_load_failed">No se pudo cargar tu biblioteca de Stremio</string>
+    <string name="filmography_loading">Buscando títulos…</string>
+    <string name="filmography_empty">No se encontraron otros títulos en tus catálogos.</string>
 </resources>
