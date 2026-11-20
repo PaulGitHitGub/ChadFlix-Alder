@@ -1254,15 +1254,14 @@ class MainActivity : Screen() {
         heroItem = item
         if (page.isGrid) {
             val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
-            heroName.text = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
+            val title = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
                 if (year != null) {
                     val start = item.name.length
                     setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
                     setSpan(android.text.style.RelativeSizeSpan(0.65f), start, length, 0)
                 }
             }
-            heroName.visibility = View.VISIBLE
-            heroLogo.visibility = View.GONE
+            showHeroTitle(item, title)
             browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
             main.post(::placeCaption)
             if (changed) {
@@ -1323,10 +1322,9 @@ class MainActivity : Screen() {
         }.also { main.postDelayed(it, HOME_HERO_WAIT) }
     }
 
-    private fun renderHero(item: Item) {
-        showArt(item)
+    private fun showHeroTitle(item: Item, title: CharSequence) {
         val logoChanged = heroLogo.tag != item.logo
-        heroName.text = item.name
+        heroName.text = title
         if (logoChanged || heroLogo.drawable == null) {
             heroName.visibility = View.VISIBLE
             heroLogo.visibility = View.GONE
@@ -1335,6 +1333,11 @@ class MainActivity : Screen() {
                 heroName.visibility = View.INVISIBLE
             }
         }
+    }
+
+    private fun renderHero(item: Item) {
+        showArt(item)
+        showHeroTitle(item, item.name)
         val meta = metas[item.id]
         val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
         val genre = meta?.genres?.firstOrNull() ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
@@ -1490,6 +1493,8 @@ class MainActivity : Screen() {
             LEADING.getValue(titleSize), resources.displayMetrics)
         heroName.setLineSpacing(heroLeading - heroName.paint.getFontMetricsInt(null), 1f)
         heroName.maxLines = 2
+        heroLogo.maxHeight = dp(if (grid) 46 else 55)
+        heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
         for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
