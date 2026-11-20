@@ -85,6 +85,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Watch Next channel logo**: Keeps the Alder channel logo in release builds for the Android TV home screen.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.
+- **Offline playback progress.** Alder keeps offline progress until your library loads. Then Alder adds the episodes that you finish to your library. Before, offline progress could replace your library or lose episodes that you finished.
 - **Audio language filter.** Source language filters now ignore subtitle languages and `MULTI` releases that name another language. Dutch tags (`NL`, `NLD`, `Nederlands`, `Vlaams`) now count as Dutch audio, and sources show their audio language tag.
 - **Search screen.** Result rows stay in view when you move down, and posters fade at the edge. Back returns to the keyboard first, and old art clears when there are no results.
 - **Shows and Movies.** Add-on errors no longer cut off the first poster row. Genre chips and the **Resume** button now respond to the remote.
