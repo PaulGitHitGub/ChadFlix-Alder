@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">देखा गया</string>
+    <string name="card_progress">%1$d%% देखा गया</string>
 
     <!-- Shared -->
     <string name="action_ok">ठीक है</string>
@@ -39,7 +41,10 @@
     <string name="tab_home">होम</string>
     <string name="tab_discover">खोजें</string>
     <string name="discover_genre">शैली</string>
-    <string name="discover_year">वर्ष</string>
+    <string name="discover_year">दशक</string>
+    <string name="discover_all_genres">सभी शैलियाँ</string>
+    <string name="discover_all_decades">सभी दशक</string>
+    <string name="discover_all_services">सभी सेवाएँ</string>
     <string name="discover_before_1980">1980 से पहले</string>
     <string name="discover_on">सेवा</string>
     <string name="discover_sort_popular">लोकप्रिय</string>
@@ -51,7 +56,7 @@
     <string name="tab_movies">फ़िल्में</string>
     <string name="tab_live">लाइव</string>
     <string name="tab_anime">एनीमे</string>
-    <string name="tab_my_list">मेरी सूची</string>
+    <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">प्रोफ़ाइल</string>
     <string name="nav_search">खोजें</string>
     <string name="updates_ready">Alder %1$s तैयार है</string>
@@ -63,7 +68,6 @@
     <string name="menu_settings">सेटिंग</string>
     <string name="action_play">चलाएँ</string>
     <string name="action_resume">जारी रखें</string>
-    <string name="new_episode">नया एपिसोड</string>
     <string name="stopped_at">%1$s पर रुका</string>
     <string name="time_left_hours">%1$d घं %2$d मि बाकी</string>
     <string name="time_left_minutes">%1$d मि बाकी</string>
@@ -83,12 +87,13 @@
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">पहले बिना देखे</string>
     <string name="list_empty">+ से सहेजे गए टाइटल यहाँ दिखते हैं</string>
-    <string name="list_empty_movies">मेरी सूची में कोई फ़िल्म नहीं</string>
-    <string name="list_empty_shows">मेरी सूची में कोई शो नहीं</string>
-    <string name="list_empty_unwatched">मेरी सूची में कोई बिना देखा टाइटल नहीं</string>
-    <string name="action_remove_from_list">मेरी सूची से हटाएँ</string>
+    <string name="list_empty_movies">My Alder में कोई फ़िल्म नहीं</string>
+    <string name="list_empty_shows">My Alder में कोई शो नहीं</string>
+    <string name="list_empty_unwatched">My Alder में कोई बिना देखा टाइटल नहीं</string>
+    <string name="list_clear_filters">फ़िल्टर साफ़ करें</string>
+    <string name="action_remove_from_list">My Alder से हटाएँ</string>
     <string name="action_mark_watched">देखा गया मार्क करें</string>
-    <string name="list_update_failed">मेरी सूची अपडेट नहीं हो सकी</string>
+    <string name="list_update_failed">My Alder अपडेट नहीं हो सकी</string>
     <string name="check_connection">कनेक्शन जाँचें और फिर से कोशिश करें।</string>
     <string name="action_choose_source">स्रोत चुनें</string>
     <string name="action_remove_from_continue">देखना जारी रखें से हटाएँ</string>
@@ -107,7 +112,7 @@
     <string name="action_more_info">ज़्यादा जानकारी</string>
     <string name="action_start_over">शुरू से देखें</string>
     <string name="action_trailer">ट्रेलर</string>
-    <string name="action_add_to_list">मेरी सूची में जोड़ें</string>
+    <string name="action_add_to_list">My Alder में जोड़ें</string>
     <string name="season_specials">स्पेशल</string>
     <string name="season_number">सीज़न %1$d</string>
     <string name="episode_number">एपिसोड %1$d</string>
@@ -138,7 +143,6 @@
     <string name="player_starting_stream">स्ट्रीम शुरू हो रही है…</string>
     <string name="player_source_failed_next">वह स्रोत नहीं चला · अगला आज़माया जा रहा है</string>
     <string name="player_source_failed_choose">वह स्रोत नहीं चला · कोई दूसरा स्रोत चुनें</string>
-    <string name="player_keeps_buffering">बार-बार बफ़र हो रहा है</string>
     <string name="player_switch_prompt">%1$dp पर जाएँ?</string>
     <string name="player_switch_desc">यह %1$dp स्रोत एक मिनट में 3 बार रुका। छोटी फ़ाइल %2$s से ज़्यादा आसानी से चल सकती है।</string>
     <string name="player_switch_to">%1$dp पर जाएँ</string>
@@ -147,7 +151,6 @@
     <string name="player_source_failed">स्रोत नहीं चला</string>
     <string name="player_try_another">कोई दूसरा स्रोत आज़माएँ</string>
     <string name="player_next_episode">अगला एपिसोड</string>
-    <string name="player_up_next">आगे है</string>
     <string name="player_play_episode">S%1$d E%2$d चलाएँ</string>
     <string name="player_exit_home">होम पर जाएँ</string>
     <string name="player_still_watching">अभी भी देख रहे हैं?</string>
@@ -155,7 +158,6 @@
     <string name="player_sleep_paused">स्लीप टाइमर ने प्लेबैक रोक दिया।</string>
     <string name="skip_intro">इंट्रो छोड़ें</string>
     <string name="skip_recap">रीकैप छोड़ें</string>
-    <string name="player_paused">रुका हुआ</string>
     <string name="player_seek">आगे-पीछे करें</string>
     <string name="player_audio_subtitles">ऑडियो और सबटाइटल</string>
     <string name="player_speed">प्लेबैक स्पीड</string>
@@ -163,8 +165,6 @@
     <string name="player_change_stream">स्रोत बदलें</string>
     <string name="player_pause">रोकें</string>
     <string name="player_info">जानकारी</string>
-    <string name="key_play_pause">चलाएँ / रोकें</string>
-    <string name="key_seek">बार पर आगे-पीछे करें</string>
     <string name="player_live">लाइव</string>
     <string name="player_chapters">%1$s  ·  ▲ चैप्टर</string>
     <string name="player_cannot_seek">यह स्रोत आगे नहीं बढ़ सकता · दूसरा आज़माने के लिए स्रोत बदलें</string>
@@ -182,14 +182,11 @@
     <string name="track_preferred">पसंदीदा</string>
     <string name="track_recent">हाल का</string>
     <string name="track_in_file">फ़ाइल में</string>
-    <string name="subtitles_heading">सबटाइटल · %1$s</string>
     <string name="quick_timing">तुरंत टाइमिंग</string>
     <string name="subtitle_color">सबटाइटल का रंग</string>
     <string name="tracks_pinned">पिन किए गए</string>
     <string name="all_languages">सभी भाषाएँ (%1$d)</string>
-    <string name="audio_heading">ऑडियो · %1$s</string>
     <string name="all_audio_tracks">सभी ऑडियो ट्रैक (%1$d)</string>
-    <string name="audio_enhancement">ऑडियो सुधार</string>
     <string name="clear_dialogue">साफ़ संवाद</string>
     <string name="clear_dialogue_hint">संगीत और इफ़ेक्ट के ऊपर आवाज़ें उभारता है</string>
     <string name="timing_earlier_heading">पहले</string>
@@ -203,7 +200,6 @@
     <string name="size_extra_large">बहुत बड़ा</string>
     <string name="color">रंग</string>
     <string name="background_box">पृष्ठभूमि</string>
-    <string name="playback_sleep">प्लेबैक और स्लीप</string>
     <string name="sleep_timer">स्लीप टाइमर</string>
     <string name="player_change_stream_arrow">स्रोत बदलें  →</string>
     <string name="subtitles_off">सबटाइटल बंद</string>
@@ -385,7 +381,6 @@
 
     <!-- Search -->
     <string name="search_clear">खोज साफ़ करें</string>
-    <string name="search_voice_unavailable">वॉइस सर्च उपलब्ध नहीं</string>
     <string name="search_space">स्पेस</string>
     <string name="search_recent">हाल की</string>
     <string name="search_recent_hint">%1$s. हाल की खोजों से हटाने के लिए OK दबाकर रखें</string>
@@ -576,4 +571,6 @@
     <string name="catalog_incomplete">कुछ कैटलॉग लोड नहीं हो सके</string>
     <string name="progress_saved_on_tv">प्रगति इस टीवी पर सेव है। Alder इसे फिर से सिंक करने की कोशिश करेगा।</string>
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
+    <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
+    <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
 </resources>

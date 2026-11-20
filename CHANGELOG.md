@@ -19,6 +19,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### New
 - **Playback speed.** Select the speed button next to Pause, then select a speed from 0.75× to 2×. Alder keeps the speed for each movie and show, so the next episode plays at the same speed. With Dolby or DTS passthrough, the sound stops for a short time when you change to or from 1×.
+- **New episode badges.** Series posters in **My List** and **Continue Watching** show **+1** or **+2** for new aired episodes after your last watched episode.
 <!-- Spotlight -->
 - **Discover.** Select **Discover** in the top bar to find any movie or show, not only the titles in your add-on catalogs. Select **Movies**, **Shows** or **Anime**. Then select a genre, a decade, a streaming service in your country, or an order: **Popular**, **Top rated** or **Newest**. More titles come when you go down. Each title opens, plays and goes to **My List** as other titles do. Alder keeps your choice for each profile. Discover uses TMDB. To move or hide the tab, select **Settings → Profile → Tabs**.
 - **Arabic interface.** Select **Settings → Language → App language → العربية**. Alder shows menus, buttons and settings in Arabic.
@@ -39,6 +40,16 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
 
 ### Easier to use
+- **Title page.** Cast chips fit each name and scroll across. Trailer is a small circle button. More Like This uses TMDB when add-ons send none.
+- **My Alder.** **My List** now has the name **My Alder**. It uses the same six-column poster grid, focus marker, dark shade and title logo with year as **Discover**.
+- **My Alder filters.** Filter chips keep focus inside the bar. Empty results with active filters show a **Clear filters** button. The year list now includes recent years and decades on **My Alder** and **Discover**.
+- **Discover.** The title and year show above the posters. Long titles use two lines. Larger posters fill six columns at the center of the screen.
+- **Discover posters.** A short light line marks the poster with focus. That poster is larger and brighter than the other posters.
+- **Discover filters.** Select **All genres**, **All decades** or **All services** to open a list. A light surface shows the filter with focus.
+- **Discover controls.** The row with focus moves to the top as you move down. Posters stay below the title and filters. Press Back to return to the last filter. Press Down to return to the last poster.
+- **Consistent poster cards.** Poster rows and grids share one card design across **Home**, **Movies**, **Shows**, **My List**, **Discover**, **Search**, and title pages. The selected card gets bigger, and the other cards get darker. Cards in progress show a thin progress bar without a dark shade. The title shows while the picture loads and stays when a backdrop replaces a poster. In **Search**, the caption moves with the selected card. Cast photos and names stay aligned. Cast preview labels stay on one line. Screen readers announce progress, watched status and live channels.
+- **Cleaner Home screen.** Home shows each fact once and removes extra button glow and zoom motion. Rows, badges and error cards use even spacing and clear text.
+- **Cleaner player screen.** The player no longer shows extra labels above the title, extra headings in the **Audio & subtitles** menu, or the remote help text in the bottom-right corner. Video and audio badges are darker and easier to read over subtitles. Error messages in the player now use full sentences.
 - **Search finds the main title first.** When you search for "matrix", **The Matrix** now comes before a short film with the name "Matrix". When two titles have the same name, the title with the higher IMDb rating comes first.
 - **Search shows all of your tabs.** The top bar in Search now shows **Live** and the tabs for other catalog types, as Home does.
 - **Discover.** The streaming service filter now has the name **Service**. Before, its name was **On**.
@@ -70,6 +81,9 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Search screen.** Result rows stay in view when you move down, and posters fade at the edge. Back returns to the keyboard first, and old art clears when there are no results.
+- **Shows and Movies.** Add-on errors no longer cut off the first poster row. Genre chips and the **Resume** button now respond to the remote.
+- **Shows and Movies layout.** Story text, the **IMDb** tag, the next-row hint, poster focus and empty poster slots now look cleaner without duplicate facts.
 - **Search posters.** Posters in **Search** no longer go blank when a new add-on answer comes in. The posters on the screen load first. When a poster does not load, Alder tries again, then shows the title name on the card.
 - **Add-ons stay safe.** Before, if you added an add-on while **My add-ons** loaded, Stremio kept only that add-on. Now **Add by URL** shows after the list loads, and Alder saves one change at a time.
 - **An add-on with errors does not empty Home.** Before, one add-on with a broken manifest stopped all rows. Now Alder shows the rows of the other add-ons and keeps the broken add-on in your list.

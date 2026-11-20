@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">Watched</string>
+    <string name="card_progress">%1$d%% watched</string>
     <string name="app_name" translatable="false">Alder</string>
 
     <!-- Shared -->
@@ -40,7 +42,10 @@
     <string name="tab_home">Home</string>
     <string name="tab_discover">Discover</string>
     <string name="discover_genre">Genre</string>
-    <string name="discover_year">Year</string>
+    <string name="discover_year">Decade</string>
+    <string name="discover_all_genres">All genres</string>
+    <string name="discover_all_decades">All decades</string>
+    <string name="discover_all_services">All services</string>
     <string name="discover_before_1980">Before 1980</string>
     <string name="discover_on">Service</string>
     <string name="discover_sort_popular">Popular</string>
@@ -52,7 +57,7 @@
     <string name="tab_movies">Movies</string>
     <string name="tab_live">Live</string>
     <string name="tab_anime">Anime</string>
-    <string name="tab_my_list">My List</string>
+    <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">Profile</string>
     <string name="nav_search">Search</string>
     <string name="updates_ready">Alder %1$s is ready</string>
@@ -64,7 +69,6 @@
     <string name="menu_settings">Settings</string>
     <string name="action_play">Play</string>
     <string name="action_resume">Resume</string>
-    <string name="new_episode">New episode</string>
     <string name="stopped_at">Stopped at %1$s</string>
     <string name="time_left_hours">%1$dh %2$dm left</string>
     <string name="time_left_minutes">%1$d min left</string>
@@ -75,7 +79,7 @@
     </plurals>
     <string name="home_unreachable">Couldn\'t reach Stremio. Check the TV\'s connection.</string>
     <string name="row_continue">Continue Watching</string>
-    <string name="home_no_picks">Picks for you show here once Watchly is installed on this profile\'s Stremio account. Shows and Movies have more to browse.</string>
+    <string name="home_no_picks">No picks yet. Browse Shows or Movies, or add Watchly in Stremio.</string>
     <string name="page_no_movie_catalogs">None of your addons has movie catalogs. Add one (AIOMetadata, Cinemeta) in Stremio.</string>
     <string name="page_no_show_catalogs">None of your addons has show catalogs. Add one (AIOMetadata, Cinemeta) in Stremio.</string>
     <string name="page_no_live_catalogs">None of your addons has live catalogs. Add one in Stremio.</string>
@@ -85,12 +89,13 @@
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Unwatched first</string>
     <string name="list_empty">Titles you save with + appear here</string>
-    <string name="list_empty_movies">No movies in My List</string>
-    <string name="list_empty_shows">No shows in My List</string>
-    <string name="list_empty_unwatched">No unwatched titles in My List</string>
-    <string name="action_remove_from_list">Remove from My List</string>
+    <string name="list_empty_movies">No movies in My Alder</string>
+    <string name="list_empty_shows">No shows in My Alder</string>
+    <string name="list_empty_unwatched">No unwatched titles in My Alder</string>
+    <string name="list_clear_filters">Clear filters</string>
+    <string name="action_remove_from_list">Remove from My Alder</string>
     <string name="action_mark_watched">Mark as watched</string>
-    <string name="list_update_failed">Couldn\'t update My List</string>
+    <string name="list_update_failed">Couldn\'t update My Alder</string>
     <string name="check_connection">Check the connection and try again.</string>
     <string name="action_choose_source">Choose a source</string>
     <string name="action_remove_from_continue">Remove from Continue Watching</string>
@@ -109,7 +114,7 @@
     <string name="action_more_info">More information</string>
     <string name="action_start_over">Start over</string>
     <string name="action_trailer">Trailer</string>
-    <string name="action_add_to_list">Add to My List</string>
+    <string name="action_add_to_list">Add to My Alder</string>
     <string name="season_specials">Specials</string>
     <string name="season_number">Season %1$d</string>
     <string name="episode_number">Episode %1$d</string>
@@ -139,9 +144,8 @@
     <string name="player_starting">Starting · %1$s</string>
     <string name="player_starting_stream">Starting stream…</string>
     <string name="streams_tag_p2p" translatable="false">P2P</string>
-    <string name="player_source_failed_next">That source failed · trying the next one</string>
+    <string name="player_source_failed_next">That source failed. Trying the next one.</string>
     <string name="player_source_failed_choose">That source failed · choose another source</string>
-    <string name="player_keeps_buffering">Keeps buffering</string>
     <string name="player_switch_prompt">Switch to %1$dp?</string>
     <string name="player_switch_desc">This %1$dp source stopped 3 times in a minute. A smaller file may play more smoothly from %2$s.</string>
     <string name="player_switch_to">Switch to %1$dp</string>
@@ -150,7 +154,6 @@
     <string name="player_source_failed">Source failed</string>
     <string name="player_try_another">Try another source</string>
     <string name="player_next_episode">Next episode</string>
-    <string name="player_up_next">Up next</string>
     <string name="player_play_episode">Play S%1$d E%2$d</string>
     <string name="player_exit_home">Exit to Home</string>
     <string name="player_still_watching">Still watching?</string>
@@ -158,7 +161,6 @@
     <string name="player_sleep_paused">The sleep timer paused playback.</string>
     <string name="skip_intro">Skip intro</string>
     <string name="skip_recap">Skip recap</string>
-    <string name="player_paused">Paused</string>
     <string name="player_seek">Seek</string>
     <string name="player_audio_subtitles">Audio &amp; subtitles</string>
     <string name="player_speed">Playback speed</string>
@@ -166,11 +168,9 @@
     <string name="player_change_stream">Change stream</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Info</string>
-    <string name="key_play_pause">Play / pause</string>
-    <string name="key_seek">Seek on the bar</string>
     <string name="player_live">Live</string>
     <string name="player_chapters">%1$s  ·  ▲ Chapters</string>
-    <string name="player_cannot_seek">This source can\'t skip ahead · Change stream to try another</string>
+    <string name="player_cannot_seek">This source can\'t skip ahead. Change stream to try another.</string>
     <string name="tab_subtitles">Subtitles</string>
     <string name="tab_audio">Audio</string>
     <string name="tab_sync_style">Sync &amp; Style</string>
@@ -185,14 +185,11 @@
     <string name="track_preferred">Preferred</string>
     <string name="track_recent">Recent</string>
     <string name="track_in_file">in the file</string>
-    <string name="subtitles_heading">Subtitles · %1$s</string>
     <string name="quick_timing">Quick timing</string>
     <string name="subtitle_color">Subtitle color</string>
     <string name="tracks_pinned">Pinned</string>
     <string name="all_languages">All languages (%1$d)</string>
-    <string name="audio_heading">Audio · %1$s</string>
     <string name="all_audio_tracks">All audio tracks (%1$d)</string>
-    <string name="audio_enhancement">Audio enhancement</string>
     <string name="clear_dialogue">Clear dialogue</string>
     <string name="clear_dialogue_hint">Boost voices above music and effects</string>
     <string name="timing_earlier_heading">Earlier</string>
@@ -206,7 +203,6 @@
     <string name="size_extra_large">Extra large</string>
     <string name="color">Color</string>
     <string name="background_box">Background box</string>
-    <string name="playback_sleep">Playback &amp; sleep</string>
     <string name="sleep_timer">Sleep timer</string>
     <string name="player_change_stream_arrow">Change stream  →</string>
     <string name="subtitles_off">Subtitles off</string>
@@ -388,7 +384,6 @@
 
     <!-- Search -->
     <string name="search_clear">Clear search</string>
-    <string name="search_voice_unavailable">Voice search unavailable</string>
     <string name="search_space">Space</string>
     <string name="search_recent">Recent</string>
     <string name="search_recent_hint">%1$s. Hold OK to remove from recent searches</string>
@@ -574,6 +569,8 @@
     <string name="failure_advice_web_page">The add-on may have moved or closed: update or remove it in Stremio.</string>
     <string name="failure_advice_other">Try again. If this goes on, send a report from Settings › About.</string>
     <string name="filmography_failed">Couldn\'t get this person\'s titles</string>
+    <string name="filmography_loading">Finding titles…</string>
+    <string name="filmography_empty">No other titles found in your catalogs.</string>
     <string name="trailer_no_app">No app on this TV can play the trailer. Install YouTube to watch it.</string>
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. Alder will try to sync it again.</string>

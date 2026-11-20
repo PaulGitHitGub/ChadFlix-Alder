@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">Visto</string>
+    <string name="card_progress">%1$d%% visto</string>
 
     <!-- Shared -->
     <string name="action_ok">Aceptar</string>
@@ -41,7 +43,10 @@
     <string name="tab_home">Inicio</string>
     <string name="tab_discover">Descubrir</string>
     <string name="discover_genre">Género</string>
-    <string name="discover_year">Año</string>
+    <string name="discover_year">Década</string>
+    <string name="discover_all_genres">Todos los géneros</string>
+    <string name="discover_all_decades">Todas las décadas</string>
+    <string name="discover_all_services">Todos los servicios</string>
     <string name="discover_before_1980">Antes de 1980</string>
     <string name="discover_on">Servicio</string>
     <string name="discover_sort_popular">Populares</string>
@@ -53,7 +58,7 @@
     <string name="tab_movies">Películas</string>
     <string name="tab_live">En vivo</string>
     <string name="tab_anime">Anime</string>
-    <string name="tab_my_list">Mi lista</string>
+    <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">Perfil</string>
     <string name="nav_search">Buscar</string>
     <string name="updates_ready">Alder %1$s está listo</string>
@@ -65,7 +70,6 @@
     <string name="menu_settings">Configuración</string>
     <string name="action_play">Reproducir</string>
     <string name="action_resume">Reanudar</string>
-    <string name="new_episode">Nuevo episodio</string>
     <string name="stopped_at">Detenido en %1$s</string>
     <string name="time_left_hours">Quedan %1$d h %2$d min</string>
     <string name="time_left_minutes">Quedan %1$d min</string>
@@ -86,12 +90,13 @@
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Sin ver primero</string>
     <string name="list_empty">Los títulos que guardes con + aparecen aquí</string>
-    <string name="list_empty_movies">No hay películas en Mi lista</string>
-    <string name="list_empty_shows">No hay series en Mi lista</string>
-    <string name="list_empty_unwatched">No hay títulos sin ver en Mi lista</string>
-    <string name="action_remove_from_list">Quitar de Mi lista</string>
+    <string name="list_empty_movies">No hay películas en My Alder</string>
+    <string name="list_empty_shows">No hay series en My Alder</string>
+    <string name="list_empty_unwatched">No hay títulos sin ver en My Alder</string>
+    <string name="list_clear_filters">Borrar filtros</string>
+    <string name="action_remove_from_list">Quitar de My Alder</string>
     <string name="action_mark_watched">Marcar como visto</string>
-    <string name="list_update_failed">No se pudo actualizar Mi lista</string>
+    <string name="list_update_failed">No se pudo actualizar My Alder</string>
     <string name="check_connection">Revisa la conexión y vuelve a intentarlo.</string>
     <string name="action_choose_source">Elegir una fuente</string>
     <string name="action_remove_from_continue">Quitar de Seguir viendo</string>
@@ -110,7 +115,7 @@
     <string name="action_more_info">Más información</string>
     <string name="action_start_over">Empezar de nuevo</string>
     <string name="action_trailer">Tráiler</string>
-    <string name="action_add_to_list">Añadir a Mi lista</string>
+    <string name="action_add_to_list">Añadir a My Alder</string>
     <string name="season_specials">Especiales</string>
     <string name="season_number">Temporada %1$d</string>
     <string name="episode_number">Episodio %1$d</string>
@@ -141,7 +146,6 @@
     <string name="player_starting_stream">Iniciando la transmisión…</string>
     <string name="player_source_failed_next">Esa fuente falló · probando la siguiente</string>
     <string name="player_source_failed_choose">Esa fuente falló · elige otra fuente</string>
-    <string name="player_keeps_buffering">Sigue cargando</string>
     <string name="player_switch_prompt">¿Cambiar a %1$dp?</string>
     <string name="player_switch_desc">Esta fuente %1$dp se detuvo 3 veces en un minuto. Un archivo más pequeño puede reproducirse mejor desde %2$s.</string>
     <string name="player_switch_to">Cambiar a %1$dp</string>
@@ -150,7 +154,6 @@
     <string name="player_source_failed">La fuente falló</string>
     <string name="player_try_another">Prueba otra fuente</string>
     <string name="player_next_episode">Siguiente episodio</string>
-    <string name="player_up_next">A continuación</string>
     <string name="player_play_episode">Reproducir T%1$d E%2$d</string>
     <string name="player_exit_home">Salir al inicio</string>
     <string name="player_still_watching">¿Sigues viendo?</string>
@@ -158,7 +161,6 @@
     <string name="player_sleep_paused">El temporizador pausó la reproducción.</string>
     <string name="skip_intro">Saltar intro</string>
     <string name="skip_recap">Saltar resumen</string>
-    <string name="player_paused">En pausa</string>
     <string name="player_seek">Avanzar o retroceder</string>
     <string name="player_audio_subtitles">Audio y subtítulos</string>
     <string name="player_speed">Velocidad de reproducción</string>
@@ -166,8 +168,6 @@
     <string name="player_change_stream">Cambiar fuente</string>
     <string name="player_pause">Pausa</string>
     <string name="player_info">Info</string>
-    <string name="key_play_pause">Reproducir / pausar</string>
-    <string name="key_seek">Moverse por la barra</string>
     <string name="player_live">En vivo</string>
     <string name="player_chapters">%1$s  ·  ▲ Capítulos</string>
     <string name="player_cannot_seek">Esta fuente no permite avanzar · Cambia de fuente para probar otra</string>
@@ -185,14 +185,11 @@
     <string name="track_preferred">Preferido</string>
     <string name="track_recent">Reciente</string>
     <string name="track_in_file">en el archivo</string>
-    <string name="subtitles_heading">Subtítulos · %1$s</string>
     <string name="quick_timing">Ajuste rápido</string>
     <string name="subtitle_color">Color de subtítulos</string>
     <string name="tracks_pinned">Fijados</string>
     <string name="all_languages">Todos los idiomas (%1$d)</string>
-    <string name="audio_heading">Audio · %1$s</string>
     <string name="all_audio_tracks">Todas las pistas de audio (%1$d)</string>
-    <string name="audio_enhancement">Mejora de audio</string>
     <string name="clear_dialogue">Diálogos claros</string>
     <string name="clear_dialogue_hint">Realza las voces sobre la música y los efectos</string>
     <string name="timing_earlier_heading">Antes</string>
@@ -206,7 +203,6 @@
     <string name="size_extra_large">Muy grande</string>
     <string name="color">Color</string>
     <string name="background_box">Fondo</string>
-    <string name="playback_sleep">Reproducción y temporizador</string>
     <string name="sleep_timer">Temporizador</string>
     <string name="player_change_stream_arrow">Cambiar fuente  →</string>
     <string name="subtitles_off">Subtítulos desactivados</string>
@@ -388,7 +384,6 @@
 
     <!-- Search -->
     <string name="search_clear">Borrar búsqueda</string>
-    <string name="search_voice_unavailable">Búsqueda por voz no disponible</string>
     <string name="search_space">Espacio</string>
     <string name="search_recent">Recientes</string>
     <string name="search_recent_hint">%1$s. Mantén OK para quitarla de las búsquedas recientes</string>
@@ -582,4 +577,6 @@
     <string name="catalog_incomplete">No se pudieron cargar algunos catálogos</string>
     <string name="progress_saved_on_tv">El progreso se guardó en este televisor. Alder intentará sincronizarlo de nuevo.</string>
     <string name="library_load_failed">No se pudo cargar tu biblioteca de Stremio</string>
+    <string name="filmography_loading">Buscando títulos…</string>
+    <string name="filmography_empty">No se encontraron otros títulos en tus catálogos.</string>
 </resources>

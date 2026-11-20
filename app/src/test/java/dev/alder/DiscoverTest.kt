@@ -8,6 +8,24 @@ import org.junit.Test
 
 /** Discover's TMDB search: the filters as TMDB takes them, and results as titles under their IMDb ids. */
 class DiscoverTest {
+    @Test fun largerPostersRemainFullyVisibleWithLessThanTwoRowsOfSpace() {
+        assertEquals(442, gridScrollTarget(scrollY = 0, viewportHeight = 696, rowTop = 442, rowHeight = 442))
+        assertEquals(188, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 442, rowHeight = 442))
+        assertEquals(0, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 0, rowHeight = 442))
+        assertEquals(884, gridScrollTarget(scrollY = 188, viewportHeight = 696, rowTop = 884, rowHeight = 442))
+        assertEquals(442, gridScrollTarget(scrollY = 0, viewportHeight = 640, rowTop = 442, rowHeight = 442))
+    }
+
+    @Test fun filterFocusSurvivesAServiceListChange() {
+        val withServices = listOf("movie", "series", "anime", "discover_genre", "discover_year", "discover_on", "sort")
+        val withoutServices = withServices - "discover_on"
+        assertEquals(6, discoverChipIndex(withServices, "sort", "movie"))
+        assertEquals(5, discoverChipIndex(withoutServices, "sort", "movie"))
+        assertEquals(1, discoverChipIndex(withoutServices, "discover_on", "series"))
+        assertEquals(2, discoverChipIndex(withServices, null, "anime"))
+        assertEquals(null, discoverChipIndex(emptyList(), "sort", "movie"))
+    }
+
     private fun params(q: DiscoverQuery) =
         discoverUrl(q, 2, "CA", "en-CA", "2026-11-18", "k").substringAfter('?').split('&').associate { it.substringBefore('=') to it.substringAfter('=') }
 
@@ -40,6 +58,9 @@ class DiscoverTest {
         assertEquals("2026-11-18", params(DiscoverQuery(type = "movie", sort = "new"))["primary_release_date.lte"])
         assertEquals("1979-12-31", params(DiscoverQuery(type = "movie", decade = 0))["primary_release_date.lte"])
         assertEquals("300", params(DiscoverQuery(type = "movie", sort = "top"))["vote_count.gte"])
+        val exact = params(DiscoverQuery(type = "movie", year = 2024))
+        assertEquals("2024-01-01", exact["primary_release_date.gte"])
+        assertEquals("2024-12-31", exact["primary_release_date.lte"])
     }
 
     @Test fun aResultBecomesATitleUnderItsImdbId() {
@@ -62,5 +83,8 @@ class DiscoverTest {
         assertTrue(inDecade("1975", 0))
         assertFalse(inDecade("1980", 0))
         assertFalse(inDecade(null, 2010))
+        assertTrue(inYear("2024", 2024))
+        assertTrue(inYear("2024–2026", 2024))
+        assertFalse(inYear("2023", 2024))
     }
 }
