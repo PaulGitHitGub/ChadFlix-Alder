@@ -58,7 +58,7 @@
     <string name="tab_movies">Film</string>
     <string name="tab_live">Dirette</string>
     <string name="tab_anime">Anime</string>
-    <string name="tab_my_list">La mia lista</string>
+    <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">Profilo</string>
     <string name="nav_search">Cerca</string>
     <string name="updates_ready">Alder %1$s è pronto</string>
@@ -90,12 +90,13 @@
     <string name="list_sort_name">A–Z</string>
     <string name="list_sort_unwatched">Prima i non visti</string>
     <string name="list_empty">I titoli che salvi con + compaiono qui</string>
-    <string name="list_empty_movies">Nessun film in La mia lista</string>
-    <string name="list_empty_shows">Nessuna serie in La mia lista</string>
-    <string name="list_empty_unwatched">Nessun titolo non visto in La mia lista</string>
-    <string name="action_remove_from_list">Rimuovi da La mia lista</string>
+    <string name="list_empty_movies">Nessun film in My Alder</string>
+    <string name="list_empty_shows">Nessuna serie in My Alder</string>
+    <string name="list_empty_unwatched">Nessun titolo non visto in My Alder</string>
+    <string name="list_clear_filters">Cancella filtri</string>
+    <string name="action_remove_from_list">Rimuovi da My Alder</string>
     <string name="action_mark_watched">Segna come visto</string>
-    <string name="list_update_failed">Impossibile aggiornare La mia lista</string>
+    <string name="list_update_failed">Impossibile aggiornare My Alder</string>
     <string name="check_connection">Controlla la connessione e riprova.</string>
     <string name="action_choose_source">Scegli una fonte</string>
     <string name="action_remove_from_continue">Rimuovi da Continua a guardare</string>
@@ -114,7 +115,7 @@
     <string name="action_more_info">Altre informazioni</string>
     <string name="action_start_over">Ricomincia</string>
     <string name="action_trailer">Trailer</string>
-    <string name="action_add_to_list">Aggiungi a La mia lista</string>
+    <string name="action_add_to_list">Aggiungi a My Alder</string>
     <string name="season_specials">Speciali</string>
     <string name="season_number">Stagione %1$d</string>
     <string name="episode_number">Episodio %1$d</string>
