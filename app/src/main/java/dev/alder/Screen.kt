@@ -440,15 +440,15 @@ abstract class Screen : Activity() {
         setPadding(dp(16), 0, dp(12), 0)
     }
 
-    /** A filter chip's face on a page of posters: solid enough to read over any art, tungsten rim on focus. */
+    /** Solid smoked glass over posters; focus lights the face without an outline. */
     protected fun listChipBackground(focused: Boolean) = GradientDrawable().apply {
         cornerRadius = dp(CHIP_H / 2).toFloat()
         setColor(if (focused) CHIP_FOCUSED else CHIP_REST)
-        setStroke(dp(1), if (focused) TUNGSTEN else GLASS_EDGE)
     }
 
     /** A [chip]'s open state: the tungsten dot and full-strength words. */
     protected fun TextView.select(label: String, selected: Boolean) {
+        isSelected = selected
         setTextColor(if (selected) TEXT else TEXT_2)
         text = if (!selected) label else android.text.SpannableString("•  $label").apply {
             setSpan(android.text.style.ForegroundColorSpan(TUNGSTEN), 0, 1, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
@@ -650,9 +650,9 @@ abstract class Screen : Activity() {
     }
 
     /** Focus lifts and subtly scales the card above its neighbours with no outline or shadow. */
-    internal fun View.lift(on: Boolean) {
+    internal fun View.lift(on: Boolean, scale: Float = CARD_GROW) {
         foreground = null
-        grow(on)
+        grow(on, scale)
             .translationZ(if (on) dp(CARD_LIFT).toFloat() else 0f).start()
     }
 
@@ -1066,6 +1066,7 @@ abstract class Screen : Activity() {
         const val WHATS_NEW_W = 480 // dp
         const val CHIP_H = 24 // the mocks' 46–48 px chips
         const val CARD_GROW = 1.06f
+        const val GRID_GROW = 1.05f
         const val CHIP_GROW = 1.04f // a wide chip grown as much as a card filled the gap to its neighbour
         const val CARD_LIFT = 8
 
@@ -1112,6 +1113,7 @@ abstract class Screen : Activity() {
         const val BASE = 0xFF0E0C0A.toInt()
         const val CARD_PLACEHOLDER = 0xFF28221E.toInt()
         const val CARD_DIM = 0.45f
+        const val GRID_DIM = 0.25f
         const val CARD_CONTINUE_DIM = 0.45f
         const val TEXT = 0xFFF3EEE6.toInt()
         const val TEXT_2 = 0xB8F3EEE6.toInt()

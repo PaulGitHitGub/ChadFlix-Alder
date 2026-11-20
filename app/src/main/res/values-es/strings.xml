@@ -43,7 +43,10 @@
     <string name="tab_home">Inicio</string>
     <string name="tab_discover">Descubrir</string>
     <string name="discover_genre">Género</string>
-    <string name="discover_year">Año</string>
+    <string name="discover_year">Década</string>
+    <string name="discover_all_genres">Todos los géneros</string>
+    <string name="discover_all_decades">Todas las décadas</string>
+    <string name="discover_all_services">Todos los servicios</string>
     <string name="discover_before_1980">Antes de 1980</string>
     <string name="discover_on">Servicio</string>
     <string name="discover_sort_popular">Populares</string>
