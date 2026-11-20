@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">Visto</string>
+    <string name="card_progress">%1$d%% visto</string>
 
     <!-- Shared -->
     <string name="action_ok">OK</string>

@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="card_watched">تمت المشاهدة</string>
+    <string name="card_progress">تمت مشاهدة %1$d%%</string>
 
     <!-- Shared -->
     <string name="action_ok">موافق</string>

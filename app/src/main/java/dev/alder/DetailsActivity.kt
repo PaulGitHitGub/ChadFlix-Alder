@@ -976,13 +976,12 @@ class DetailsActivity : Screen() {
             content.addView(caps(R.string.details_cast, TEXT_2).onArt().marginTop(14))
             val castRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
+                gravity = Gravity.TOP
                 clipChildren = false
                 clipToPadding = false
             }
 
             val avatarSize = dp(56)
-            val ringBox = avatarSize + dp(6)
 
             fullCast.forEachIndexed { index, actor ->
                 val card = LinearLayout(this).apply {
@@ -994,17 +993,10 @@ class DetailsActivity : Screen() {
                     setPadding(dp(4), dp(4), dp(4), dp(6))
                 }
 
-                val avatarContainer = FrameLayout(this).apply { clipChildren = false }
-
-                val ring = View(this).apply {
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(0x00000000)
-                        setStroke(dp(2), TUNGSTEN)
-                    }
-                    visibility = View.INVISIBLE
+                val avatarContainer = FrameLayout(this).apply {
+                    clipChildren = false
+                    alpha = 0.55f
                 }
-                avatarContainer.addView(ring, FrameLayout.LayoutParams(ringBox, ringBox, Gravity.CENTER))
 
                 val avatarFrame = FrameLayout(this).apply {
                     background = GradientDrawable().apply {
@@ -1041,7 +1033,7 @@ class DetailsActivity : Screen() {
 
                 card.addView(avatarContainer, wrap())
 
-                val nameView = text(actor.name, SMALL, bold = true, color = TEXT).apply {
+                val nameView = text(actor.name, SMALL, bold = true, color = TEXT_2).apply {
                     gravity = Gravity.CENTER_HORIZONTAL
                     textAlignment = View.TEXT_ALIGNMENT_CENTER
                     maxLines = 2
@@ -1061,9 +1053,11 @@ class DetailsActivity : Screen() {
                 charView?.let { card.addView(it, LinearLayout.LayoutParams(dp(82), -2).apply { topMargin = dp(2) }) }
 
                 card.setOnFocusChangeListener { _, focused ->
-                    card.grow(focused).start()
-                    ring.visibility = if (focused) View.VISIBLE else View.INVISIBLE
-                    nameView.setTextColor(if (focused) 0xFFFBF8F5.toInt() else TEXT)
+                    avatarContainer.grow(focused)
+                        .translationZ(if (focused) dp(CARD_LIFT).toFloat() else 0f)
+                        .alpha(if (focused) 1f else 0.55f)
+                        .start()
+                    nameView.setTextColor(if (focused) TEXT else TEXT_2)
                     charView?.setTextColor(if (focused) TEXT else TEXT_2)
                 }
 
@@ -1084,7 +1078,7 @@ class DetailsActivity : Screen() {
                 setPadding(room, room, room, room)
                 addView(castRow)
             }
-            content.addView(castScroll, LinearLayout.LayoutParams(-1, dp(128) + 2 * room).apply {
+            content.addView(castScroll, LinearLayout.LayoutParams(-1, -2).apply {
                 leftMargin = -room
                 rightMargin = -room
                 topMargin = dp(6) - room
@@ -1183,8 +1177,10 @@ class DetailsActivity : Screen() {
         )
         var firstCard: View? = null
         titles.forEachIndexed { index, title ->
-            val card = MediaCardView(this, title.name, title.poster, title.background, dimAlpha = 0f, fadeIn = false).apply {
+            val card = MediaCardView(this, title.name, title.poster, title.background, fadeIn = false).apply {
+                dim(true, animate = false)
                 setOnFocusChanged { has ->
+                    dim(!has)
                     if (has) {
                         rail.scrollToCard(index)
                         val yearStr = title.year?.take(4)?.let { "  ·  $it" } ?: ""
