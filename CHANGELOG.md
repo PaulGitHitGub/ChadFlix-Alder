@@ -81,7 +81,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
-- **Audio language filter.** Source language filters now ignore subtitle languages (flags after 💬 and tags like `NL subs`) and do not match `MULTI` releases that name another language. Dutch tags (`NL`, `NLD`, `Nederlands`, `Vlaams`) now count as Dutch audio, and sources show their audio language tag.
+- **Audio language filter.** Source language filters now ignore subtitle languages and `MULTI` releases that name another language. Dutch tags (`NL`, `NLD`, `Nederlands`, `Vlaams`) now count as Dutch audio, and sources show their audio language tag.
 - **Search screen.** Result rows stay in view when you move down, and posters fade at the edge. Back returns to the keyboard first, and old art clears when there are no results.
 - **Shows and Movies.** Add-on errors no longer cut off the first poster row. Genre chips and the **Resume** button now respond to the remote.
 - **Shows and Movies layout.** Story text, the **IMDb** tag, the next-row hint, poster focus and empty poster slots now look cleaner without duplicate facts.

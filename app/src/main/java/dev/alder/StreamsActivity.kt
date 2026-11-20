@@ -283,9 +283,9 @@ class StreamsActivity : Screen() {
      * sources name only one. Sources that name no language count as English, as most English releases name none.
      */
     private fun showLanguages(streams: List<Stream>, redraw: () -> Unit) {
-        val unnamed = streams.any { it.audioLanguages.isEmpty() && !it.multiAudio }
+        val hasEnglish = streams.any { it.audioLanguages.isEmpty() || it.multiAudio }
         val mine = Settings.audioLanguage(this)
-        val codes = (streams.flatMap { it.audioLanguages } + listOfNotNull("en".takeIf { unnamed })).distinct()
+        val codes = (streams.flatMap { it.audioLanguages } + listOfNotNull("en".takeIf { hasEnglish })).distinct()
             .sortedWith(compareBy({ it != mine }, { it != "en" }, ::languageName))
         if (!audioOpened) {
             audioOpened = true
