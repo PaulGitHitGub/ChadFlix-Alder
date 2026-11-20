@@ -29,6 +29,8 @@ class ProfilesActivity : Screen() {
     private var pickerGeneration = 0
     private var signInGeneration = 0
     private var nameInput: EditText? = null
+    // The unlocked profile the picker was opened from (via "pick"); null otherwise so Back cannot bypass a PIN.
+    private var originProfileId: String? = null
     // Where Back goes from the profile menu's screens (PIN, rename); null elsewhere.
     private var backTo: (() -> Unit)? = null
 
@@ -48,11 +50,18 @@ class ProfilesActivity : Screen() {
                 (typed in pins).also { ok -> if (ok) { setResult(RESULT_OK); finish() } }
             }
         }
+        val pick = intent.getBooleanExtra("pick", false)
         when {
             again != null -> enter(again)
             profiles.isEmpty() -> showName()
-            profiles.size == 1 && !intent.getBooleanExtra("pick", false) -> enter(profiles[0])
-            else -> showPicker()
+            profiles.size == 1 && !pick -> enter(profiles[0])
+            else -> {
+                if (pick) {
+                    val storedActiveId = getSharedPreferences("account", MODE_PRIVATE).getString("active", null)
+                    originProfileId = pickerReturnProfile(profiles, storedActiveId)?.id
+                }
+                showPicker()
+            }
         }
     }
 
@@ -98,15 +107,15 @@ class ProfilesActivity : Screen() {
 
     private fun showPicker() {
         ++signInGeneration // a sign-in still on the way is left behind
-        // Opened from inside a profile (Switch profile, Manage profiles): Back returns to it instead of leaving Alder.
-        val current = Profiles.active(this)?.takeIf { intent.getBooleanExtra("pick", false) }
-        backTo = current?.let { { openHome(it) } }
+        val profiles = Profiles.all(this)
+        // Opened from inside an unlocked profile (Switch profile, Manage profiles): Back returns to it instead of leaving Alder.
+        val current = pickerReturnProfile(profiles, originProfileId)
+        backTo = current?.let { { enter(it) } }
         nameInput = null
         // Left a sign-in: stop its polling, or approving the abandoned code would still change the profile.
         signingIn = false
         waitingCode = null
         val generation = ++pickerGeneration
-        val profiles = Profiles.all(this)
         val art = onboardingBackdrop(false).apply { alpha = 0.42f }
         var selected = profiles.firstOrNull { it.id == Profiles.active(this)?.id } ?: profiles.first()
         // Top-aligned, so Add (no "last watched" line) sits level with the portraits; padding above for the 10% lift.
@@ -353,6 +362,7 @@ class ProfilesActivity : Screen() {
             getString(R.string.profiles_remove_desc, p.name)) { i ->
             if (i == 0) return@choose
             Profiles.remove(this, p.id)
+            if (p.id == originProfileId) originProfileId = null
             background({ Http.forget() }) {}
             // Best effort; the TV forgets the profile either way. A sign-in another profile still uses stays signed in.
             if (Profiles.all(this).none { it.authKey == p.authKey }) {
@@ -764,3 +774,11 @@ class ProfilesActivity : Screen() {
     }
 
 }
+
+/**
+ * The unlocked profile the picker may return to on Back, or null when no explicit unlocked origin exists.
+ * Never falls back to a lone remaining profile or returns a PIN-locked one, so removing or locking the origin
+ * (or launching the exported picker externally) cannot bypass a PIN.
+ */
+internal fun pickerReturnProfile(profiles: List<Profile>, originId: String?): Profile? =
+    originId?.let { id -> profiles.firstOrNull { it.id == id && it.pin == null } }
