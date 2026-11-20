@@ -379,7 +379,6 @@
 
     <!-- Search -->
     <string name="search_clear">खोज साफ़ करें</string>
-    <string name="search_voice_unavailable">वॉइस सर्च उपलब्ध नहीं</string>
     <string name="search_space">स्पेस</string>
     <string name="search_recent">हाल की</string>
     <string name="search_recent_hint">%1$s. हाल की खोजों से हटाने के लिए OK दबाकर रखें</string>

@@ -382,7 +382,6 @@
 
     <!-- Search -->
     <string name="search_clear">Limpar busca</string>
-    <string name="search_voice_unavailable">Busca por voz indisponível</string>
     <string name="search_space">Espaço</string>
     <string name="search_recent">Recentes</string>
     <string name="search_recent_hint">%1$s. Segure OK para remover das buscas recentes</string>

@@ -3,14 +3,18 @@ package dev.alder
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
@@ -69,9 +73,10 @@ class SearchActivity : Screen() {
     private lateinit var heroName: TextView
     private lateinit var heroFacts: TextView
     private lateinit var heroAbout: TextView
-    private lateinit var heroTag: TextView
-    private lateinit var heroScore: TextView
+    private lateinit var heroRatings: LinearLayout
     private lateinit var keyboard: LinearLayout
+    private lateinit var field: LinearLayout
+    private lateinit var headerBar: View
     private lateinit var nav: LinearLayout
     private var navTabIds = emptyList<String>()
     private val characterKeys = mutableListOf<TextView>()
@@ -81,10 +86,12 @@ class SearchActivity : Screen() {
     private var lastKey: View? = null
     private var lastKeyboardFocus: View? = null
     private var firstResult: View? = null
+    private var resultsAction: View? = null
     private var focused: Meta? = null
     private var rendered: String? = null // [searchRenderKey] of what's on screen
     private var numeric = false
     private var request = 0
+    private var userMovedFocus = false
     private val searchTasks = mutableListOf<Future<*>>()
     private val typed = Runnable { search(false) }
     override val backdrop get() = art
@@ -111,9 +118,10 @@ class SearchActivity : Screen() {
             background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(0x8C0E0C0A.toInt(), 0x000E0C0A))
         }, FrameLayout.LayoutParams(-1, dp(80), Gravity.TOP))
-        root.addView(header(), FrameLayout.LayoutParams(-1, dp(40)).apply { topMargin = dp(24) })
+        headerBar = header()
+        root.addView(headerBar, FrameLayout.LayoutParams(-1, dp(76)))
 
-        val field = LinearLayout(this).apply {
+        field = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(12), 0, dp(10), 0)
         }
@@ -122,6 +130,7 @@ class SearchActivity : Screen() {
             imageTintList = ColorStateList.valueOf(TEXT_2)
         }, LinearLayout.LayoutParams(dp(15), dp(15)))
         input = EditText(this).apply {
+            id = View.generateViewId()
             hint = getString(R.string.nav_search)
             setHintTextColor(TEXT_3)
             setTextColor(TEXT)
@@ -159,64 +168,72 @@ class SearchActivity : Screen() {
         field.addView(clear, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginStart = dp(4) })
         clearSearch = clear
         val fieldRest = glassOver(field, 17, shade = FROST_DENSE)
+        val fieldFocused = glass(17, focused = true)
         field.background = fieldRest
         input.setOnFocusChangeListener { _, has ->
-            field.background = if (has) android.graphics.drawable.LayerDrawable(arrayOf(fieldRest,
-                GradientDrawable().apply {
-                    setColor(Color.TRANSPARENT)
-                    cornerRadius = dp(17).toFloat()
-                    setStroke(dp(1), TUNGSTEN_RIM)
-                })) else fieldRest
+            field.background = if (has) fieldFocused else fieldRest
             placeCursor()
             if (!has) {
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
             }
         }
-        root.addView(field, FrameLayout.LayoutParams(dp(284), dp(34)).apply { leftMargin = dp(48); topMargin = dp(88) })
+        root.addView(field, FrameLayout.LayoutParams(dp(284), dp(34)).apply { leftMargin = dp(PAD); topMargin = dp(88) })
 
         keyboard = column(Gravity.START).apply {
             setPadding(dp(10), dp(10), dp(10), dp(10))
             background = glassOver(this, 14, shade = FROST_DENSE)
         }
         buildKeyboard()
-        root.addView(keyboard, FrameLayout.LayoutParams(dp(284), dp(190)).apply { leftMargin = dp(48); topMargin = dp(134) })
+        root.addView(keyboard, FrameLayout.LayoutParams(dp(284), dp(190)).apply { leftMargin = dp(PAD); topMargin = dp(134) })
 
-        recentBox = column(Gravity.START)
-        root.addView(recentBox, FrameLayout.LayoutParams(dp(284), -2).apply { leftMargin = dp(48); topMargin = dp(345) })
+        recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
+        root.addView(recentBox, FrameLayout.LayoutParams(dp(284), -2).apply { leftMargin = dp(PAD); topMargin = dp(345) })
         showRecent()
 
-        heroLogo = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_START }
-        heroName = text("", 48f, serif = true).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+        heroLogo = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_START
+            adjustViewBounds = true
+            maxHeight = dp(55)
+        }
+        heroName = text("", SERIF_HERO, serif = true).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         heroFacts = text("", SMALL, color = TEXT_2).onArt()
-        heroTag = ratingTag()
-        heroScore = text("", SMALL, color = TEXT_2).onArt()
+        heroRatings = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         heroAbout = text("", BODY, color = TEXT).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         hero = column(Gravity.START).apply {
-            addView(heroLogo, LinearLayout.LayoutParams(dp(210), dp(46)))
+            addView(heroLogo, LinearLayout.LayoutParams(-2, dp(55)))
             addView(heroName, LinearLayout.LayoutParams(-1, -2))
             addView(LinearLayout(this@SearchActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(heroFacts)
-                addView(heroTag, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
-                addView(heroScore, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(5) })
+                addView(heroRatings)
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-            addView(heroAbout, LinearLayout.LayoutParams(dp(420), -2).apply { topMargin = dp(5) })
+            addView(heroAbout, LinearLayout.LayoutParams(dp(HERO_W), -2).apply { topMargin = dp(6) })
             visibility = View.INVISIBLE
         }
-        root.addView(hero, FrameLayout.LayoutParams(dp((width - 408).toInt()), dp(122)).apply {
-            leftMargin = dp(360); topMargin = dp(88)
+        root.addView(hero, FrameLayout.LayoutParams(dp((width - 408).toInt()), -2).apply {
+            leftMargin = dp(360); topMargin = dp(84)
         })
-        results = column(Gravity.START)
-        resultsScroll = ScrollView(this).apply {
+        results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
+        resultsScroll = object : ScrollView(this) {
+            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
+        }.apply {
             isVerticalScrollBarEnabled = false
+            outlineProvider = ViewOutlineProvider.BOUNDS
+            clipToOutline = true
             addView(results)
         }
         // Runs to the screen's right edge, as Home's rows do: stopping 48 dp short sliced the last poster in half.
-        root.addView(resultsScroll, FrameLayout.LayoutParams(dp((width - 360).toInt()), dp((height - 220).toInt())).apply {
-            leftMargin = dp(360); topMargin = dp(220)
+        root.addView(resultsScroll, FrameLayout.LayoutParams(dp((width - 360).toInt()), dp((height - 232).toInt())).apply {
+            leftMargin = dp(360); topMargin = dp(232)
         })
         window.setBackgroundDrawable(null)
         setContentView(root)
+        root.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
+            userMovedFocus = true
+            lastKey?.let { key ->
+                if (!key.hasFocus()) updateKeyStyle(key, false)
+            }
+        }
 
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -245,7 +262,8 @@ class SearchActivity : Screen() {
     private lateinit var cursor: View
 
     private fun placeCursor() {
-        cursor.visibility = if (input.hasFocus()) View.GONE else View.VISIBLE
+        val empty = input.text.isNullOrEmpty()
+        cursor.visibility = if (empty || input.hasFocus()) View.GONE else View.VISIBLE
         cursor.translationX = input.paddingStart + input.paint.measureText(input.text.toString())
     }
 
@@ -259,24 +277,53 @@ class SearchActivity : Screen() {
 
     private fun header(): View {
         val profile = Profiles.active(this)
-        val bar = FrameLayout(this).apply { setPadding(dp(48), 0, dp(48), 0) }
-        val avatar = text(profile?.name?.take(1)?.uppercase() ?: "A", BODY, bold = true, color = TUNGSTEN).apply {
+        val bar = FrameLayout(this).apply { setPadding(dp(PAD), dp(18), dp(PAD), dp(6)) }
+        val avatar = text(profile?.name?.take(1)?.uppercase() ?: "A", SMALL, bold = true, color = TUNGSTEN).apply {
             gravity = Gravity.CENTER
-            background = glass(15)
-            rowFocus(15, rest = { glass(15) })
+            contentDescription = getString(R.string.nav_profile)
+            val rest = glassOver(this, 20)
+            fun style(focused: Boolean) {
+                background = if (focused) glass(20, true) else rest
+                setTextColor(TUNGSTEN)
+                grow(focused).start()
+            }
+            style(false)
+            isFocusable = true
+            setOnFocusChangeListener { _, has -> style(has) }
             setOnClickListener {
-                choose(profile?.name ?: getString(R.string.nav_profile),
-                    listOf(getString(R.string.menu_switch_profile), getString(R.string.menu_settings))) { picked ->
+                val pendingUpdate = Updates.available(this@SearchActivity)
+                val items = buildList {
+                    if (pendingUpdate != null) add(getString(R.string.menu_install_update, pendingUpdate.version))
+                    add(getString(R.string.menu_switch_profile))
+                    add(getString(R.string.menu_settings))
+                }
+                choose(profile?.name ?: getString(R.string.nav_profile), items) { picked ->
+                    if (pendingUpdate != null && picked == 0) return@choose installUpdate(pendingUpdate)
+                    val offset = if (pendingUpdate != null) picked - 1 else picked
                     startActivity(Intent(this@SearchActivity,
-                        if (picked == 0) ProfilesActivity::class.java else SettingsActivity::class.java)
-                        .apply { if (picked == 0) {
+                        if (offset == 0) ProfilesActivity::class.java else SettingsActivity::class.java)
+                        .apply { if (offset == 0) {
                             putExtra("pick", true)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                         } })
                 }
             }
         }
-        bar.addView(avatar, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.START or Gravity.CENTER_VERTICAL))
+        val dot = View(this).apply {
+            background = rounded(TUNGSTEN, 4)
+            elevation = dp(4).toFloat()
+            visibility = if (Updates.hasUpdate(this@SearchActivity)) View.VISIBLE else View.GONE
+        }
+        val avatarBox = FrameLayout(this).apply {
+            clipChildren = false
+            clipToPadding = false
+            addView(avatar, FrameLayout.LayoutParams(dp(30), dp(30)))
+            addView(dot, FrameLayout.LayoutParams(dp(8), dp(8), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(1)
+                marginEnd = dp(1)
+            })
+        }
+        bar.addView(avatarBox, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.START or Gravity.CENTER_VERTICAL))
         nav = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(4), dp(4), dp(4), dp(4))
@@ -287,7 +334,7 @@ class SearchActivity : Screen() {
             addView(ImageView(this@SearchActivity).apply {
                 setImageResource(R.drawable.ic_search)
                 imageTintList = ColorStateList.valueOf(TEXT)
-            }, FrameLayout.LayoutParams(dp(17), dp(17), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(3) })
+            }, FrameLayout.LayoutParams(dp(17), dp(17), Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(4) })
             addView(View(this@SearchActivity).apply { background = rounded(TUNGSTEN, 3) },
                 FrameLayout.LayoutParams(dp(3), dp(3), Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(2) })
             setOnFocusChangeListener { _, has -> background = if (has) glass(18, true) else null }
@@ -298,7 +345,7 @@ class SearchActivity : Screen() {
         background({ Stremio.savedAddons(authKey.orEmpty()).orEmpty().flatMap { a -> a.catalogs.map { it.type } } }) { r ->
             r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = it; updateNavTabs() }
         }
-        nav.background = glassOver(nav, 20, shade = FROST_READING)
+        nav.background = glassOver(nav, 22, shade = 0.22f, keepPrevious = false)
         bar.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         bar.addView(TextClock(this).apply {
             format12Hour = "h:mm a"
@@ -351,15 +398,19 @@ class SearchActivity : Screen() {
     private fun buildKeyboard() {
         val letterRows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
         val letters = letterRows.joinToString("")
+        val rows = mutableListOf<List<View>>()
         letterRows.forEach { rowLetters ->
             val row = keyRow()
+            val built = mutableListOf<View>()
             rowLetters.forEachIndexed { column, letter ->
                 val index = characterKeys.size
                 val key = key(letter.toString(), row, 1, column == rowLetters.lastIndex) {
                     append(characterKeys[index].text.toString())
                 }
                 characterKeys += key
+                built += key
             }
+            rows += built
         }
         val controls = keyRow()
         val mode = key("123", controls, 3, false) {
@@ -371,19 +422,77 @@ class SearchActivity : Screen() {
             modeLabel?.text = if (numeric) "ABC" else "123"
         }
         modeLabel = mode
-        key("−", controls, 2, false) { append("-") }
-        key("⌫", controls, 5, true) { delete() }
+        val hyphen = key("−", controls, 2, false) { append("-") }
+        val backspace = key("⌫", controls, 5, true) { delete() }
+        rows += listOf(mode, hyphen, backspace)
+
         val last = keyRow()
-        key(getString(R.string.search_space).uppercase(), last, 8, true) { append(" ") }
-        last.addView(ImageView(this).apply {
-            setImageResource(R.drawable.ic_mic)
-            imageTintList = ColorStateList.valueOf(TEXT_3)
-            scaleType = ImageView.ScaleType.CENTER
-            alpha = 0.45f
-            contentDescription = getString(R.string.search_voice_unavailable)
-            isFocusable = false
-            isClickable = false
-        }, LinearLayout.LayoutParams(dp(49), -1).apply { marginStart = dp(3) })
+        val speechAvailable = SpeechRecognizer.isRecognitionAvailable(this)
+        val space = key(getString(R.string.search_space).uppercase(), last, if (speechAvailable) 8 else 10, !speechAvailable) { append(" ") }
+        if (speechAvailable) {
+            val mic = ImageView(this).apply {
+                id = View.generateViewId()
+                setImageResource(R.drawable.ic_mic)
+                imageTintList = ColorStateList.valueOf(TEXT_2)
+                scaleType = ImageView.ScaleType.CENTER
+                isFocusable = true
+                contentDescription = getString(R.string.nav_search)
+                setOnFocusChangeListener { v, has ->
+                    if (has) lastKeyboardFocus = v
+                    updateKeyStyle(v, has)
+                    imageTintList = ColorStateList.valueOf(if (has) TEXT else TEXT_2)
+                }
+                setOnClickListener {
+                    runCatching {
+                        startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        }, VOICE_REQUEST)
+                    }
+                }
+            }
+            rightEdgeKeys += mic
+            last.addView(mic, LinearLayout.LayoutParams(dp(49), -1).apply { marginStart = dp(3) })
+            rows += listOf(space, mic)
+        } else {
+            rows += listOf(space)
+        }
+
+        val r0 = rows[0]
+        val r1 = rows[1]
+        val r2 = rows[2]
+        val r3 = rows[3]
+        val r4 = rows[4]
+        r0.forEachIndexed { i, v ->
+            v.nextFocusUpId = input.id
+            v.nextFocusDownId = r1[(i * r1.size) / r0.size].id
+        }
+        r1.forEachIndexed { i, v ->
+            v.nextFocusUpId = r0[(i * r0.size + r1.size / 2) / r1.size].id
+            v.nextFocusDownId = r2[(i - 1).coerceIn(0, r2.lastIndex)].id
+        }
+        r2.forEachIndexed { i, v ->
+            v.nextFocusUpId = r1[(i + 1).coerceIn(0, r1.lastIndex)].id
+            v.nextFocusDownId = r3[when { i <= 1 -> 0; i <= 3 -> 1; else -> 2 }].id
+        }
+        r3[0].nextFocusUpId = r2[0].id
+        r3[1].nextFocusUpId = r2[2].id
+        r3[2].nextFocusUpId = r2[5].id
+        r3.forEachIndexed { i, v ->
+            v.nextFocusDownId = if (r4.size > 1 && i == 2) r4[1].id else r4[0].id
+        }
+        r4[0].nextFocusUpId = r3[1].id
+        if (r4.size > 1) r4[1].nextFocusUpId = r3[2].id
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == VOICE_REQUEST && resultCode == RESULT_OK) {
+            val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim() ?: return
+            input.setText(spoken)
+            input.setSelection(spoken.length)
+            main.removeCallbacks(typed)
+            search(true)
+        }
     }
 
     private var modeLabel: TextView? = null
@@ -393,18 +502,25 @@ class SearchActivity : Screen() {
         keyboard.addView(this, LinearLayout.LayoutParams(-1, dp(30)).apply { if (keyboard.childCount > 0) topMargin = dp(4) })
     }
 
+    private fun updateKeyStyle(view: View, has: Boolean) {
+        view.background = if (has) rounded(GLASS_FOCUSED, 7) else null
+        if (view is TextView) view.setTextColor(if (has) TEXT else TEXT_2)
+    }
+
     private fun key(label: String, row: LinearLayout, span: Int, rightEdge: Boolean, click: () -> Unit): TextView {
         val view = text(label, if (label.length > 1) SMALL else BODY, color = TEXT_2).apply {
+            id = View.generateViewId()
             gravity = Gravity.CENTER
             isFocusable = true
         }
-        view.rowFocus(7, rest = { if (lastKey === view) tile(7) else null }) { has ->
+        view.setOnFocusChangeListener { v, has ->
             if (has) lastKeyboardFocus = view
+            updateKeyStyle(v, has)
         }
         view.setOnClickListener {
             val previous = lastKey
             lastKey = view
-            if (previous != null && previous !== view && !previous.hasFocus()) previous.background = null
+            if (previous != null && previous !== view && !previous.hasFocus()) updateKeyStyle(previous, false)
             click()
         }
         row.addView(view, LinearLayout.LayoutParams(dp(23 * span + 3 * (span - 1)), -1).apply {
@@ -432,13 +548,17 @@ class SearchActivity : Screen() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val focus = currentFocus
+            if (event.keyCode == KeyEvent.KEYCODE_BACK &&
+                (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus() || input.hasFocus() || clearSearch.hasFocus())) {
+                if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
+            }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus === input && clearSearch.visibility == View.VISIBLE && clearSearch.requestFocus()) return true
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && focus === clearSearch && input.requestFocus()) return true
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && focus === input) {
-                if (firstKey?.requestFocus() == true) return true
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && (focus === input || focus === clearSearch)) {
+                if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys) {
-                if (firstResult?.requestFocus() == true) return true
+                if ((firstResult ?: resultsAction)?.requestFocus() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && cards.any { it === focus }) {
                 if (firstResult === focus || cards.indexOfFirst { it === focus } == 0) {
@@ -467,15 +587,19 @@ class SearchActivity : Screen() {
         showRecent()
     }
 
-    private fun showRecent() {
+    private fun showRecent(restoreFocus: Boolean = false) {
         recentBox.removeAllViews()
-        val values = recent()
-        if (values.isEmpty()) return
+        val values = recent().take(RECENT)
+        if (values.isEmpty()) {
+            if (restoreFocus) (lastKeyboardFocus ?: firstKey)?.requestFocus()
+            return
+        }
         recentBox.addView(caps(R.string.search_recent, TEXT_3), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
+        var firstChip: View? = null
         values.chunked(2).forEach { pair ->
-            val line = LinearLayout(this)
+            val line = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
             pair.forEach { query ->
-                line.addView(chip(query).apply {
+                val chipView = chip(query).apply {
                     textSize = SMALL
                     maxWidth = dp(110)
                     maxLines = 1
@@ -493,50 +617,126 @@ class SearchActivity : Screen() {
                             if (picked == 0) {
                                 getSharedPreferences("search", MODE_PRIVATE).edit()
                                     .putString(recentKey(), recent().filterNot { it == query }.joinToString("\n")).apply()
-                                showRecent()
+                                showRecent(restoreFocus = true)
                             }
                         }
                         true
                     }
-                }, LinearLayout.LayoutParams(-2, dp(24)).apply { if (line.childCount > 0) marginStart = dp(5) })
+                }
+                if (firstChip == null) firstChip = chipView
+                line.addView(chipView, LinearLayout.LayoutParams(-2, dp(24)).apply { if (line.childCount > 0) marginStart = dp(5) })
             }
             recentBox.addView(line, LinearLayout.LayoutParams(-1, dp(27)))
         }
         recentBox.addView(text(R.string.search_hold_to_remove, SMALL, color = TEXT_3),
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+        if (restoreFocus) (firstChip ?: lastKeyboardFocus ?: firstKey)?.requestFocus()
+    }
+
+    private fun resetBackdrop() {
+        art.animate().cancel()
+        art.tag = null
+        art.setImageDrawable(null)
+        artBack.setImageDrawable(null)
+        art.alpha = 0f
+        refrost()
+    }
+
+    private fun showLoading() {
+        resultsAction = null
+        results.removeAllViews()
+        results.addView(ring(), LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+            topMargin = dp(24)
+            marginStart = dp(16)
+        })
+    }
+
+    private fun showEmpty() {
+        resetBackdrop()
+        hero.visibility = View.INVISIBLE
+        results.removeAllViews()
+        val clearBtn = pill(R.string.search_clear).apply {
+            setOnClickListener {
+                input.setText("")
+                main.removeCallbacks(typed)
+                search(false)
+                firstKey?.requestFocus()
+            }
+            setOnKeyListener { _, code, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)
+                    (lastKeyboardFocus ?: firstKey)?.requestFocus() == true
+                else false
+            }
+        }
+        resultsAction = clearBtn
+        results.addView(column(Gravity.START,
+            text(R.string.search_no_matches, BODY, color = TEXT),
+            clearBtn.marginTop(14),
+        ).apply {
+            setPadding(dp(18), dp(16), dp(18), dp(16))
+            background = glassOver(this, 14, shade = FROST_DENSE)
+        })
+    }
+
+    private fun showFailed(message: String, retry: () -> Unit): View {
+        val card = failed(message, retry)
+        val btn = card.getChildAt(1)?.apply {
+            setOnKeyListener { _, code, event ->
+                if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)
+                    (lastKeyboardFocus ?: firstKey)?.requestFocus() == true
+                else false
+            }
+        }
+        resultsAction = btn
+        results.addView(card)
+        return card
     }
 
     private fun search(moveFocus: Boolean, previous: Failure? = null) {
         val query = input.text.toString().trim()
         val token = ++request
+        userMovedFocus = false
         searchTasks.forEach { it.cancel(true) }
         searchTasks.clear()
+        cards.forEach { it.unload() }
         firstResult = null
+        resultsAction = null
         cards.clear()
         focused = null
         rendered = null
         hero.visibility = View.INVISIBLE
-        results.removeAllViews()
+        resetBackdrop()
         resultsScroll.scrollTo(0, 0)
         resultCount.text = ""
-        results.addView(ring(), LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginStart = dp(12) })
+        showLoading()
         if (query.isEmpty()) {
             background({
                 val addons = Stremio.savedAddons(authKey.orEmpty()).orEmpty().ifEmpty { Stremio.addons(authKey.orEmpty()) }
                 val catalogs = addons.flatMap { it.catalogs }
                     .filter { it.type == "movie" || it.type == "series" }
                 // Popular or trending first, then any other; one that fails or comes back empty gives way to the next.
-                catalogs.sortedByDescending { it.name.contains("popular", true) || it.name.contains("trending", true) }
+                var lastError: Throwable? = null
+                val found = catalogs.sortedByDescending { it.name.contains("popular", true) || it.name.contains("trending", true) }
                     .take(4).asSequence()
-                    .map { c -> runCatching { c.addon.savedCatalog(c)?.takeIf { it.isNotEmpty() } ?: c.addon.catalog(c) }.getOrDefault(emptyList())
-                        .filterNot { isAddonMessage(it.name) }.take(PER_TYPE) }
+                    .map { c ->
+                        runCatching { c.addon.savedCatalog(c)?.takeIf { it.isNotEmpty() } ?: c.addon.catalog(c) }
+                            .onFailure { lastError = it }
+                            .getOrDefault(emptyList())
+                            .filterNot { isAddonMessage(it.name) }.take(PER_TYPE)
+                    }
                     .firstOrNull { it.isNotEmpty() }.orEmpty()
+                if (found.isEmpty() && lastError != null) throw lastError!!
+                found
             }) { answer ->
                 if (token != request) return@background
+                val error = answer.exceptionOrNull()
+                if (error != null) FailureLog.record(FailureLog.Operation.SEARCH, failureOf(error))
                 val titles = answer.getOrNull().orEmpty()
                 if (titles.isEmpty()) {
                     results.removeAllViews()
-                    results.addView(failed(getString(R.string.search_popular_unavailable)) { search(false) })
+                    val msg = error?.let { failureMessage(R.string.search_popular_unavailable, failureOf(it)) }
+                        ?: getString(R.string.search_popular_unavailable)
+                    showFailed(msg) { search(false) }
                 } else render(linkedMapOf(getString(R.string.search_popular) to titles), "", false)
             }
             return
@@ -547,7 +747,7 @@ class SearchActivity : Screen() {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.SEARCH, failure)
                 results.removeAllViews()
-                results.addView(failed(failureMessage(R.string.search_unavailable, failure, source = "Stremio")) { search(true, failure) })
+                showFailed(failureMessage(R.string.search_unavailable, failure, source = "Stremio")) { search(true, failure) }
                 return@background
             }
             val answers = arrayOfNulls<List<Meta>>(addons.size)
@@ -564,7 +764,7 @@ class SearchActivity : Screen() {
                 val sections = linkedMapOf(getString(R.string.tab_movies) to ranked.filter { it.type == "movie" }.take(PER_TYPE),
                     getString(R.string.tab_shows) to ranked.filter { it.type == "series" }.take(PER_TYPE)).filterValues { it.isNotEmpty() }
                 val settled = final || completed == addons.size
-                if (sections.isNotEmpty()) render(sections, query, moveFocus && settled)
+                if (sections.isNotEmpty()) render(sections, query, moveFocus && settled && !userMovedFocus)
                 if (!settled) return
                 val failure = searchFailure(failures.filterNotNull(), completed, addons.size)
                 if (sections.isEmpty()) {
@@ -574,16 +774,15 @@ class SearchActivity : Screen() {
                 if (failure != null) {
                     FailureLog.record(FailureLog.Operation.SEARCH, failure)
                     val message = if (sections.isEmpty() && answers.all { it == null }) R.string.search_unavailable else R.string.search_incomplete
-                    val card = failed(failureMessage(message, failure)) { search(true, failure) }
-                    results.addView(card)
-                    if (moveFocus && sections.isEmpty()) card.getChildAt(1).requestFocus()
+                    showFailed(failureMessage(message, failure)) { search(true, failure) }
+                    if (moveFocus && !userMovedFocus && sections.isEmpty()) resultsAction?.requestFocus()
                 } else {
                     previous?.let { FailureLog.record(FailureLog.Operation.SEARCH, it, recovered = true) }
-                    if (sections.isEmpty()) results.addView(text(R.string.search_no_matches, BODY, color = TEXT_2))
+                    if (sections.isEmpty()) showEmpty()
                 }
             }
             if (addons.isEmpty()) { update(true); return@background }
-            main.postDelayed({ if (token == request) { update(true); finished = true } }, SEARCH_WAIT)
+            main.postDelayed({ if (!isDestroyed && token == request) { update(true); finished = true } }, SEARCH_WAIT)
             addons.forEachIndexed { index, addon ->
                 searchTasks += searchPool.submit {
                     val answer = runCatching { addon.searchCatalogs(query) }
@@ -604,6 +803,7 @@ class SearchActivity : Screen() {
 
     override fun onDestroy() {
         searchTasks.forEach { it.cancel(true) }
+        cards.forEach { it.unload() }
         super.onDestroy()
     }
 
@@ -619,25 +819,23 @@ class SearchActivity : Screen() {
         }
         rendered = key
         val posters = mutableListOf<() -> Unit>()
+        cards.forEach { it.unload() }
         cards.clear()
         firstResult = null
+        resultsAction = null
         results.removeAllViews()
         val total = sections.values.sumOf { it.size }
         resultCount.text = if (total == 0 || query.isEmpty()) "" else plural(R.plurals.search_titles, total) // not for Popular
-        if (total == 0) {
-            hero.visibility = View.INVISIBLE
-            results.addView(text(R.string.search_no_matches, BODY, color = TEXT_2))
-            return
-        }
         sections.forEach { (label, list) ->
             val group = column(Gravity.START)
             group.addView(LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(caps(label).onArt())
+                setPadding(dp(8), 0, dp(PAD), 0)
+                addView(text(label, BODY, bold = true).onArt())
                 addView(text(list.size.toString(), SMALL, color = TEXT_3).onArt(),
                     LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(9) })
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-            val caption = caption("").apply {
+            val caption = caption("", shade = FROST_DENSE).apply {
                 visibility = View.INVISIBLE
                 maxWidth = dp(280)
                 maxLines = 1
@@ -645,35 +843,36 @@ class SearchActivity : Screen() {
             }
             val rail = HorizontalCardRail(
                 screen = this,
-                cardGapPx = dp(CARD_GAP),
-                paddingStartPx = dp(6),
-                paddingTopPx = dp(8),
-                paddingEndPx = dp(48),
+                cardGapPx = dp(CARD_GAP_RAIL),
+                paddingStartPx = dp(8),
+                paddingTopPx = dp(10),
+                paddingEndPx = dp(PAD),
                 paddingBottomPx = dp(8),
+                rightFadePx = dp(30),
                 stopAtStart = false,
-                cullLeft = false,
+                cullLeft = true,
             ).apply {
                 onScroll = {
                     cards.getOrNull(this.selected)?.takeIf { it.hasFocus() }?.let { card ->
                         caption.translationX = (card.left - scroller.scrollX).toFloat()
-                            .coerceIn(0f, (scroller.width - dp(48) - caption.width).coerceAtLeast(0).toFloat())
+                            .coerceIn(0f, (scroller.width - dp(PAD) - caption.width).coerceAtLeast(0).toFloat())
                     }
                 }
             }
             list.forEachIndexed { index, meta ->
                 rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
             }
-            group.addView(rail.scroller, LinearLayout.LayoutParams(-1, dp(148)))
-            group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
-            results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(28) })
+            group.addView(rail.scroller, LinearLayout.LayoutParams(-1, dp(POSTER_H + 18)))
+            group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(6) })
+            results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(24) })
         }
         // The first [Images.THREADS] requests start at once on idle threads; the rest wait in a newest-first queue. So the
         // first cards (the ones on screen) go first, then the rest last card first, which puts the next on-screen card
         // at the front of the queue.
         (posters.take(Images.THREADS) + posters.drop(Images.THREADS).asReversed()).forEach { it() }
         sections.values.firstOrNull()?.firstOrNull()?.let(::show)
-        if (selected != null) (cards.firstOrNull { it.tag == selected } ?: firstResult)?.requestFocus()
-        else if (moveFocus) firstResult?.requestFocus()
+        val target = if (selected != null) cards.firstOrNull { it.tag == selected } ?: firstResult else if (moveFocus) firstResult else null
+        target?.post { target.requestFocus() }
     }
 
     private fun card(meta: Meta, caption: TextView, rail: HorizontalCardRail, index: Int, firstInRow: Boolean, posters: MutableList<() -> Unit>): MediaCardView {
@@ -683,18 +882,12 @@ class SearchActivity : Screen() {
             setOnFocusChanged { has ->
                 dim(!has)
                 if (has) {
-                    // The focused row snaps to the pane's top, as on Home: scrolling just far enough left Shows cut off.
-                    // Rows above it draw nothing: the pane didn't clip them, and they sat over the title's words.
                     (rail.scroller.parent as? View)?.let { group ->
                         resultsScroll.smoothScrollTo(0, group.top)
-                        for (i in 0 until results.childCount) results.getChildAt(i).let { it.alpha = if (it.top < group.top) 0f else 1f }
                     }
-                    caption.text = meta.name + (meta.year?.let { "  ·  " + it.take(4) } ?: "")
+                    caption.text = meta.name + (meta.year?.let { "$DOT${it.take(4)}" } ?: "")
                     caption.visibility = View.VISIBLE
-                    val target = rail.scrollToCard(index)
-                    rail.cards.forEach {
-                        it.animate().alpha(if (it.left < target + rail.strip.paddingStart - 1) 0f else 1f).setDuration(FOCUS_MS).start()
-                    }
+                    rail.scrollToCard(index)
                     caption.post { rail.onScroll?.invoke() }
                     show(meta)
                 } else caption.visibility = View.INVISIBLE
@@ -734,25 +927,32 @@ class SearchActivity : Screen() {
                     refrost()
                 }
             }) {
-                if (focused === meta) { art.enter(PAGE_MS).alpha(1f).start(); refrost() }
+                if (focused === meta) {
+                    art.enter(PAGE_MS).alpha(1f).withEndAction {
+                        if (focused === meta) artBack.setImageDrawable(null)
+                    }.start()
+                    refrost()
+                }
             }
         } else if (url == null) {
-            art.tag = null
-            art.setImageDrawable(null)
-            artBack.setImageDrawable(null)
-            refrost()
+            resetBackdrop()
         }
         heroName.text = meta.name
-        heroName.visibility = View.GONE
-        heroLogo.visibility = View.VISIBLE
-        Images.load(meta.logo ?: Images.logoFor(meta.id), heroLogo, dp(210), urgent = true, failed = {
-            if (focused === meta) { heroLogo.visibility = View.GONE; heroName.visibility = View.VISIBLE }
-        })
-        heroFacts.text = listOfNotNull(meta.year, meta.genres.firstOrNull(), meta.runtime?.let(::runtime)).joinToString("  ·  ") +
-            if (meta.rating != null) "  ·" else ""
-        heroTag.visibility = if (meta.rating == null) View.GONE else View.VISIBLE
-        heroScore.visibility = heroTag.visibility
-        heroScore.text = meta.rating.orEmpty()
+        heroLogo.tag = null
+        heroLogo.setImageDrawable(null)
+        heroName.visibility = View.VISIBLE
+        heroLogo.visibility = View.GONE
+        Images.load(meta.logo ?: Images.logoFor(meta.id), heroLogo, dp(260), urgent = true) {
+            if (focused === meta) { heroLogo.visibility = View.VISIBLE; heroName.visibility = View.GONE }
+        }
+        val length = if (hasEpisodes(meta.type, meta.videos)) {
+            meta.videos.map { it.season }.filter { it > 0 }.distinct().size.takeIf { it > 0 }?.let { plural(R.plurals.seasons, it) }
+        } else meta.runtime?.let(::runtime)
+        val factsText = listOfNotNull(meta.year, meta.genres.firstOrNull(), length).joinToString(DOT)
+        val ratings = shownRatings(Settings.ratings(this), meta.rating, null)
+        heroFacts.text = if (factsText.isNotEmpty() && ratings.isNotEmpty()) "$factsText$DOT" else factsText
+        heroRatings.removeAllViews()
+        addRatings(heroRatings, ratings, firstGap = 0)
         val description = meta.description.orEmpty()
         heroAbout.text = description
         heroAbout.visibility = if (meta.description.isNullOrBlank()) View.GONE else View.VISIBLE
@@ -767,10 +967,11 @@ class SearchActivity : Screen() {
     }
 
     private companion object {
-        const val RECENT = 6
+        const val RECENT = 4
         const val PER_TYPE = 12
         const val TYPING_PAUSE = 500L
         const val SEARCH_WAIT = 6000L
+        const val VOICE_REQUEST = 101
         val searchPool = Images.newestFirst(8)
     }
 }

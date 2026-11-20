@@ -558,9 +558,9 @@ abstract class Screen : Activity() {
         }
     }
 
-    protected fun caption(value: String, keepPrevious: Boolean = true) = text(value, SMALL).apply {
+    protected fun caption(value: String, keepPrevious: Boolean = true, shade: Float = 0f) = text(value, SMALL).apply {
         setPadding(dp(12), dp(6), dp(12), dp(6))
-        background = glassOver(this, 16, keepPrevious = keepPrevious)
+        background = glassOver(this, 16, shade = shade, keepPrevious = keepPrevious)
     }
 
     /** "[OK] Play / pause": the key in a small box, then what it does. */
