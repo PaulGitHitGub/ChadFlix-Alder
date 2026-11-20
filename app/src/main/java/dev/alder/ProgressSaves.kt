@@ -59,18 +59,26 @@ internal fun newerProgress(local: JSONObject, remote: JSONObject?) =
 /** If playback started without a library item, apply its progress to the real item when it becomes available. */
 internal fun applyProgress(checkpoint: JSONObject, remote: JSONObject?): JSONObject {
     val local = JSONObject(checkpoint.toString())
-    if (local.remove("alderProvisional") != true || remote == null) return local
+    if (local.optBoolean("alderProvisional") != true) return local
+    if (remote == null) return local
+    local.remove("alderProvisional")
+    if (local.optString("_mtime") <= remote.optString("_mtime")) return JSONObject(remote.toString())
     val merged = JSONObject(remote.toString())
+    merged.put("_mtime", local.optString("_mtime"))
+    val progress = local.optJSONObject("state") ?: return merged
+    val sameVideo = Library.savedVideoId(local) == Library.savedVideoId(merged)
     val state = merged.state
-    val progress = local.state
-    val sameVideo = Library.savedVideoId(local) == Library.savedVideoId(remote)
+    val alreadyWatched = sameVideo && state.optInt("flaggedWatched") != 0
+    val flaggedWatched = progress.optInt("flaggedWatched")
+    val watchedBitfield = progress.text("watched")
+    val completedOffline = flaggedWatched != 0 || progress.optInt("timesWatched") > 0 ||
+        (watchedBitfield != null && watchedBitfield != state.text("watched"))
     val played = progress.optLong("overallTimeWatched")
     for (field in listOf("video_id", "timeOffset", "duration", "lastWatched")) state.put(field, progress.opt(field))
     state.put("timeWatched", (if (sameVideo) state.optLong("timeWatched") else 0L) + progress.optLong("timeWatched"))
     state.put("overallTimeWatched", state.optLong("overallTimeWatched") + played)
-    val watched = progress.optInt("flaggedWatched")
-    val alreadyWatched = sameVideo && state.optInt("flaggedWatched") != 0
-    if (!alreadyWatched) state.put("flaggedWatched", watched)
-    if (!alreadyWatched && watched != 0) state.put("timesWatched", state.optInt("timesWatched") + 1)
-    return merged.put("_mtime", local.getString("_mtime"))
+    if (watchedBitfield != null) state.put("watched", watchedBitfield)
+    if (!alreadyWatched) state.put("flaggedWatched", flaggedWatched)
+    if (!alreadyWatched && completedOffline) state.put("timesWatched", state.optInt("timesWatched") + 1)
+    return merged
 }
