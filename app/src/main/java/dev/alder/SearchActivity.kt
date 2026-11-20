@@ -48,6 +48,14 @@ internal fun <T> rankSearchTitles(items: List<T>, query: String, rating: (T) -> 
     }.thenByDescending { rating(it) ?: 0.0 })
 }
 
+/**
+ * What a render of [sections] shows, in order: the same key means the same rows, so a late add-on that adds nothing
+ * redraws nothing. Each card is given by its id, poster and name, so a preferred add-on's answer with another poster
+ * for the same title still redraws.
+ */
+internal fun searchRenderKey(sections: Map<String, List<String>>, query: String): String =
+    query + "|" + sections.entries.joinToString("|") { (label, cards) -> label + ":" + cards.joinToString(",") }
+
 internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = answers.filterNotNull().flatten()
 
 /** House Lights search: remote keyboard on the left, focused title and poster rows on the right. */
@@ -78,6 +86,7 @@ class SearchActivity : Screen() {
     private var lastKeyboardFocus: View? = null
     private var firstResult: View? = null
     private var focused: Meta? = null
+    private var rendered: String? = null // [searchRenderKey] of what's on screen
     private var numeric = false
     private var request = 0
     private val searchTasks = mutableListOf<Future<*>>()
@@ -509,6 +518,7 @@ class SearchActivity : Screen() {
         firstResult = null
         cards.clear()
         focused = null
+        rendered = null
         hero.visibility = View.INVISIBLE
         results.removeAllViews()
         resultsScroll.scrollTo(0, 0)
@@ -603,6 +613,16 @@ class SearchActivity : Screen() {
 
     private fun render(sections: Map<String, List<Meta>>, query: String, moveFocus: Boolean) {
         val selected = (currentFocus?.tag as? String)?.takeIf { resultsScroll.hasFocus() }
+        // Each add-on's answer calls this. Rebuilding cards that didn't change cleared their posters (blank tiles while
+        // they loaded again) and could move the remote; the same rows stay as they are.
+        // ponytail: any change still rebuilds the whole pane; diff rows in place if late add-ons reorder a lot.
+        val key = searchRenderKey(sections.mapValues { (_, list) -> list.map { "${it.type}:${it.id}:${it.poster}:${it.background}:${it.name}" } }, query)
+        if (key == rendered) {
+            if (selected == null && moveFocus) firstResult?.requestFocus()
+            return
+        }
+        rendered = key
+        val posters = mutableListOf<() -> Unit>()
         cards.clear()
         firstResult = null
         results.removeAllViews()
@@ -647,7 +667,7 @@ class SearchActivity : Screen() {
                 addView(row)
             }
             list.forEachIndexed { index, meta ->
-                row.addView(card(meta, caption, scroller, index == 0), LinearLayout.LayoutParams(dp(88), dp(132)).apply {
+                row.addView(card(meta, caption, scroller, index == 0, posters), LinearLayout.LayoutParams(dp(88), dp(132)).apply {
                     if (index > 0) marginStart = dp(14)
                 })
             }
@@ -655,13 +675,24 @@ class SearchActivity : Screen() {
             group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
             results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(28) })
         }
+        // The first [Images.THREADS] requests start at once on idle threads; the rest wait in a newest-first queue. So the
+        // first cards (the ones on screen) go first, then the rest last card first, which puts the next on-screen card
+        // at the front of the queue.
+        (posters.take(Images.THREADS) + posters.drop(Images.THREADS).asReversed()).forEach { it() }
         sections.values.firstOrNull()?.firstOrNull()?.let(::show)
         if (selected != null) (cards.firstOrNull { it.first.tag == selected }?.first ?: firstResult)?.requestFocus()
         else if (moveFocus) firstResult?.requestFocus()
     }
 
-    private fun card(meta: Meta, caption: TextView, scroller: HorizontalScrollView, firstInRow: Boolean): View {
+    private fun card(meta: Meta, caption: TextView, scroller: HorizontalScrollView, firstInRow: Boolean, posters: MutableList<() -> Unit>): View {
         val image = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; setBackgroundColor(BASE) }
+        // The name, when there's no picture: a dark tile with nothing on it read as a broken result.
+        val name = text(meta.name, SMALL, bold = true).apply {
+            maxLines = 3
+            ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(8), 0, dp(8), dp(10))
+            visibility = View.GONE
+        }
         val shade = View(this).apply { setBackgroundColor(Color.BLACK); alpha = 0.5f }
         val card = FrameLayout(this).apply {
             tag = "${meta.type}:${meta.id}"
@@ -671,6 +702,7 @@ class SearchActivity : Screen() {
             }
             clipToOutline = true
             addView(image, FrameLayout.LayoutParams(-1, -1))
+            addView(name, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
             addView(shade, FrameLayout.LayoutParams(-1, -1))
             cardFocus(6) { has ->
                 // grow() unclamps ancestors; Search must keep each row inside its result pane.
@@ -716,8 +748,22 @@ class SearchActivity : Screen() {
         }
         cards += card to shade
         if (firstResult == null) firstResult = card
-        Images.load(meta.poster ?: meta.background, image, dp(96))
+        posters += { poster(meta, image, name, retry = true) }
         return card
+    }
+
+    /**
+     * The card's poster, else its backdrop. A download that fails (a slow or missing image host) is tried once more a
+     * moment later; after that the card shows the title's name. Failures are logged by host, to trace missing posters.
+     */
+    private fun poster(meta: Meta, image: ImageView, name: TextView, retry: Boolean) {
+        val url = meta.poster ?: meta.background
+        Images.load(url, image, dp(96), orElse = meta.background?.takeIf { it != url }, failed = {
+            android.util.Log.w("Alder", "search poster failed: ${url?.let { android.net.Uri.parse(it).host } ?: "none"}" +
+                if (retry && url != null) ", trying again" else "")
+            if (retry && url != null) main.postDelayed({ if (image.isAttachedToWindow) poster(meta, image, name, retry = false) }, POSTER_RETRY)
+            else name.visibility = View.VISIBLE
+        })
     }
 
     private fun show(meta: Meta) {
@@ -773,6 +819,7 @@ class SearchActivity : Screen() {
         const val PER_TYPE = 12
         const val TYPING_PAUSE = 500L
         const val SEARCH_WAIT = 6000L
+        const val POSTER_RETRY = 2000L // ms before a failed poster is asked for again
         val searchPool = Images.newestFirst(8)
     }
 }

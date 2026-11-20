@@ -26,7 +26,9 @@ object Images {
     private val screens = store(Runtime.getRuntime().maxMemory() / 6)
     private fun cache(widthPx: Int) = if (widthPx > 1000) screens else cards
     // Home asks only for posters near the screen and lets far ones go, so this pool and cache stay small.
-    private val pool = newestFirst(8)
+    /** Threads in the card pool: the first this many requests start at once, ahead of the newest-first queue. */
+    const val THREADS = 8
+    private val pool = newestFirst(THREADS)
     // The picture on screen right now (the full-screen art, a logo) skips the queue of cards loading behind it.
     private val urgentPool = newestFirst(2)
     // Art fetched ahead for where the remote may go next never holds up the cards on screen.
