@@ -14,6 +14,10 @@ internal object ProgressSaves {
         prefs = context.getSharedPreferences("pending_progress", Context.MODE_PRIVATE)
     }
 
+    internal fun init(store: SharedPreferences?) {
+        prefs = store
+    }
+
     private fun prefix(authKey: String) = MessageDigest.getInstance("SHA-256").digest(authKey.toByteArray())
         .joinToString("") { "%02x".format(it) } + "/"
 
@@ -23,8 +27,16 @@ internal object ProgressSaves {
         val key = prefix(authKey) + item.getString("_id")
         val old = store.getString(key, null)?.let(::JSONObject)
         if (old == null || item.optString("_mtime") >= old.optString("_mtime")) {
-            if (provisional) item.put("alderProvisional", true)
-            store.edit().putString(key, item.toString()).apply()
+            val saved = JSONObject(item.toString())
+            if (provisional) saved.put("alderProvisional", true)
+            if (provisional || saved.optBoolean("alderProvisional")) {
+                val (mergedWatched, _) = Library.mergeWatchedBitfields(
+                    old?.optJSONObject("state")?.text("watched"),
+                    saved.optJSONObject("state")?.text("watched"),
+                )
+                if (mergedWatched != null) saved.state.put("watched", mergedWatched)
+            }
+            store.edit().putString(key, saved.toString()).apply()
         }
     }
 
@@ -70,15 +82,19 @@ internal fun applyProgress(checkpoint: JSONObject, remote: JSONObject?): JSONObj
     val state = merged.state
     val alreadyWatched = sameVideo && state.optInt("flaggedWatched") != 0
     val flaggedWatched = progress.optInt("flaggedWatched")
-    val watchedBitfield = progress.text("watched")
-    val completedOffline = flaggedWatched != 0 || progress.optInt("timesWatched") > 0 ||
-        (watchedBitfield != null && watchedBitfield != state.text("watched"))
+    val (mergedWatched, addedWatched) = Library.mergeWatchedBitfields(state.text("watched"), progress.text("watched"))
+    val completedOffline = flaggedWatched != 0 || progress.optInt("timesWatched") > 0 || addedWatched > 0
     val played = progress.optLong("overallTimeWatched")
     for (field in listOf("video_id", "timeOffset", "duration", "lastWatched")) state.put(field, progress.opt(field))
     state.put("timeWatched", (if (sameVideo) state.optLong("timeWatched") else 0L) + progress.optLong("timeWatched"))
     state.put("overallTimeWatched", state.optLong("overallTimeWatched") + played)
-    if (watchedBitfield != null) state.put("watched", watchedBitfield)
+    if (mergedWatched != null) state.put("watched", mergedWatched)
     if (!alreadyWatched) state.put("flaggedWatched", flaggedWatched)
-    if (!alreadyWatched && completedOffline) state.put("timesWatched", state.optInt("timesWatched") + 1)
+    val addedWatches = when {
+        !alreadyWatched && completedOffline -> maxOf(1, progress.optInt("timesWatched"), addedWatched)
+        alreadyWatched && addedWatched > 0 -> addedWatched
+        else -> 0
+    }
+    if (addedWatches > 0) state.put("timesWatched", state.optInt("timesWatched") + addedWatches)
     return merged
 }
