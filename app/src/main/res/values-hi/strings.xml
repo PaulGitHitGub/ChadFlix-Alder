@@ -63,7 +63,6 @@
     <string name="menu_settings">सेटिंग</string>
     <string name="action_play">चलाएँ</string>
     <string name="action_resume">जारी रखें</string>
-    <string name="new_episode">नया एपिसोड</string>
     <string name="stopped_at">%1$s पर रुका</string>
     <string name="time_left_hours">%1$d घं %2$d मि बाकी</string>
     <string name="time_left_minutes">%1$d मि बाकी</string>

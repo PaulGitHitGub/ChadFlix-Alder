@@ -1,6 +1,5 @@
 package dev.alder
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -18,10 +17,7 @@ import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.ViewTreeObserver
-import android.view.animation.DecelerateInterpolator
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -246,7 +242,7 @@ class MainActivity : Screen() {
     private val Page.isCatalog get() = this == Page.SHOWS || this == Page.MOVIES || type != null
     private val Page.hasGenreShortcuts get() = this == Page.SHOWS || this == Page.MOVIES
     private val Page.polishedRail get() = this == Page.HOME || hasGenreShortcuts
-    private var held = false
+    private val held get() = rows.any { it.rail.held }
     /** One row of cards under the focused title's art: every page but My List's grid. */
     private val Page.isBrowse get() = this == Page.HOME || isCatalog || this == Page.LIVE
     /** A grid of large posters under the focused title's art: My List and Discover. */
@@ -387,7 +383,6 @@ class MainActivity : Screen() {
         val resumeAt: Long = 0,
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
-        var newEpisode: Boolean = false,
     ) {
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
@@ -527,7 +522,7 @@ class MainActivity : Screen() {
             rows.filter { it.active && (now == null || !isInside(now, it.view)) }.forEach { it.light(false) }
             if (mode == Mode.CINEMA) chrome() // the top bar shows only while the remote is on it
             // The caption names the focused card: none while the remote is up in the top bar.
-            if (now !is Row.Card) {
+            if (now !is MediaCardView) {
                 cardCaption.visibility = View.GONE
                 cardUnderline.visibility = View.INVISIBLE
             }
@@ -1344,7 +1339,7 @@ class MainActivity : Screen() {
     }
 
     private fun showCaption(item: Item) {
-        if ((currentFocus as? Row.Card)?.item !== item) {
+        if (((currentFocus as? MediaCardView)?.payload as? Item) !== item) {
             cardCaption.visibility = View.GONE
             cardUnderline.visibility = View.INVISIBLE
             return
@@ -1370,7 +1365,7 @@ class MainActivity : Screen() {
     }
 
     private fun placeCaption() {
-        val card = currentFocus as? Row.Card ?: return
+        val card = currentFocus as? MediaCardView ?: return
         val parent = cardCaption.parent as FrameLayout
         if (!card.isAttachedToWindow || !isInside(card, parent)) return
         captionAnchor.set(0, 0, card.width, card.height)
@@ -1611,7 +1606,7 @@ class MainActivity : Screen() {
             loadMoreSections = null
             val oldSlots = catalogSlots.toMutableMap()
             val focusedRow = rows.firstOrNull { it.view.hasFocus() && it.view.parent in oldSlots.values }
-            val focused = currentFocus as? Row.Card
+            val focused = currentFocus as? MediaCardView
             val focusedTag = focused?.tag?.takeIf { focusedRow != null }
             catalogSlots.clear()
             noCatalogs?.let(content::removeView)
@@ -2331,7 +2326,7 @@ class MainActivity : Screen() {
                     previous?.let { FailureLog.record(FailureLog.Operation.LIBRARY_EDIT, it, recovered = true) }
                     library = library.map { if (it.optString("_id") == item.id) updated else it }
                     if (page == Page.LIBRARY) {
-                        val stillOnTitle = (currentFocus as? Row.Card)?.item?.id == item.id || currentFocus == null
+                        val stillOnTitle = ((currentFocus as? MediaCardView)?.payload as? Item)?.id == item.id || currentFocus == null
                         redrawLibrary(index.takeIf { remove && stillOnTitle })
                     }
                 }) { error ->
@@ -2488,62 +2483,37 @@ class MainActivity : Screen() {
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
         private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
         private val polishedRail = page.polishedRail
-        private val gap = if (grid) LIST_GAP else if (polishedRail) 16 else CARD_GAP
+        private val gap = if (grid) LIST_GAP else if (polishedRail) CARD_GAP_RAIL else CARD_GAP
         val cardStep = cardWidth + dp(gap)
         val items = first.toMutableList()
-        val cards = items.mapIndexed { i, item -> Card(item, i) }.toMutableList()
         private var fetching = false
-        var selected = 0
         var pendingUpdate: (() -> Unit)? = null
         var active = false
         var loaded = false
-        private var anim: ValueAnimator? = null
-        val strip = LinearLayout(this@MainActivity).apply {
-            // Room above and below for the focused card to grow into without being clipped.
-            val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(PAD)
-            setPadding(inset, dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM), inset, if (grid) dp(LIST_GAP) else dp(ROW_BOTTOM_ROOM))
-            clipToPadding = false
-            cards.forEachIndexed { i, c -> addView(c, LinearLayout.LayoutParams(cardWidth, cardHeight).apply { if (i > 0) marginStart = dp(gap) }) }
-        }
-        val scroller: HorizontalScrollView = object : HorizontalScrollView(this@MainActivity) {
-            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
-            override fun getLeftFadingEdgeStrength() = if (polishedRail) 0f else super.getLeftFadingEdgeStrength()
 
-            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                val left = event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
-                if (!left && event.keyCode != KeyEvent.KEYCODE_DPAD_RIGHT) return super.dispatchKeyEvent(event)
-                if (event.action == KeyEvent.ACTION_DOWN) {
-                    held = event.repeatCount > 0
-                    if (shouldSkipRepeat(held, wide, event.repeatCount)) return true
-                    cards.getOrNull(selected + if (left) -1 else 1)?.requestFocus()
-                } else {
-                    val wasHeld = held
-                    held = false
-                    if (wasHeld && !grid && !page.polishedRail) items.getOrNull(selected)?.let(::showArt)
-                }
-                return true // at either end the remote simply stays put
-            }
-
-            // Coming in from above or below, the remote lands on the card this row last had.
-            override fun addFocusables(views: ArrayList<View>, direction: Int, focusableMode: Int) {
-                if (!hasFocus() && (direction == View.FOCUS_UP || direction == View.FOCUS_DOWN)) views.add(cards[selected])
-                else super.addFocusables(views, direction, focusableMode)
-            }
-        }.apply {
-            isHorizontalScrollBarEnabled = false
-            if (polishedRail) {
-                isHorizontalFadingEdgeEnabled = true
-                setFadingEdgeLength(dp(30))
-            }
-            addView(strip)
-            if (polishedRail) strip.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> showVisibleCards() }
-            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> showVisibleCards() }
-            setOnScrollChangeListener { view, _, _, _, _ ->
-                showVisibleCards()
-                if (view.hasFocus()) placeCaption()
+        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(PAD)
+        val rail = HorizontalCardRail(
+            screen = this@MainActivity,
+            cardGapPx = dp(gap),
+            paddingStartPx = inset,
+            paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
+            paddingEndPx = inset,
+            paddingBottomPx = dp(if (grid) LIST_GAP else ROW_BOTTOM_ROOM),
+            wideMotion = wide,
+            rightFadePx = if (polishedRail) dp(30) else 0,
+        ).apply {
+            onScroll = {
+                if (scroller.hasFocus()) placeCaption()
                 loadRest(this@Row)
             }
+            onHoldEnd = { sel ->
+                if (!grid && !polishedRail) items.getOrNull(sel)?.let(::showArt)
+            }
         }
+        val cards: MutableList<MediaCardView> get() = rail.cards
+        val scroller: HorizontalScrollView get() = rail.scroller
+        val selected: Int get() = rail.selected
+
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         private val heading = text(title, BODY, bold = true).onArt().apply {
@@ -2556,26 +2526,57 @@ class MainActivity : Screen() {
         }
         val view: View = column(Gravity.START, heading, scroller).apply { if (wide) setPadding(0, dp(CARD_H - WIDE_H), 0, 0) }
 
-        init { if (grid) cards.forEach { it.dim(true) } }
+        init {
+            items.forEachIndexed { i, item -> rail.appendCard(makeCard(item, i)) }
+            if (grid) cards.forEach { it.dim(true) }
+        }
+
+        private fun makeCard(item: Item, index: Int) = MediaCardView(
+            screen = this@MainActivity,
+            titleName = item.name,
+            posterUrl = item.poster,
+            artUrl = item.art,
+            widthPx = cardWidth,
+            heightPx = cardHeight,
+            wide = wide,
+            grid = grid,
+            showRim = !polishedRail,
+            dimAlpha = if (grid) 0f else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
+            eagerFallback = grid || page.hasGenreShortcuts,
+            progress = item.progress,
+            finished = item.finished,
+            live = item.live,
+            settled = item.settled,
+        ).apply {
+            payload = item
+            tag = "card:${item.id}"
+            onRequestMeta = { fill(item) }
+            item.onFill += { refresh(item.poster, item.art, item.settled) }
+            setOnFocusChanged { has ->
+                if (has) {
+                    focus(index)
+                    showHero(item)
+                } else main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
+            }
+            // A channel has no title page to show: OK plays it, and holding OK lists its sources.
+            setOnClickListener { if (item.live) play(item) else openDetails(item) }
+            if (grid && page == Page.LIBRARY) setOnLongClickListener { listMenu(item); true }
+            else if (continueRow) setOnLongClickListener { continueMenu(item); true }
+            else setOnLongClickListener { rowMenu(this@Row, item); true }
+        }
 
         fun peek(show: Boolean) { if (!grid) heading.visibility = if (show) View.VISIBLE else View.INVISIBLE } // a grid row has no name
-
 
         /** In or out of this row: its title brightens or quiets, its cards come forward or settle back. */
         fun light(on: Boolean) {
             if (active == on) return
             active = on
-            if (on) peek(true)
+            if (on) peek(true) else rail.clearHeld()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
             cards.forEachIndexed { i, c -> c.dim(if (grid) !on || i != selected else on && i != selected) }
         }
 
-        fun focusFirst() = cards[selected].requestFocus()
-
-        private fun showVisibleCards() {
-            val x = scroller.scrollX
-            cards.forEach { it.show(it.isFocused || (it.right - x > dp(PAD) && it.left - x < scroller.width)) }
-        }
+        fun focusFirst() = rail.focusSelected()
 
         /**
          * The remote reached card [index]: slide it to the row's start, where the eye already is. Near the end the row
@@ -2585,7 +2586,7 @@ class MainActivity : Screen() {
          */
         fun focus(index: Int) {
             val previous = selected
-            selected = index
+            rail.selectIndex(index)
             main.post { loadMoreSections?.invoke() }
             if (active) {
                 if (previous != index) { cards[previous].dim(true); cards[index].dim(false) }
@@ -2603,14 +2604,9 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            anim?.cancel()
-            val startScroll = scroller.scrollX
-            val targetScroll = minOf(index * cardStep, (strip.width - scroller.width).coerceAtLeast(0))
-            // Keep the cards at the current scroll position visible while the strip slides toward its destination.
-            val right = scroller.width - dp(PAD) / 2
-            showVisibleCards()
+            val targetScroll = rail.scrollToCard(index)
             loadRest(this@Row)
-            val beyond = cards.any { it.right - targetScroll > right }
+            val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
             moreHint.translationY = if (wide) dp(CARD_H - WIDE_H + WIDE_H / 2 - CARD_H / 2).toFloat() else 0f
             if (!grid && wideRow != wide) {
@@ -2618,14 +2614,6 @@ class MainActivity : Screen() {
                 browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
                     bottomMargin = heroBottom - if (wide) dp(CARD_H - WIDE_H) else 0
                 }
-            }
-            // A held key repeats every 50 ms. Restarting a slowing-down slide on each repeat made the row lurch and brake
-            // twenty times a second; a straight slide that lasts until the next repeat joins them into one glide.
-            val glideTime = rowGlideDuration(held, wide, ViewConfiguration.getKeyRepeatDelay().toLong())
-            anim = ValueAnimator.ofInt(startScroll, targetScroll).setDuration(glideTime).apply {
-                interpolator = if (held) LinearInterpolator() else DecelerateInterpolator()
-                addUpdateListener { scroller.scrollTo(it.animatedValue as Int, 0) }
-                start()
             }
         }
 
@@ -2640,190 +2628,20 @@ class MainActivity : Screen() {
                 val fresh = result.getOrElse { return@background }.filter { it.id !in known } // a failed page can be asked again
                 if (fresh.isEmpty()) { this.more = null; return@background }
                 for (item in fresh) {
-                    val card = Card(item, items.size)
+                    val card = makeCard(item, items.size)
                     items += item
-                    cards += card
-                    strip.addView(card, LinearLayout.LayoutParams(cardWidth, cardHeight).apply { marginStart = dp(gap) })
-                    card.alpha = 0f // shows once focus moves near, like the cards past the right margin
-                    card.dim(active)
+                    rail.appendCard(card)
+                    card.show(false) // shows once focus moves near, like the cards past the right margin
+                    card.dim(active, animate = false)
                 }
                 if (loaded) loadRest(this@Row)
-                if (active && !grid) strip.post {
+                if (active && !grid) rail.strip.post {
                     if (active) {
                         placeCaption()
-                        val right = scroller.width - dp(PAD) / 2
-                        val beyond = cards.any { it.right - scroller.scrollX > right }
+                        val beyond = rail.hasCardsBeyond(scroller.scrollX, dp(PAD) / 2)
                         moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
                     }
                 }
-            }
-        }
-
-        /** One title: its poster (the name only when there's none), or in a wide row its art with name, time left and progress. */
-        inner class Card(val item: Item, val index: Int) : FrameLayout(this@MainActivity) {
-
-            // Fading, a card that may overlap itself is drawn into a layer of its own first: an extra pass for every
-            // card fading in or out. Fading each part on its own looks the same over 150 ms.
-            override fun hasOverlappingRendering() = false
-            // Grey only until the art arrives, so the GPU doesn't paint a hidden layer under every card.
-            private val image = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-            // The name in words: always on a wide card, on a poster only when it has no picture. Made only then: a
-            // text view per card was a good part of the cost of making a row.
-            private val nameMade = lazy {
-                text(item.name, if (wide) BODY else SMALL, bold = true).apply {
-                    maxLines = if (wide) 1 else 2
-                    ellipsize = TextUtils.TruncateAt.END
-                    if (item.live) gravity = Gravity.CENTER
-                }.also {
-                    face.addView(it, LayoutParams(
-                        if (item.live) -2 else -1,
-                        -2,
-                        if (item.live) Gravity.CENTER else Gravity.BOTTOM or Gravity.START
-                    ).apply {
-                        if (item.live) setMargins(dp(8), dp(8), dp(8), dp(8))
-                        else setMargins(dp(inset), 0, dp(inset), dp(if (item.progress > 0) 22 else 12))
-                    })
-                }
-            }
-            private val name by nameMade
-            private val inset = if (wide) 14 else 12
-            private var shown: String? = null
-            private var wanted = false // near the screen: load when the details arrive
-            // The poster appears once it's decoded; until then the card is a plain dark tile.
-            private val face = object : FrameLayout(context) { override fun hasOverlappingRendering() = false }.apply { alpha = 0f }
-            // Darkens the cards beside the focused one. A shade, not transparency: a see-through card would let the
-            // art behind it show through and look like it was floating on the poster.
-            private val shade = View(context).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
-            private val progress = item.progress.takeIf { it > 0f && !grid }?.let { progressBar(it) }
-
-            init {
-                if (grid) setBackgroundColor(0xFF28221E.toInt())
-                outlineProvider = object : android.view.ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: android.graphics.Outline) =
-                        outline.setRoundRect(0, 0, view.width, view.height, dp(if (grid) 6 else RADIUS).toFloat())
-                }
-                clipToOutline = true
-                if (!grid) setBackgroundColor(BASE)
-                face.addView(image, LayoutParams(-1, -1))
-                // A dark foot under the words or the progress bar; a plain poster needs none.
-                if ((wide && !item.live) || progress != null) face.addView(View(context).apply {
-                    background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000))
-                }, LayoutParams(-1, cardHeight * (if (wide) 6 else 4) / 10, Gravity.BOTTOM))
-                if (wide && !item.live) name.visibility = View.VISIBLE
-                val addBadge = {
-                    face.addView(text(R.string.new_episode, SMALL, bold = true, color = TUNGSTEN).apply {
-                        tag = "new_badge"
-                        background = rounded(0xCC000000.toInt(), 6)
-                        setPadding(dp(8), dp(4), dp(8), dp(4))
-                    }, LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { setMargins(dp(10), dp(10), 0, 0) })
-                }
-                if (wide && item.newEpisode) addBadge()
-                addView(face, LayoutParams(-1, -1))
-                if (progress != null) addView(progress,
-                    LayoutParams(-1, dp(3), Gravity.BOTTOM).apply {
-                        setMargins(dp(inset), 0, dp(inset), dp(11))
-                    })
-                if (grid && item.finished) addView(text("✓", SMALL, bold = true, color = TUNGSTEN).apply {
-                    gravity = Gravity.CENTER
-                    background = rounded(BASE, 12)
-                }, LayoutParams(dp(24), dp(24), Gravity.TOP or Gravity.END).apply { setMargins(0, dp(6), dp(6), 0) })
-                addView(shade, LayoutParams(-1, -1))
-                isFocusable = true
-                if (grid) contentDescription = item.name
-                tag = "card:${item.id}"
-                item.onFill += {
-                    if (wide && item.newEpisode && face.findViewWithTag<View>("new_badge") == null) addBadge()
-                    if (wanted) load()
-                }
-                setOnFocusChangeListener { _, has ->
-                    lift(has, rim = !polishedRail)
-                    if (has) {
-                        focus(index)
-                        showHero(item)
-                    } else main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
-                }
-                // A channel has no title page to show: OK plays it, and holding OK lists its sources.
-                setOnClickListener { if (item.live) play(item) else openDetails(item) }
-                if (grid && page == Page.LIBRARY) setOnLongClickListener { listMenu(item); true }
-                else if (continueRow) setOnLongClickListener { continueMenu(item); true }
-                else setOnLongClickListener { rowMenu(this@Row, item); true }
-            }
-
-            private var showing: Boolean? = null
-
-            /** In view or slid into a margin; the row's slide supplies the motion. */
-            fun show(on: Boolean) {
-                if (on == showing) return
-                showing = on
-                alpha = if (on) 1f else 0f
-            }
-
-            fun dim(on: Boolean) = shade.animate()
-                .alpha(if (grid) 0f
-                    else if (!on) 0f else if (continueRow || page.hasGenreShortcuts) CONTINUE_DIM else DIM).setDuration(FOCUS_MS).start()
-
-            /** On screen (or nearly): the poster (the wide art cropped for a title without one, else its name). */
-            fun load() {
-                wanted = true
-                // A wide card waits for the title's art (it comes with its details) and takes the poster only if there's none.
-                val pick = if (item.live) item.poster ?: item.art else if (wide) item.art ?: item.poster?.takeIf { item.settled } else item.poster ?: item.art
-                if (pick == null || (!item.live && wide && item.art == null)) fill(item)
-                val url = pick ?: run {
-                    if (item.settled || item.live || grid || page.hasGenreShortcuts) {
-                        if (item.live) face.background = glass(RADIUS)
-                        name.visibility = View.VISIBLE
-                        face.alpha = 1f
-                    }
-                    return
-                }
-                if (url == shown) return
-                shown = url
-                face.animate().cancel()
-                face.alpha = 0f
-                val imageWidth = (cardWidth * CARD_GROW).toInt()
-                if ((grid || page.hasGenreShortcuts) && !Images.cached(url, imageWidth)) {
-                    name.visibility = View.VISIBLE
-                    face.alpha = 1f
-                }
-                var now = true // from memory: no fade, it's simply there
-                Images.load(url, image, imageWidth, failed = {
-                    if (item.live) face.background = glass(RADIUS)
-                    name.visibility = View.VISIBLE
-                    face.alpha = 1f
-                }) {
-                    if (item.live) fitLogo()
-                    if (nameMade.isInitialized()) name.visibility = if (wide && !item.live) View.VISIBLE else View.INVISIBLE
-                    if (now) face.alpha = 1f else face.enter(QUICK_MS).alpha(1f).start()
-                    if (isFocused) lift(true, rim = !polishedRail)
-                }
-                now = false
-            }
-
-            /**
-             * A channel's picture is often its logo: on a transparent background, or a shape far from the card's. That
-             * sits whole inside the card on glass instead of being cropped; a picture shaped like the card fills it.
-             */
-            private fun fitLogo() {
-                val bitmap = (image.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return
-                val shape = bitmap.width / bitmap.height.toFloat()
-                val target = cardWidth / cardHeight.toFloat()
-                val logo = bitmap.hasAlpha() || kotlin.math.abs(shape - target) > 0.25f
-                image.scaleType = if (logo) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP
-                val inset = if (logo) dp(if (wide) 8 else LOGO_INSET) else 0
-                image.setPadding(inset, inset, inset, inset)
-                face.background = if (logo) glass(RADIUS) else null
-            }
-
-            /** Far off screen: let the pictures go. */
-            fun unload() {
-                if (!wanted && shown == null && image.drawable == null) return
-                wanted = false
-                shown = null
-                image.tag = null
-                image.setImageDrawable(null)
-                image.setPadding(0, 0, 0, 0)
-                face.background = null
-                face.alpha = 0f
             }
         }
     }
@@ -2855,10 +2673,6 @@ class MainActivity : Screen() {
         if (item.logo == null) item.logo = m.logo
         if (item.about.isEmpty()) item.about = m.description ?: ""
         if (item.facts.isEmpty() || item.resume) item.facts = facts(m)
-        if (item.nextEpisodePending && item.videoId != null) {
-            val v = m.videos.firstOrNull { it.id == item.videoId }
-            if (v != null && isRecentlyAired(v.released)) item.newEpisode = true
-        }
         // Home's first title (the first card the remote lands on): next launch starts on its art and logo.
         if (cinema.firstOrNull() === item && item.art != null) getSharedPreferences("home", MODE_PRIVATE).edit()
             .putString("art:${profile.id}", item.art).putString("logo:${profile.id}", item.logo).apply()
@@ -2915,16 +2729,11 @@ class MainActivity : Screen() {
         val progress = if (duration > 0) offset.toFloat() / duration else 0f
         val id = item.getString("_id")
         val type = item.optString("type")
-        val newEpisode = if (pending) {
-            val v = metas[id]?.videos?.firstOrNull { it.id == videoId }
-            v != null && isRecentlyAired(v.released)
-        } else false
         return Item(
             id, type, item.text("name")?.takeIf { it.isNotBlank() } ?: getString(R.string.addons_unavailable), item.text("poster"),
             null, Images.logoFor(id), "", emptyList(), videoId, progress,
             resume = offset > 0, timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
-            newEpisode = newEpisode,
         )
     }
 
@@ -3079,14 +2888,10 @@ class MainActivity : Screen() {
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
-        const val RADIUS = 6
-        const val LOGO_INSET = 14 // dp around a channel logo inside its card
         const val ROW_TOP_ROOM = HEADING_GAP + 8 // dp between the row title and its cards, plus the focused card's growth
         const val ROW_BOTTOM_ROOM = 40 // room for the focused caption below the poster
         const val SAFE_BOTTOM = 28
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
-        const val DIM = 0.5f
-        const val CONTINUE_DIM = 0.38f
         const val HOME_SYNOPSIS_W = 445
         const val HOME_HERO_WAIT = 150L
         const val HOME_ART_EXIT_MS = 100L

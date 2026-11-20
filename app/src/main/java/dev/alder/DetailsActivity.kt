@@ -1162,25 +1162,31 @@ class DetailsActivity : Screen() {
         content.addView(headerRow, LinearLayout.LayoutParams(-1, -2).apply {
             bottomMargin = dp(12)
         })
-        val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
-        similarFirst = null
+        similarFirst = addPosterRail(content, titles, captionPill)
+        similarOverlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
+            leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
+        })
+        root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
+        showHero(meta)
+    }
+
+    private fun addPosterRail(content: LinearLayout, titles: List<Meta>, captionPill: TextView): View? {
+        val room = dp(8)
+        val rail = HorizontalCardRail(
+            screen = this,
+            cardGapPx = dp(CARD_GAP),
+            paddingStartPx = room,
+            paddingTopPx = room,
+            paddingEndPx = room,
+            paddingBottomPx = room,
+            cullLeft = false,
+        )
+        var firstCard: View? = null
         titles.forEachIndexed { index, title ->
-            val card = FrameLayout(this).apply {
-                background = rounded(BASE, 6)
-                outlineProvider = object : android.view.ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: android.graphics.Outline) =
-                        outline.setRoundRect(0, 0, view.width, view.height, dp(6).toFloat())
-                }
-                clipToOutline = true
-                val image = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-                addView(image, FrameLayout.LayoutParams(-1, -1))
-                val fallback = text(title.name, SMALL, bold = true).apply {
-                    maxLines = 3; ellipsize = TextUtils.TruncateAt.END
-                    setPadding(dp(8), 0, dp(8), dp(8)); visibility = View.GONE
-                }
-                addView(fallback, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-                cardFocus(6) { has ->
+            val card = MediaCardView(this, title.name, title.poster, title.background, dimAlpha = 0f, fadeIn = false).apply {
+                setOnFocusChanged { has ->
                     if (has) {
+                        rail.scrollToCard(index)
                         val yearStr = title.year?.take(4)?.let { "  ·  $it" } ?: ""
                         captionPill.text = "${title.name}$yearStr"
                         captionPill.visibility = View.VISIBLE
@@ -1191,32 +1197,18 @@ class DetailsActivity : Screen() {
                         .putExtra("type", title.type).putExtra("id", title.id).putExtra("name", title.name)
                         .putExtra("poster", title.poster).putExtra("background", title.background))
                 }
-                Images.load(title.poster ?: title.background, image, dp(POSTER_W), failed = {
-                    fallback.visibility = View.VISIBLE
-                })
+                load()
             }
-            if (similarFirst == null) similarFirst = card
-            row.addView(card, LinearLayout.LayoutParams(dp(POSTER_W), dp(POSTER_H)).apply {
-                if (index > 0) marginStart = dp(CARD_GAP)
-            })
+            if (firstCard == null) firstCard = card
+            rail.appendCard(card)
         }
-        val room = dp(8)
-        content.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            setPadding(room, room, room, room)
-            addView(row)
-        }, LinearLayout.LayoutParams(-1, dp(POSTER_H) + 2 * room).apply {
+        content.addView(rail.scroller, LinearLayout.LayoutParams(-1, dp(POSTER_H) + 2 * room).apply {
             leftMargin = -room
             rightMargin = -room
             topMargin = -room
             bottomMargin = -room
         })
-        similarOverlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
-            leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
-        })
-        root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
-        showHero(meta)
+        return firstCard
     }
 
     private fun showSimilar() {
@@ -1437,56 +1429,7 @@ class DetailsActivity : Screen() {
         content.addView(headerRow, LinearLayout.LayoutParams(-1, -2).apply {
             bottomMargin = dp(12)
         })
-        val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
-        filmographyFirst = null
-        titles.forEachIndexed { index, title ->
-            val card = FrameLayout(this).apply {
-                background = rounded(BASE, 6)
-                outlineProvider = object : android.view.ViewOutlineProvider() {
-                    override fun getOutline(view: View, outline: android.graphics.Outline) =
-                        outline.setRoundRect(0, 0, view.width, view.height, dp(6).toFloat())
-                }
-                clipToOutline = true
-                val image = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-                addView(image, FrameLayout.LayoutParams(-1, -1))
-                val fallback = text(title.name, SMALL, bold = true).apply {
-                    maxLines = 3; ellipsize = TextUtils.TruncateAt.END
-                    setPadding(dp(8), 0, dp(8), dp(8)); visibility = View.GONE
-                }
-                addView(fallback, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-                cardFocus(6) { has ->
-                    if (has) {
-                        val yearStr = title.year?.take(4)?.let { "  ·  $it" } ?: ""
-                        captionPill.text = "${title.name}$yearStr"
-                        captionPill.visibility = View.VISIBLE
-                    }
-                }
-                setOnClickListener {
-                    startActivity(Intent(this@DetailsActivity, DetailsActivity::class.java)
-                        .putExtra("type", title.type).putExtra("id", title.id).putExtra("name", title.name)
-                        .putExtra("poster", title.poster).putExtra("background", title.background))
-                }
-                Images.load(title.poster ?: title.background, image, dp(POSTER_W), failed = {
-                    fallback.visibility = View.VISIBLE
-                })
-            }
-            if (filmographyFirst == null) filmographyFirst = card
-            row.addView(card, LinearLayout.LayoutParams(dp(POSTER_W), dp(POSTER_H)).apply {
-                if (index > 0) marginStart = dp(CARD_GAP)
-            })
-        }
-        val room = dp(8)
-        content.addView(HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            setPadding(room, room, room, room)
-            addView(row)
-        }, LinearLayout.LayoutParams(-1, dp(POSTER_H) + 2 * room).apply {
-            leftMargin = -room
-            rightMargin = -room
-            topMargin = -room
-            bottomMargin = -room
-        })
+        filmographyFirst = addPosterRail(content, titles, captionPill)
         filmographyOverlay.addView(content, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply {
             leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
         })
