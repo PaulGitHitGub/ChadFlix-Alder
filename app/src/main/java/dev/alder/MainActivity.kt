@@ -1586,7 +1586,7 @@ class MainActivity : Screen() {
             var fresh = false
             fun show(prepared: HomeLibrary, force: Boolean = false) {
                 val (list, cw, metadata) = prepared
-                metadata.forEach { (id, meta) -> metas.putIfAbsent(id, meta) }
+                metadata.forEach { (id, meta) -> if (id !in metas) metas[id] = meta }
                 val what = (if (p == Page.HOME) cw else list).joinToString {
                     val state = it.state
                     "${it.optString("_id")}:${it.optString("_mtime")}:${it.optBoolean("removed")}:${state.optLong("timeOffset")}:${state.optLong("duration")}:${state.text("video_id")}"
@@ -2118,7 +2118,7 @@ class MainActivity : Screen() {
         }, metaPool) { r ->
             fillingListDetails -= ids
             r.getOrNull()?.forEach { (id, m) ->
-                metas.putIfAbsent(id, m)
+                if (id !in metas) metas[id] = m
                 val count = newEpisodeCount(id, m)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
