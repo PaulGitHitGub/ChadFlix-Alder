@@ -51,6 +51,14 @@ class ScreenDesignTest {
         assertEquals(setOf("it"), audioLanguagesIn("Movie.2024.1080p.BluRay.ITA.x264"))
         assertEquals(setOf("fr"), audioLanguagesIn("Movie 2024 TRUEFRENCH 2160p WEB"))
         assertEquals(emptySet<String>(), audioLanguagesIn("Movie.2024.2160p.WEB-DL.DV.HDR.H265"))
+        // Subtitle flags after 💬 and "<lang> subs" tags are ignored for all languages.
+        assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("🎙️ 🇬🇧 💬 🇬🇧 🇸🇦 🇨🇳 🇩🇰 🇳🇱 🇫🇮 🇫🇷")))
+        assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("Movie.2024.1080p.WEB-DL.ENG.NL.Subs")))
+        assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 NLSubs ENG")))
+        assertEquals(setOf("fr"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 FRENCH | Subs ENG")))
+        assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("Frozen (2013) BRRip NL Gesproken")))
+        assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("100%NL - Zootropolis")))
+        assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 Vlaams NLD")))
     }
 
     @Test fun whatsNewReadsOneVersionsEntries() {

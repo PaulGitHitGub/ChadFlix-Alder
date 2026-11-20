@@ -458,10 +458,13 @@ class Stream(
     val dtsHdAudio = Regex("dts.?hd").containsMatchIn(words)
     val multiAudio = Regex("\\b(multi|dual)\\b").containsMatchIn(words)
     val dubbed = Regex("\\bdub(bed)?\\b").containsMatchIn(words)
+    // The names without the languages they give for subtitles only, so "🎙️ 🇬🇧 💬 🇬🇧 🇳🇱" or "NL subs" isn't a Dutch dub.
+    private val spoken = withoutSubtitleLanguages(words)
     /** The audio languages the names give, as two-letter codes; empty when they give none (see [audioLanguagesIn]). */
-    val audioLanguages = audioLanguagesIn(words)
-    /** Whether the names mention this language ("hindi" for "hi"). */
-    fun mentions(language: String) = Locale.forLanguageTag(language).getDisplayLanguage(Locale.ENGLISH).lowercase().let { it.length > 2 && it in words }
+    val audioLanguages = audioLanguagesIn(spoken)
+    /** Whether the names mention this language for the audio ("hindi" for "hi"). */
+    fun mentions(language: String) = language in audioLanguages ||
+        Locale.forLanguageTag(language).getDisplayLanguage(Locale.ENGLISH).lowercase().let { it.length > 2 && it in spoken }
 
     /** Short tags for the source list: "REMUX · DV · Atmos". */
     val tags get() = listOfNotNull(
@@ -550,6 +553,20 @@ internal fun audioLanguagesIn(text: String): Set<String> {
     return found
 }
 
+/**
+ * [text] without the languages it names for subtitles only: the flags after 💬, as StremThru writes them
+ * ("🎙️ 🇬🇧 💬 🇬🇧 🇳🇱 🇫🇷"), and tags such as "NL subs", "NLSubs" or "Subs ENG". What's left speaks for the audio.
+ */
+internal fun withoutSubtitleLanguages(text: String): String =
+    text.replace(subtitleFlags, " ").replace(subtitleTags) { m ->
+        val language = (m.groups[1] ?: m.groups[2])?.value?.lowercase()
+        if (language in languageWords) " " else m.value
+    }
+
+private val subtitleFlags = Regex("\\x{1F4AC}\\x{FE0F}?(?:\\s*(?:[\\x{1F1E6}-\\x{1F1FF}]{2}|\\x{1F3F3}\\x{FE0F}?))*")
+private val subtitleTags =
+    Regex("(?i)\\b(\\p{L}+?)[ ._-]?(?:subs?|subtitles?|subbed)\\b|\\b(?:subs?|subtitles?)[ ._:-]+(\\p{L}+)\\b")
+
 private val flagLanguages = mapOf("gb" to "en", "us" to "en", "au" to "en", "it" to "it", "in" to "hi", "es" to "es",
     "mx" to "es", "fr" to "fr", "de" to "de", "pt" to "pt", "br" to "pt", "ru" to "ru", "jp" to "ja", "kr" to "ko",
     "cn" to "zh", "tw" to "zh", "hk" to "zh", "nl" to "nl", "pl" to "pl", "tr" to "tr", "se" to "sv", "dk" to "da",
@@ -563,6 +580,8 @@ private val languageWords = mapOf("english" to "en", "eng" to "en", "hindi" to "
     "french" to "fr", "fre" to "fr", "fra" to "fr", "vff" to "fr", "truefrench" to "fr", "german" to "de", "ger" to "de",
     "deu" to "de", "portuguese" to "pt", "russian" to "ru", "rus" to "ru", "japanese" to "ja", "jpn" to "ja",
     "korean" to "ko", "kor" to "ko", "chinese" to "zh", "mandarin" to "zh", "cantonese" to "zh", "dutch" to "nl",
+    // Dutch releases: "NL Gesproken", "100%NL", "NLD", Flemish ("Vlaams"); "NL subs" is taken out first.
+    "nl" to "nl", "nld" to "nl", "dut" to "nl", "nederlands" to "nl", "vlaams" to "nl", "flemish" to "nl",
     "polish" to "pl", "turkish" to "tr", "swedish" to "sv", "danish" to "da", "norwegian" to "no", "finnish" to "fi",
     "greek" to "el", "hebrew" to "he", "arabic" to "ar", "thai" to "th", "vietnamese" to "vi", "indonesian" to "id",
     "ukrainian" to "uk", "czech" to "cs", "hungarian" to "hu", "romanian" to "ro", "persian" to "fa", "urdu" to "ur",
