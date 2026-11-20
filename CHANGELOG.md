@@ -81,6 +81,9 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Phone text entry.** A slow or idle connection no longer blocks text from your phone. Alder closes the phone page server when you leave the screen.
+- **Crash reports.** Crash reports remove user names and keys before the host name in web addresses. When GitHub search fails, the crash service returns an error instead of a duplicate issue.
+- **Memory use.** Alder drops closed dialogs and error cards from glass effects. TVs on Android 6 and 7 use smaller picture caches. Alder keeps pictures in normal memory when graphics memory fails.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.

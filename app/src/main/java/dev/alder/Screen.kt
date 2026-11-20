@@ -78,7 +78,7 @@ internal val GPU_BITMAP: Bitmap.Config = if (android.os.Build.VERSION.SDK_INT >=
 internal fun Bitmap.onGpu() = android.os.Build.VERSION.SDK_INT >= 26 && config == Bitmap.Config.HARDWARE
 /** This picture moved to GPU memory (Android 8+), the original recycled; older Android keeps it as it is. */
 internal fun Bitmap.toGpu(): Bitmap =
-    if (android.os.Build.VERSION.SDK_INT >= 26) copy(Bitmap.Config.HARDWARE, false).also { recycle() } else this
+    if (android.os.Build.VERSION.SDK_INT >= 26) copy(Bitmap.Config.HARDWARE, false)?.also { recycle() } ?: this else this
 
 /**
  * A [w] x [h] copy of [src]'s pixels, or null. Decoded art is often a hardware bitmap, which can't be read: scaling
@@ -141,6 +141,9 @@ abstract class Screen : Activity() {
     }
 
     override fun onDestroy() {
+        phoneEntry?.close()
+        phoneEntry = null
+        frostHosts.clear()
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
@@ -646,6 +649,8 @@ abstract class Screen : Activity() {
         field.requestFocus()
     }
 
+    private var phoneEntry: PhoneEntry? = null
+
     /**
      * Text too long for a remote (an API key), sent from a phone: a QR opens a one-box page served by the TV itself on
      * the home network (PhoneEntry). "Type it instead" falls back to [askText], as does a TV with no network address.
@@ -659,8 +664,14 @@ abstract class Screen : Activity() {
             }) { typed -> main.post { if (dialog.isShowing) dialog.dismiss(); done(typed) } }
         }.getOrNull()
         val url = entry?.url ?: run { entry?.close(); return askText(title, R.string.action_ok, initial = initial, done = done) }
+        phoneEntry?.close()
+        phoneEntry = entry
         val back = currentFocus // the row that opened it, so the remote stays there when the phone sends the text
-        dialog.setOnDismissListener { entry.close(); back?.requestFocus() }
+        dialog.setOnDismissListener {
+            if (phoneEntry === entry) phoneEntry = null
+            entry.close()
+            back?.requestFocus()
+        }
         val typeInstead = pill(R.string.phone_entry_type).apply {
             setOnClickListener { dialog.dismiss(); askText(title, R.string.action_ok, initial = initial, done = done) }
         }
@@ -767,10 +778,11 @@ abstract class Screen : Activity() {
     /** The screen's art, behind its glass: what [glassOver] frosts. Screens with art behind them name it. */
     protected open val backdrop: ImageView? get() = null
 
+    private class FrostHost(val view: View, var attached: Boolean = view.isAttachedToWindow)
     private var frostSource: Bitmap? = null
     private var frostFor: Bitmap? = null
     private var frostBitmap: Bitmap? = null
-    private val frostHosts = mutableListOf<View>()
+    private val frostHosts = mutableListOf<FrostHost>()
 
     /**
      * Frosted glass, as the episode list draws it: the art behind, blurred, seen through a rounded pane under the
@@ -781,13 +793,28 @@ abstract class Screen : Activity() {
     protected fun glassOver(host: View, radiusDp: Int, shade: Float = 0f, keepPrevious: Boolean = true): Drawable {
         // No art to frost (Settings): the glass sits on the base colour, so a dialog doesn't show the rows under it.
         val behind = backdrop ?: return LayerDrawable(arrayOf(rounded(BASE, radiusDp), glass(radiusDp)))
-        frostHosts += host
+        frostHosts.removeAll { it.attached && !it.view.isAttachedToWindow }
+        if (frostHosts.none { it.view === host }) {
+            val entry = FrostHost(host)
+            frostHosts += entry
+            host.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                override fun onViewAttachedToWindow(v: View) {
+                    entry.attached = true
+                    if (frostHosts.none { it === entry }) frostHosts += entry
+                }
+
+                override fun onViewDetachedFromWindow(v: View) {
+                    frostHosts.remove(entry)
+                }
+            })
+        }
         return Frost(host, behind, dp(radiusDp).toFloat(), shade, keepPrevious)
     }
 
     /** The art behind changed: glass redraws with the new picture once it's blurred. */
     protected fun refrost() {
-        frostHosts.forEach { it.invalidate() }
+        frostHosts.removeAll { it.attached && !it.view.isAttachedToWindow }
+        frostHosts.toList().forEach { if (it.view.isAttachedToWindow) it.view.invalidate() }
         updateWindowShade()
     }
 
