@@ -27,6 +27,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.Util
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -322,6 +323,8 @@ class PlayerActivity : Screen() {
     private val dialogueProcessor = DialogueAudioProcessor()
     @Volatile private var decodeAudio = false
     @Volatile private var retryWithPcm = false
+    @Volatile private var speed = 1f // playback speed: the audio sink decodes to PCM for any but 1x
+    @Volatile private var passthroughOut = false // the audio track takes the stream as it is, not decoded PCM
     private var pickedSub: String? = null // the exact subtitle picked for this video before: "addon:<url>" or "file:<track id>"
     // Timing for subtitles (in the file or from add-ons): offset is applied directly to the TextRenderer live.
     private var subDelay = 0L
@@ -368,10 +371,11 @@ class PlayerActivity : Screen() {
         }
         if (sources.isEmpty() && isTrailer) return finish()
         decodeAudio = Settings.decodeAudio(this)
+        speed = if (isTrailer) 1f else Settings.titleChoice(this, metaId)?.speed?.takeIf { it in SPEEDS } ?: 1f // kept per title, like audio and subtitles
         dialogueProcessor.enabled = Settings.clearDialogue(this)
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
-                playbackAudioSink(context, dialogueProcessor) { decodeAudio || retryWithPcm }
+                playbackAudioSink(context, dialogueProcessor) { decodeAudio || retryWithPcm || speed != 1f }
 
             override fun buildTextRenderers(
                 context: Context,
@@ -398,8 +402,10 @@ class PlayerActivity : Screen() {
             setParameters(buildUponParameters().setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true))
         }
         player = ExoPlayer.Builder(this, renderers).setLoadControl(load).setTrackSelector(selector).build()
+        player.setPlaybackSpeed(speed)
         player.addAnalyticsListener(object : AnalyticsListener {
             override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
+                passthroughOut = !Util.isEncodingLinearPcm(audioTrackConfig.encoding)
                 android.util.Log.i("Alder", "Audio output: encoding=${audioTrackConfig.encoding}, sample rate=${audioTrackConfig.sampleRate}, channel mask=${audioTrackConfig.channelConfig}")
             }
         })
@@ -1108,6 +1114,40 @@ class PlayerActivity : Screen() {
         android.util.Log.i("Alder", reason)
     }
 
+    private fun selectedTrackPassesAudio(): Boolean =
+        !decodeAudio && !retryWithPcm && player.currentTracks.groups
+            .firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }
+            ?.let { passthroughOutput(this, player.audioAttributes)(it.getTrackFormat(0)) } == true
+
+    /** The speeds in the shared glass list, the one in use ticked and focused; picking one plays at it. */
+    private fun openSpeedMenu() {
+        val note = if (passthroughOut || (speed != 1f && selectedTrackPassesAudio()))
+            getString(R.string.player_speed_passthrough_note) else null
+        choose(getString(R.string.player_speed), SPEEDS.map(::speedLabel), message = note,
+            checked = SPEEDS.indexOf(speed), widthDp = 260) { i ->
+            applySpeed(SPEEDS[i])
+            showControls(speedButton) // focus back on the button, and the controls' hide timer starts again
+        }
+    }
+
+    /**
+     * Plays at [to]. Away from 1x a passthrough stream is reopened as PCM, since the sink can only time-stretch PCM;
+     * back at 1x a stream the route can pass is reopened as it is again.
+     */
+    private fun applySpeed(to: Float) {
+        speedButton.text = speedLabel(to)
+        speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
+        if (to == speed) return
+        val reopen = if (to != 1f) passthroughOut else selectedTrackPassesAudio()
+        speed = to
+        Settings.pickedInPlayer(this, metaId, speed = to)
+        if (reopen) {
+            player.stop()
+            retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
+        }
+        player.setPlaybackSpeed(speed)
+    }
+
     private val tickTask = Runnable { tick() }
 
     // Progress every 10 s, pushed to Stremio every minute (Stremio's own apps push every 3 minutes).
@@ -1574,6 +1614,7 @@ class PlayerActivity : Screen() {
     private lateinit var length: TextView
     private lateinit var playPause: TextView
     private lateinit var audioButton: TextView
+    private lateinit var speedButton: TextView
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
@@ -1738,6 +1779,19 @@ class PlayerActivity : Screen() {
 
         audioButton = button(getString(R.string.player_audio_subtitles), R.drawable.ic_subtitles) { openOptions() }
         val streamButton = button(getString(R.string.player_change_stream), R.drawable.ic_layers) { changeStream() }
+        // Shows the speed itself rather than an icon; OK opens the list of speeds above it.
+        speedButton = button(getString(R.string.player_speed), 0) { openSpeedMenu() }.apply {
+            text = speedLabel(speed)
+            textSize = SMALL
+            typeface = text("", SMALL, bold = true).typeface // Screen.fonts is private
+            setTextColor(if (speed != 1f) TUNGSTEN else TEXT)
+            maxLines = 1
+            includeFontPadding = false
+            setPadding(dp(2), 0, dp(2), 0)
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+            }
+        }
         playPause = button(getString(R.string.player_pause), R.drawable.ic_pause, primary = true) {
             if (player.playWhenReady) player.pause() else player.play()
         }
@@ -1754,26 +1808,35 @@ class PlayerActivity : Screen() {
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
+            clipToPadding = false
             gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
             if (!isTrailer) {
-                addView(buttonCell(streamButton))
-                addView(buttonCell(audioButton))
-                addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
-                    LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
+                addView(LinearLayout(context).apply {
+                    clipChildren = false; clipToPadding = false
+                    gravity = Gravity.END or Gravity.TOP
+                    addView(buttonCell(streamButton))
+                    addView(buttonCell(audioButton))
+                    addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
+                        LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginEnd = dp(10) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
             }
             addView(buttonCell(playPause, true))
             if (!isTrailer) {
-                addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
-                    LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
-                addView(nextCell)
-                addView(buttonCell(infoButton))
+                addView(LinearLayout(context).apply {
+                    clipChildren = false; clipToPadding = false
+                    gravity = Gravity.START or Gravity.TOP
+                    addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
+                        LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
+                    addView(buttonCell(speedButton))
+                    addView(nextCell)
+                    addView(buttonCell(infoButton))
+                }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
-        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton))
+        for (button in listOf(streamButton, audioButton, speedButton, playPause, nextButton, infoButton))
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
-
         return FrameLayout(this).apply {
             visibility = View.GONE
             alpha = 0f
@@ -2010,7 +2073,7 @@ class PlayerActivity : Screen() {
             gravity = Gravity.CENTER
             contentDescription = label
             isFocusable = true
-            foreground = centred(res, if (primary) 25 else 20, if (primary) BASE else TEXT)
+            if (res != 0) foreground = centred(res, if (primary) 25 else 20, if (primary) BASE else TEXT)
             if (primary) {
                 fun face(focused: Boolean) = GradientDrawable().apply {
                     setColor(TEXT); cornerRadius = dp(radius).toFloat()
@@ -2113,7 +2176,7 @@ class PlayerActivity : Screen() {
             optionsLeft.text = if (live || duration <= 0) "" else "−${clock((duration - position).coerceAtLeast(0))}"
         }
         val remaining = (duration - position).coerceAtLeast(0)
-        val end = if (duration > 0) SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis() + remaining)) else null
+        val end = if (duration > 0) SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis() + (remaining / player.playbackParameters.speed).toLong())) else null
         if (started) {
             pauseFacts.text = playerPauseFacts(subtitle.text.toString(), end, isTrailer, live, getString(R.string.player_ends_at))
             pauseFacts.visibility = if (pauseFacts.text.isEmpty()) View.GONE else View.VISIBLE

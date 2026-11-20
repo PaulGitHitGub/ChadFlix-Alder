@@ -47,4 +47,8 @@ class PlaybackAudioTest {
     }
 
     private fun format(mime: String) = Format.Builder().setSampleMimeType(mime).setChannelCount(6).build()
+
+    @Test fun speedsLabelPlainly() {
+        assertEquals(listOf("0.75×", "1×", "1.25×", "1.5×", "1.75×", "2×"), SPEEDS.map(::speedLabel))
+    }
 }

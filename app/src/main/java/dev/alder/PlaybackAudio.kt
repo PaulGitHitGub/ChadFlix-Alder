@@ -43,15 +43,26 @@ internal fun bestAudioFormat(
         { it.channelCount }
     ))
 
+/** Whether the audio route can take [Format]s as they are (passthrough), not decoded to PCM. */
 @androidx.annotation.OptIn(UnstableApi::class)
-internal fun losslessOutput(context: Context, attributes: AudioAttributes): (Format) -> Boolean {
+internal fun passthroughOutput(context: Context, attributes: AudioAttributes): (Format) -> Boolean {
     val capabilities = AudioCapabilities.getCapabilities(context, attributes, null)
     return { format ->
-        losslessEncoding(format) != null && canPassAudio(
+        format.sampleMimeType != MimeTypes.AUDIO_RAW && canPassAudio(
             format, false, capabilities.getEncodingAndChannelConfigForPassthrough(format, attributes)?.first
         )
     }
 }
+
+internal fun losslessOutput(context: Context, attributes: AudioAttributes): (Format) -> Boolean {
+    val passes = passthroughOutput(context, attributes)
+    return { format -> losslessEncoding(format) != null && passes(format) }
+}
+
+// Playback speeds offered in the player. Any but 1x needs PCM: a passthrough stream can't be time-stretched.
+internal val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+
+internal fun speedLabel(speed: Float): String = speed.toString().trimEnd('0').trimEnd('.') + "×"
 
 @androidx.annotation.OptIn(UnstableApi::class)
 internal fun playbackAudioSink(

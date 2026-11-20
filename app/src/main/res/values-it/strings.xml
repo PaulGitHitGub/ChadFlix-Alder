@@ -163,6 +163,8 @@
     <string name="skip_recap">Salta riassunto</string>
     <string name="player_seek">Avanza o torna indietro</string>
     <string name="player_audio_subtitles">Audio e sottotitoli</string>
+    <string name="player_speed">Velocità di riproduzione</string>
+    <string name="player_speed_passthrough_note">L\'audio si interrompe brevemente passando a o da 1×.</string>
     <string name="player_change_stream">Cambia fonte</string>
     <string name="player_pause">Pausa</string>
     <string name="player_info">Info</string>

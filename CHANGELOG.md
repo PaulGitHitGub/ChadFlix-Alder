@@ -18,6 +18,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 ## Unreleased
 
 ### New
+- **Playback speed.** Select the speed button next to Pause, then select a speed from 0.75× to 2×. Alder keeps the speed for each movie and show, so the next episode plays at the same speed. With Dolby or DTS passthrough, the sound stops for a short time when you change to or from 1×.
 - **New episode badges.** Series posters in **My List** and **Continue Watching** show **+1** or **+2** for new aired episodes after your last watched episode.
 <!-- Spotlight -->
 - **Discover.** Select **Discover** in the top bar to find any movie or show, not only the titles in your add-on catalogs. Select **Movies**, **Shows** or **Anime**. Then select a genre, a decade, a streaming service in your country, or an order: **Popular**, **Top rated** or **Newest**. More titles come when you go down. Each title opens, plays and goes to **My List** as other titles do. Alder keeps your choice for each profile. Discover uses TMDB. To move or hide the tab, select **Settings → Profile → Tabs**.
