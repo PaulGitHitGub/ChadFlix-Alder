@@ -25,17 +25,7 @@
     <string name="whats_new_no_notes">वर्शन %1$s के लिए कोई नोट नहीं है।</string>
     <string name="whats_new_version">वर्शन %1$s</string>
     <string name="whats_new_group">नया</string>
-    <plurals name="whats_new_highlights">
-        <item quantity="one">नया क्या है · %1$d खास बात</item>
-        <item quantity="other">नया क्या है · %1$d खास बातें</item>
-    </plurals>
-    <string name="whats_new_all">सभी बदलाव (%1$d)</string>
     <string name="whats_new_highlights_short">खास बातें</string>
-    <string name="whats_new_back">← खास बातों पर वापस</string>
-    <plurals name="whats_new_see_all">
-        <item quantity="one">%1$d बदलाव देखें  →</item>
-        <item quantity="other">सभी %1$d बदलाव देखें  →</item>
-    </plurals>
 
     <!-- Home -->
     <string name="tab_home">होम</string>

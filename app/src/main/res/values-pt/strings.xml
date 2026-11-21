@@ -25,19 +25,7 @@
     <string name="whats_new_no_notes">Não há notas para a versão %1$s.</string>
     <string name="whats_new_version">Versão %1$s</string>
     <string name="whats_new_group">Novo</string>
-    <plurals name="whats_new_highlights">
-        <item quantity="one">Novidades · %1$d destaque</item>
-        <item quantity="many">Novidades · %1$d destaques</item>
-        <item quantity="other">Novidades · %1$d destaques</item>
-    </plurals>
-    <string name="whats_new_all">Todas as mudanças (%1$d)</string>
     <string name="whats_new_highlights_short">Destaques</string>
-    <string name="whats_new_back">← Voltar aos destaques</string>
-    <plurals name="whats_new_see_all">
-        <item quantity="one">Ver %1$d mudança  →</item>
-        <item quantity="many">Ver as %1$d mudanças  →</item>
-        <item quantity="other">Ver as %1$d mudanças  →</item>
-    </plurals>
 
     <!-- Home -->
     <string name="tab_home">Início</string>

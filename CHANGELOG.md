@@ -45,7 +45,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **Subtitles that fit.** Subtitles for your exact release come first. New **Gray** subtitles are easier on OLED TVs in a dark room.
 - **A faster Home.** Your rows show right away while fresh data loads, and they scroll smoothly even when you hold Right.
 - **Each row keeps its place** on **Shows** and **Movies**.
-- **What's new shows you.** The top five changes now come with a picture, so you see each one at a glance.
+- **A new What's new.** The biggest changes come first, each with a picture from the TV. Every other change is listed below them, by type.
 - **Errors tell you what to do.** Messages name the add-on or service that failed and say what to try next.
 
 ### Fixes
