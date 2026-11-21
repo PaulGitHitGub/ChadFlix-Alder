@@ -81,7 +81,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
-- **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page. When you came back from a related title, buttons also showed behind the panel.
+- **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page or left old buttons when an open panel closed. When you came back from a related title, buttons also showed behind the panel.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.

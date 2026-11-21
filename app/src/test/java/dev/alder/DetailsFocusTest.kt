@@ -99,4 +99,31 @@ class DetailsFocusTest {
             resolveFilmographyReturnTarget(actorAttached = false, infoOpen = false),
         )
     }
+
+    @Test
+    fun shouldRefreshHeroOnOverlayCloseOnlyWhenDirtyAndNoOverlayRemainsOpen() {
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = false, DetailsOverlayState()))
+        assertTrue(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState()))
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState(guideOpen = true)))
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState(infoOpen = true)))
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState(similarOpen = true)))
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState(filmographyOpen = true)))
+        assertFalse(shouldRefreshHeroOnOverlayClose(heroNeedsRefresh = true, DetailsOverlayState(infoOpen = true, filmographyOpen = true)))
+    }
+
+    @Test
+    fun resolveFilmographyHeroFocusPreservesAttachedCastChipOrFallsBackToPlay() {
+        assertEquals(
+            HeroFocusState(HeroControlFocus.CAST, 2),
+            resolveFilmographyHeroFocus(actorAttached = true, castIndex = 2),
+        )
+        assertEquals(
+            HeroFocusState(HeroControlFocus.PLAY),
+            resolveFilmographyHeroFocus(actorAttached = false, castIndex = 2),
+        )
+        assertEquals(
+            HeroFocusState(HeroControlFocus.PLAY),
+            resolveFilmographyHeroFocus(actorAttached = true, castIndex = -1),
+        )
+    }
 }

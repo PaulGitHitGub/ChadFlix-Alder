@@ -108,6 +108,11 @@ internal enum class FilmographyReturnTarget {
 
 internal fun shouldShowHero(overlays: DetailsOverlayState): Boolean = !overlays.anyOpen
 
+internal fun shouldRefreshHeroOnOverlayClose(
+    heroNeedsRefresh: Boolean,
+    overlays: DetailsOverlayState,
+): Boolean = heroNeedsRefresh && !overlays.anyOpen
+
 internal fun shouldCloseInfoOnRestart(infoOpen: Boolean, filmographyOpen: Boolean): Boolean =
     infoOpen && !filmographyOpen
 
@@ -140,6 +145,15 @@ internal fun resolveFilmographyReturnTarget(
     actorAttached -> FilmographyReturnTarget.LAST_FOCUSED_ACTOR
     infoOpen -> FilmographyReturnTarget.INFO_OVERLAY
     else -> FilmographyReturnTarget.PLAY_BUTTON
+}
+
+internal fun resolveFilmographyHeroFocus(
+    actorAttached: Boolean,
+    castIndex: Int,
+): HeroFocusState = if (actorAttached && castIndex >= 0) {
+    HeroFocusState(HeroControlFocus.CAST, castIndex)
+} else {
+    HeroFocusState(HeroControlFocus.PLAY)
 }
 
 // A title stays in place over its art; episodes and related titles open over the same scene.
@@ -181,6 +195,7 @@ class DetailsActivity : Screen() {
     private var guideOpen = false
     private var similarOpen = false
     private var infoOpen = false
+    private var heroNeedsRefresh = false
 
     private fun overlays() = DetailsOverlayState(guideOpen, infoOpen, similarOpen, filmographyOpen)
 
@@ -246,7 +261,7 @@ class DetailsActivity : Screen() {
             richCast = m.castMembers
             certificate = m.certification ?: certificate
             val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
-            showHero(m)
+            if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(m)
             if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
             if (!hasEpisodes(type, m.videos) && !similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
@@ -256,7 +271,7 @@ class DetailsActivity : Screen() {
                     val resolved = r.getOrNull()
                     if (resolved != null && resolved != certificate) {
                         certificate = resolved
-                        if (!anyOverlayOpen()) showHero(meta)
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                     }
                 }
             }
@@ -268,7 +283,7 @@ class DetailsActivity : Screen() {
                     val score = r.getOrNull()
                     if (score != null && score != letterboxdScore) {
                         letterboxdScore = score
-                        if (!anyOverlayOpen()) showHero(meta)
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                     }
                 }
             }
@@ -279,7 +294,9 @@ class DetailsActivity : Screen() {
                     if (resolved.isNotEmpty()) {
                         val hadTrailer = m.trailerStreams.isNotEmpty() || m.trailerYtId != null || imdbTrailers.isNotEmpty()
                         imdbTrailers = resolved
-                        if (!hadTrailer && !anyOverlayOpen()) showHero(meta)
+                        if (!hadTrailer) {
+                            if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
+                        }
                     }
                 }
             }
@@ -288,7 +305,12 @@ class DetailsActivity : Screen() {
             (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
         }) { result ->
             result.getOrNull()?.let { (saved, libraryItem) ->
-                if (!itemChangedHere && item == null) item = libraryItem
+                if (!itemChangedHere && item == null && libraryItem != null) {
+                    item = libraryItem
+                    if (meta != null) {
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
+                    }
+                }
                 if (meta == null) saved?.let(::show)
             }
         }
@@ -303,8 +325,15 @@ class DetailsActivity : Screen() {
         }
         background({ Stremio.library(key, listOf(metaId)).firstOrNull() }) { result ->
             if (!itemChangedHere && !savingEdit) {
-                item = result.getOrNull() ?: item
-                if (meta != null && !anyOverlayOpen()) showHero(meta)
+                val loaded = result.getOrNull()
+                if (loaded != null) item = loaded
+                if (meta != null) {
+                    if (anyOverlayOpen()) {
+                        if (loaded != null) heroNeedsRefresh = true
+                    } else {
+                        showHero(meta)
+                    }
+                }
             }
         }
     }
@@ -347,8 +376,35 @@ class DetailsActivity : Screen() {
         }
     }
 
-    private fun showHero(m: Meta?, failure: Failure? = null) {
-        val savedFocus = captureHeroFocus() ?: HeroFocusState(HeroControlFocus.PLAY)
+    private fun refreshHeroIfNeeded(
+        preferredFocus: HeroControlFocus? = null,
+        preferredCastIndex: Int = 0,
+    ): Boolean {
+        if (!shouldRefreshHeroOnOverlayClose(heroNeedsRefresh, overlays())) return false
+        val currentMeta = meta ?: return false
+        val focusState = preferredFocus?.let { HeroFocusState(it, preferredCastIndex) }
+        showHero(currentMeta, preferredFocus = focusState)
+        return true
+    }
+
+    private fun revealHero(preferredFocus: HeroControlFocus) {
+        if (!shouldShowHero(overlays())) return
+        hero.visibility = View.VISIBLE
+        if (!refreshHeroIfNeeded(preferredFocus)) {
+            when (preferredFocus) {
+                HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton.requestFocus()
+                else -> if (::playButton.isInitialized) playButton.requestFocus()
+            }
+        }
+    }
+
+    private fun showHero(
+        m: Meta?,
+        failure: Failure? = null,
+        preferredFocus: HeroFocusState? = null,
+    ) {
+        heroNeedsRefresh = false
+        val savedFocus = preferredFocus ?: captureHeroFocus() ?: HeroFocusState(HeroControlFocus.PLAY)
         castChips.clear()
         castStripSlot = null
         trailerButton = null
@@ -805,10 +861,7 @@ class DetailsActivity : Screen() {
         leftShade(true)
         guide.exit().alpha(0f).translationY(dp(24).toFloat()).withEndAction {
             guide.visibility = View.GONE
-            if (shouldShowHero(overlays())) {
-                hero.visibility = View.VISIBLE
-                if (::playButton.isInitialized) playButton.requestFocus()
-            }
+            revealHero(HeroControlFocus.PLAY)
         }.start()
     }
 
@@ -838,7 +891,7 @@ class DetailsActivity : Screen() {
 
     private fun refreshAfterEdit(focusEpisodeId: String? = null, focusSeason: Int? = null) {
         fillGuide()
-        meta?.let(::showHero)
+        if (anyOverlayOpen()) heroNeedsRefresh = true else meta?.let(::showHero)
         if (focusEpisodeId != null) {
             val target = (0 until guideRows.childCount).map { guideRows.getChildAt(it) }
                 .firstOrNull { it.tag == focusEpisodeId }
@@ -1168,14 +1221,10 @@ class DetailsActivity : Screen() {
             val closing = infoOverlay
             closing.exit().alpha(0f).translationY(dp(20).toFloat()).withEndAction {
                 root.removeView(closing)
-                if (shouldShowHero(overlays())) {
-                    hero.visibility = View.VISIBLE
-                    if (::infoButton.isInitialized) infoButton.requestFocus()
-                }
+                revealHero(HeroControlFocus.INFO)
             }.start()
-        } else if (shouldShowHero(overlays())) {
-            hero.visibility = View.VISIBLE
-            if (::infoButton.isInitialized) infoButton.requestFocus()
+        } else {
+            revealHero(HeroControlFocus.INFO)
         }
     }
 
@@ -1229,7 +1278,7 @@ class DetailsActivity : Screen() {
         if (::similarOverlay.isInitialized) root.removeView(similarOverlay)
         similarOverlay = buildPosterRowOverlay(heading, titles) { similarFirst = it }
         root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
-        if (!anyOverlayOpen()) showHero(meta)
+        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
     }
 
     private fun addPosterRail(content: LinearLayout, titles: List<Meta>, captionPill: TextView): View? {
@@ -1290,10 +1339,7 @@ class DetailsActivity : Screen() {
         similarOpen = false
         similarOverlay.exit().alpha(0f).translationY(dp(20).toFloat()).withEndAction {
             similarOverlay.visibility = View.GONE
-            if (shouldShowHero(overlays())) {
-                hero.visibility = View.VISIBLE
-                if (::playButton.isInitialized) playButton.requestFocus()
-            }
+            revealHero(HeroControlFocus.PLAY)
         }.start()
     }
 
@@ -1308,9 +1354,12 @@ class DetailsActivity : Screen() {
                 val focusedCastIndex = if (!anyOverlayOpen()) {
                     focused?.let { v -> castChips.indexOfFirst { it === v || isInside(v, it) } } ?: -1
                 } else -1
-                castStripSlot?.let { slot ->
+                val slot = castStripSlot
+                if (slot != null) {
                     slot.removeAllViews()
                     buildCastChips(richCast)?.let { slot.addView(it) }
+                } else if (meta != null) {
+                    if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                 }
                 if (focusedCastIndex >= 0 && !anyOverlayOpen()) {
                     val resolved = resolveHeroFocusTarget(
@@ -1536,6 +1585,15 @@ class DetailsActivity : Screen() {
         filmographyFirst?.requestFocus()
     }
 
+    private fun focusFilmographyReturnTarget(actorAttached: Boolean) {
+        val target = when (resolveFilmographyReturnTarget(actorAttached, infoOpen)) {
+            FilmographyReturnTarget.LAST_FOCUSED_ACTOR -> lastFocusedActor
+            FilmographyReturnTarget.INFO_OVERLAY -> infoOverlay
+            FilmographyReturnTarget.PLAY_BUTTON -> if (::playButton.isInitialized) playButton else null
+        }
+        target?.requestFocus()
+    }
+
     private fun hideFilmography() {
         if (!filmographyOpen) return
         filmographyOpen = false
@@ -1543,15 +1601,16 @@ class DetailsActivity : Screen() {
             filmographyOverlay.visibility = View.GONE
             if (infoOpen) {
                 infoOverlay.visibility = View.VISIBLE
+                focusFilmographyReturnTarget(lastFocusedActor?.isAttachedToWindow == true)
             } else if (shouldShowHero(overlays())) {
                 hero.visibility = View.VISIBLE
+                val actorAttached = lastFocusedActor?.isAttachedToWindow == true
+                val castIndex = if (actorAttached) castChips.indexOf(lastFocusedActor) else -1
+                val heroFocus = resolveFilmographyHeroFocus(actorAttached, castIndex)
+                if (!refreshHeroIfNeeded(heroFocus.control, heroFocus.castIndex)) {
+                    focusFilmographyReturnTarget(actorAttached)
+                }
             }
-            val target = when (resolveFilmographyReturnTarget(lastFocusedActor?.isAttachedToWindow == true, infoOpen)) {
-                FilmographyReturnTarget.LAST_FOCUSED_ACTOR -> lastFocusedActor
-                FilmographyReturnTarget.INFO_OVERLAY -> infoOverlay
-                FilmographyReturnTarget.PLAY_BUTTON -> if (::playButton.isInitialized) playButton else null
-            }
-            target?.requestFocus()
         }.start()
     }
 
@@ -1664,7 +1723,11 @@ class DetailsActivity : Screen() {
                 storyScrollView = null
             }
             hero.visibility = if (shouldShowHero(overlays())) View.VISIBLE else View.INVISIBLE
-            showHero(meta)
+            if (anyOverlayOpen()) {
+                heroNeedsRefresh = true
+            } else {
+                showHero(meta)
+            }
             meta?.videos?.takeIf { episodic && it.isNotEmpty() }?.let(::buildGuide)
             if (wasGuide) showGuide()
         }
