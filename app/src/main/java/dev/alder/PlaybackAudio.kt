@@ -33,9 +33,11 @@ internal fun bestAudioFormat(
     formats: List<Format>,
     language: String,
     failed: Set<Format>,
+    requireLanguage: Boolean = false,
     hasLosslessOutput: (Format) -> Boolean
 ): Format? = formats
     .filter { it !in failed && it.label?.contains("commentary", ignoreCase = true) != true }
+    .filter { !requireLanguage || Languages.match(it.language, language) > 0 }
     .maxWithOrNull(compareBy(
         { Languages.match(it.language, language) },
         hasLosslessOutput,

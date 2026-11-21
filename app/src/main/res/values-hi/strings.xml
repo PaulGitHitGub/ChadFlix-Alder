@@ -265,7 +265,7 @@
     <string name="player_no_other_app">इस टीवी पर कोई दूसरा वीडियो प्लेयर नहीं है। Alder वीडियो चलाता है।</string>
     <string name="clear_dialogue_setting_hint">टीवी स्पीकर पर संगीत और तेज़ इफ़ेक्ट के ऊपर आवाज़ें उभारता है।</string>
     <string name="dubbed">डब रिलीज़</string>
-    <string name="dubbed_hint">पहले मूल भाषा डब रिलीज़ को आख़िर में रखता है; पहले मेरी भाषा इस प्रोफ़ाइल की ऑडियो भाषा का इस्तेमाल करता है।</string>
+    <string name="dubbed_hint">पहले मूल भाषा डब रिलीज़ को आख़िर में रखता है। पहले मेरी भाषा में Alder का प्लेयर अपने आप चलाने से पहले ऑडियो की भाषा जाँचता है। आप अब भी कोई भी स्रोत चुन सकते हैं।</string>
     <string name="dubbed_original">पहले मूल भाषा</string>
     <string name="dubbed_mine">पहले मेरी भाषा</string>
     <string name="subs_default">डिफ़ॉल्ट रूप से सबटाइटल</string>
@@ -573,4 +573,7 @@
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
     <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
     <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
+    <string name="streams_no_preferred_audio">%1$s के रूप में चिह्नित कोई भी स्रोत अपने आप नहीं चल सकता। जारी रखने के लिए कोई स्रोत चुनें।</string>
+    <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
+    <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
 </resources>

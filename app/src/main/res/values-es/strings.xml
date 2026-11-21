@@ -268,7 +268,7 @@
     <string name="player_no_other_app">No hay otro reproductor de video en este TV. Alder reproduce el video.</string>
     <string name="clear_dialogue_setting_hint">Realza las voces sobre la música y los efectos fuertes con los altavoces del TV.</string>
     <string name="dubbed">Versiones dobladas</string>
-    <string name="dubbed_hint">Original primero pone al final las versiones dobladas; Mi idioma primero usa el idioma de audio de este perfil.</string>
+    <string name="dubbed_hint">Original primero pone al final las versiones dobladas. Mi idioma primero comprueba el audio en el reproductor de Alder antes de la reproducción automática. Puedes seguir eligiendo cualquier fuente.</string>
     <string name="dubbed_original">Original primero</string>
     <string name="dubbed_mine">Mi idioma primero</string>
     <string name="subs_default">Subtítulos por defecto</string>
@@ -579,4 +579,7 @@
     <string name="library_load_failed">No se pudo cargar tu biblioteca de Stremio</string>
     <string name="filmography_loading">Buscando títulos…</string>
     <string name="filmography_empty">No se encontraron otros títulos en tus catálogos.</string>
+    <string name="streams_no_preferred_audio">No se puede reproducir automáticamente ninguna fuente marcada como %1$s. Elige una fuente para continuar.</string>
+    <string name="failure_preferred_audio">no hay ninguna pista de audio compatible en tu idioma preferido</string>
+    <string name="failure_advice_preferred_audio">Elige una fuente con tu idioma de audio.</string>
 </resources>

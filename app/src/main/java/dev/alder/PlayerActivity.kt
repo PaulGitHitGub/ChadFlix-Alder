@@ -404,6 +404,7 @@ class PlayerActivity : Screen() {
     // resume), else the profile's Settings. Picks in the menu change them, are kept for the title, and hold when the
     // player moves to another source.
     private var wantAudio = ""
+    private val requireAudioLanguage get() = !isTrailer && !intent.getBooleanExtra("picked", false) && Settings.dub(this) == "mine"
     private var wantSub = ""
     private var subsOn = true
     private var viewerAddonSub = false // the viewer chose the addon file, over the file's own in the same language
@@ -706,6 +707,10 @@ class PlayerActivity : Screen() {
                 if (audio.isNotEmpty()) audioGroups = audio
                 val lostAudioSupport = audio.any { it.isSelected && !it.isTrackSupported(0) }
                 val best = bestAudio(audio)
+                if (requireAudioLanguage && !audioPicked && best == null &&
+                    tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO || it.type == C.TRACK_TYPE_VIDEO }) {
+                    return next(Failure.PREFERRED_AUDIO)
+                }
                 // Releases flag foreign subtitles as forced or default (Lanterns came up with Russian "Forced" under
                 // English audio): start with subtitles only in the profile's subtitle language, whatever the sound, else
                 // none. The file's own come first, then the addon file attached at the start, then the file's own from
@@ -746,6 +751,7 @@ class PlayerActivity : Screen() {
                 if ((audioPicked && !lostAudioSupport) || best == null) return
                 audioPicked = true // once per video; picks made later in the settings menu stand
                 player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
                     .setOverrideForType(TrackSelectionOverride(best.mediaTrackGroup, (0 until best.length).toList())).build()
             }
         })
@@ -999,7 +1005,9 @@ class PlayerActivity : Screen() {
             audioPicked = false
             audioGroups = emptyList()
             failedAudio.clear()
-            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).build()
+            // Keep audio quiet until Media3 reports a supported track in the required language.
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, requireAudioLanguage).build()
             closeInFlightOpened()
             if (opening !== s) opening = null
             opened?.close()
@@ -1012,7 +1020,7 @@ class PlayerActivity : Screen() {
         val src = opened!!
         startWait = src.startWait ?: START_WAIT
         val app = Settings.externalPlayer(this)
-        if (!isTrailer && !handedOff && !externalUnavailable && app != null) {
+        if (!isTrailer && !requireAudioLanguage && !handedOff && !externalUnavailable && app != null) {
             if (handOff(src, position, app)) return
             // No other video app on this TV: Alder plays it, and says so.
             return load(position, getString(R.string.player_no_other_app), play)
@@ -1251,7 +1259,7 @@ class PlayerActivity : Screen() {
         val supported = groups.filter { it.isTrackSupported(0) }
         if (supported.isEmpty()) return null
         val lossless = if (decodeAudio || retryWithPcm) ({ _: Format -> false }) else losslessOutput(this, player.audioAttributes)
-        val best = bestAudioFormat(supported.map { it.getTrackFormat(0) }, wantAudio, failedAudio, lossless)
+        val best = bestAudioFormat(supported.map { it.getTrackFormat(0) }, wantAudio, failedAudio, requireAudioLanguage, lossless)
         return supported.firstOrNull { it.getTrackFormat(0) === best }
     }
 

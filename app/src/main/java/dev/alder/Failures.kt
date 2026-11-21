@@ -23,6 +23,7 @@ internal enum class Failure(val message: Int, val advice: Int) {
     RESPONSE(R.string.error_response, R.string.failure_advice_response),
     MISSING(R.string.error_missing, R.string.failure_advice_missing),
     FORMAT(R.string.error_format, R.string.failure_advice_format),
+    PREFERRED_AUDIO(R.string.failure_preferred_audio, R.string.failure_advice_preferred_audio),
     NETWORK(R.string.error_network, R.string.failure_advice_network),
     WEB_PAGE(R.string.failure_web_page, R.string.failure_advice_web_page),
     OTHER(R.string.failure_error, R.string.failure_advice_other),

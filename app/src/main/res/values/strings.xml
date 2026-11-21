@@ -268,7 +268,7 @@
     <string name="player_no_other_app">No other video player is on this TV. Alder plays the video.</string>
     <string name="clear_dialogue_setting_hint">Lifts voices above music and loud effects when using TV speakers.</string>
     <string name="dubbed">Dubbed releases</string>
-    <string name="dubbed_hint">Original first puts dubbed releases last; My language first uses this profile\'s audio language.</string>
+    <string name="dubbed_hint">Original first puts dubbed releases last. My language first uses Alder’s player to check the audio before automatic playback. You can still choose any source.</string>
     <string name="dubbed_original">Original first</string>
     <string name="dubbed_mine">My language first</string>
     <string name="subs_default">Subtitles by default</string>
@@ -412,6 +412,7 @@
         <item quantity="other">%1$d sources</item>
     </plurals>
     <string name="streams_none_playable">No playable sources found.</string>
+    <string name="streams_no_preferred_audio">No source marked as %1$s can play automatically. Choose a source to continue.</string>
     <string name="streams_all_languages">All languages</string>
     <string name="streams_scan">Scan with your phone to set up %1$s</string>
     <string name="streams_scan_debrid">Add a debrid account there, such as Real-Debrid, and install it again. Then select Try again.</string>
@@ -438,6 +439,8 @@
     <string name="failure_secure">secure connection failed</string>
     <string name="failure_not_sources">not a source list</string>
     <string name="failure_error">error</string>
+    <string name="failure_preferred_audio">no supported track in your preferred audio language</string>
+    <string name="failure_advice_preferred_audio">Choose a source with your audio language.</string>
 
     <!-- Add-ons -->
     <string name="addons_move_or_remove">Move or remove</string>

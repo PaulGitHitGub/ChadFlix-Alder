@@ -40,6 +40,28 @@ class StreamsResolverTest {
     }
 
     @Test
+    fun automaticPlaybackWaitsForPolishAndQueuesOnlyPolishMatches() {
+        val hindi = stream("Movie 1080p Hindi", filename = "last-played.mkv")
+        val unknown = stream("Movie 1080p MULTI")
+        val polish = stream("Movie 1080p Polish")
+        val polishBackup = requireNotNull(Stream.from(JSONObject()
+            .put("name", "Movie 1080p")
+            .put("infoHash", "1234567890abcdef1234567890abcdef12345678")
+            .put("behaviorHints", JSONObject().put("filename", "Movie.POL.mkv")), allowTorrents = true))
+        val answers: Array<List<Stream>?> = arrayOf(listOf(hindi, unknown), null, listOf(polish, polishBackup))
+        val tv = Device(hevc = true, av1 = false, dolbyVision = false, hdr = true, height = 1080)
+
+        fun queue(allowGaps: Boolean, language: String?) = StreamsResolver.rank(
+            readyStreams(answers, allowGaps).filter { StreamsResolver.matchesAutomaticLanguage(it, language) },
+            tv, 0, hindi.filename, null, false, { 0 }, false
+        ).take(StreamsResolver.TRY)
+
+        assertEquals(emptyList<Stream>(), queue(allowGaps = false, language = "pl"))
+        assertEquals(listOf(polish, polishBackup), queue(allowGaps = true, language = "pl"))
+        assertEquals(hindi, queue(allowGaps = true, language = null).first())
+    }
+
+    @Test
     fun ranksHigherResolutionWhenItFitsAndBestPictureIsPreferred() {
         val hd = stream("Movie 1080p WEB-DL")
         val uhd = stream("Movie 2160p WEB-DL")

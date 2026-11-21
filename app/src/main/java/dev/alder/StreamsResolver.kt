@@ -91,6 +91,16 @@ object StreamsResolver {
             (Settings.hdr(context) || !s.isHdr) && !s.cam
     }
 
+    internal fun automaticLanguage(context: Context, metaId: String?): String? =
+        Settings.preferredAudio(context, metaId).takeIf { Settings.dub(context) == "mine" }
+
+    internal fun matchesAutomaticLanguage(stream: Stream, language: String?): Boolean =
+        language == null || Languages.base(language) in stream.audioLanguages ||
+            (Languages.base(language) == "en" && stream.audioLanguages.isEmpty())
+
+    internal fun automaticEligibility(context: Context, tv: Device, language: String?, maxHeight: Int): (Stream) -> Boolean =
+        { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) && matchesAutomaticLanguage(it, language) }
+
     /**
      * Stream add-ons for [type] and [videoId]: the active profile's [own] add-ons first, then [lent] household
      * add-ons whose transport URL and id do not match an own add-on so a lender config never shadows own settings.
@@ -127,6 +137,8 @@ object StreamsResolver {
         var started = false
         var waitingForEarlier = false
         val tv = Device.of(context)
+        val language = automaticLanguage(context, metaId)
+        val eligible = automaticEligibility(context, tv, language, maxHeight)
 
         val cancellable = object : Cancellable {
             override fun cancel() {
@@ -159,7 +171,7 @@ object StreamsResolver {
             fun tryStart(allowGaps: Boolean = false) {
                 if (canceled || started) return
                 val ready = readyStreams(answers, allowGaps)
-                val best = rank(context, ready.filter { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) }, videoId, metaId, maxHeight)
+                val best = rank(context, ready.filter(eligible), videoId, metaId, maxHeight)
                 if (best.isEmpty() && answers.any { it == null }) return
                 if (best.isEmpty()) {
                     started = true
@@ -173,7 +185,9 @@ object StreamsResolver {
             addons.forEachIndexed { i, addon ->
                 executor.execute {
                     if (canceled) return@execute
-                    val streamsResult = runCatching { addon.streams(type, videoId) }
+                    val streamsResult = runCatching {
+                        addon.streams(type, videoId, allowTorrents = language != null && supportsTorrentPlayback)
+                    }
                     mainHandler.post {
                         if (canceled) return@post
                         answers[i] = streamsResult.getOrNull()?.playable.orEmpty()
@@ -181,7 +195,7 @@ object StreamsResolver {
                             tryStart(allowGaps = true)
                         } else {
                             tryStart(allowGaps = false)
-                            if (!started && !waitingForEarlier && readyStreams(answers, true).any { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) }) {
+                            if (!started && !waitingForEarlier && readyStreams(answers, true).any(eligible)) {
                                 waitingForEarlier = true
                                 mainHandler.postDelayed({ tryStart(allowGaps = true) }, 800)
                             }

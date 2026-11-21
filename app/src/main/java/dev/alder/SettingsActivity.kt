@@ -154,6 +154,7 @@ object Settings {
     /** Two-letter code of the dub to start with: the TV's language unless one is picked. */
     fun audioLanguage(c: Context): String = prefs(c).getString(profileKey(c, "audioLang"), prefs(c).getString("audioLang", ""))
         .orEmpty().ifEmpty { Languages.code(Locale.getDefault().toLanguageTag()) ?: "en" }
+    fun preferredAudio(c: Context, metaId: String?): String = metaId?.let { titleChoice(c, it)?.audio } ?: audioLanguage(c)
     /** Two-letter code of the subtitles to start with: the TV's language unless one is picked. */
     fun subtitleLanguage(c: Context): String = prefs(c).getString(profileKey(c, "subLang"), "")
         .orEmpty().ifEmpty { Languages.code(Locale.getDefault().toLanguageTag()) ?: "en" }
