@@ -326,6 +326,10 @@
     <string name="ratings_source">Bewertungen</string>
     <string name="ratings_source_hint">Wählt die Bewertungen auf Titelseiten und der Startseite. Letterboxd gilt nur für Filme und braucht einen MDBList-Schlüssel. Serien zeigen immer IMDb.</string>
     <string name="ratings_both">Beide</string>
+    <string name="episode_badges">Neue-Folgen-Hinweis</string>
+    <string name="episode_badges_hint">Wählt die Zahl auf Serienpostern. Neu erschienen zählt Folgen, die nach deinem letzten Ansehen kamen. Aktuelle Staffel zählt die restlichen Folgen der Staffel, die du schaust.</string>
+    <string name="episode_badges_aired">Neu erschienen</string>
+    <string name="episode_badges_season">Aktuelle Staffel</string>
     <string name="mdblist_key">MDBList-Schlüssel</string>
     <string name="mdblist_key_hint">Dein kostenloser API-Schlüssel von mdblist.com/preferences. Alder nutzt ihn nur für Letterboxd-Bewertungen.</string>
     <string name="key_not_set">Nicht festgelegt</string>

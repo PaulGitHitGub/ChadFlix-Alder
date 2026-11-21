@@ -329,6 +329,10 @@
     <string name="ratings_source">Valutazioni</string>
     <string name="ratings_source_hint">Sceglie le valutazioni nelle pagine dei titoli e nella Home. Letterboxd vale solo per i film e richiede una chiave MDBList. Le serie usano sempre IMDb.</string>
     <string name="ratings_both">Entrambe</string>
+    <string name="episode_badges">Badge nuovi episodi</string>
+    <string name="episode_badges_hint">Sceglie il numero sui poster delle serie. Appena usciti conta gli episodi usciti dopo l’ultima visione. Stagione attuale conta gli episodi rimasti nella stagione che guardi.</string>
+    <string name="episode_badges_aired">Appena usciti</string>
+    <string name="episode_badges_season">Stagione attuale</string>
     <string name="mdblist_key">Chiave MDBList</string>
     <string name="mdblist_key_hint">La tua chiave API gratuita da mdblist.com/preferences. Alder la usa solo per le valutazioni Letterboxd.</string>
     <string name="key_not_set">Non impostata</string>

@@ -329,6 +329,10 @@
     <string name="ratings_source">Ratings</string>
     <string name="ratings_source_hint">Choose the ratings on title pages and Home. Letterboxd is for films only and needs an MDBList key. Shows always use IMDb.</string>
     <string name="ratings_both">Both</string>
+    <string name="episode_badges">New episode badges</string>
+    <string name="episode_badges_hint">Choose the number on series posters. Newly aired counts episodes that came out after you last watched. Current season counts the episodes left in the season you watch.</string>
+    <string name="episode_badges_aired">Newly aired</string>
+    <string name="episode_badges_season">Current season</string>
     <string name="mdblist_key">MDBList key</string>
     <string name="mdblist_key_hint">Your free API key from mdblist.com/preferences. Alder uses it only to get Letterboxd ratings.</string>
     <string name="key_not_set">Not set</string>

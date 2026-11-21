@@ -329,6 +329,10 @@
     <string name="ratings_source">Avaliações</string>
     <string name="ratings_source_hint">Escolhe as avaliações nas páginas de títulos e no início. Letterboxd é só para filmes e precisa de uma chave do MDBList. As séries usam sempre IMDb.</string>
     <string name="ratings_both">Ambas</string>
+    <string name="episode_badges">Selos de novos episódios</string>
+    <string name="episode_badges_hint">Escolhe o número nos pôsteres de séries. Recém-lançados conta os episódios lançados depois da sua última visualização. Temporada atual conta os episódios restantes da temporada que você assiste.</string>
+    <string name="episode_badges_aired">Recém-lançados</string>
+    <string name="episode_badges_season">Temporada atual</string>
     <string name="mdblist_key">Chave do MDBList</string>
     <string name="mdblist_key_hint">Sua chave de API gratuita em mdblist.com/preferences. O Alder a usa apenas para avaliações do Letterboxd.</string>
     <string name="key_not_set">Não definida</string>

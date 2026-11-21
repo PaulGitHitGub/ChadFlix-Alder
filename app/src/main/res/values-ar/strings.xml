@@ -339,6 +339,10 @@
     <string name="ratings_source">التقييمات</string>
     <string name="ratings_source_hint">اختر التقييمات التي تظهر في صفحات العناوين وفي الرئيسية. يتوفّر Letterboxd للأفلام فقط ويتطلّب مفتاح MDBList. تستخدم المسلسلات IMDb دائمًا.</string>
     <string name="ratings_both">كلاهما</string>
+    <string name="episode_badges">شارات الحلقات الجديدة</string>
+    <string name="episode_badges_hint">اختر الرقم على ملصقات المسلسلات. «المعروضة حديثًا» تعدّ الحلقات التي صدرت بعد آخر مشاهدة. «الموسم الحالي» تعدّ الحلقات المتبقية في الموسم الذي تشاهده.</string>
+    <string name="episode_badges_aired">المعروضة حديثًا</string>
+    <string name="episode_badges_season">الموسم الحالي</string>
     <string name="mdblist_key">مفتاح MDBList</string>
     <string name="mdblist_key_hint">مفتاح API المجاني من mdblist.com/preferences. يستخدمه Alder لجلب تقييمات Letterboxd فقط.</string>
     <string name="key_not_set">غير مضبوط</string>

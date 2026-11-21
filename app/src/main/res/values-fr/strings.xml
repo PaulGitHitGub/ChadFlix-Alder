@@ -329,6 +329,10 @@
     <string name="ratings_source">Notes</string>
     <string name="ratings_source_hint">Choisit les notes des pages de titres et de l’accueil. Letterboxd ne couvre que les films et demande une clé MDBList. Les séries utilisent toujours IMDb.</string>
     <string name="ratings_both">Les deux</string>
+    <string name="episode_badges">Badges de nouveaux épisodes</string>
+    <string name="episode_badges_hint">Choisit le nombre sur les affiches de séries. Nouvellement diffusés compte les épisodes sortis après votre dernier visionnage. Saison en cours compte les épisodes restants de la saison que vous regardez.</string>
+    <string name="episode_badges_aired">Nouvellement diffusés</string>
+    <string name="episode_badges_season">Saison en cours</string>
     <string name="mdblist_key">Clé MDBList</string>
     <string name="mdblist_key_hint">Votre clé d’API gratuite sur mdblist.com/preferences. Alder l’utilise uniquement pour les notes Letterboxd.</string>
     <string name="key_not_set">Non définie</string>
