@@ -948,7 +948,12 @@ abstract class Screen : Activity() {
     /** Highlights come from CHANGELOG.md; the full release notes remain one remote action away. */
     protected fun whatsNew(version: String = Updates.mine(this), quiet: Boolean = false) {
         val changes = runCatching { assets.open("CHANGELOG.md").bufferedReader().use { it.readText() } }.getOrNull()
-            ?.let { text -> changesFor(text, version).ifEmpty { changesFor(text, "Unreleased") } }.orEmpty()
+            ?.let { text ->
+                // A debug build previews the next release's notes.
+                val debug = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+                (if (debug) changesFor(text, "Unreleased") else emptyList()).ifEmpty { changesFor(text, version) }
+                    .ifEmpty { changesFor(text, "Unreleased") }
+            }.orEmpty()
         if (changes.isEmpty()) {
             if (!quiet) choose(getString(R.string.whats_new), listOf(getString(R.string.action_ok)),
                 getString(R.string.whats_new_no_notes, version)) {}
@@ -959,7 +964,7 @@ abstract class Screen : Activity() {
 
         val metrics = resources.displayMetrics
         val dialogW = minOf(dp(1060), (metrics.widthPixels * 0.88f).toInt())
-        val dialogH = minOf(dp(620), (metrics.heightPixels * 0.84f).toInt())
+        val dialogH = minOf(dp(640), (metrics.heightPixels * 0.88f).toInt())
 
         val root = FrameLayout(this).apply {
             background = glassOver(this, 16, shade = FROST_DENSE)
@@ -1000,7 +1005,21 @@ abstract class Screen : Activity() {
         }
         val heroContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(24), dp(16), dp(16))
+            setPadding(0, dp(18), dp(16), dp(16))
+        }
+        // A spotlight picture (`<!-- Spotlight: whats-new/x.webp -->`, from assets) shows what the change looks like.
+        val picture = android.widget.ImageView(this).apply {
+            scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) =
+                    outline.setRoundRect(0, 0, view.width, view.height, dp(TILE_RADIUS).toFloat())
+            }
+            clipToOutline = true
+            visibility = View.GONE
+        }
+        val pictures = HashMap<String, android.graphics.Bitmap?>()
+        fun pictureFor(path: String) = pictures.getOrPut(path) {
+            runCatching { assets.open(path).use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
         }
         val categoryTag = caps(R.string.whats_new_group, TUNGSTEN)
         val titleView = text("", SERIF_TITLE, serif = true).apply {
@@ -1009,6 +1028,7 @@ abstract class Screen : Activity() {
         val descView = text("", BODY, color = TEXT).apply {
             setLineSpacing(dp(4).toFloat(), 1f)
         }
+        heroContent.addView(picture, LinearLayout.LayoutParams(-1, dp(270)).apply { bottomMargin = dp(18) })
         heroContent.addView(categoryTag)
         heroContent.addView(titleView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         heroContent.addView(descView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
@@ -1069,6 +1089,9 @@ abstract class Screen : Activity() {
             titleView.text = displayTitle
             val desc = change.description.ifEmpty { change.text }
             descView.text = changeLine(desc)
+            val bitmap = change.image?.let(::pictureFor)
+            if (bitmap != null) picture.setImageBitmap(bitmap)
+            picture.visibility = if (bitmap != null) View.VISIBLE else View.GONE
             heroScroll.scrollTo(0, 0)
         }
 
@@ -1106,7 +1129,7 @@ abstract class Screen : Activity() {
                 }
                 addView(dot, LinearLayout.LayoutParams(dp(6), dp(6)).apply { marginEnd = dp(10) })
 
-                val rowTitle = change.title.ifEmpty { change.text }
+                val rowTitle = change.title.ifEmpty { change.text }.let { if (showAll) it else "${index + 1}   $it" }
                 val label = text(rowTitle, BODY, color = TEXT_2).apply {
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -1273,7 +1296,7 @@ abstract class Screen : Activity() {
 }
 
 /** One changelog entry and the "### " heading it sits under (New, Easier to use, Fixes), null above the first. */
-internal class Change(val group: String?, val text: String, val spotlight: Boolean = false) {
+internal class Change(val group: String?, val text: String, val spotlight: Boolean = false, val image: String? = null) {
     /** The bold lead-in title from **Title.**, without markdown marks or trailing period. */
     val title: String get() = Regex("""\*\*(.+?)\*\*""").find(text)?.groupValues?.get(1)?.trimEnd('.').orEmpty()
 
@@ -1292,11 +1315,15 @@ internal fun changesFor(changelog: String, version: String): List<Change> {
     val start = lines.indexOfFirst { it.trim() == "## $version" }.takeIf { it >= 0 } ?: return emptyList()
     var group: String? = null
     var spotlight = false
+    var image: String? = null
+    val marker = Regex("""^<!--\s*Spotlight\s*(?::\s*(\S+))?\s*-->$""")
     return lines.drop(start + 1).takeWhile { !it.startsWith("## ") }.mapNotNull { line ->
+        val spot = marker.find(line.trim())
         when {
-            line.startsWith("### ") -> { group = line.removePrefix("### ").trim(); spotlight = false; null }
-            line.trim() == "<!-- Spotlight -->" -> { spotlight = true; null }
-            line.startsWith("- ") -> Change(group, line.removePrefix("- ").trim(), spotlight).also { spotlight = false }
+            line.startsWith("### ") -> { group = line.removePrefix("### ").trim(); spotlight = false; image = null; null }
+            spot != null -> { spotlight = true; image = spot.groupValues[1].ifEmpty { null }; null }
+            line.startsWith("- ") -> Change(group, line.removePrefix("- ").trim(), spotlight, image)
+                .also { spotlight = false; image = null }
             else -> null
         }
     }
