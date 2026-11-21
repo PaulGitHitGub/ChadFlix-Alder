@@ -244,15 +244,28 @@ internal fun playerBadges(
 internal class PlaybackCheckpoint {
     var handedOff: Boolean = false
         private set
+    var resumeOnReturn: Boolean = false
+        private set
     private var pauseCommitted = false
     private var externalCommitted = false
 
     fun onHandOffStarted() {
         handedOff = true
+        resumeOnReturn = false
     }
 
     fun onHandOffCancelled() {
         handedOff = false
+    }
+
+    fun captureResumeOnPause(playWhenReady: Boolean, finishing: Boolean) {
+        resumeOnReturn = playWhenReady && !finishing && !handedOff
+    }
+
+    fun consumeResumeOnReturn(finishing: Boolean, destroyed: Boolean, prepared: Boolean): Boolean {
+        val shouldResume = resumeOnReturn && !finishing && !destroyed && !handedOff && prepared
+        resumeOnReturn = false
+        return shouldResume
     }
 
     fun onResume(finishing: Boolean) {
@@ -797,7 +810,7 @@ class PlayerActivity : Screen() {
                     if (prepared) {
                         selectAddonSub = true
                         val pos = position()
-                        val play = player.playWhenReady
+                        val play = if (paused || stopped) checkpoint.resumeOnReturn else player.playWhenReady
                         if (paused || stopped) pendingForegroundAction = { load(pos, play = play) }
                         else load(pos, play = play)
                     } else if (beginStarted) {
@@ -1369,6 +1382,7 @@ class PlayerActivity : Screen() {
         super.onResume()
         paused = false
         stopped = false
+        val shouldResume = checkpoint.consumeResumeOnReturn(isFinishing, isDestroyed, prepared)
         if (!::status.isInitialized || isFinishing || isDestroyed || handedOff) return
         checkpoint.onResume(isFinishing)
         pendingForegroundAction?.let { action ->
@@ -1378,12 +1392,14 @@ class PlayerActivity : Screen() {
         }
         if (prepared) {
             lastPosition = position()
-            // Left before the picture showed: nothing was seen, so it goes on, with a fresh START_WAIT.
-            if (!started && !isTrailer) {
+            if (shouldResume) {
                 if (player.playbackState == Player.STATE_IDLE) player.prepare()
                 player.play()
-                main.removeCallbacks(startTimeout)
-                main.postDelayed(startTimeout, startWait)
+                // Left before the picture showed: nothing was seen, so it gets a fresh START_WAIT.
+                if (!started && !isTrailer) {
+                    main.removeCallbacks(startTimeout)
+                    main.postDelayed(startTimeout, startWait)
+                }
             }
             if (!isTrailer) {
                 main.removeCallbacks(tickTask)
@@ -3425,11 +3441,14 @@ class PlayerActivity : Screen() {
             main.removeCallbacks(loadingTask)
             main.removeCallbacks(startTimeout)
             main.removeCallbacks(seekTask)
+            checkpoint.captureResumeOnPause(player.playWhenReady, isFinishing)
             player.pause()
             val durationMs = player.duration.takeIf { it > 0 } ?: item?.optJSONObject("state")?.optLong("duration") ?: 0L
             val canCommit = !isTrailer && watched && !player.isCurrentMediaItemLive && !isLiveType(type) &&
                 !(episodic && !plausibleEpisode(durationMs))
             checkpoint.commitOnPause(canCommit, ::commitPauseCheckpoint)
+        } else {
+            checkpoint.captureResumeOnPause(playWhenReady = false, finishing = isFinishing)
         }
         super.onPause()
     }

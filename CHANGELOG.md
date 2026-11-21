@@ -85,6 +85,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Playback speed on Live TV.** Alder hides the speed button on **Live** streams. On streams that cannot skip ahead, speed changes no longer restart playback at 0:00.
 - **Track highlight in Audio & subtitles.** When you select a subtitle or audio track and move focus away, the active highlight stays on that track.
 - **Player start after you leave.** Before, if you left Alder while a source loaded, the player opened the source list in the background or timed out too early. Now Alder waits until you return.
+- **Playback state after you leave.** When you return to the player, Alder keeps the playback state from before you left. A paused video stays paused.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.

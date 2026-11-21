@@ -176,4 +176,44 @@ class PlaybackAudioTest {
             resolveSpeedChange(isTrailer = false, isLive = false, seekable = true, currentSpeed = 1.5f, targetSpeed = 1f, passthroughOut = false, trackPassesAudio = true)
         )
     }
+
+    @Test fun resumeOnReturnRestoresOnlyWhenPlayingAndNotPausedOrHandedOffOrFinishing() {
+        val playing = PlaybackCheckpoint()
+        playing.captureResumeOnPause(playWhenReady = true, finishing = false)
+        assertTrue(playing.resumeOnReturn)
+        assertTrue(playing.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = true))
+        assertFalse(playing.resumeOnReturn)
+        assertFalse(playing.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = true))
+
+        val userPaused = PlaybackCheckpoint()
+        userPaused.captureResumeOnPause(playWhenReady = false, finishing = false)
+        assertFalse(userPaused.resumeOnReturn)
+        assertFalse(userPaused.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = true))
+
+        val handedOff = PlaybackCheckpoint()
+        handedOff.onHandOffStarted()
+        handedOff.captureResumeOnPause(playWhenReady = true, finishing = false)
+        assertFalse(handedOff.resumeOnReturn)
+        assertFalse(handedOff.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = true))
+
+        val finishingOnPause = PlaybackCheckpoint()
+        finishingOnPause.captureResumeOnPause(playWhenReady = true, finishing = true)
+        assertFalse(finishingOnPause.resumeOnReturn)
+        assertFalse(finishingOnPause.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = true))
+
+        val finishingOnResume = PlaybackCheckpoint()
+        finishingOnResume.captureResumeOnPause(playWhenReady = true, finishing = false)
+        assertFalse(finishingOnResume.consumeResumeOnReturn(finishing = true, destroyed = false, prepared = true))
+        assertFalse(finishingOnResume.resumeOnReturn)
+
+        val destroyedOnResume = PlaybackCheckpoint()
+        destroyedOnResume.captureResumeOnPause(playWhenReady = true, finishing = false)
+        assertFalse(destroyedOnResume.consumeResumeOnReturn(finishing = false, destroyed = true, prepared = true))
+        assertFalse(destroyedOnResume.resumeOnReturn)
+
+        val notPrepared = PlaybackCheckpoint()
+        notPrepared.captureResumeOnPause(playWhenReady = true, finishing = false)
+        assertFalse(notPrepared.consumeResumeOnReturn(finishing = false, destroyed = false, prepared = false))
+        assertFalse(notPrepared.resumeOnReturn)
+    }
 }
