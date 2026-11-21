@@ -76,6 +76,86 @@ internal fun episodeDate(value: String?, locale: Locale = Locale.getDefault()): 
     return SimpleDateFormat("d MMM yyyy", locale).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(parsed)
 }
 
+internal enum class HeroControlFocus {
+    PLAY,
+    TRAILER,
+    START_OVER,
+    LIST,
+    INFO,
+    CAST,
+}
+
+internal data class HeroFocusState(
+    val control: HeroControlFocus = HeroControlFocus.PLAY,
+    val castIndex: Int = 0,
+)
+
+internal data class DetailsOverlayState(
+    val guideOpen: Boolean = false,
+    val infoOpen: Boolean = false,
+    val similarOpen: Boolean = false,
+    val filmographyOpen: Boolean = false,
+) {
+    val anyOpen: Boolean
+        get() = guideOpen || infoOpen || similarOpen || filmographyOpen
+}
+
+internal enum class FilmographyReturnTarget {
+    LAST_FOCUSED_ACTOR,
+    INFO_OVERLAY,
+    PLAY_BUTTON,
+}
+
+internal fun shouldShowHero(overlays: DetailsOverlayState): Boolean = !overlays.anyOpen
+
+internal fun shouldRefreshHeroOnOverlayClose(
+    heroNeedsRefresh: Boolean,
+    overlays: DetailsOverlayState,
+): Boolean = heroNeedsRefresh && !overlays.anyOpen
+
+internal fun shouldCloseInfoOnRestart(infoOpen: Boolean, filmographyOpen: Boolean): Boolean =
+    infoOpen && !filmographyOpen
+
+internal fun shouldRefreshInfoOnCastLoad(infoOpen: Boolean, filmographyOpen: Boolean): Boolean =
+    infoOpen && !filmographyOpen
+
+internal fun shouldIncludeResumeAtExtra(resumeAt: Long, startOver: Boolean): Boolean =
+    !startOver && resumeAt > 0L
+
+internal fun resolveHeroFocusTarget(
+    saved: HeroFocusState,
+    hasTrailer: Boolean,
+    hasStartOver: Boolean,
+    castCount: Int,
+): HeroFocusState = when (saved.control) {
+    HeroControlFocus.TRAILER -> if (hasTrailer) saved else HeroFocusState(HeroControlFocus.PLAY)
+    HeroControlFocus.START_OVER -> if (hasStartOver) saved else HeroFocusState(HeroControlFocus.PLAY)
+    HeroControlFocus.CAST -> if (castCount > 0) {
+        HeroFocusState(HeroControlFocus.CAST, saved.castIndex.coerceIn(0, castCount - 1))
+    } else {
+        HeroFocusState(HeroControlFocus.PLAY)
+    }
+    HeroControlFocus.PLAY, HeroControlFocus.LIST, HeroControlFocus.INFO -> saved
+}
+
+internal fun resolveFilmographyReturnTarget(
+    actorAttached: Boolean,
+    infoOpen: Boolean,
+): FilmographyReturnTarget = when {
+    actorAttached -> FilmographyReturnTarget.LAST_FOCUSED_ACTOR
+    infoOpen -> FilmographyReturnTarget.INFO_OVERLAY
+    else -> FilmographyReturnTarget.PLAY_BUTTON
+}
+
+internal fun resolveFilmographyHeroFocus(
+    actorAttached: Boolean,
+    castIndex: Int,
+): HeroFocusState = if (actorAttached && castIndex >= 0) {
+    HeroFocusState(HeroControlFocus.CAST, castIndex)
+} else {
+    HeroFocusState(HeroControlFocus.PLAY)
+}
+
 // A title stays in place over its art; episodes and related titles open over the same scene.
 class DetailsActivity : Screen() {
     private val type by lazy { intent.getStringExtra("type") ?: "movie" }
@@ -109,10 +189,17 @@ class DetailsActivity : Screen() {
     private lateinit var listButton: TextView
     private lateinit var playButton: TextView
     private lateinit var infoButton: TextView
+    private var trailerButton: TextView? = null
+    private var startOverButton: TextView? = null
     private lateinit var infoOverlay: FrameLayout
     private var guideOpen = false
     private var similarOpen = false
     private var infoOpen = false
+    private var heroNeedsRefresh = false
+
+    private fun overlays() = DetailsOverlayState(guideOpen, infoOpen, similarOpen, filmographyOpen)
+
+    private fun anyOverlayOpen() = overlays().anyOpen
     private val infoCastCards = mutableListOf<View>()
     private var storyScrollView: ScrollView? = null
     private var richCast: List<CastMember> = emptyList()
@@ -174,7 +261,7 @@ class DetailsActivity : Screen() {
             richCast = m.castMembers
             certificate = m.certification ?: certificate
             val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
-            showHero(m)
+            if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(m)
             if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
             if (!hasEpisodes(type, m.videos) && !similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
@@ -184,7 +271,7 @@ class DetailsActivity : Screen() {
                     val resolved = r.getOrNull()
                     if (resolved != null && resolved != certificate) {
                         certificate = resolved
-                        if (!guideOpen && !infoOpen && !similarOpen && !filmographyOpen) showHero(meta)
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                     }
                 }
             }
@@ -196,7 +283,7 @@ class DetailsActivity : Screen() {
                     val score = r.getOrNull()
                     if (score != null && score != letterboxdScore) {
                         letterboxdScore = score
-                        if (!guideOpen && !infoOpen && !similarOpen && !filmographyOpen) showHero(meta)
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                     }
                 }
             }
@@ -207,7 +294,9 @@ class DetailsActivity : Screen() {
                     if (resolved.isNotEmpty()) {
                         val hadTrailer = m.trailerStreams.isNotEmpty() || m.trailerYtId != null || imdbTrailers.isNotEmpty()
                         imdbTrailers = resolved
-                        if (!hadTrailer && !guideOpen && !infoOpen && !similarOpen && !filmographyOpen) showHero(meta)
+                        if (!hadTrailer) {
+                            if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
+                        }
                     }
                 }
             }
@@ -216,7 +305,12 @@ class DetailsActivity : Screen() {
             (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
         }) { result ->
             result.getOrNull()?.let { (saved, libraryItem) ->
-                if (!itemChangedHere && item == null) item = libraryItem
+                if (!itemChangedHere && item == null && libraryItem != null) {
+                    item = libraryItem
+                    if (meta != null) {
+                        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
+                    }
+                }
                 if (meta == null) saved?.let(::show)
             }
         }
@@ -231,15 +325,90 @@ class DetailsActivity : Screen() {
         }
         background({ Stremio.library(key, listOf(metaId)).firstOrNull() }) { result ->
             if (!itemChangedHere && !savingEdit) {
-                item = result.getOrNull() ?: item
-                if (meta != null) showHero(meta)
+                val loaded = result.getOrNull()
+                if (loaded != null) item = loaded
+                if (meta != null) {
+                    if (anyOverlayOpen()) {
+                        if (loaded != null) heroNeedsRefresh = true
+                    } else {
+                        showHero(meta)
+                    }
+                }
             }
         }
     }
 
     // ---------- title and watch window ----------
 
-    private fun showHero(m: Meta?, failure: Failure? = null) {
+    private fun captureHeroFocus(): HeroFocusState? {
+        val focused = currentFocus ?: return null
+        if (!::hero.isInitialized || !isInside(focused, hero)) return null
+        val castIndex = castChips.indexOfFirst { it === focused || isInside(focused, it) }
+        if (castIndex >= 0) return HeroFocusState(HeroControlFocus.CAST, castIndex)
+        return when {
+            ::playButton.isInitialized && (focused === playButton || isInside(focused, playButton)) ->
+                HeroFocusState(HeroControlFocus.PLAY)
+            trailerButton?.let { focused === it || isInside(focused, it) } == true ->
+                HeroFocusState(HeroControlFocus.TRAILER)
+            startOverButton?.let { focused === it || isInside(focused, it) } == true ->
+                HeroFocusState(HeroControlFocus.START_OVER)
+            ::listButton.isInitialized && (focused === listButton || isInside(focused, listButton)) ->
+                HeroFocusState(HeroControlFocus.LIST)
+            ::infoButton.isInitialized && (focused === infoButton || isInside(focused, infoButton)) ->
+                HeroFocusState(HeroControlFocus.INFO)
+            else -> HeroFocusState(HeroControlFocus.PLAY)
+        }
+    }
+
+    private fun heroFocusView(target: HeroFocusState): View? = when (target.control) {
+        HeroControlFocus.PLAY -> if (::playButton.isInitialized) playButton else null
+        HeroControlFocus.TRAILER -> trailerButton ?: if (::playButton.isInitialized) playButton else null
+        HeroControlFocus.START_OVER -> startOverButton ?: if (::playButton.isInitialized) playButton else null
+        HeroControlFocus.LIST -> if (::listButton.isInitialized) listButton else null
+        HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton else null
+        HeroControlFocus.CAST -> castChips.getOrNull(target.castIndex) ?: if (::playButton.isInitialized) playButton else null
+    }
+
+    private fun restoreHeroFocus(target: View?) {
+        if (target == null || anyOverlayOpen()) return
+        if (!hero.isAttachedToWindow || !target.requestFocus()) {
+            target.post { if (!anyOverlayOpen() && target.isAttachedToWindow) target.requestFocus() }
+        }
+    }
+
+    private fun refreshHeroIfNeeded(
+        preferredFocus: HeroControlFocus? = null,
+        preferredCastIndex: Int = 0,
+    ): Boolean {
+        if (!shouldRefreshHeroOnOverlayClose(heroNeedsRefresh, overlays())) return false
+        val currentMeta = meta ?: return false
+        val focusState = preferredFocus?.let { HeroFocusState(it, preferredCastIndex) }
+        showHero(currentMeta, preferredFocus = focusState)
+        return true
+    }
+
+    private fun revealHero(preferredFocus: HeroControlFocus) {
+        if (!shouldShowHero(overlays())) return
+        hero.visibility = View.VISIBLE
+        if (!refreshHeroIfNeeded(preferredFocus)) {
+            when (preferredFocus) {
+                HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton.requestFocus()
+                else -> if (::playButton.isInitialized) playButton.requestFocus()
+            }
+        }
+    }
+
+    private fun showHero(
+        m: Meta?,
+        failure: Failure? = null,
+        preferredFocus: HeroFocusState? = null,
+    ) {
+        heroNeedsRefresh = false
+        val savedFocus = preferredFocus ?: captureHeroFocus() ?: HeroFocusState(HeroControlFocus.PLAY)
+        castChips.clear()
+        castStripSlot = null
+        trailerButton = null
+        startOverButton = null
         hero.removeAllViews()
         val title = text(m?.name ?: name, SERIF_HERO, serif = true).onArt().apply {
             maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.BOTTOM or Gravity.START
@@ -271,7 +440,7 @@ class DetailsActivity : Screen() {
             val error = failed(failure?.let { failureMessage(R.string.details_load_failed, it) }
                 ?: getString(R.string.details_load_failed)) { recreate() }
             stack.addView(error.marginTop(16))
-            error.post { error.getChildAt(1).requestFocus() }
+            error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
             stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(12) })
             m.description?.takeIf { it.isNotBlank() }?.let {
@@ -306,6 +475,15 @@ class DetailsActivity : Screen() {
             }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
                 leftMargin = dp(PAD); bottomMargin = dp(28)
             })
+        }
+        if (m != null) {
+            val resolved = resolveHeroFocusTarget(
+                saved = savedFocus,
+                hasTrailer = trailerButton != null,
+                hasStartOver = startOverButton != null,
+                castCount = castChips.size,
+            )
+            restoreHeroFocus(heroFocusView(resolved))
         }
     }
 
@@ -345,20 +523,21 @@ class DetailsActivity : Screen() {
             playButton = pill(R.string.action_episodes).apply {
                 setOnClickListener { showGuide() }
             }
-            val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
+            val trailer = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
+            trailerButton = trailer
+            startOverButton = null
             infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo() }
-            listButton = listButton()
+            listButton = buildListButton()
             buttonRow = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 clipChildren = false
                 clipToPadding = false
                 addView(playButton, wrap().apply { marginEnd = dp(14) })
-                trailerButton?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
+                trailer?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
                 addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
                 addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
             }
             stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
-            playButton.post { if (!guideOpen && !infoOpen && !similarOpen) playButton.requestFocus() }
             return
         }
         val duration = item?.optJSONObject("state")?.optLong("duration") ?: 0L
@@ -377,24 +556,25 @@ class DetailsActivity : Screen() {
             // Held OK: every source, to choose one by hand.
             setOnLongClickListener { openSources(target?.first ?: metaId, startOver = false, pick = true); true }
         }
-        val trailerButton = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
+        val trailer = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
         val startOver = if (resumeAt > 0) iconButton("↺", getString(R.string.action_start_over)) {
             openSources(target?.first ?: metaId, startOver = true)
         } else null
+        trailerButton = trailer
+        startOverButton = startOver
         infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo(focusCast = false) }
-        listButton = listButton()
+        listButton = buildListButton()
         buttonRow = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             clipChildren = false
             clipToPadding = false
             addView(playButton, wrap().apply { marginEnd = dp(14) })
-            trailerButton?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
+            trailer?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             startOver?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
             addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
-        playButton.post { if (!guideOpen && !infoOpen && !similarOpen && !filmographyOpen) playButton.requestFocus() }
     }
 
     private fun buildMetadataRow(m: Meta, detailed: Boolean): LinearLayout {
@@ -456,7 +636,7 @@ class DetailsActivity : Screen() {
         return video.id to video
     }
 
-    private fun listButton(): TextView {
+    private fun buildListButton(): TextView {
         val inList = Library.inList(item)
         val desc = getString(if (inList) R.string.action_remove_from_list else R.string.action_add_to_list)
         return iconButton(if (inList) "✓" else "+", desc, action = ::toggleList)
@@ -681,8 +861,7 @@ class DetailsActivity : Screen() {
         leftShade(true)
         guide.exit().alpha(0f).translationY(dp(24).toFloat()).withEndAction {
             guide.visibility = View.GONE
-            hero.visibility = View.VISIBLE
-            if (::playButton.isInitialized) playButton.requestFocus()
+            revealHero(HeroControlFocus.PLAY)
         }.start()
     }
 
@@ -712,7 +891,7 @@ class DetailsActivity : Screen() {
 
     private fun refreshAfterEdit(focusEpisodeId: String? = null, focusSeason: Int? = null) {
         fillGuide()
-        meta?.let(::showHero)
+        if (anyOverlayOpen()) heroNeedsRefresh = true else meta?.let(::showHero)
         if (focusEpisodeId != null) {
             val target = (0 until guideRows.childCount).map { guideRows.getChildAt(it) }
                 .firstOrNull { it.tag == focusEpisodeId }
@@ -1042,14 +1221,10 @@ class DetailsActivity : Screen() {
             val closing = infoOverlay
             closing.exit().alpha(0f).translationY(dp(20).toFloat()).withEndAction {
                 root.removeView(closing)
-                if (!infoOpen) {
-                    hero.visibility = View.VISIBLE
-                    infoButton.requestFocus()
-                }
+                revealHero(HeroControlFocus.INFO)
             }.start()
         } else {
-            hero.visibility = View.VISIBLE
-            infoButton.requestFocus()
+            revealHero(HeroControlFocus.INFO)
         }
     }
 
@@ -1103,7 +1278,7 @@ class DetailsActivity : Screen() {
         if (::similarOverlay.isInitialized) root.removeView(similarOverlay)
         similarOverlay = buildPosterRowOverlay(heading, titles) { similarFirst = it }
         root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
-        showHero(meta)
+        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
     }
 
     private fun addPosterRail(content: LinearLayout, titles: List<Meta>, captionPill: TextView): View? {
@@ -1164,8 +1339,7 @@ class DetailsActivity : Screen() {
         similarOpen = false
         similarOverlay.exit().alpha(0f).translationY(dp(20).toFloat()).withEndAction {
             similarOverlay.visibility = View.GONE
-            hero.visibility = View.VISIBLE
-            playButton.requestFocus()
+            revealHero(HeroControlFocus.PLAY)
         }.start()
     }
 
@@ -1176,24 +1350,40 @@ class DetailsActivity : Screen() {
             val enhanced = result.getOrNull().orEmpty()
             if (enhanced.isNotEmpty()) {
                 richCast = enhanced
-                castStripSlot?.let { slot ->
+                val focused = currentFocus
+                val focusedCastIndex = if (!anyOverlayOpen()) {
+                    focused?.let { v -> castChips.indexOfFirst { it === v || isInside(v, it) } } ?: -1
+                } else -1
+                val slot = castStripSlot
+                if (slot != null) {
                     slot.removeAllViews()
                     buildCastChips(richCast)?.let { slot.addView(it) }
+                } else if (meta != null) {
+                    if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                 }
-                if (infoOpen) {
-                    showInfo(focusCast = currentFocus in infoCastCards)
+                if (focusedCastIndex >= 0 && !anyOverlayOpen()) {
+                    val resolved = resolveHeroFocusTarget(
+                        saved = HeroFocusState(HeroControlFocus.CAST, focusedCastIndex),
+                        hasTrailer = trailerButton != null,
+                        hasStartOver = startOverButton != null,
+                        castCount = castChips.size,
+                    )
+                    restoreHeroFocus(heroFocusView(resolved))
+                }
+                if (shouldRefreshInfoOnCastLoad(infoOpen, filmographyOpen)) {
+                    showInfo(focusCast = currentFocus?.let { v -> infoCastCards.any { it === v || isInside(v, it) } } == true)
                 }
             }
         }
     }
 
     private fun buildCastChips(allMembers: List<CastMember>): View? {
+        castChips.clear()
         val members = heroCastPreview(
             allMembers,
             maxCount = if (allMembers.size <= 4 && allMembers.sumOf { it.name.length } <= 52) 4 else 3
         )
         if (members.isEmpty()) return null
-        castChips.clear()
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1353,13 +1543,19 @@ class DetailsActivity : Screen() {
                 val reason = failureOf(error)
                 FailureLog.record(FailureLog.Operation.SEARCH, reason)
                 choose(actor.name, listOf(getString(R.string.action_ok)),
-                    failureMessage(R.string.filmography_failed, reason, advice = false)) { originView.requestFocus() }
+                    failureMessage(R.string.filmography_failed, reason, advice = false)) {
+                    val fallback = if (infoOpen) infoOverlay else if (::playButton.isInitialized) playButton else null
+                    (originView.takeIf { it.isAttachedToWindow } ?: fallback)?.requestFocus()
+                }
                 return@background
             }
             val titles = result.getOrNull().orEmpty()
             if (titles.isEmpty()) {
                 choose(actor.name, listOf(getString(R.string.action_ok)),
-                    getString(R.string.filmography_empty)) { originView.requestFocus() }
+                    getString(R.string.filmography_empty)) {
+                    val fallback = if (infoOpen) infoOverlay else if (::playButton.isInitialized) playButton else null
+                    (originView.takeIf { it.isAttachedToWindow } ?: fallback)?.requestFocus()
+                }
                 return@background
             }
             val heading = if (actor.isDirector) getString(R.string.directed_by, actor.name) else actor.name
@@ -1389,6 +1585,15 @@ class DetailsActivity : Screen() {
         filmographyFirst?.requestFocus()
     }
 
+    private fun focusFilmographyReturnTarget(actorAttached: Boolean) {
+        val target = when (resolveFilmographyReturnTarget(actorAttached, infoOpen)) {
+            FilmographyReturnTarget.LAST_FOCUSED_ACTOR -> lastFocusedActor
+            FilmographyReturnTarget.INFO_OVERLAY -> infoOverlay
+            FilmographyReturnTarget.PLAY_BUTTON -> if (::playButton.isInitialized) playButton else null
+        }
+        target?.requestFocus()
+    }
+
     private fun hideFilmography() {
         if (!filmographyOpen) return
         filmographyOpen = false
@@ -1396,10 +1601,16 @@ class DetailsActivity : Screen() {
             filmographyOverlay.visibility = View.GONE
             if (infoOpen) {
                 infoOverlay.visibility = View.VISIBLE
-            } else {
+                focusFilmographyReturnTarget(lastFocusedActor?.isAttachedToWindow == true)
+            } else if (shouldShowHero(overlays())) {
                 hero.visibility = View.VISIBLE
+                val actorAttached = lastFocusedActor?.isAttachedToWindow == true
+                val castIndex = if (actorAttached) castChips.indexOf(lastFocusedActor) else -1
+                val heroFocus = resolveFilmographyHeroFocus(actorAttached, castIndex)
+                if (!refreshHeroIfNeeded(heroFocus.control, heroFocus.castIndex)) {
+                    focusFilmographyReturnTarget(actorAttached)
+                }
             }
-            (lastFocusedActor ?: if (infoOpen) infoOverlay else playButton).requestFocus()
         }.start()
     }
 
@@ -1484,7 +1695,7 @@ class DetailsActivity : Screen() {
             .putExtra("logo", m?.logo).putExtra("still", video?.thumbnail).putExtra("runtime", m?.runtime)
             .putExtra("blurStill", Settings.blurThumbnails(this) && video != null && video.id !in Library.watched(item, m?.videos.orEmpty()))
             .putExtra("episode", video?.let { v -> listOfNotNull("S${v.season} E${v.episode}", v.title.takeIf { it.isNotBlank() }).joinToString("  ·  ") })
-            .putExtra("resumeAt", resumeAt)
+            .apply { if (shouldIncludeResumeAtExtra(resumeAt, startOver)) putExtra("resumeAt", resumeAt) }
 
         if (pick || Settings.alwaysList(this)) {
             startActivity(intent)
@@ -1506,9 +1717,17 @@ class DetailsActivity : Screen() {
             ?: Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId } }) { result ->
             item = result.getOrNull() ?: item
             val wasGuide = guideOpen
-            if (infoOpen) { root.removeView(infoOverlay); infoOpen = false; storyScrollView = null }
-            hero.visibility = View.VISIBLE
-            showHero(meta)
+            if (shouldCloseInfoOnRestart(infoOpen, filmographyOpen)) {
+                root.removeView(infoOverlay)
+                infoOpen = false
+                storyScrollView = null
+            }
+            hero.visibility = if (shouldShowHero(overlays())) View.VISIBLE else View.INVISIBLE
+            if (anyOverlayOpen()) {
+                heroNeedsRefresh = true
+            } else {
+                showHero(meta)
+            }
             meta?.videos?.takeIf { episodic && it.isNotEmpty() }?.let(::buildGuide)
             if (wasGuide) showGuide()
         }

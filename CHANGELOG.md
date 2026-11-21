@@ -81,6 +81,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page or left old buttons when an open panel closed. When you came back from a related title, buttons also showed behind the panel.
 - **Continue Watching.** Posters now show **+1** or **+2** badges for new aired episodes. Focus moves to the next row or top bar when you remove the last title. Playback keeps your saved library position when no local time exists.
 - **Home and My Alder details.** A cold visit to **My Alder** now loads title details for filters and badges. Home updates series details after six hours online and keeps saved details offline.
 - **Discover and layout.** Rapid filter changes on **Discover** no longer stack error cards or show old results. Press Down from the top bar to reach **Try again**. Long descriptions shrink to one line on large text sizes so they clear the filter bar.
