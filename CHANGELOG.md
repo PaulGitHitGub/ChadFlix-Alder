@@ -82,6 +82,11 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Fixes
 - **Source list and audio filter.** Alder now matches Brazilian Portuguese (`pt-BR`) audio and ignores separated subtitle flags after `💬`. Your own stream add-ons now come before shared add-ons. When you pick another source after playback, Alder resumes from your saved position. Source selection stops when you leave the screen.
+- **Player progress on exit.** Alder now saves watch progress as soon as the player closes. When another video app plays a film, Alder sends that progress once.
+- **Playback speed on Live TV.** Alder hides the speed button on **Live** streams. On streams that cannot skip ahead, speed changes no longer restart playback at 0:00.
+- **Track highlight in Audio & subtitles.** When you select a subtitle or audio track and move focus away, the active highlight stays on that track.
+- **Player start after you leave.** Before, if you left Alder while a source loaded, the player opened the source list in the background or timed out too early. Now Alder waits until you return.
+- **Playback state after you leave.** When you return to the player, Alder keeps the playback state from before you left. A paused video stays paused.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.

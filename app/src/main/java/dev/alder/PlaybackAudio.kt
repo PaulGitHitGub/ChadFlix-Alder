@@ -64,6 +64,37 @@ internal val SPEEDS = listOf(0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
 internal fun speedLabel(speed: Float): String = speed.toString().trimEnd('0').trimEnd('.') + "×"
 
+internal fun isSpeedAvailable(isTrailer: Boolean, isLive: Boolean): Boolean = !isTrailer && !isLive
+
+internal fun shouldSeekOnAudioRetry(isLive: Boolean, seekable: Boolean): Boolean = !isLive && seekable
+
+internal enum class SpeedChangeAction {
+    UNAVAILABLE,
+    BLOCKED_UNSEEKABLE_PASSTHROUGH,
+    APPLY_IN_PLACE,
+    REOPEN_AUDIO_AND_APPLY,
+}
+
+internal fun resolveSpeedChange(
+    isTrailer: Boolean,
+    isLive: Boolean,
+    seekable: Boolean,
+    currentSpeed: Float,
+    targetSpeed: Float,
+    passthroughOut: Boolean,
+    trackPassesAudio: Boolean,
+): SpeedChangeAction {
+    if (!isSpeedAvailable(isTrailer, isLive)) return SpeedChangeAction.UNAVAILABLE
+    if (targetSpeed == currentSpeed) return SpeedChangeAction.APPLY_IN_PLACE
+    val reopen = if (targetSpeed != 1f) passthroughOut else trackPassesAudio
+    if (!reopen) return SpeedChangeAction.APPLY_IN_PLACE
+    if (!seekable) {
+        return if (targetSpeed != 1f) SpeedChangeAction.BLOCKED_UNSEEKABLE_PASSTHROUGH
+        else SpeedChangeAction.APPLY_IN_PLACE
+    }
+    return SpeedChangeAction.REOPEN_AUDIO_AND_APPLY
+}
+
 @androidx.annotation.OptIn(UnstableApi::class)
 internal fun playbackAudioSink(
     context: Context,
