@@ -2,7 +2,9 @@ package dev.alder
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
@@ -67,5 +69,28 @@ class HomeMetaRefreshTest {
         )
         assertNull(got)
         assertEquals(1, reads)
+    }
+
+    @Test
+    fun freshSeriesWithinTtlIsNotExpired() {
+        val now = 10_000_000L
+        assertFalse(isMetaExpired("series", fetchedAtMs = now - ttlMs + 1L, ttlMs = ttlMs, nowMs = now))
+        assertFalse(isMetaExpired("anime", fetchedAtMs = now - 1_000L, ttlMs = ttlMs, nowMs = now))
+    }
+
+    @Test
+    fun seriesAtOrPastTtlOrWithoutTimestampIsExpired() {
+        val now = 30_000_000L
+        assertTrue(isMetaExpired("series", fetchedAtMs = null, ttlMs = ttlMs, nowMs = now))
+        assertTrue(isMetaExpired("series", fetchedAtMs = now - ttlMs, ttlMs = ttlMs, nowMs = now))
+        assertTrue(isMetaExpired("series", fetchedAtMs = now - ttlMs - 1L, ttlMs = ttlMs, nowMs = now))
+        assertTrue(isMetaExpired("anime", fetchedAtMs = now - ttlMs, ttlMs = ttlMs, nowMs = now))
+    }
+
+    @Test
+    fun moviesNeverExpireInMemory() {
+        val now = 30_000_000L
+        assertFalse(isMetaExpired("movie", fetchedAtMs = null, ttlMs = ttlMs, nowMs = now))
+        assertFalse(isMetaExpired("movie", fetchedAtMs = now - ttlMs - 10_000L, ttlMs = ttlMs, nowMs = now))
     }
 }

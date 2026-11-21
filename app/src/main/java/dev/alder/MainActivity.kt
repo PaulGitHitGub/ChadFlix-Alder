@@ -285,7 +285,13 @@ class MainActivity : Screen() {
     private val rows = mutableListOf<Row>()
     private var focusedSomething = false
     private val fillingListDetails = mutableSetOf<String>()
-    private val metas = mutableMapOf<String, Meta>() // full details, fetched once per title
+    private val metas = mutableMapOf<String, Meta>() // full details, cached with fetch time for series TTL refresh
+    private val metaFetchedAt = mutableMapOf<String, Long>()
+
+    private fun cacheMeta(id: String, meta: Meta, fetchedAtMs: Long = System.currentTimeMillis()) {
+        metas[id] = meta
+        metaFetchedAt[id] = fetchedAtMs
+    }
 
     // The art, at full strength and full bleed, over the previous title's art while it crossfades in.
     private lateinit var art: ImageView
@@ -1586,7 +1592,8 @@ class MainActivity : Screen() {
             var fresh = false
             fun show(prepared: HomeLibrary, force: Boolean = false) {
                 val (list, cw, metadata) = prepared
-                metadata.forEach { (id, meta) -> if (id !in metas) metas[id] = meta }
+                val now = System.currentTimeMillis()
+                metadata.forEach { (id, meta) -> cacheMeta(id, meta, now) }
                 val what = (if (p == Page.HOME) cw else list).joinToString {
                     val state = it.state
                     "${it.optString("_id")}:${it.optString("_mtime")}:${it.optBoolean("removed")}:${state.optLong("timeOffset")}:${state.optLong("duration")}:${state.text("video_id")}"
@@ -1630,15 +1637,17 @@ class MainActivity : Screen() {
             if (grid && remembered != null) show(HomeLibrary(remembered))
             else {
                 val known = if (grid) emptyMap() else metas.toMap()
+                val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
                 background({
-                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, key, grid) }
+                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid) }
                 }, cacheReads) { r -> if (g == generation && !fresh) r.getOrNull()?.let { show(it) } }
             }
             var libraryRequest = 0
             fun ask() {
                 val request = ++libraryRequest
                 val known = if (grid) emptyMap() else metas.toMap()
-                background({ prepareLibrary(Stremio.library(key), known, key, grid) }) { result ->
+                val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
+                background({ prepareLibrary(Stremio.library(key), known, knownFetchedAt, key, grid) }) { result ->
                     if (g != generation || request != libraryRequest) return@background
                     result.fold({
                         fresh = true
@@ -2098,7 +2107,11 @@ class MainActivity : Screen() {
      * ponytail: one title at a time on one thread; the first visit to a long list takes a while, later ones read disk.
      */
     private fun fillListDetails() {
-        val missing = listTitles().filter { val id = it.optString("_id"); id !in metas && id !in fillingListDetails }
+        val missing = listTitles().filter {
+            val id = it.optString("_id")
+            val type = it.optString("type")
+            (id !in metas || isMetaExpired(type, metaFetchedAt[id], META_REFRESH_MS)) && id !in fillingListDetails
+        }
         if (missing.isEmpty()) return
         val ids = missing.map { it.optString("_id") }
         fillingListDetails += ids
@@ -2117,8 +2130,9 @@ class MainActivity : Screen() {
             }
         }, metaPool) { r ->
             fillingListDetails -= ids
+            val now = System.currentTimeMillis()
             r.getOrNull()?.forEach { (id, m) ->
-                if (id !in metas) metas[id] = m
+                cacheMeta(id, m, now)
                 val count = newEpisodeCount(id, m)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
@@ -2842,7 +2856,9 @@ class MainActivity : Screen() {
     private fun fill(item: Item) {
         if (item.filled) return
         item.filled = true
-        metas[item.id]?.let { applyMeta(item, it); return }
+        if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
+            metas[item.id]?.let { applyMeta(item, it); return }
+        }
         val key = profile.authKey
         metaPool.execute {
             // Last time's details from disk when fresh; the network for unseen titles or library series past TTL.
@@ -2856,8 +2872,8 @@ class MainActivity : Screen() {
             )
             main.post {
                 if (isDestroyed) return@post
-                if (m == null) return@post settle(item)
-                metas[item.id] = m
+                if (m == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
+                cacheMeta(item.id, m)
                 applyMeta(item, m)
             }
         }
@@ -2901,7 +2917,13 @@ class MainActivity : Screen() {
         val metadata: Map<String, Meta> = emptyMap(),
     )
 
-    private fun prepareLibrary(list: List<JSONObject>, known: Map<String, Meta>, key: String, grid: Boolean): HomeLibrary {
+    private fun prepareLibrary(
+        list: List<JSONObject>,
+        known: Map<String, Meta>,
+        knownFetchedAt: Map<String, Long>,
+        key: String,
+        grid: Boolean,
+    ): HomeLibrary {
         if (grid) return HomeLibrary(list)
         val addons by lazy { Stremio.savedAddons(key).orEmpty() }
         val remote by lazy { runCatching { Stremio.addons(key) } }
@@ -2910,11 +2932,12 @@ class MainActivity : Screen() {
             val id = item.optString("_id")
             val type = item.optString("type")
             val ttl = if (type != "movie") META_REFRESH_MS else null
-            val meta = known[id] ?: found[id] ?: resolveMetaWithOfflineFallback(
+            val freshKnown = known[id]?.takeIf { !isMetaExpired(type, knownFetchedAt[id], META_REFRESH_MS) }
+            val meta = freshKnown ?: found[id] ?: resolveMetaWithOfflineFallback(
                 ttl = ttl,
                 readSaved = { age -> addons.savedMeta(type, id, age) },
                 fetchRemote = { remote.getOrThrow().meta(type, id) },
-            )?.also { found[id] = it }
+            )?.also { found[id] = it } ?: known[id]
             val video = meta?.videos?.firstOrNull { it.id == videoId }
             video != null && !isEpisodeAired(video.released)
         }
@@ -3178,6 +3201,14 @@ internal fun inDecade(year: String?, decade: Int): Boolean {
 
 internal fun nextHeroMaxLines(top: Int, minTop: Int, maxLines: Int): Int? =
     (maxLines - 1).takeIf { top < minTop && maxLines > 1 }
+
+/** Returns true when cached in-memory metadata should be refreshed against [ttlMs]. */
+internal fun isMetaExpired(
+    type: String,
+    fetchedAtMs: Long?,
+    ttlMs: Long,
+    nowMs: Long = System.currentTimeMillis(),
+): Boolean = type != "movie" && (fetchedAtMs == null || nowMs - fetchedAtMs >= ttlMs)
 
 /** Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. */
 internal fun resolveMetaWithOfflineFallback(
