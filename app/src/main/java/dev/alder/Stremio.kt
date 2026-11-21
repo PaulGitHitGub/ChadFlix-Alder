@@ -81,9 +81,30 @@ object Stremio {
     private fun pendingSave(key: String): JSONObject? =
         saving[key]?.takeIf { savedAt[key]?.let { System.currentTimeMillis() - it < 30_000 } ?: true }
 
-    private fun newest(authKey: String, ids: List<String>, items: List<JSONObject>): List<JSONObject> {
+    internal fun recordSavingForTest(authKey: String, item: JSONObject, savedAtMs: Long? = null) {
+        val key = "$authKey/${item.optString("_id")}"
+        saving[key] = item
+        if (savedAtMs == null) savedAt.remove(key) else savedAt[key] = savedAtMs
+    }
+
+    internal fun clearSavingForTest() {
+        saving.clear()
+        savedAt.clear()
+    }
+
+    internal fun newest(authKey: String, ids: List<String>, items: List<JSONObject>): List<JSONObject> {
         val pending = ProgressSaves.pending(authKey).values.map(::JSONObject)
         val latest = items.associateByTo(linkedMapOf()) { it.optString("_id") }
+        val prefix = "$authKey/"
+        saving.keys.asSequence()
+            .filter { it.startsWith(prefix) }
+            .map { it.removePrefix(prefix) }
+            .filter { ids.isEmpty() || it in ids }
+            .forEach { id ->
+                pendingSave("$authKey/$id")?.let { saved ->
+                    if (newerProgress(saved, latest[id])) latest[id] = saved
+                }
+            }
         pending.filter { ids.isEmpty() || it.optString("_id") in ids }.forEach { item ->
             val id = item.optString("_id")
             if (newerProgress(item, latest[id])) latest[id] = applyProgress(item, latest[id])

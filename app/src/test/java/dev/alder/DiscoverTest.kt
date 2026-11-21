@@ -94,4 +94,11 @@ class DiscoverTest {
         assertTrue(inYear("2024–2026", 2024))
         assertFalse(inYear("2023", 2024))
     }
+
+    @Test fun heroAboutShrinksDownToOneLineWhenTallTextTouchesHeader() {
+        assertEquals(1, nextHeroMaxLines(top = 90, minTop = 120, maxLines = 2))
+        assertEquals(2, nextHeroMaxLines(top = 90, minTop = 120, maxLines = 3))
+        assertEquals(null, nextHeroMaxLines(top = 90, minTop = 120, maxLines = 1))
+        assertEquals(null, nextHeroMaxLines(top = 120, minTop = 120, maxLines = 2))
+    }
 }
