@@ -1593,7 +1593,9 @@ class MainActivity : Screen() {
             fun show(prepared: HomeLibrary, force: Boolean = false) {
                 val (list, cw, metadata) = prepared
                 val now = System.currentTimeMillis()
-                metadata.forEach { (id, meta) -> cacheMeta(id, meta, now) }
+                metadata.forEach { (id, resolved) ->
+                    cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                }
                 val what = (if (p == Page.HOME) cw else list).joinToString {
                     val state = it.state
                     "${it.optString("_id")}:${it.optString("_mtime")}:${it.optBoolean("removed")}:${state.optLong("timeOffset")}:${state.optLong("duration")}:${state.text("video_id")}"
@@ -2131,9 +2133,9 @@ class MainActivity : Screen() {
         }, metaPool) { r ->
             fillingListDetails -= ids
             val now = System.currentTimeMillis()
-            r.getOrNull()?.forEach { (id, m) ->
-                cacheMeta(id, m, now)
-                val count = newEpisodeCount(id, m)
+            r.getOrNull()?.forEach { (id, resolved) ->
+                cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                val count = newEpisodeCount(id, resolved.meta)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
                         val item = card.payload as? Item
@@ -2865,16 +2867,16 @@ class MainActivity : Screen() {
             val ttl = if (item.resume && item.type != "movie") META_REFRESH_MS else null
             val saved by lazy { Stremio.savedAddons(key).orEmpty() }
             val remote by lazy { runCatching { Stremio.addons(key) } }
-            val m = resolveMetaWithOfflineFallback(
+            val resolved = resolveMetaWithOfflineFallback(
                 ttl = ttl,
                 readSaved = { age -> saved.savedMeta(item.type, item.id, age) },
                 fetchRemote = { remote.getOrThrow().meta(item.type, item.id) },
             )
             main.post {
                 if (isDestroyed) return@post
-                if (m == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
-                cacheMeta(item.id, m)
-                applyMeta(item, m)
+                if (resolved == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
+                cacheMeta(item.id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[item.id]))
+                applyMeta(item, resolved.meta)
             }
         }
     }
@@ -2914,7 +2916,7 @@ class MainActivity : Screen() {
     private data class HomeLibrary(
         val list: List<JSONObject>,
         val continuing: List<JSONObject> = emptyList(),
-        val metadata: Map<String, Meta> = emptyMap(),
+        val metadata: Map<String, MetaResolution> = emptyMap(),
     )
 
     private fun prepareLibrary(
@@ -2927,17 +2929,17 @@ class MainActivity : Screen() {
         if (grid) return HomeLibrary(list)
         val addons by lazy { Stremio.savedAddons(key).orEmpty() }
         val remote by lazy { runCatching { Stremio.addons(key) } }
-        val found = mutableMapOf<String, Meta>()
+        val found = mutableMapOf<String, MetaResolution>()
         val continuing = Library.continueWatching(list) { item, videoId ->
             val id = item.optString("_id")
             val type = item.optString("type")
             val ttl = if (type != "movie") META_REFRESH_MS else null
             val freshKnown = known[id]?.takeIf { !isMetaExpired(type, knownFetchedAt[id], META_REFRESH_MS) }
-            val meta = freshKnown ?: found[id] ?: resolveMetaWithOfflineFallback(
+            val meta = freshKnown ?: found[id]?.meta ?: resolveMetaWithOfflineFallback(
                 ttl = ttl,
                 readSaved = { age -> addons.savedMeta(type, id, age) },
                 fetchRemote = { remote.getOrThrow().meta(type, id) },
-            )?.also { found[id] = it } ?: known[id]
+            )?.also { found[id] = it }?.meta ?: known[id]
             val video = meta?.videos?.firstOrNull { it.id == videoId }
             video != null && !isEpisodeAired(video.released)
         }
@@ -3210,9 +3212,21 @@ internal fun isMetaExpired(
     nowMs: Long = System.currentTimeMillis(),
 ): Boolean = type != "movie" && (fetchedAtMs == null || nowMs - fetchedAtMs >= ttlMs)
 
+internal data class MetaResolution(val meta: Meta, val fresh: Boolean)
+
+/** Returns [nowMs] for freshly loaded metadata, or preserves [previousFetchedAtMs] (defaulting to 0L) for expired offline fallback. */
+internal fun preservedMetaTimestamp(
+    fresh: Boolean,
+    previousFetchedAtMs: Long?,
+    nowMs: Long = System.currentTimeMillis(),
+): Long = if (fresh) nowMs else previousFetchedAtMs ?: 0L
+
 /** Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. */
 internal fun resolveMetaWithOfflineFallback(
     ttl: Long?,
     readSaved: (Long?) -> Meta?,
     fetchRemote: () -> Meta?,
-): Meta? = readSaved(ttl) ?: runCatching { fetchRemote() }.getOrNull() ?: if (ttl != null) readSaved(null) else null
+): MetaResolution? =
+    readSaved(ttl)?.let { MetaResolution(it, fresh = true) }
+        ?: runCatching { fetchRemote() }.getOrNull()?.let { MetaResolution(it, fresh = true) }
+        ?: if (ttl != null) readSaved(null)?.let { MetaResolution(it, fresh = false) } else null

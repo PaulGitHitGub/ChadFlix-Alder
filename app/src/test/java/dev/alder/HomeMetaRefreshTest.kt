@@ -21,7 +21,8 @@ class HomeMetaRefreshTest {
             readSaved = { age -> if (age == ttlMs) fresh else null },
             fetchRemote = { remoteCalled = true; fresh },
         )
-        assertEquals("Fresh", got?.name)
+        assertEquals("Fresh", got?.meta?.name)
+        assertEquals(true, got?.fresh)
         assertEquals(false, remoteCalled)
     }
 
@@ -33,7 +34,8 @@ class HomeMetaRefreshTest {
             readSaved = { age -> seenAges += age; if (age == null) stale else null },
             fetchRemote = { fresh },
         )
-        assertEquals("Fresh", got?.name)
+        assertEquals("Fresh", got?.meta?.name)
+        assertEquals(true, got?.fresh)
         assertEquals(listOf<Long?>(ttlMs), seenAges)
     }
 
@@ -45,7 +47,8 @@ class HomeMetaRefreshTest {
             readSaved = { age -> seenAges += age; if (age == null) stale else null },
             fetchRemote = { throw IOException("offline") },
         )
-        assertEquals("Stale", got?.name)
+        assertEquals("Stale", got?.meta?.name)
+        assertEquals(false, got?.fresh)
         assertEquals(listOf<Long?>(ttlMs, null), seenAges)
     }
 
@@ -56,7 +59,8 @@ class HomeMetaRefreshTest {
             readSaved = { age -> if (age == null) stale else null },
             fetchRemote = { null },
         )
-        assertEquals("Stale", got?.name)
+        assertEquals("Stale", got?.meta?.name)
+        assertEquals(false, got?.fresh)
     }
 
     @Test
@@ -92,5 +96,54 @@ class HomeMetaRefreshTest {
         val now = 30_000_000L
         assertFalse(isMetaExpired("movie", fetchedAtMs = null, ttlMs = ttlMs, nowMs = now))
         assertFalse(isMetaExpired("movie", fetchedAtMs = now - ttlMs - 10_000L, ttlMs = ttlMs, nowMs = now))
+    }
+
+    @Test
+    fun offlineFallbackPreservesExpiredTimestampAndRefreshesOnReconnect() {
+        val oldFetchedAt = 10_000_000L
+        val offlineNow = oldFetchedAt + ttlMs + 60_000L
+        var online = false
+
+        val offlineResolved = resolveMetaWithOfflineFallback(
+            ttl = ttlMs,
+            readSaved = { age -> if (age == null) stale else null },
+            fetchRemote = { if (!online) throw IOException("offline") else fresh },
+        )
+        assertEquals("Stale", offlineResolved?.meta?.name)
+        assertFalse(offlineResolved!!.fresh)
+
+        val preservedTs = preservedMetaTimestamp(
+            fresh = offlineResolved.fresh,
+            previousFetchedAtMs = oldFetchedAt,
+            nowMs = offlineNow,
+        )
+        assertEquals(oldFetchedAt, preservedTs)
+        assertTrue(isMetaExpired("series", fetchedAtMs = preservedTs, ttlMs = ttlMs, nowMs = offlineNow))
+
+        val coldOfflineTs = preservedMetaTimestamp(
+            fresh = offlineResolved.fresh,
+            previousFetchedAtMs = null,
+            nowMs = offlineNow,
+        )
+        assertEquals(0L, coldOfflineTs)
+        assertTrue(isMetaExpired("series", fetchedAtMs = coldOfflineTs, ttlMs = ttlMs, nowMs = offlineNow))
+
+        online = true
+        val reconnectNow = offlineNow + 5_000L
+        val reconnectedResolved = resolveMetaWithOfflineFallback(
+            ttl = ttlMs,
+            readSaved = { age -> if (age == null) stale else null },
+            fetchRemote = { if (!online) throw IOException("offline") else fresh },
+        )
+        assertEquals("Fresh", reconnectedResolved?.meta?.name)
+        assertTrue(reconnectedResolved!!.fresh)
+
+        val refreshedTs = preservedMetaTimestamp(
+            fresh = reconnectedResolved.fresh,
+            previousFetchedAtMs = preservedTs,
+            nowMs = reconnectNow,
+        )
+        assertEquals(reconnectNow, refreshedTs)
+        assertFalse(isMetaExpired("series", fetchedAtMs = refreshedTs, ttlMs = ttlMs, nowMs = reconnectNow))
     }
 }
