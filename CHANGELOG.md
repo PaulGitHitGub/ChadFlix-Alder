@@ -84,6 +84,20 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Phone text entry.** A slow or idle connection no longer blocks text from your phone. Alder closes the phone page server when you leave the screen.
 - **Crash reports.** Crash reports remove user names and keys before the host name in web addresses. When GitHub search fails, the crash service returns an error instead of a duplicate issue.
 - **Memory use.** Alder drops closed dialogs and error cards from glass effects. TVs on Android 6 and 7 use smaller picture caches. Alder keeps pictures in normal memory when graphics memory fails.
+- **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page or left old buttons when an open panel closed. When you came back from a related title, buttons also showed behind the panel.
+- **Continue Watching.** Posters now show **+1** or **+2** badges for new aired episodes. Focus moves to the next row or top bar when you remove the last title. Playback keeps your saved library position when no local time exists.
+- **Home and My Alder details.** A cold visit to **My Alder** now loads title details for filters and badges. Home updates series details after six hours online and keeps saved details offline.
+- **Discover and layout.** Rapid filter changes on **Discover** no longer stack error cards or show old results. Press Down from the top bar to reach **Try again**. Long descriptions shrink to one line on large text sizes so they clear the filter bar.
+- **New library titles.** Alder keeps a new title in your library immediately after you save it. Before, a new title did not show for up to 30 seconds.
+- **Watch Next updates.** Alder prepares all art before it changes **Watch Next**, and updates the rows one change at a time. When you change or lock a profile, Alder clears old rows immediately and stops old updates. Before, updates at the same time or after a profile change could show old or locked rows.
+- **Removed profiles.** When you remove a profile, Alder clears its subtitle choice, **Home** art, and **Discover** choices. Before, a new profile could keep old choices from the removed profile.
+- **Title launch requests.** Alder ignores a request from another app to open a title when the title ID is empty or invalid. Before, a bad request could stop Alder.
+- **Source list and audio filter.** Alder now matches Brazilian Portuguese (`pt-BR`) audio and ignores separated subtitle flags after `💬`. Your own stream add-ons now come before shared add-ons. When you pick another source after playback, Alder resumes from your saved position. Source selection stops when you leave the screen.
+- **Player progress on exit.** Alder now saves watch progress as soon as the player closes. When another video app plays a film, Alder sends that progress once.
+- **Playback speed on Live TV.** Alder hides the speed button on **Live** streams. On streams that cannot skip ahead, speed changes no longer restart playback at 0:00.
+- **Track highlight in Audio & subtitles.** When you select a subtitle or audio track and move focus away, the active highlight stays on that track.
+- **Player start after you leave.** Before, if you left Alder while a source loaded, the player opened the source list in the background or timed out too early. Now Alder waits until you return.
+- **Playback state after you leave.** When you return to the player, Alder keeps the playback state from before you left. A paused video stays paused.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
 - **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
 - **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.
