@@ -111,6 +111,7 @@ object WatchNext {
         if (applied) lastSyncedGeneration = expectedGeneration
     }.onFailure { android.util.Log.w("Alder", "Watch Next not updated", it) }
 
+    @androidx.annotation.RequiresApi(26)
     private fun deleteRows(resolver: ContentResolver) {
         resolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf(WatchNextPrograms._ID), null, null, null)?.use { c ->
             while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
