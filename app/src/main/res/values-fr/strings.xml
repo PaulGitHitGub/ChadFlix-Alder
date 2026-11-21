@@ -579,7 +579,9 @@
     <string name="library_load_failed">Impossible de charger votre bibliothèque Stremio</string>
     <string name="filmography_loading">Recherche de titres…</string>
     <string name="filmography_empty">Aucun autre titre trouvé dans vos catalogues.</string>
-    <string name="streams_no_preferred_audio">Aucune source indiquée comme %1$s ne peut être lue automatiquement. Choisissez une source pour continuer.</string>
+    <string name="streams_no_preferred_audio">Aucune source ne correspond aux langues choisies pour la lecture automatique. Choisissez une source pour continuer.</string>
+    <string name="audio_fallback">Langue audio de secours</string>
+    <string name="audio_fallback_hint">Avec Ma langue d’abord, Alder essaie votre langue, cette langue de secours, puis l’anglais. Sélectionnez Désactivé pour utiliser uniquement votre langue.</string>
     <string name="failure_preferred_audio">aucune piste audio prise en charge dans votre langue préférée</string>
     <string name="failure_advice_preferred_audio">Choisissez une source avec votre langue audio.</string>
 </resources>

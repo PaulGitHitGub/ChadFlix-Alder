@@ -579,7 +579,9 @@
     <string name="library_load_failed">Impossibile caricare la tua libreria Stremio</string>
     <string name="filmography_loading">Ricerca titoli…</string>
     <string name="filmography_empty">Nessun altro titolo trovato nei tuoi cataloghi.</string>
-    <string name="streams_no_preferred_audio">Nessuna fonte contrassegnata come %1$s può essere riprodotta automaticamente. Scegli una fonte per continuare.</string>
+    <string name="streams_no_preferred_audio">Nessuna fonte corrisponde alle lingue per la riproduzione automatica. Scegli una fonte per continuare.</string>
+    <string name="audio_fallback">Lingua audio di riserva</string>
+    <string name="audio_fallback_hint">Con Prima la mia lingua, Alder prova la tua lingua, questa lingua di riserva e infine l’inglese. Seleziona Disattivato per usare solo la tua lingua.</string>
     <string name="failure_preferred_audio">nessuna traccia audio supportata nella tua lingua preferita</string>
     <string name="failure_advice_preferred_audio">Scegli una fonte con la tua lingua audio.</string>
 </resources>

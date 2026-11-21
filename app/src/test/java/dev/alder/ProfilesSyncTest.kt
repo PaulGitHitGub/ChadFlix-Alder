@@ -112,9 +112,11 @@ class ProfilesSyncTest {
         prefs.edit()
             .putString("subPref@1", "foreign")
             .putString("release@1", "remux")
+            .putString("audioFallback@1", "fr")
             .putString("title:tt123@1", """{"audio":"ja"}""")
             .putBoolean("showTab:anime@1", false)
             .putString("subPref@2", "off")
+            .putString("audioFallback@2", "")
             .putString("release@2", "web")
             .putInt("maxHeight", 1080)
             .apply()
@@ -123,10 +125,12 @@ class ProfilesSyncTest {
 
         assertFalse(prefs.contains("subPref@1"))
         assertFalse(prefs.contains("release@1"))
+        assertFalse(prefs.contains("audioFallback@1"))
         assertFalse(prefs.contains("title:tt123@1"))
         assertFalse(prefs.contains("showTab:anime@1"))
 
         assertEquals("off", prefs.getString("subPref@2", null))
+        assertEquals("", prefs.getString("audioFallback@2", null))
         assertEquals("web", prefs.getString("release@2", null))
         assertEquals(1080, prefs.getInt("maxHeight", 0))
     }

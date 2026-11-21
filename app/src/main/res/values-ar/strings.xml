@@ -597,7 +597,9 @@
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>
     <string name="filmography_loading">جارٍ البحث عن العناوين…</string>
     <string name="filmography_empty">لم يتم العثور على عناوين أخرى في قوائمك.</string>
-    <string name="streams_no_preferred_audio">لا يمكن تشغيل أي مصدر محدد باللغة %1$s تلقائيًا. اختر مصدرًا للمتابعة.</string>
+    <string name="streams_no_preferred_audio">لا توجد مصادر تطابق لغات التشغيل التلقائي. اختر مصدرًا للمتابعة.</string>
+    <string name="audio_fallback">لغة الصوت الاحتياطية</string>
+    <string name="audio_fallback_hint">مع خيار لغتي أولًا، يحاول Alder تشغيل لغتك المفضلة ثم اللغة الاحتياطية ثم الإنجليزية. اختر إيقاف لاستخدام لغتك المفضلة فقط.</string>
     <string name="failure_preferred_audio">لا يوجد مسار صوتي مدعوم بلغتك المفضلة</string>
     <string name="failure_advice_preferred_audio">اختر مصدرًا يوفر لغة الصوت التي تفضلها.</string>
 </resources>

@@ -573,7 +573,9 @@
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
     <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
     <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
-    <string name="streams_no_preferred_audio">%1$s के रूप में चिह्नित कोई भी स्रोत अपने आप नहीं चल सकता। जारी रखने के लिए कोई स्रोत चुनें।</string>
+    <string name="streams_no_preferred_audio">कोई भी स्रोत अपने आप चलाने के लिए चुनी गई भाषाओं से मेल नहीं खाता। जारी रखने के लिए कोई स्रोत चुनें।</string>
+    <string name="audio_fallback">वैकल्पिक ऑडियो भाषा</string>
+    <string name="audio_fallback_hint">पहले मेरी भाषा में Alder पहले आपकी चुनी हुई भाषा, फिर यह वैकल्पिक भाषा और फिर अंग्रेज़ी आज़माता है। केवल अपनी चुनी हुई भाषा के लिए बंद चुनें।</string>
     <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
     <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
 </resources>

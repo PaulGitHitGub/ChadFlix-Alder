@@ -40,7 +40,7 @@ class StreamsResolverTest {
     }
 
     @Test
-    fun automaticPlaybackWaitsForPolishAndQueuesOnlyPolishMatches() {
+    fun automaticPlaybackExhaustsPreferredMatchesBeforeFallbacks() {
         val hindi = stream("Movie 1080p Hindi", filename = "last-played.mkv")
         val unknown = stream("Movie 1080p MULTI")
         val polish = stream("Movie 1080p Polish")
@@ -48,17 +48,26 @@ class StreamsResolverTest {
             .put("name", "Movie 1080p")
             .put("infoHash", "1234567890abcdef1234567890abcdef12345678")
             .put("behaviorHints", JSONObject().put("filename", "Movie.POL.mkv")), allowTorrents = true))
-        val answers: Array<List<Stream>?> = arrayOf(listOf(hindi, unknown), null, listOf(polish, polishBackup))
+        val morePolish = listOf(stream("Another Polish release"), stream("Fourth Polish release"))
+        val french = stream("Movie 1080p French")
+        val english = stream("Movie 1080p English")
+        val answers: Array<List<Stream>?> = arrayOf(listOf(hindi, unknown, english, french), null, listOf(polish, polishBackup) + morePolish)
         val tv = Device(hevc = true, av1 = false, dolbyVision = false, hdr = true, height = 1080)
 
-        fun queue(allowGaps: Boolean, language: String?) = StreamsResolver.rank(
-            readyStreams(answers, allowGaps).filter { StreamsResolver.matchesAutomaticLanguage(it, language) },
+        val ranked = StreamsResolver.rank(
+            readyStreams(answers, allowGaps = true),
             tv, 0, hindi.filename, null, false, { 0 }, false
-        ).take(StreamsResolver.TRY)
+        )
+        val polishAttempts = (listOf(polish) + morePolish + polishBackup).map { PlaybackSource(it, "pl") }
+        val englishAttempts = listOf(PlaybackSource(unknown, "en"), PlaybackSource(english, "en"))
 
-        assertEquals(emptyList<Stream>(), queue(allowGaps = false, language = "pl"))
-        assertEquals(listOf(polish, polishBackup), queue(allowGaps = true, language = "pl"))
-        assertEquals(hindi, queue(allowGaps = true, language = null).first())
+        assertEquals(polishAttempts, StreamsResolver.playbackQueue(ranked, StreamsResolver.languageOrder("pl", "")))
+        assertEquals(polishAttempts + englishAttempts, StreamsResolver.playbackQueue(ranked, StreamsResolver.languageOrder("pl", "en")))
+        assertEquals(polishAttempts + PlaybackSource(french, "fr") + englishAttempts,
+            StreamsResolver.playbackQueue(ranked, StreamsResolver.languageOrder("pl", "fr")))
+        assertEquals(listOf("en", "fr"), StreamsResolver.languageOrder("en", "fr"))
+        assertEquals(listOf("pt-BR", "en"), StreamsResolver.languageOrder("pt-BR", "pt"))
+        assertEquals(listOf(hindi, unknown, english), StreamsResolver.playbackQueue(ranked, emptyList()).map { it.stream })
     }
 
     @Test

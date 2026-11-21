@@ -47,6 +47,7 @@ class PlaybackAudioTest {
 
         assertEquals(polish, bestAudioFormat(formats, "pl", emptySet(), requireLanguage = true) { false })
         assertNull(bestAudioFormat(formats, "pl", setOf(polish), requireLanguage = true) { false })
+        assertNull(bestAudioFormat(listOf(hindi, untagged), "pl", emptySet(), requireLanguage = true) { false })
         assertEquals(hindi, bestAudioFormat(formats, "pl", setOf(polish)) { false })
     }
 
