@@ -284,7 +284,14 @@ class MainActivity : Screen() {
     private var search: ImageView? = null
     private val rows = mutableListOf<Row>()
     private var focusedSomething = false
-    private val metas = mutableMapOf<String, Meta>() // full details, fetched once per title
+    private val fillingListDetails = mutableSetOf<String>()
+    private val metas = mutableMapOf<String, Meta>() // full details, cached with fetch time for series TTL refresh
+    private val metaFetchedAt = mutableMapOf<String, Long>()
+
+    private fun cacheMeta(id: String, meta: Meta, fetchedAtMs: Long = System.currentTimeMillis()) {
+        metas[id] = meta
+        metaFetchedAt[id] = fetchedAtMs
+    }
 
     // The art, at full strength and full bleed, over the previous title's art while it crossfades in.
     private lateinit var art: ImageView
@@ -409,8 +416,6 @@ class MainActivity : Screen() {
         val onFill = mutableListOf<() -> Unit>()
     }
 
-    // Title details, newest request first, so the cards on screen get theirs before the ones scrolled past.
-    private val metaPool = Images.newestFirst(6)
     private var generation = 0 // which showPage answers belong to: late ones from an earlier page are dropped
     private var rowDrawListener: ViewTreeObserver.OnPreDrawListener? = null
     private var restoreCatalogFocus: (() -> Unit)? = null
@@ -752,6 +757,7 @@ class MainActivity : Screen() {
         }
         if (event.action == KeyEvent.ACTION_DOWN && (page.isCatalog || page.isGrid) && mode == Mode.BROWSE) {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && header.hasFocus()) {
+                if (warning()?.requestFocus() == true) return true
                 pageChip()?.requestFocus()?.let { if (it) return true }
                 if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
             }
@@ -796,6 +802,7 @@ class MainActivity : Screen() {
         }
         // Down from the top bar goes to the titles, past Resume (one Up from the cards), to where the remote last was.
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN && header.hasFocus()) {
+            if (warning()?.requestFocus() == true) return true
             val to = last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.let { it.cards[it.selected] }
             if (to != null) { to.requestFocus(); return true }
         }
@@ -1253,9 +1260,8 @@ class MainActivity : Screen() {
             // the next title.
             addOnLayoutChangeListener { _, _, top, _, _, _, _, _, _ ->
                 if (page.isGrid) return@addOnLayoutChangeListener
-                val lines = heroAbout.maxLines
                 val minTop = if (genreStrip.visibility == View.VISIBLE) dp(HEADER_H + 44) else dp(HEADER_H - 12)
-                if (top < minTop && lines > 2) heroAbout.post { heroAbout.maxLines = lines - 1 }
+                nextHeroMaxLines(top, minTop, heroAbout.maxLines)?.let { next -> heroAbout.post { heroAbout.maxLines = next } }
             }
         }
         return browseInfo
@@ -1587,7 +1593,10 @@ class MainActivity : Screen() {
             var fresh = false
             fun show(prepared: HomeLibrary, force: Boolean = false) {
                 val (list, cw, metadata) = prepared
-                metadata.forEach { (id, meta) -> metas.putIfAbsent(id, meta) }
+                val now = System.currentTimeMillis()
+                metadata.forEach { (id, resolved) ->
+                    cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                }
                 val what = (if (p == Page.HOME) cw else list).joinToString {
                     val state = it.state
                     "${it.optString("_id")}:${it.optString("_mtime")}:${it.optBoolean("removed")}:${state.optLong("timeOffset")}:${state.optLong("duration")}:${state.text("video_id")}"
@@ -1598,7 +1607,8 @@ class MainActivity : Screen() {
                 val firstShow = shown == null
                 shown = what
                 // The remote was on one of these titles: it stays on that title wherever it moved (watched: to the front).
-                val was = (currentFocus?.takeIf { isInside(it, slot) })?.tag
+                val inSlot = currentFocus?.let { isInside(it, slot) } == true
+                val was = if (inSlot) currentFocus?.tag else null
                 library = list
                 if (p == Page.HOME) Profiles.active(this)?.let { me ->
                     val syncGeneration = WatchNext.currentGeneration()
@@ -1612,11 +1622,19 @@ class MainActivity : Screen() {
                         slot.addView(row(getString(R.string.row_continue), items.take(initialRowCards(false)), later(items), continueRow = true).view)
                         android.util.Log.d("Alder", "page ${p.label}: Continue in ${android.os.SystemClock.uptimeMillis() - opened} ms")
                         startCinema(items.take(CINEMA_MAX))
+                    } else if (inSlot && firstRow() == null) {
+                        cancelBrowseHero()
+                        heroItem = null
+                        browseInfo.alpha = 0f
+                        resetArt()
                     }
                 } else {
                     showLibrary(slot, was)
                 }
-                if (was != null && p == Page.HOME) (slot.findViewWithTag(was) ?: rows.firstOrNull { isInside(it.view, slot) }?.cards?.firstOrNull())?.requestFocus()
+                if (inSlot && p == Page.HOME) {
+                    val target = was?.let { slot.findViewWithTag<View>(it) } ?: rows.firstOrNull { isInside(it.view, slot) }?.cards?.firstOrNull()
+                    if (target?.requestFocus() != true && firstRow()?.focusFirst() != true) navItems[page]?.requestFocus()
+                }
                 // Continue came in after a quicker row below took the first focus: the remote starts on Continue.
                 else if (p == Page.HOME && firstShow && !touched && focusedSomething && scroller.hasFocus())
                     rows.firstOrNull { isInside(it.view, slot) }?.focusFirst()
@@ -1625,15 +1643,17 @@ class MainActivity : Screen() {
             if (grid && remembered != null) show(HomeLibrary(remembered))
             else {
                 val known = if (grid) emptyMap() else metas.toMap()
+                val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
                 background({
-                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, key, grid) }
+                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid) }
                 }, cacheReads) { r -> if (g == generation && !fresh) r.getOrNull()?.let { show(it) } }
             }
             var libraryRequest = 0
             fun ask() {
                 val request = ++libraryRequest
                 val known = if (grid) emptyMap() else metas.toMap()
-                background({ prepareLibrary(Stremio.library(key), known, key, grid) }) { result ->
+                val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
+                background({ prepareLibrary(Stremio.library(key), known, knownFetchedAt, key, grid) }) { result ->
                     if (g != generation || request != libraryRequest) return@background
                     result.fold({
                         fresh = true
@@ -2093,20 +2113,33 @@ class MainActivity : Screen() {
      * ponytail: one title at a time on one thread; the first visit to a long list takes a while, later ones read disk.
      */
     private fun fillListDetails() {
-        val missing = listTitles().filter { it.optString("_id") !in metas }
+        val missing = listTitles().filter {
+            val id = it.optString("_id")
+            val type = it.optString("type")
+            (id !in metas || isMetaExpired(type, metaFetchedAt[id], META_REFRESH_MS)) && id !in fillingListDetails
+        }
         if (missing.isEmpty()) return
+        val ids = missing.map { it.optString("_id") }
+        fillingListDetails += ids
         val key = profile.authKey
         background({
-            val addons = Stremio.addons(key)
+            val saved by lazy { Stremio.savedAddons(key).orEmpty() }
+            val remote by lazy { runCatching { Stremio.addons(key) } }
             missing.mapNotNull { t ->
                 val id = t.optString("_id"); val type = t.optString("type")
                 val ttl = if (type != "movie") META_REFRESH_MS else null
-                runCatching { addons.savedMeta(type, id, ttl) ?: addons.meta(type, id) }.getOrNull()?.let { id to it }
+                resolveMetaWithOfflineFallback(
+                    ttl = ttl,
+                    readSaved = { age -> saved.savedMeta(type, id, age) },
+                    fetchRemote = { remote.getOrThrow().meta(type, id) },
+                )?.let { id to it }
             }
         }, metaPool) { r ->
-            r.getOrNull()?.forEach { (id, m) ->
-                metas.putIfAbsent(id, m)
-                val count = newEpisodeCount(id, m)
+            fillingListDetails -= ids
+            val now = System.currentTimeMillis()
+            r.getOrNull()?.forEach { (id, resolved) ->
+                cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                val count = newEpisodeCount(id, resolved.meta)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
                         val item = card.payload as? Item
@@ -2144,6 +2177,7 @@ class MainActivity : Screen() {
      * they open, play and save like any other title.
      */
     private fun showDiscover(g: Int) {
+        if (g != generation) return
         if (!discoverLoaded) {
             discoverLoaded = true
             getSharedPreferences("home", MODE_PRIVATE).getString(discoverKey(), null)?.let { saved ->
@@ -2154,6 +2188,9 @@ class MainActivity : Screen() {
                 }
             }
         }
+        rows.forEach { r -> r.cards.forEach { it.unload() } }
+        rows.clear()
+        content.removeAllViews()
         val media = discover.media
         background({
             discoverLists.getOrPut(media) { Tmdb.genres(media) to runCatching { Tmdb.services(media) }.getOrDefault(emptyList()) }
@@ -2161,22 +2198,24 @@ class MainActivity : Screen() {
             if (g != generation) return@background
             r.fold({ (genres, services) -> discoverGrid(g, genres, services) }) { e ->
                 FailureLog.record(FailureLog.Operation.CATALOG, failureOf(e))
-                content.addView(failed(failureMessage(R.string.catalog_incomplete, failureOf(e))) { showDiscover(g) },
-                    LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
+                content.removeAllViews()
+                val retry = failed(failureMessage(R.string.catalog_incomplete, failureOf(e))) { showDiscover(++generation) }
+                content.addView(retry, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
+                retry.post { if (retry.isAttachedToWindow && currentFocus == null) retry.getChildAt(1).requestFocus() }
             }
         }
     }
 
-    private fun chooseDiscover(g: Int, query: DiscoverQuery) {
+    private fun chooseDiscover(query: DiscoverQuery) {
         if (query == discover) return
         discover = query
         getSharedPreferences("home", MODE_PRIVATE).edit().putString(discoverKey(), JSONObject()
             .put("type", query.type).putOpt("genre", query.genre).putOpt("decade", query.decade)
             .putOpt("year", query.year).putOpt("service", query.service).put("sort", query.sort).toString()).apply()
-        showDiscover(g)
+        showDiscover(++generation)
     }
 
-    private fun showDiscoverChips(g: Int, genres: List<Pair<Int, String>>, services: List<Pair<Int, String>>) {
+    private fun showDiscoverChips(genres: List<Pair<Int, String>>, services: List<Pair<Int, String>>) {
         val q = discover
         val focused = lastListChip?.takeIf { it in discoverChips }?.tag as? String
         discoverChips.clear()
@@ -2189,13 +2228,13 @@ class MainActivity : Screen() {
                 val unset = value == null || value == (null to null) || current == null
                 addChip(resources.getResourceEntryName(name), if (unset) getString(allLabel) else "${getString(name)}: $current", false, margin, list = true) {
                     choose(getString(name), options.map { it.first }, checked = options.indexOfFirst { it.second == value }.coerceAtLeast(0)) { i ->
-                        chooseDiscover(g, set(options[i].second))
+                        chooseDiscover(set(options[i].second))
                     }
                 }
             }
             listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows, "anime" to R.string.tab_anime).forEach { (type, words) ->
                 addChip(type, getString(words), type == q.type) {
-                    if (type != q.type) chooseDiscover(g, q.copy(type = type, genre = null, service = null))
+                    if (type != q.type) chooseDiscover(q.copy(type = type, genre = null, service = null))
                 }
             }
             val all = getString(R.string.filter_all)
@@ -2212,7 +2251,7 @@ class MainActivity : Screen() {
                 getString(R.string.discover_sort_new) to "new")
             addChip("sort", "${getString(R.string.list_sort)}: ${sorts.first { it.second == q.sort }.first}", false, list = true) {
                 choose(getString(R.string.list_sort), sorts.map { it.first }, checked = sorts.indexOfFirst { it.second == q.sort }) { i ->
-                    chooseDiscover(g, q.copy(sort = sorts[i].second))
+                    chooseDiscover(q.copy(sort = sorts[i].second))
                 }
             }
         }
@@ -2224,7 +2263,7 @@ class MainActivity : Screen() {
      */
     private fun discoverGrid(g: Int, genres: List<Pair<Int, String>>, services: List<Pair<Int, String>>) {
         if (g != generation) return
-        showDiscoverChips(g, genres, services)
+        showDiscoverChips(genres, services)
         rows.forEach { r -> r.cards.forEach { it.unload() } }
         rows.clear()
         content.removeAllViews()
@@ -2274,8 +2313,11 @@ class MainActivity : Screen() {
                 }) { e ->
                     val reason = failureOf(e)
                     FailureLog.record(FailureLog.Operation.CATALOG, reason)
-                    if (rows.isEmpty()) content.addView(failed(failureMessage(R.string.catalog_incomplete, reason)) { discoverGrid(g, genres, services) },
-                        LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
+                    if (rows.isEmpty()) {
+                        content.removeAllViews()
+                        content.addView(failed(failureMessage(R.string.catalog_incomplete, reason)) { discoverGrid(g, genres, services) },
+                            LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(PAD) })
+                    }
                 }
             }
         }
@@ -2392,6 +2434,7 @@ class MainActivity : Screen() {
     }
 
     private fun showLibrary(slot: FrameLayout, focusTag: Any? = null, removedIndex: Int? = null) {
+        fillListDetails()
         val all = listTitles()
             .filter { listFilter == ListFilter.ALL || (it.optString("type") == "movie") == (listFilter == ListFilter.MOVIES) }
             .filter { t -> listGenre == null || metas[t.optString("_id")]?.genres?.contains(listGenre) == true }
@@ -2819,19 +2862,25 @@ class MainActivity : Screen() {
     private fun fill(item: Item) {
         if (item.filled) return
         item.filled = true
-        metas[item.id]?.let { applyMeta(item, it); return }
+        if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
+            metas[item.id]?.let { applyMeta(item, it); return }
+        }
         val key = profile.authKey
         metaPool.execute {
             // Last time's details from disk when fresh; the network for unseen titles or library series past TTL.
             val ttl = if (item.resume && item.type != "movie") META_REFRESH_MS else null
-            val m = runCatching {
-                Stremio.addons(key).let { it.savedMeta(item.type, item.id, ttl) ?: it.meta(item.type, item.id) }
-            }.getOrNull()
+            val saved by lazy { Stremio.savedAddons(key).orEmpty() }
+            val remote by lazy { runCatching { Stremio.addons(key) } }
+            val resolved = resolveMetaWithOfflineFallback(
+                ttl = ttl,
+                readSaved = { age -> saved.savedMeta(item.type, item.id, age) },
+                fetchRemote = { remote.getOrThrow().meta(item.type, item.id) },
+            )
             main.post {
                 if (isDestroyed) return@post
-                if (m == null) return@post settle(item)
-                metas[item.id] = m
-                applyMeta(item, m)
+                if (resolved == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
+                cacheMeta(item.id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[item.id]))
+                applyMeta(item, resolved.meta)
             }
         }
     }
@@ -2871,18 +2920,30 @@ class MainActivity : Screen() {
     private data class HomeLibrary(
         val list: List<JSONObject>,
         val continuing: List<JSONObject> = emptyList(),
-        val metadata: Map<String, Meta> = emptyMap(),
+        val metadata: Map<String, MetaResolution> = emptyMap(),
     )
 
-    private fun prepareLibrary(list: List<JSONObject>, known: Map<String, Meta>, key: String, grid: Boolean): HomeLibrary {
+    private fun prepareLibrary(
+        list: List<JSONObject>,
+        known: Map<String, Meta>,
+        knownFetchedAt: Map<String, Long>,
+        key: String,
+        grid: Boolean,
+    ): HomeLibrary {
         if (grid) return HomeLibrary(list)
         val addons by lazy { Stremio.savedAddons(key).orEmpty() }
-        val found = mutableMapOf<String, Meta>()
+        val remote by lazy { runCatching { Stremio.addons(key) } }
+        val found = mutableMapOf<String, MetaResolution>()
         val continuing = Library.continueWatching(list) { item, videoId ->
             val id = item.optString("_id")
-            val meta = known[id] ?: found[id] ?: runCatching {
-                addons.savedMeta(item.optString("type"), id)
-            }.getOrNull()?.also { found[id] = it }
+            val type = item.optString("type")
+            val ttl = if (type != "movie") META_REFRESH_MS else null
+            val freshKnown = known[id]?.takeIf { !isMetaExpired(type, knownFetchedAt[id], META_REFRESH_MS) }
+            val meta = freshKnown ?: found[id]?.meta ?: resolveMetaWithOfflineFallback(
+                ttl = ttl,
+                readSaved = { age -> addons.savedMeta(type, id, age) },
+                fetchRemote = { remote.getOrThrow().meta(type, id) },
+            )?.also { found[id] = it }?.meta ?: known[id]
             val video = meta?.videos?.firstOrNull { it.id == videoId }
             video != null && !isEpisodeAired(video.released)
         }
@@ -2929,7 +2990,7 @@ class MainActivity : Screen() {
             .putExtra("runtime", metas[item.id]?.runtime)
             .putExtra("episode", listOfNotNull(episode, episode(item)?.title?.takeIf { it.isNotBlank() }).joinToString(DOT).ifEmpty { null })
             .putExtra("label", listOfNotNull(item.name, episode).joinToString("  ·  "))
-            .putExtra("resumeAt", item.resumeAt)
+            .apply { if (item.resumeAt > 0L) putExtra("resumeAt", item.resumeAt) }
 
         if (pick || Settings.alwaysList(this)) {
             startActivity(intent)
@@ -3039,6 +3100,8 @@ class MainActivity : Screen() {
 
     private companion object {
         val cacheReads = java.util.concurrent.Executors.newSingleThreadExecutor()
+        // Title details, newest request first, so the cards on screen get theirs before the ones scrolled past.
+        val metaPool = Images.newestFirst(6)
         const val META_REFRESH_MS = 6 * 60 * 60 * 1000L // 6h: pick up new seasons/episodes for library series
         const val HEADER_H = 76 // dp
         const val WHATS_NEW_WAIT = 1_500L // ms after Home opens: its first row draws before the pop-up covers it
@@ -3141,3 +3204,33 @@ internal fun inDecade(year: String?, decade: Int): Boolean {
     val y = year?.take(4)?.toIntOrNull() ?: return false
     return if (decade == 0) y < 1980 else y in decade..decade + 9
 }
+
+internal fun nextHeroMaxLines(top: Int, minTop: Int, maxLines: Int): Int? =
+    (maxLines - 1).takeIf { top < minTop && maxLines > 1 }
+
+/** Returns true when cached in-memory metadata should be refreshed against [ttlMs]. */
+internal fun isMetaExpired(
+    type: String,
+    fetchedAtMs: Long?,
+    ttlMs: Long,
+    nowMs: Long = System.currentTimeMillis(),
+): Boolean = type != "movie" && (fetchedAtMs == null || nowMs - fetchedAtMs >= ttlMs)
+
+internal data class MetaResolution(val meta: Meta, val fresh: Boolean)
+
+/** Returns [nowMs] for freshly loaded metadata, or preserves [previousFetchedAtMs] (defaulting to 0L) for expired offline fallback. */
+internal fun preservedMetaTimestamp(
+    fresh: Boolean,
+    previousFetchedAtMs: Long?,
+    nowMs: Long = System.currentTimeMillis(),
+): Long = if (fresh) nowMs else previousFetchedAtMs ?: 0L
+
+/** Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. */
+internal fun resolveMetaWithOfflineFallback(
+    ttl: Long?,
+    readSaved: (Long?) -> Meta?,
+    fetchRemote: () -> Meta?,
+): MetaResolution? =
+    readSaved(ttl)?.let { MetaResolution(it, fresh = true) }
+        ?: runCatching { fetchRemote() }.getOrNull()?.let { MetaResolution(it, fresh = true) }
+        ?: if (ttl != null) readSaved(null)?.let { MetaResolution(it, fresh = false) } else null
