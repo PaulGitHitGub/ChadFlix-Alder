@@ -815,6 +815,7 @@ class MainActivity : Screen() {
     }
 
     private fun switchProfile() {
+        WatchNext.invalidate()
         startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         finish()
@@ -1599,7 +1600,10 @@ class MainActivity : Screen() {
                 // The remote was on one of these titles: it stays on that title wherever it moved (watched: to the front).
                 val was = (currentFocus?.takeIf { isInside(it, slot) })?.tag
                 library = list
-                if (p == Page.HOME) Profiles.active(this)?.let { me -> background({ WatchNext.sync(applicationContext, me.authKey, cw, me.pin != null) }) {} }
+                if (p == Page.HOME) Profiles.active(this)?.let { me ->
+                    val syncGeneration = WatchNext.currentGeneration()
+                    background({ WatchNext.sync(applicationContext, me.authKey, cw, me.pin != null, syncGeneration) }) {}
+                }
                 rows.filter { isInside(it.view, slot) }.forEach { r -> r.cards.forEach { it.unload() }; rows.remove(r) }
                 slot.removeAllViews()
                 if (p == Page.HOME) {

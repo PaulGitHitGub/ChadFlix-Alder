@@ -93,7 +93,10 @@ class ProfilesActivity : Screen() {
     private fun enter(p: Profile) = withPin(p) { if (Profiles.signedOut(this, p.id)) showSignIn(p.name, p) else openHome(p) }
 
     private fun openHome(profile: Profile) {
+        val previousActiveId = getSharedPreferences("account", MODE_PRIVATE).getString("active", null)
+        WatchNext.invalidate()
         Profiles.setActive(this, profile.id)
+        if (profile.pin != null || previousActiveId != profile.id) clearWatchNextAfterInvalidation()
         val home = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         // Opened from the Google TV home's Continue Watching: Home, with that title's page on top of it.
         // A fresh task, so an app already open in the background doesn't end up with two Homes.
@@ -101,6 +104,12 @@ class ProfilesActivity : Screen() {
             Intent(intent).setClass(this, DetailsActivity::class.java).setFlags(0)))
         else startActivity(home)
         finish()
+    }
+
+    private fun clearWatchNextAfterInvalidation() {
+        val generation = WatchNext.currentGeneration()
+        val appContext = applicationContext
+        pool.execute { WatchNext.clearIfCurrent(appContext, generation) }
     }
 
     // ---------- who's watching ----------
@@ -257,7 +266,12 @@ class ProfilesActivity : Screen() {
         askPin(getString(R.string.profiles_choose_pin, p.name), ::showPicker) { first ->
             askPin(getString(R.string.profiles_pin_again), ::showPicker, getString(R.string.profiles_pin_mismatch)) { second ->
                 (second == first).also { same ->
-                    if (same) { Profiles.update(this, p.id, pin = first); showPicker() }
+                    if (same) {
+                        val wasActive = Profiles.active(this)?.id == p.id
+                        Profiles.update(this, p.id, pin = first)
+                        if (wasActive) clearWatchNextAfterInvalidation()
+                        showPicker()
+                    }
                 }
             }
             true
@@ -361,7 +375,9 @@ class ProfilesActivity : Screen() {
         choose(getString(R.string.profiles_remove_title, p.name), listOf(getString(R.string.action_cancel), getString(R.string.action_remove)),
             getString(R.string.profiles_remove_desc, p.name)) { i ->
             if (i == 0) return@choose
+            val wasActive = Profiles.active(this)?.id == p.id
             Profiles.remove(this, p.id)
+            if (wasActive) clearWatchNextAfterInvalidation()
             if (p.id == originProfileId) originProfileId = null
             background({ Http.forget() }) {}
             // Best effort; the TV forgets the profile either way. A sign-in another profile still uses stays signed in.
@@ -720,6 +736,7 @@ class ProfilesActivity : Screen() {
         }
         val others = Profiles.all(this)
         val profile = Profiles.add(this, name, key, draftColor)
+        if (others.isNotEmpty()) clearWatchNextAfterInvalidation()
         draftName = ""
         draftColor = Profiles.COLORS[0]
         // Each profile brings its own add-ons (stream add-ons are shared in Settings, never copied);

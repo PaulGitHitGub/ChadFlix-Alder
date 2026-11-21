@@ -31,7 +31,10 @@ object Profiles {
         return list.firstOrNull { it.id == prefs(context).getString("active", null) } ?: list.singleOrNull()
     }
 
-    fun setActive(context: Context, id: String) = prefs(context).edit().putString("active", id).apply()
+    fun setActive(context: Context, id: String) {
+        prefs(context).edit().putString("active", id).apply()
+        WatchNext.invalidate()
+    }
 
     fun add(context: Context, name: String, authKey: String, color: Int = COLORS[0]): Profile {
         val list = all(context)
@@ -66,6 +69,7 @@ object Profiles {
         Settings.forgetPrefs(settingsPrefs, id)
         searchPrefs.edit().remove("recent:$id").apply()
         homePrefs.edit().remove("art:$id").remove("logo:$id").remove("discover:$id").apply()
+        WatchNext.invalidate()
     }
 
     /**
@@ -74,7 +78,10 @@ object Profiles {
      */
     fun signedOut(context: Context, id: String) = prefs(context).getBoolean("signedOut:$id", false)
 
-    fun markSignedOut(context: Context, id: String) = prefs(context).edit().putBoolean("signedOut:$id", true).apply()
+    fun markSignedOut(context: Context, id: String) {
+        prefs(context).edit().putBoolean("signedOut:$id", true).apply()
+        WatchNext.invalidate()
+    }
 
     /** A fresh sign-in for an existing profile: its new auth key, everything else kept. */
     fun signIn(context: Context, id: String, authKey: String) {
@@ -99,6 +106,7 @@ object Profiles {
             if (it.id != id) it
             else Profile(it.id, name ?: it.name, color ?: it.color, it.authKey, if (clearPin) null else pin ?: it.pin)
         })
+        if (pin != null) WatchNext.invalidate()
     }
 
     private fun save(prefs: SharedPreferences, list: List<Profile>) {

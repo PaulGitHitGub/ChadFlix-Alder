@@ -1,11 +1,13 @@
 package dev.alder
 
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.media.tv.TvContract.WatchNextPrograms
 import android.media.tv.TvContract
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Continue Watching on the Google TV home ("Watch Next"), through Android's own TV provider: our rows are replaced
@@ -17,22 +19,56 @@ object WatchNext {
     private const val ART_PX = 1280 // the launcher's cards are a few hundred px wide; TMDB's 4K original is wasted there
 
     internal val LOGO_RES = R.drawable.logo_transparent
+    private val generation = AtomicLong(0L)
+    private var lastSyncedGeneration = -1L
 
     internal fun logoUri(packageName: String, entryName: String = "logo_transparent"): String =
         "android.resource://$packageName/drawable/$entryName"
 
+    /** Advances the generation so any queued or in-flight sync aborts before modifying Watch Next; never blocks on the sync lock. */
+    fun invalidate() {
+        generation.incrementAndGet()
+    }
+
+    internal fun currentGeneration(): Long = generation.get()
+
+    internal fun isGenerationStale(expectedGeneration: Long): Boolean = generation.get() != expectedGeneration
+
+    internal fun isProfileStale(active: Profile?, authKey: String, locked: Boolean, expectedGeneration: Long): Boolean =
+        isGenerationStale(expectedGeneration) || active?.authKey != authKey || (!locked && active.pin != null)
+
     @Synchronized
-    fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean) = runCatching {
+    fun clear(context: Context) = clearRows(context, expectedGeneration = null)
+
+    @Synchronized
+    internal fun clearIfCurrent(context: Context, expectedGeneration: Long) = clearRows(context, expectedGeneration)
+
+    private fun clearRows(context: Context, expectedGeneration: Long?) = runCatching {
+        if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
+        // A newer profile switch supersedes this clear, and a completed sync for the same generation already replaced Watch Next.
+        if (expectedGeneration != null && (isGenerationStale(expectedGeneration) || lastSyncedGeneration == expectedGeneration)) {
+            return@runCatching
+        }
+        deleteRows(context.contentResolver)
+    }.onFailure { android.util.Log.w("Alder", "Watch Next not cleared", it) }
+
+    @Synchronized
+    fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean) =
+        sync(context, authKey, items, locked, generation.get())
+
+    @Synchronized
+    fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean, expectedGeneration: Long) = runCatching {
         if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
         val resolver = context.contentResolver
+        var applied = false
         syncRows(
             items = items,
             locked = locked,
+            isStale = { isProfileStale(Profiles.active(context), authKey, locked, expectedGeneration) },
             resolveBackdrop = { backdrop(authKey, it) },
             deleteExisting = {
-                resolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf(WatchNextPrograms._ID), null, null, null)?.use { c ->
-                    while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
-                }
+                applied = true
+                deleteRows(resolver)
             },
             insertRows = { entries ->
                 val logoUri = logoUri(context.packageName, context.resources.getResourceEntryName(LOGO_RES))
@@ -72,17 +108,30 @@ object WatchNext {
                 }
             },
         )
+        if (applied) lastSyncedGeneration = expectedGeneration
     }.onFailure { android.util.Log.w("Alder", "Watch Next not updated", it) }
+
+    private fun deleteRows(resolver: ContentResolver) {
+        resolver.query(TvContract.WatchNextPrograms.CONTENT_URI, arrayOf(WatchNextPrograms._ID), null, null, null)?.use { c ->
+            while (c.moveToNext()) resolver.delete(TvContract.buildWatchNextProgramUri(c.getLong(0)), null, null)
+        }
+    }
 
     @Synchronized
     internal fun syncRows(
         items: List<JSONObject>,
         locked: Boolean,
+        isStale: () -> Boolean = { false },
         resolveBackdrop: (JSONObject) -> String?,
         deleteExisting: () -> Unit,
         insertRows: (List<Pair<JSONObject, String?>>) -> Unit,
     ) {
-        val resolved = if (locked) emptyList() else items.take(MAX).map { it to resolveBackdrop(it) }
+        if (isStale()) return
+        val resolved = if (locked) emptyList() else items.take(MAX).map { item ->
+            if (isStale()) return
+            item to resolveBackdrop(item)
+        }
+        if (isStale()) return
         deleteExisting()
         if (locked || resolved.isEmpty()) return
         insertRows(resolved)

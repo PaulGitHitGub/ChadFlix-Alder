@@ -147,4 +147,133 @@ class WatchNextTest {
             events,
         )
     }
+
+    @Test
+    fun syncRowsAbortsWithoutModifyingWhenStaleBeforeResolve() {
+        val events = mutableListOf<String>()
+        val items = listOf(JSONObject().put("_id", "tt1"), JSONObject().put("_id", "tt2"))
+
+        WatchNext.syncRows(
+            items = items,
+            locked = false,
+            isStale = { true },
+            resolveBackdrop = { events += "resolve:${it.getString("_id")}"; "https://img.example/a.jpg" },
+            deleteExisting = { events += "delete" },
+            insertRows = { events += "insert" },
+        )
+
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun syncRowsAbortsWithoutDeletingOrInsertingWhenInvalidatedDuringResolveBackdrop() {
+        val multiEvents = mutableListOf<String>()
+        val token1 = WatchNext.currentGeneration()
+        val multiItems = listOf(JSONObject().put("_id", "tt1"), JSONObject().put("_id", "tt2"))
+
+        WatchNext.syncRows(
+            items = multiItems,
+            locked = false,
+            isStale = { WatchNext.isGenerationStale(token1) },
+            resolveBackdrop = { item ->
+                val id = item.getString("_id")
+                multiEvents += "resolve:$id"
+                if (id == "tt1") WatchNext.invalidate()
+                "https://img.example/$id.jpg"
+            },
+            deleteExisting = { multiEvents += "delete" },
+            insertRows = { multiEvents += "insert" },
+        )
+
+        assertEquals(listOf("resolve:tt1"), multiEvents)
+
+        val singleEvents = mutableListOf<String>()
+        val token2 = WatchNext.currentGeneration()
+        WatchNext.syncRows(
+            items = listOf(JSONObject().put("_id", "tt3")),
+            locked = false,
+            isStale = { WatchNext.isGenerationStale(token2) },
+            resolveBackdrop = { item ->
+                singleEvents += "resolve:${item.getString("_id")}"
+                WatchNext.invalidate()
+                "https://img.example/tt3.jpg"
+            },
+            deleteExisting = { singleEvents += "delete" },
+            insertRows = { singleEvents += "insert" },
+        )
+
+        assertEquals(listOf("resolve:tt3"), singleEvents)
+    }
+
+    @Test
+    fun invalidateAdvancesGenerationAndMarksPriorTokensStale() {
+        val firstToken = WatchNext.currentGeneration()
+        assertFalse(WatchNext.isGenerationStale(firstToken))
+
+        WatchNext.invalidate()
+        val secondToken = WatchNext.currentGeneration()
+
+        assertTrue(secondToken > firstToken)
+        assertTrue(WatchNext.isGenerationStale(firstToken))
+        assertFalse(WatchNext.isGenerationStale(secondToken))
+    }
+
+    @Test
+    fun isProfileStaleChecksGenerationAuthKeyAndPinLock() {
+        val unlocked = Profile(id = "1", name = "A", color = 0, authKey = "key-1", pin = null)
+        val locked = Profile(id = "2", name = "B", color = 0, authKey = "key-2", pin = "1234")
+        val sameKeyLocked = Profile(id = "1", name = "A", color = 0, authKey = "key-1", pin = "1234")
+
+        val token = WatchNext.currentGeneration()
+        assertFalse(WatchNext.isProfileStale(unlocked, "key-1", locked = false, expectedGeneration = token))
+        assertTrue(WatchNext.isProfileStale(null, "key-1", locked = false, expectedGeneration = token))
+        assertTrue(WatchNext.isProfileStale(locked, "key-1", locked = false, expectedGeneration = token))
+        assertTrue(WatchNext.isProfileStale(sameKeyLocked, "key-1", locked = false, expectedGeneration = token))
+        assertFalse(WatchNext.isProfileStale(locked, "key-2", locked = true, expectedGeneration = token))
+
+        WatchNext.invalidate()
+        assertTrue(WatchNext.isProfileStale(unlocked, "key-1", locked = false, expectedGeneration = token))
+    }
+
+    @Test
+    fun invalidateDoesNotBlockOnInFlightSyncAndAbortsStaleInsert() {
+        val rows = mutableListOf("previous-profile")
+        val events = mutableListOf<String>()
+        val resolving = CountDownLatch(1)
+        val invalidated = CountDownLatch(1)
+        val finished = CountDownLatch(1)
+        val token = WatchNext.currentGeneration()
+
+        val staleThread = Thread {
+            WatchNext.syncRows(
+                items = listOf(JSONObject().put("_id", "tt-old")),
+                locked = false,
+                isStale = { WatchNext.isGenerationStale(token) },
+                resolveBackdrop = {
+                    events += "old:resolve"
+                    resolving.countDown()
+                    assertTrue(invalidated.await(5, TimeUnit.SECONDS))
+                    "https://img.example/old.jpg"
+                },
+                deleteExisting = {
+                    events += "old:delete"
+                    rows.clear()
+                },
+                insertRows = {
+                    events += "old:insert"
+                    rows += "tt-old"
+                },
+            )
+            finished.countDown()
+        }
+
+        staleThread.start()
+        assertTrue(resolving.await(5, TimeUnit.SECONDS))
+        WatchNext.invalidate()
+        invalidated.countDown()
+
+        assertTrue(finished.await(5, TimeUnit.SECONDS))
+        assertEquals(listOf("old:resolve"), events)
+        assertEquals(listOf("previous-profile"), rows)
+    }
 }
