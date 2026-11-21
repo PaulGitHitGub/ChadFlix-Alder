@@ -239,7 +239,9 @@ fun List<Addon>.meta(type: String, id: String, together: Boolean = false, report
 fun List<Addon>.savedMeta(type: String, id: String, maxAgeMs: Long? = null): Meta? =
     filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { runCatching { it.savedMeta(type, id, maxAgeMs) }.getOrNull() }
 
-private val metaPool = java.util.concurrent.Executors.newCachedThreadPool()
+private val metaPool = java.util.concurrent.Executors.newCachedThreadPool { r ->
+    Thread(r, "alder-meta").apply { isDaemon = true }
+}
 
 class Meta(json: JSONObject) {
     val id: String = json.getString("id")
@@ -290,7 +292,7 @@ class Meta(json: JSONObject) {
 }
 
 /** [lang] is what the addon sends: ISO 639-2 ("eng") from OpenSubtitles, sometimes a two-letter code. */
-class Subtitle(val url: String, val lang: String, val addon: String) {
+data class Subtitle(val url: String, val lang: String, val addon: String) {
     val language: String get() = Languages.name(lang)
     val mimeType: String get() = url.substringBefore('?').lowercase().let {
         when {
@@ -463,8 +465,11 @@ class Stream(
     /** The audio languages the names give, as two-letter codes; empty when they give none (see [audioLanguagesIn]). */
     val audioLanguages = audioLanguagesIn(spoken)
     /** Whether the names mention this language for the audio ("hindi" for "hi"). */
-    fun mentions(language: String) = language in audioLanguages ||
-        Locale.forLanguageTag(language).getDisplayLanguage(Locale.ENGLISH).lowercase().let { it.length > 2 && it in spoken }
+    fun mentions(language: String): Boolean {
+        val base = Languages.base(language)
+        return language in audioLanguages || base in audioLanguages ||
+            Locale.forLanguageTag(language).getDisplayLanguage(Locale.ENGLISH).lowercase().let { it.length > 2 && it in spoken }
+    }
 
     /** Short tags for the source list: "REMUX · DV · Atmos". */
     val tags get() = listOfNotNull(
@@ -573,7 +578,7 @@ internal fun withoutSubtitleLanguages(text: String): String {
     }
 }
 
-private val subtitleFlags = Regex("\\x{1F4AC}\\x{FE0F}?(?:\\s*(?:[\\x{1F1E6}-\\x{1F1FF}]{2}|\\x{1F3F3}\\x{FE0F}?))*")
+private val subtitleFlags = Regex("\\x{1F4AC}\\x{FE0F}?(?:[\\s/,|·&+-]*(?:[\\x{1F1E6}-\\x{1F1FF}]{2}|\\x{1F3F3}\\x{FE0F}?))*")
 private val subtitlePrefixTags = Regex("(?i)\\b(?:subs?|subtitles?)[ ._:-]+\\p{L}+(?:[ ._,/|&:-]+\\p{L}+)*\\b")
 private val subtitleSuffixTags = Regex("(?i)\\b(\\p{L}+?)[ ._-]?(?:subs?|subtitles?|subbed)\\b")
 

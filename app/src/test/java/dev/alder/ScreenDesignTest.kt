@@ -53,6 +53,8 @@ class ScreenDesignTest {
         assertEquals(emptySet<String>(), audioLanguagesIn("Movie.2024.2160p.WEB-DL.DV.HDR.H265"))
         // Subtitle flags after 💬 and "<lang> subs" tags are ignored for all languages.
         assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("🎙️ 🇬🇧 💬 🇬🇧 🇸🇦 🇨🇳 🇩🇰 🇳🇱 🇫🇮 🇫🇷")))
+        assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("🎙️ 🇬🇧 💬 🇬🇧 / 🇳🇱")))
+        assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("🎙️ 🇬🇧 💬 🇬🇧, 🇳🇱 | 🇫🇷 · 🇩🇪 & 🇪🇸 + 🇮🇹 - 🇯🇵")))
         assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("Movie.2024.1080p.WEB-DL.ENG.NL.Subs")))
         assertEquals(setOf("en"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 NLSubs ENG")))
         assertEquals(setOf("fr"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 FRENCH | Subs ENG")))
@@ -63,6 +65,20 @@ class ScreenDesignTest {
         assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("Frozen (2013) BRRip NL Gesproken")))
         assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("100%NL - Zootropolis")))
         assertEquals(setOf("nl"), audioLanguagesIn(withoutSubtitleLanguages("Movie 2024 Vlaams NLD")))
+    }
+
+    @Test fun brazilianPortugueseMatchesPortugueseAudioStreams() {
+        val brazilianFlag = Stream("Torrentio", "Movie 1080p 🇧🇷 / 🇬🇧", "https://example.invalid/pt.mkv", emptyMap(), 0L, null, null)
+        assertTrue(brazilianFlag.mentions("pt-BR"))
+        assertTrue(streamSpeaks(brazilianFlag, "pt-BR"))
+        assertEquals("Portuguese + English", streamSpokenTag(brazilianFlag, "pt-BR"))
+    }
+
+    @Test fun subtitleUsesValueEqualityForSelectionLookup() {
+        val first = Subtitle("https://subs.example/en.srt", "eng", "OpenSubtitles")
+        val duplicate = Subtitle("https://subs.example/en.srt", "eng", "OpenSubtitles")
+        assertEquals(first, duplicate)
+        assertEquals(0, listOf(first).indexOf(duplicate))
     }
 
     @Test fun whatsNewReadsOneVersionsEntries() {

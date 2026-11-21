@@ -91,6 +91,21 @@ object StreamsResolver {
             (Settings.hdr(context) || !s.isHdr) && !s.cam
     }
 
+    /**
+     * Stream add-ons for [type] and [videoId]: the active profile's [own] add-ons first, then [lent] household
+     * add-ons whose transport URL and id do not match an own add-on so a lender config never shadows own settings.
+     */
+    internal fun mergeStreamAddons(own: List<Addon>, lent: List<Addon>, type: String, videoId: String): List<Addon> {
+        val ownServing = own.filter { it.serves("stream", type, videoId) }
+        val household = lent.filter { it.serves("stream", type, videoId) }.distinctBy { it.id }
+        return ownServing + household.filterNot { h ->
+            ownServing.any {
+                (it.transportUrl.isNotEmpty() && it.transportUrl == h.transportUrl) ||
+                    (it.id.isNotEmpty() && it.id == h.id)
+            }
+        }
+    }
+
     fun resolve(
         context: Context,
         type: String,
@@ -130,8 +145,7 @@ object StreamsResolver {
                         (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable }
                     }.getOrDefault(emptyList())
                 }
-                val household = lent.filter { it.serves("stream", type, videoId) }.distinctBy { it.id }
-                household + own.filter { it.serves("stream", type, videoId) }.filterNot { mine -> household.any { it.id == mine.id } }
+                mergeStreamAddons(own, lent, type, videoId)
             }
 
             val addons = res.getOrNull().orEmpty()
