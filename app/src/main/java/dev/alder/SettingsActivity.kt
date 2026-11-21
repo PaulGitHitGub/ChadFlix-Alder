@@ -1,6 +1,7 @@
 package dev.alder
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.app.ActivityManager
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -90,9 +91,15 @@ object Settings {
     fun wantsLetterboxd(c: Context, type: String, id: String) =
         type == "movie" && id.startsWith("tt") && ratings(c) != "imdb" && mdblistKey(c).isNotEmpty()
     /** A removed profile's taste goes with it, so a new profile in its place starts with none. */
-    fun forget(c: Context, profileId: String) = prefs(c).edit().apply {
-        listOf("release", "dub", "audioLang", "subLang", "hidden", "blurThumbnails", "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary", "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs").forEach { remove("$it@$profileId") }
-        prefs(c).all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:")) && it.endsWith("@$profileId") }.forEach(::remove)
+    fun forget(c: Context, profileId: String) = forgetPrefs(prefs(c), profileId)
+
+    internal fun forgetPrefs(prefs: SharedPreferences, profileId: String) = prefs.edit().apply {
+        listOf(
+            "release", "dub", "audioLang", "subLang", "subPref", "hidden", "blurThumbnails",
+            "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary",
+            "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
+        ).forEach { remove("$it@$profileId") }
+        prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 
     /**
