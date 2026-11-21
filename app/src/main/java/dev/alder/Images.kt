@@ -19,11 +19,13 @@ object Images {
     // the budget to the device, so switching pages shows them from memory. Full-screen art (8 MB a picture at 1080p) has a store of its own: sharing one, a few arts pushed out every poster,
     // so a page seen a moment ago drew blank tiles again. Posters: a quarter (48 MB here, about three pages); art: a
     // sixth (32 MB, the art on screen, the one fading out and the neighbours fetched ahead).
-    private fun store(budget: Long) = object : LruCache<String, Bitmap>(budget.toInt()) {
+    private fun store(budget: Long) = object : LruCache<String, Bitmap>(budget.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
-    private val cards = store(Runtime.getRuntime().maxMemory() / 4)
-    private val screens = store(Runtime.getRuntime().maxMemory() / 6)
+    // On API 23-25 bitmaps live in the Java heap instead of GPU memory, so halve the cache share there.
+    private val softwareBitmaps = android.os.Build.VERSION.SDK_INT < 26
+    private val cards = store(Runtime.getRuntime().maxMemory() / if (softwareBitmaps) 8 else 4)
+    private val screens = store(Runtime.getRuntime().maxMemory() / if (softwareBitmaps) 12 else 6)
     private fun cache(widthPx: Int) = if (widthPx > 1000) screens else cards
     // Home asks only for posters near the screen and lets far ones go, so this pool and cache stay small.
     /** Threads in the card pool: the first this many requests start at once, ahead of the newest-first queue. */

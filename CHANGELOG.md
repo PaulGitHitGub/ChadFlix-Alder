@@ -81,6 +81,9 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Phone text entry.** A slow or idle connection no longer blocks text from your phone. Alder closes the phone page server when you leave the screen.
+- **Crash reports.** Crash reports remove user names and keys before the host name in web addresses. When GitHub search fails, the crash service returns an error instead of a duplicate issue.
+- **Memory use.** Alder drops closed dialogs and error cards from glass effects. TVs on Android 6 and 7 use smaller picture caches. Alder keeps pictures in normal memory when graphics memory fails.
 - **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page or left old buttons when an open panel closed. When you came back from a related title, buttons also showed behind the panel.
 - **Continue Watching.** Posters now show **+1** or **+2** badges for new aired episodes. Focus moves to the next row or top bar when you remove the last title. Playback keeps your saved library position when no local time exists.
 - **Home and My Alder details.** A cold visit to **My Alder** now loads title details for filters and badges. Home updates series details after six hours online and keeps saved details offline.
