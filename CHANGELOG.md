@@ -81,6 +81,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
 
 ### Fixes
+- **Source list and audio filter.** Alder now matches Brazilian Portuguese (`pt-BR`) audio and ignores separated subtitle flags after `💬`. Your own stream add-ons now come before shared add-ons. When you pick another source after playback, Alder resumes from your saved position. Source selection stops when you leave the screen.
 - **Player progress on exit.** Alder now saves watch progress as soon as the player closes. When another video app plays a film, Alder sends that progress once.
 - **Playback speed on Live TV.** Alder hides the speed button on **Live** streams. On streams that cannot skip ahead, speed changes no longer restart playback at 0:00.
 - **Track highlight in Audio & subtitles.** When you select a subtitle or audio track and move focus away, the active highlight stays on that track.
