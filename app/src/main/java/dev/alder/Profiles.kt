@@ -15,8 +15,9 @@ object Profiles {
     const val MAX = 5
     val COLORS = intArrayOf(0xFFF3D9B1.toInt(), 0xFFC98E6A.toInt(), 0xFF8FA39A.toInt(), 0xFFA6A2BD.toInt(), 0xFFD3A66B.toInt())
 
-    fun all(context: Context): List<Profile> {
-        val prefs = prefs(context)
+    fun all(context: Context): List<Profile> = readProfiles(prefs(context))
+
+    internal fun readProfiles(prefs: SharedPreferences): List<Profile> {
         migrate(prefs)
         return JSONArray(prefs.getString("profiles", "[]")).objects()
             .map { Profile(it.getString("id"), it.getString("name"), it.getInt("color").takeIf { c -> c in COLORS } ?: COLORS[0],
@@ -30,7 +31,10 @@ object Profiles {
         return list.firstOrNull { it.id == prefs(context).getString("active", null) } ?: list.singleOrNull()
     }
 
-    fun setActive(context: Context, id: String) = prefs(context).edit().putString("active", id).apply()
+    fun setActive(context: Context, id: String) {
+        prefs(context).edit().putString("active", id).apply()
+        WatchNext.invalidate()
+    }
 
     fun add(context: Context, name: String, authKey: String, color: Int = COLORS[0]): Profile {
         val list = all(context)
@@ -41,13 +45,31 @@ object Profiles {
         return profile
     }
 
-    fun remove(context: Context, id: String) {
-        val prefs = prefs(context)
-        save(prefs, all(context).filterNot { it.id == id })
-        if (prefs.getString("active", null) == id) prefs.edit().remove("active").apply()
-        prefs.edit().remove("shareStreams:$id").remove("signedOut:$id").apply()
-        Settings.forget(context, id)
-        context.getSharedPreferences("search", Context.MODE_PRIVATE).edit().remove("recent:$id").apply()
+    fun remove(context: Context, id: String) = removeFromPrefs(
+        accountPrefs = prefs(context),
+        settingsPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE),
+        searchPrefs = context.getSharedPreferences("search", Context.MODE_PRIVATE),
+        homePrefs = context.getSharedPreferences("home", Context.MODE_PRIVATE),
+        id = id,
+    )
+
+    internal fun removeFromPrefs(
+        accountPrefs: SharedPreferences,
+        settingsPrefs: SharedPreferences,
+        searchPrefs: SharedPreferences,
+        homePrefs: SharedPreferences,
+        id: String,
+    ) {
+        save(accountPrefs, readProfiles(accountPrefs).filterNot { it.id == id })
+        accountPrefs.edit().apply {
+            if (accountPrefs.getString("active", null) == id) remove("active")
+            remove("shareStreams:$id")
+            remove("signedOut:$id")
+        }.apply()
+        Settings.forgetPrefs(settingsPrefs, id)
+        searchPrefs.edit().remove("recent:$id").apply()
+        homePrefs.edit().remove("art:$id").remove("logo:$id").remove("discover:$id").apply()
+        WatchNext.invalidate()
     }
 
     /**
@@ -56,7 +78,10 @@ object Profiles {
      */
     fun signedOut(context: Context, id: String) = prefs(context).getBoolean("signedOut:$id", false)
 
-    fun markSignedOut(context: Context, id: String) = prefs(context).edit().putBoolean("signedOut:$id", true).apply()
+    fun markSignedOut(context: Context, id: String) {
+        prefs(context).edit().putBoolean("signedOut:$id", true).apply()
+        WatchNext.invalidate()
+    }
 
     /** A fresh sign-in for an existing profile: its new auth key, everything else kept. */
     fun signIn(context: Context, id: String, authKey: String) {
@@ -81,6 +106,7 @@ object Profiles {
             if (it.id != id) it
             else Profile(it.id, name ?: it.name, color ?: it.color, it.authKey, if (clearPin) null else pin ?: it.pin)
         })
+        if (pin != null) WatchNext.invalidate()
     }
 
     private fun save(prefs: SharedPreferences, list: List<Profile>) {
