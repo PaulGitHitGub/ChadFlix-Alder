@@ -1,14 +1,15 @@
 package dev.alder
 
-import android.content.Context
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.lang.reflect.Modifier
+import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class WatchNextTest {
     @Test
@@ -33,14 +34,21 @@ class WatchNextTest {
     }
 
     @Test
-    fun syncMethodIsSynchronized() {
-        val syncMethod = WatchNext::class.java.declaredMethods.single {
-            (it.name == "sync" || it.name.startsWith("sync-")) &&
-                it.parameterTypes.contentEquals(
-                    arrayOf(Context::class.java, String::class.java, List::class.java, Boolean::class.javaPrimitiveType)
-                )
+    fun syncAndClearMethodsDoNotHoldMonitorLock() {
+        val methods = WatchNext::class.java.declaredMethods.filter { method ->
+            method.name == "sync" || method.name.startsWith("sync-") ||
+                method.name == "clear" || method.name.startsWith("clear-") ||
+                method.name.startsWith("syncRows") ||
+                method.name.startsWith("clearIfCurrent") ||
+                method.name.startsWith("clearRows")
         }
-        assertTrue(Modifier.isSynchronized(syncMethod.modifiers))
+        assertTrue(methods.any { it.name == "sync" || it.name.startsWith("sync-") })
+        assertTrue(methods.any { it.name.startsWith("syncRows") })
+        assertTrue(methods.any { it.name == "clear" || it.name.startsWith("clear-") })
+        assertTrue(methods.any { it.name.startsWith("clearIfCurrent") })
+        methods.forEach { method ->
+            assertFalse("${method.name} must not be @Synchronized", Modifier.isSynchronized(method.modifiers))
+        }
     }
 
     @Test
@@ -84,11 +92,11 @@ class WatchNextTest {
     }
 
     @Test
-    fun concurrentSyncCallsSerializeSoLockedProfileNeverLeaksUnlockedRows() {
-        val rows = mutableListOf("stale")
-        val events = mutableListOf<String>()
-        val resolvingUnlocked = CountDownLatch(1)
-        val allowUnlockedToFinish = CountDownLatch(1)
+    fun concurrentRowWritesSerializeDeleteAndInsert() {
+        val rows = Collections.synchronizedList(mutableListOf("stale"))
+        val events = Collections.synchronizedList(mutableListOf<String>())
+        val writingUnlocked = CountDownLatch(1)
+        val allowWriteToFinish = CountDownLatch(1)
         val unlockedFinished = CountDownLatch(1)
         val lockedFinished = CountDownLatch(1)
 
@@ -97,15 +105,14 @@ class WatchNextTest {
                 items = listOf(JSONObject().put("_id", "tt1")),
                 locked = false,
                 resolveBackdrop = {
-                    events += "unlocked:resolve:start"
-                    resolvingUnlocked.countDown()
-                    assertTrue(allowUnlockedToFinish.await(5, TimeUnit.SECONDS))
-                    events += "unlocked:resolve:end"
+                    events += "unlocked:resolve"
                     "https://img.example/tt1.jpg"
                 },
                 deleteExisting = {
                     events += "unlocked:delete"
                     rows.clear()
+                    writingUnlocked.countDown()
+                    assertTrue(allowWriteToFinish.await(5, TimeUnit.SECONDS))
                 },
                 insertRows = { entries ->
                     events += "unlocked:insert"
@@ -116,7 +123,7 @@ class WatchNextTest {
         }
 
         val lockedThread = Thread {
-            assertTrue(resolvingUnlocked.await(5, TimeUnit.SECONDS))
+            assertTrue(writingUnlocked.await(5, TimeUnit.SECONDS))
             WatchNext.syncRows(
                 items = listOf(JSONObject().put("_id", "tt2")),
                 locked = true,
@@ -133,17 +140,20 @@ class WatchNextTest {
         unlockedThread.start()
         lockedThread.start()
 
-        assertTrue(resolvingUnlocked.await(5, TimeUnit.SECONDS))
-        // Give lockedThread time to block on the WatchNext monitor while unlockedThread waits inside resolveBackdrop.
-        Thread.sleep(50)
+        assertTrue(writingUnlocked.await(5, TimeUnit.SECONDS))
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (lockedThread.state != Thread.State.BLOCKED && System.nanoTime() < deadline) {
+            Thread.yield()
+        }
+        assertEquals(Thread.State.BLOCKED, lockedThread.state)
         assertFalse(events.contains("locked:delete"))
-        allowUnlockedToFinish.countDown()
+        allowWriteToFinish.countDown()
 
         assertTrue(unlockedFinished.await(5, TimeUnit.SECONDS))
         assertTrue(lockedFinished.await(5, TimeUnit.SECONDS))
         assertTrue(rows.isEmpty())
         assertEquals(
-            listOf("unlocked:resolve:start", "unlocked:resolve:end", "unlocked:delete", "unlocked:insert", "locked:delete"),
+            listOf("unlocked:resolve", "unlocked:delete", "unlocked:insert", "locked:delete"),
             events,
         )
     }
@@ -275,5 +285,138 @@ class WatchNextTest {
         assertTrue(finished.await(5, TimeUnit.SECONDS))
         assertEquals(listOf("old:resolve"), events)
         assertEquals(listOf("previous-profile"), rows)
+    }
+
+    @Test
+    fun clearCompletesWithoutWaitingForBlockedBackdropAndStaleSyncAborts() {
+        assertClearsWithoutWaitingForBlockedBackdrop("clear:delete") { newGeneration, rows, events ->
+            WatchNext.clearRows(expectedGeneration = newGeneration) {
+                events += "clear:delete"
+                rows.clear()
+            }
+        }
+    }
+
+    @Test
+    fun lockedSyncCompletesWithoutWaitingForBlockedBackdropAndStaleSyncAborts() {
+        assertClearsWithoutWaitingForBlockedBackdrop("locked:delete") { newGeneration, rows, events ->
+            WatchNext.syncRows(
+                items = listOf(JSONObject().put("_id", "tt-secret")),
+                locked = true,
+                expectedGeneration = newGeneration,
+                isStale = { WatchNext.isGenerationStale(newGeneration) },
+                resolveBackdrop = { events += "locked:resolve"; null },
+                deleteExisting = {
+                    events += "locked:delete"
+                    rows.clear()
+                },
+                insertRows = { events += "locked:insert" },
+            )
+        }
+    }
+
+    private fun assertClearsWithoutWaitingForBlockedBackdrop(
+        expectedClearEvent: String,
+        runConcurrentClear: (Long, MutableList<String>, MutableList<String>) -> Unit,
+    ) {
+        WatchNext.invalidate()
+        val oldGeneration = WatchNext.currentGeneration()
+        val rows = Collections.synchronizedList(mutableListOf("previous-profile"))
+        val events = Collections.synchronizedList(mutableListOf<String>())
+        val resolvingBlocked = CountDownLatch(1)
+        val allowResolveToUnblock = CountDownLatch(1)
+        val syncFinished = CountDownLatch(1)
+        val clearFinished = CountDownLatch(1)
+
+        val syncThread = Thread {
+            WatchNext.syncRows(
+                items = listOf(JSONObject().put("_id", "tt-old")),
+                locked = false,
+                expectedGeneration = oldGeneration,
+                isStale = { WatchNext.isGenerationStale(oldGeneration) },
+                resolveBackdrop = {
+                    events += "old:resolve:start"
+                    resolvingBlocked.countDown()
+                    assertTrue(allowResolveToUnblock.await(5, TimeUnit.SECONDS))
+                    events += "old:resolve:end"
+                    "https://img.example/old.jpg"
+                },
+                deleteExisting = {
+                    events += "old:delete"
+                    rows.clear()
+                },
+                insertRows = { entries ->
+                    events += "old:insert"
+                    rows += entries.map { it.first.getString("_id") }
+                },
+            )
+            syncFinished.countDown()
+        }
+
+        syncThread.start()
+        assertTrue(resolvingBlocked.await(5, TimeUnit.SECONDS))
+
+        // Simulate a PIN lock or profile switch: invalidate generation, then clear Watch Next while metadata is blocked.
+        WatchNext.invalidate()
+        val newGeneration = WatchNext.currentGeneration()
+        val clearThread = Thread {
+            runConcurrentClear(newGeneration, rows, events)
+            clearFinished.countDown()
+        }
+        clearThread.start()
+
+        assertTrue(clearFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(rows.isEmpty())
+        assertEquals(listOf("old:resolve:start", expectedClearEvent), events)
+
+        allowResolveToUnblock.countDown()
+        assertTrue(syncFinished.await(5, TimeUnit.SECONDS))
+        assertTrue(rows.isEmpty())
+        assertEquals(listOf("old:resolve:start", expectedClearEvent, "old:resolve:end"), events)
+    }
+
+    @Test
+    fun clearRowsSkipsAlreadySyncedOrSupersededGenerationAndStaleSyncDoesNotClaimGeneration() {
+        WatchNext.invalidate()
+        val gen1 = WatchNext.currentGeneration()
+
+        WatchNext.syncRows(
+            items = listOf(JSONObject().put("_id", "tt1")),
+            locked = false,
+            expectedGeneration = gen1,
+            isStale = { WatchNext.isGenerationStale(gen1) },
+            resolveBackdrop = { "https://img.example/tt1.jpg" },
+            deleteExisting = {},
+            insertRows = {},
+        )
+
+        var cleared = false
+        WatchNext.clearRows(expectedGeneration = gen1) { cleared = true }
+        assertFalse(cleared)
+
+        WatchNext.invalidate()
+        val gen2 = WatchNext.currentGeneration()
+        WatchNext.clearRows(expectedGeneration = gen1) { cleared = true }
+        assertFalse(cleared)
+
+        val becameStaleBeforeWrite = AtomicBoolean(false)
+        val staleEvents = mutableListOf<String>()
+        WatchNext.syncRows(
+            items = listOf(JSONObject().put("_id", "tt2")),
+            locked = false,
+            expectedGeneration = gen2,
+            isStale = { becameStaleBeforeWrite.get() },
+            resolveBackdrop = {
+                staleEvents += "resolve"
+                becameStaleBeforeWrite.set(true)
+                "https://img.example/tt2.jpg"
+            },
+            deleteExisting = { staleEvents += "delete" },
+            insertRows = { staleEvents += "insert" },
+        )
+        assertEquals(listOf("resolve"), staleEvents)
+
+        WatchNext.clearRows(expectedGeneration = gen2) { cleared = true }
+        assertTrue(cleared)
     }
 }

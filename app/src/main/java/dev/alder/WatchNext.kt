@@ -20,12 +20,13 @@ object WatchNext {
 
     internal val LOGO_RES = R.drawable.logo_transparent
     private val generation = AtomicLong(0L)
+    private val writeLock = Any()
     private var lastSyncedGeneration = -1L
 
     internal fun logoUri(packageName: String, entryName: String = "logo_transparent"): String =
         "android.resource://$packageName/drawable/$entryName"
 
-    /** Advances the generation so any queued or in-flight sync aborts before modifying Watch Next; never blocks on the sync lock. */
+    /** Advances the generation so any queued or in-flight sync aborts before modifying Watch Next; never blocks on the write lock. */
     fun invalidate() {
         generation.incrementAndGet()
     }
@@ -37,39 +38,37 @@ object WatchNext {
     internal fun isProfileStale(active: Profile?, authKey: String, locked: Boolean, expectedGeneration: Long): Boolean =
         isGenerationStale(expectedGeneration) || active?.authKey != authKey || (!locked && active.pin != null)
 
-    @Synchronized
     fun clear(context: Context) = clearRows(context, expectedGeneration = null)
 
-    @Synchronized
     internal fun clearIfCurrent(context: Context, expectedGeneration: Long) = clearRows(context, expectedGeneration)
 
-    private fun clearRows(context: Context, expectedGeneration: Long?) = runCatching {
-        if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
-        // A newer profile switch supersedes this clear, and a completed sync for the same generation already replaced Watch Next.
-        if (expectedGeneration != null && (isGenerationStale(expectedGeneration) || lastSyncedGeneration == expectedGeneration)) {
-            return@runCatching
-        }
-        deleteRows(context.contentResolver)
-    }.onFailure { android.util.Log.w("Alder", "Watch Next not cleared", it) }
+    private fun clearRows(context: Context, expectedGeneration: Long?) = clearRows(expectedGeneration) {
+        if (android.os.Build.VERSION.SDK_INT >= 26) deleteRows(context.contentResolver)
+    }
 
-    @Synchronized
+    internal fun clearRows(expectedGeneration: Long? = null, deleteExisting: () -> Unit) = synchronized(writeLock) {
+        runCatching {
+            // A newer profile switch supersedes this clear, and a completed sync for the same generation already replaced Watch Next.
+            if (expectedGeneration != null && (isGenerationStale(expectedGeneration) || lastSyncedGeneration == expectedGeneration)) {
+                return@runCatching
+            }
+            deleteExisting()
+        }.onFailure { android.util.Log.w("Alder", "Watch Next not cleared", it) }
+    }
+
     fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean) =
         sync(context, authKey, items, locked, generation.get())
 
-    @Synchronized
     fun sync(context: Context, authKey: String, items: List<JSONObject>, locked: Boolean, expectedGeneration: Long) = runCatching {
         if (android.os.Build.VERSION.SDK_INT < 26) return@runCatching
         val resolver = context.contentResolver
-        var applied = false
         syncRows(
             items = items,
             locked = locked,
+            expectedGeneration = expectedGeneration,
             isStale = { isProfileStale(Profiles.active(context), authKey, locked, expectedGeneration) },
             resolveBackdrop = { backdrop(authKey, it) },
-            deleteExisting = {
-                applied = true
-                deleteRows(resolver)
-            },
+            deleteExisting = { deleteRows(resolver) },
             insertRows = { entries ->
                 val logoUri = logoUri(context.packageName, context.resources.getResourceEntryName(LOGO_RES))
                 entries.forEach { (item, resolvedBackdrop) ->
@@ -108,7 +107,6 @@ object WatchNext {
                 }
             },
         )
-        if (applied) lastSyncedGeneration = expectedGeneration
     }.onFailure { android.util.Log.w("Alder", "Watch Next not updated", it) }
 
     private fun deleteRows(resolver: ContentResolver) {
@@ -118,7 +116,6 @@ object WatchNext {
         }
     }
 
-    @Synchronized
     internal fun syncRows(
         items: List<JSONObject>,
         locked: Boolean,
@@ -126,16 +123,19 @@ object WatchNext {
         resolveBackdrop: (JSONObject) -> String?,
         deleteExisting: () -> Unit,
         insertRows: (List<Pair<JSONObject, String?>>) -> Unit,
+        expectedGeneration: Long? = null,
     ) {
         if (isStale()) return
         val resolved = if (locked) emptyList() else items.take(MAX).map { item ->
             if (isStale()) return
             item to resolveBackdrop(item)
         }
-        if (isStale()) return
-        deleteExisting()
-        if (locked || resolved.isEmpty()) return
-        insertRows(resolved)
+        synchronized(writeLock) {
+            if (isStale()) return
+            deleteExisting()
+            if (!locked && resolved.isNotEmpty()) insertRows(resolved)
+            if (expectedGeneration != null) lastSyncedGeneration = expectedGeneration
+        }
     }
 
     private fun backdrop(authKey: String, item: JSONObject): String? = runCatching {

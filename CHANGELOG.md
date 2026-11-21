@@ -82,7 +82,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Fixes
 - **New library titles.** Alder keeps a new title in your library immediately after you save it. Before, a new title did not show for up to 30 seconds.
-- **Watch Next updates.** Alder prepares all art before it changes **Watch Next**, and runs one update at a time. When you change profiles, Alder clears old rows and stops old updates. Before, updates at the same time or after a profile change could show old or locked rows.
+- **Watch Next updates.** Alder prepares all art before it changes **Watch Next**, and updates the rows one change at a time. When you change or lock a profile, Alder clears old rows immediately and stops old updates. Before, updates at the same time or after a profile change could show old or locked rows.
 - **Removed profiles.** When you remove a profile, Alder clears its subtitle choice, **Home** art, and **Discover** choices. Before, a new profile could keep old choices from the removed profile.
 - **Title launch requests.** Alder ignores a request from another app to open a title when the title ID is empty or invalid. Before, a bad request could stop Alder.
 - **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
