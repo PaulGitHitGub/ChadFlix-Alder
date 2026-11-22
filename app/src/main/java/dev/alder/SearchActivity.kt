@@ -142,7 +142,7 @@ class SearchActivity : Screen() {
                 imageTintList = ColorStateList.valueOf(HomeStyle.WHITE)
             }, LinearLayout.LayoutParams(dp(12), dp(12)))
             addView(input, LinearLayout.LayoutParams(0, -2, 1f))
-        }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(66) })
+        }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(QUERY_TOP) })
 
         keyboard = column(Gravity.START)
         buildKeyboard()
@@ -163,8 +163,8 @@ class SearchActivity : Screen() {
             addView(results)
         }
         // Runs to the screen's right edge, as Home's rows do: stopping 48 dp short sliced the last poster in half.
-        root.addView(resultsScroll, FrameLayout.LayoutParams(dp((width - RESULTS_X).toInt()), dp((height - 104).toInt())).apply {
-            leftMargin = dp(RESULTS_X); topMargin = dp(104)
+        root.addView(resultsScroll, FrameLayout.LayoutParams(dp((width - RESULTS_X).toInt()), dp((height - RESULTS_TOP).toInt())).apply {
+            leftMargin = dp(RESULTS_X); topMargin = dp(RESULTS_TOP)
         })
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(root)
@@ -932,7 +932,7 @@ class SearchActivity : Screen() {
             val rail = HorizontalCardRail(
                 screen = this,
                 cardGapPx = dp(CARD_GAP_RAIL),
-                paddingStartPx = 0,
+                paddingStartPx = dp(2), // room for the first card's focus border, which sits outside the card
                 paddingTopPx = dp(2),
                 paddingEndPx = dp(PAD),
                 paddingBottomPx = dp(8),
@@ -951,8 +951,8 @@ class SearchActivity : Screen() {
                 rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
             }
             group.addView(rail.scroller, LinearLayout.LayoutParams(-1, posterH + dp(10)))
-            group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(2) })
-            results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+            group.addView(caption, LinearLayout.LayoutParams(-2, -2))
+            results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(ROW_GAP) })
         }
         // The first [Images.THREADS] requests start at once on idle threads; the rest wait in a newest-first queue. So the
         // first cards (the ones on screen) go first, then the rest last card first, which puts the next on-screen card
@@ -1004,6 +1004,8 @@ class SearchActivity : Screen() {
     private val posterH by lazy {
         val title = HomeStyle.height(text("", HomeStyle.ROW_TITLE, bold = true)) + dp(2)
         val caption = HomeStyle.height(text("", HomeStyle.INFO, bold = true)) + dp(2)
+        // Sized with the earlier, looser gaps (104 dp top, 16 dp between rows) and kept so: the owner liked this size,
+        // and the tighter gaps now leave the TV's safe area under the Shows row.
         val room = (resources.displayMetrics.heightPixels - dp(104)) - 2 * title - 2 * dp(10) - caption - dp(16)
         (room / 2).coerceIn(dp(100), dp(HomeStyle.CARD_H))
     }
@@ -1011,6 +1013,10 @@ class SearchActivity : Screen() {
     private companion object {
         const val RECENT = 4
         const val RESULTS_X = 298 // dp: the header and the rows start here, right of the keyboard
+        // ChadFlix: tighter gaps, so the Shows row ends inside the TV's safe area (27 dp from the bottom); poster size kept.
+        const val QUERY_TOP = 58 // dp: the search line (was 66)
+        const val RESULTS_TOP = 90 // dp: the rows (was 104)
+        const val ROW_GAP = 12 // dp: a row's caption to the next row's title (was 16)
         const val KEYS_X = 40
         const val KEY_W = 33
         const val KEY_H = 32
