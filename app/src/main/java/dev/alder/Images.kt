@@ -96,6 +96,14 @@ object Images {
      */
     class Look(val name: String, val paint: (Bitmap) -> Bitmap)
     val blurred = Look("blurred") { src -> frost(src).also { if (it !== src) src.recycle() } }
+    /** ChadFlix: a title logo cropped to its ink (MetaHub logos are 800 x 310 canvases with wide transparent margins). Title page only. */
+    val trimmedLogo = Look("trimmed") { src ->
+        val w = src.width; val h = src.height
+        val pixels = IntArray(w * h).also { src.getPixels(it, 0, w, 0, 0, w, h) }
+        val box = inkBounds(w, h, pixels)
+        if (box == null || (box[0] == 0 && box[1] == 0 && box[2] == w && box[3] == h)) src
+        else Bitmap.createBitmap(src, box[0], box[1], box[2] - box[0], box[3] - box[1]).also { if (it !== src) src.recycle() }
+    }
 
     private val inFlight = ConcurrentHashMap<String, FutureTask<Bitmap?>>()
 
@@ -194,4 +202,34 @@ object Images {
         }
         return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
     }
+}
+
+/** ChadFlix: the pixels of a [width] x [height] ARGB picture whose alpha is above [threshold], as [left, top, right, bottom] (right and bottom exclusive); null when none. */
+internal fun inkBounds(width: Int, height: Int, pixels: IntArray, threshold: Int = 16): IntArray? {
+    var left = width; var top = height; var right = -1; var bottom = -1
+    for (y in 0 until height) for (x in 0 until width) {
+        if ((pixels[y * width + x] ushr 24) > threshold) {
+            if (x < left) left = x
+            if (x > right) right = x
+            if (y < top) top = y
+            bottom = y
+        }
+    }
+    return if (right < 0) null else intArrayOf(left, top, right + 1, bottom + 1)
+}
+
+/**
+ * ChadFlix: the title page logo's size in px for a trimmed picture of [trimW] x [trimH] px. Constant area (132 x 68 dp):
+ * height = min(68, sqrt(8976 / aspect)) dp, width capped at 240 dp. Never larger than the picture's own pixels
+ * (one source px per device px at most), so it is never upscaled and stays sharp; the aspect ratio is kept.
+ */
+internal fun logoSizePx(trimW: Int, trimH: Int, density: Float): Pair<Int, Int> {
+    val aspect = trimW.toDouble() / trimH
+    var hDp = minOf(68.0, Math.sqrt(8976.0 / aspect))
+    var wDp = aspect * hDp
+    if (wDp > 240.0) { wDp = 240.0; hDp = wDp / aspect }
+    val scale = minOf(1.0, trimW / (wDp * density), trimH / (hDp * density))
+    val w = minOf(trimW, Math.floor(wDp * density * scale).toInt()).coerceAtLeast(1)
+    val h = minOf(trimH, Math.floor(hDp * density * scale).toInt()).coerceAtLeast(1)
+    return w to h
 }

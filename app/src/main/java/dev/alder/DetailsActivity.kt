@@ -35,6 +35,13 @@ internal fun heroCastPreview(allMembers: List<CastMember>, maxCount: Int = 3): L
     return ordered.take(maxCount)
 }
 
+/** ChadFlix: how many cast chips fit the 520 dp hero column: 4 (names up to 52 characters in all), else 3 (first three up to 44), else 2; "+N more" is extra. */
+internal fun heroChipCount(allMembers: List<CastMember>): Int {
+    val names = heroCastPreview(allMembers, 4).map { it.name.length }
+    return if (allMembers.size <= 4 && allMembers.sumOf { it.name.length } <= 52) 4
+    else if (names.take(3).sum() <= 44) 3 else 2
+}
+
 internal fun isEpisodeAired(released: String?, now: Long = System.currentTimeMillis()): Boolean {
     if (released.isNullOrBlank()) return true
     val day = released.take(10).takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) } ?: return true
@@ -422,17 +429,24 @@ class DetailsActivity : Screen() {
             addView(title, FrameLayout.LayoutParams(-1, -1, Gravity.TOP or Gravity.START))
             if (m != null) {
                 val logo = ImageView(this@DetailsActivity).apply {
-                    adjustViewBounds = true
                     scaleType = ImageView.ScaleType.FIT_START
-                    maxWidth = dp(132)
-                    maxHeight = dp(68)
                     visibility = View.GONE
                 }
                 addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-                Images.load(m.logo ?: Images.logoFor(m.id), logo, dp(520), urgent = true, failed = {
+                title.visibility = View.INVISIBLE // ChadFlix: no flash of the text title while the logo loads; the failed path below shows it
+                // ChadFlix: cropped to its ink, decoded at full source width (1000 px > the 800 px logos: no scale-down first),
+                // then sized by constant area and never above its own pixels.
+                Images.load(m.logo ?: Images.logoFor(m.id), logo, 1000, urgent = true, look = Images.trimmedLogo, failed = {
                     title.visibility = View.VISIBLE; logo.visibility = View.GONE
                 }) {
-                    title.visibility = View.GONE; logo.visibility = View.VISIBLE
+                    val bitmap = (logo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    if (bitmap == null || bitmap.width < 1 || bitmap.height < 1) {
+                        title.visibility = View.VISIBLE; logo.visibility = View.GONE
+                    } else {
+                        val (w, h) = logoSizePx(bitmap.width, bitmap.height, resources.displayMetrics.density)
+                        logo.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.BOTTOM or Gravity.START)
+                        title.visibility = View.GONE; logo.visibility = View.VISIBLE
+                    }
                 }
             }
         }
@@ -443,11 +457,11 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
-            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(10) })
+            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(8) })
             m.description?.takeIf { it.isNotBlank() }?.let {
                 stack.addView(text(it, BODY, color = TEXT).onArt().apply {
-                    maxLines = 5; ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(dp(330), -2).apply { topMargin = dp(10) })
+                    maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(dp(380), -2).apply { topMargin = dp(4) })
             }
             val initialCast = richCast.ifEmpty {
                 val dirMembers = m.directors.map { CastMember(it, character = getString(R.string.cast_director), role = "director") }
@@ -460,7 +474,7 @@ class DetailsActivity : Screen() {
                     addView(castStrip)
                 }
                 castStripSlot = slot
-                stack.addView(slot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+                stack.addView(slot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
             }
             addWatch(m, stack)
         }
@@ -595,6 +609,7 @@ class DetailsActivity : Screen() {
         val facts = (listOfNotNull(m.year, genreText) + lengthParts).joinToString(DOT)
         return LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
+            if (!detailed) minimumHeight = dp(17) // ChadFlix: a missing certificate or facts doesn't shift the rows below
             certificate?.let { cert ->
                 addView(text(cert, 9.5f, bold = true, color = TEXT_2).apply {
                     includeFontPadding = false
@@ -1382,7 +1397,7 @@ class DetailsActivity : Screen() {
         castChips.clear()
         val members = heroCastPreview(
             allMembers,
-            maxCount = if (allMembers.size <= 4 && allMembers.sumOf { it.name.length } <= 52) 4 else 3
+            maxCount = heroChipCount(allMembers)
         )
         if (members.isEmpty()) return null
         val container = LinearLayout(this).apply {
