@@ -403,6 +403,9 @@
     <string name="search_popular_unavailable">العناوين الرائجة غير متاحة.</string>
     <string name="search_popular_titles">العناوين الرائجة</string>
     <string name="search_voice">بحث صوتي</string>
+    <string name="search_listening">جارٍ الاستماع…</string>
+    <string name="search_clear_pill">مسح</string>
+    <string name="search_voice_missed">لم أفهم ذلك</string>
     <string name="search_delete">حذف</string>
     <string name="search_unavailable">البحث غير متاح حاليًا.</string>
     <string name="search_no_matches">لا توجد نتائج مطابقة · جرّب عنوانًا أقصر</string>

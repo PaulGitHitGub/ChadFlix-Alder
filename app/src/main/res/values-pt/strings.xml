@@ -393,6 +393,9 @@
     <string name="search_popular_unavailable">Os títulos populares estão indisponíveis.</string>
     <string name="search_popular_titles">Títulos populares</string>
     <string name="search_voice">Pesquisa por voz</string>
+    <string name="search_listening">Ouvindo…</string>
+    <string name="search_clear_pill">Limpar</string>
+    <string name="search_voice_missed">Não entendi</string>
     <string name="search_delete">Apagar</string>
     <string name="search_unavailable">A busca está indisponível no momento.</string>
     <string name="search_no_matches">Nenhum resultado · Tente um título mais curto</string>

@@ -410,6 +410,9 @@
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
     <string name="search_popular_titles">Popular Titles</string>
     <string name="search_voice">Voice Search</string>
+    <string name="search_listening">Listening…</string>
+    <string name="search_clear_pill">Clear</string>
+    <string name="search_voice_missed">Didn\'t catch that</string>
     <string name="search_delete">Delete</string>
     <string name="search_unavailable">Search is unavailable right now.</string>
     <string name="search_no_matches">No matches · Try a shorter title</string>

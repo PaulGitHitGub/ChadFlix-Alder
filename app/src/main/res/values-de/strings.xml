@@ -390,6 +390,9 @@
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
     <string name="search_popular_titles">Beliebte Titel</string>
     <string name="search_voice">Sprachsuche</string>
+    <string name="search_listening">Ich höre zu…</string>
+    <string name="search_clear_pill">Löschen</string>
+    <string name="search_voice_missed">Das habe ich nicht verstanden</string>
     <string name="search_delete">Löschen</string>
     <string name="search_unavailable">Die Suche ist gerade nicht verfügbar.</string>
     <string name="search_no_matches">Keine Treffer · Versuche einen kürzeren Titel</string>

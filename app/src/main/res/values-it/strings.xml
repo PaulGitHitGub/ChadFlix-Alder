@@ -393,6 +393,9 @@
     <string name="search_popular_unavailable">I titoli popolari non sono disponibili.</string>
     <string name="search_popular_titles">Titoli popolari</string>
     <string name="search_voice">Ricerca vocale</string>
+    <string name="search_listening">In ascolto…</string>
+    <string name="search_clear_pill">Cancella tutto</string>
+    <string name="search_voice_missed">Non ho capito</string>
     <string name="search_delete">Cancella</string>
     <string name="search_unavailable">La ricerca non è disponibile al momento.</string>
     <string name="search_no_matches">Nessun risultato · Prova un titolo più breve</string>

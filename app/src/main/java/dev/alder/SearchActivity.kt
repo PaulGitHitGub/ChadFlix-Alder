@@ -1,13 +1,17 @@
 package dev.alder
 
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.graphics.Paint
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.text.Editable
+import android.util.Log
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.Gravity
@@ -54,6 +58,14 @@ internal fun <T> rankSearchTitles(items: List<T>, query: String, rating: (T) -> 
 internal fun searchRenderKey(sections: Map<String, List<String>>, query: String): String =
     query + "|" + sections.entries.joinToString("|") { (label, cards) -> label + ":" + cards.joinToString(",") }
 
+/** SpeechRecognizer's error codes by name, for the log. */
+internal fun voiceErrorName(code: Int): String = when (code) {
+    1 -> "network timeout"; 2 -> "network"; 3 -> "audio"; 4 -> "server"; 5 -> "client"; 6 -> "speech timeout"
+    7 -> "no match"; 8 -> "recognizer busy"; 9 -> "insufficient permissions"; 10 -> "too many requests"
+    11 -> "server disconnected"; 12 -> "language not supported"; 13 -> "language unavailable"
+    else -> "unknown"
+}
+
 internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = answers.filterNotNull().flatten()
 
 /** ChadFlix search: Voice Search and the keyboard on the left, Alder's Movies and Shows rows of home posters on the right. */
@@ -67,6 +79,15 @@ class SearchActivity : Screen() {
     private lateinit var nav: LinearLayout
     private lateinit var searchTab: ImageView
     private var voice: View? = null
+    private var clear: View? = null // above Voice Search while the query has words
+    private var styleVoice: () -> Unit = {}
+    private var recognizer: SpeechRecognizer? = null // ChadFlix: in-app listening, no Google overlay
+    private var recognizerService: ComponentName? = null // null: the TV's default speech service
+    private var listening = false
+    private var heardSpeech = false // the service got as far as ready-for-speech this session
+    private var beforeVoice: String? = null // the query as it was when listening began, while the header shows voice's words
+    private var quiet = false // the header's words are changing for voice: don't search them
+    private val restoreHeader = Runnable { restoreQuery() }
     private var navTabIds = emptyList<String>()
     private val rightEdgeKeys = mutableSetOf<View>()
     private val cards = mutableListOf<MediaCardView>()
@@ -158,6 +179,8 @@ class SearchActivity : Screen() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                updateClear()
+                if (quiet) return
                 ++request
                 searchTasks.forEach { it.cancel(true) }
                 searchTasks.clear()
@@ -172,6 +195,8 @@ class SearchActivity : Screen() {
         }
         // Our keyboard only: the Android one never opens.
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        clear?.let { root.addView(it, FrameLayout.LayoutParams(dp(KEYS_W), dp(KEY_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(104 - KEY_H - 12) }) }
+        updateClear()
         (voice ?: firstKey)?.let { it.post { it.requestFocus() } }
         search(false)
     }
@@ -179,6 +204,16 @@ class SearchActivity : Screen() {
     override fun onResume() {
         super.onResume()
         if (::nav.isInitialized) updateNavTabs()
+    }
+
+    override fun onPause() {
+        cancelVoice()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        cancelVoice()
+        super.onStop()
     }
 
     // The add-ons' catalog types, for Live and the per-type tabs that Home shows too.
@@ -333,16 +368,20 @@ class SearchActivity : Screen() {
                 contentDescription = getString(R.string.search_voice)
                 fun style(has: Boolean) {
                     background = HomeStyle.pill(if (has) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
-                    icon.imageTintList = ColorStateList.valueOf(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+                    icon.imageTintList = ColorStateList.valueOf(if (listening) HomeStyle.LIST_RED else if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                     label.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+                    label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
                 }
                 style(false)
+                styleVoice = { style(hasFocus()) }
                 setOnFocusChangeListener { v, has ->
                     if (has) lastKeyboardFocus = v
                     style(has)
                 }
                 setOnClickListener {
-                    // ChadFlix: ask for the microphone once; Google's speech service checks the asking app holds it.
+                    // OK while listening: stop and search what was heard so far.
+                    if (listening) return@setOnClickListener stopVoice()
+                    // ChadFlix: ask for the microphone once; the speech service checks the asking app holds it.
                     if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
                     else requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
                 }
@@ -351,6 +390,37 @@ class SearchActivity : Screen() {
             }
             rightEdgeKeys += voice!!
         }
+        // ChadFlix: Clear, in Voice Search's style, above it while the query has words.
+        val clearIcon = ImageView(this).apply { setImageResource(R.drawable.ic_close) }
+        val clearLabel = text(getString(R.string.search_clear_pill), SMALL, bold = true)
+        clear = LinearLayout(this).apply {
+            id = View.generateViewId()
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(14), 0)
+            isFocusable = true
+            visibility = View.GONE
+            contentDescription = getString(R.string.search_clear_pill)
+            fun style(has: Boolean) {
+                background = HomeStyle.pill(if (has) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
+                clearIcon.imageTintList = ColorStateList.valueOf(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+                clearLabel.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+            }
+            style(false)
+            setOnFocusChangeListener { v, has ->
+                if (has) lastKeyboardFocus = v
+                style(has)
+            }
+            setOnClickListener {
+                cancelVoice()
+                (voice ?: firstKey)?.requestFocus()
+                input.setText("")
+                main.removeCallbacks(typed)
+                search(false)
+            }
+            addView(clearIcon, LinearLayout.LayoutParams(dp(16), dp(16)))
+            addView(clearLabel, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
+        }
+        rightEdgeKeys += clear!!
 
         rows.forEachIndexed { r, keys ->
             keys.forEachIndexed { c, v ->
@@ -358,36 +428,156 @@ class SearchActivity : Screen() {
                 v.nextFocusDownId = if (r < rows.lastIndex) rows[r + 1][c].id else (if (c < 3) space else delete).id
             }
         }
+        firstRow = rows[0]
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
-        voice?.nextFocusUpId = input.id
-        input.nextFocusDownId = (voice ?: rows[0][0]).id
+        clear?.nextFocusUpId = input.id
+        clear?.nextFocusDownId = (voice ?: rows[0][0]).id
     }
 
-    private fun startVoice() {
-        runCatching {
-            startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            }, VOICE_REQUEST)
+    private var firstRow = emptyList<View>()
+
+    /** Clear shows while the query has words; Up from Voice Search (or the keys) goes Clear → query field, Down mirrors. */
+    private fun updateClear() {
+        val c = clear ?: return
+        val show = (beforeVoice ?: input.text.toString()).isNotEmpty()
+        if (!show && c.hasFocus()) (voice ?: firstKey)?.requestFocus()
+        if (!show && lastKeyboardFocus === c) lastKeyboardFocus = voice ?: firstKey
+        c.visibility = if (show) View.VISIBLE else View.GONE
+        val above = if (show) c.id else input.id
+        voice?.nextFocusUpId = above
+        if (voice == null) firstRow.forEach { it.nextFocusUpId = above }
+        input.nextFocusDownId = if (show) c.id else (voice ?: firstKey)?.id ?: View.NO_ID
+    }
+
+    /** The header's words without searching them: voice's partial words, "Didn't catch that", the query back again. */
+    private fun setHeader(words: String) {
+        quiet = true
+        input.setText(words)
+        input.setSelection(words.length)
+        quiet = false
+    }
+
+    /** Ends a "Didn't catch that" or a cancelled listen: the query as it was before. */
+    private fun restoreQuery() {
+        main.removeCallbacks(restoreHeader)
+        val old = beforeVoice ?: return
+        beforeVoice = null
+        setHeader(old)
+    }
+
+    /** The Shield's own speech service, named outright: tried once when the default binding refuses. */
+    private fun katnissService(): ComponentName? = runCatching {
+        packageManager.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+            .map { ComponentName(it.serviceInfo.packageName, it.serviceInfo.name) }
+            .let { found -> found.firstOrNull { it.packageName == KATNISS } ?: found.firstOrNull() }
+    }.getOrNull() ?: ComponentName(KATNISS, "com.google.android.apps.tvsearch.voice.recognition.KatnissRecognitionService")
+
+    private fun recognizer(): SpeechRecognizer = recognizer ?: run {
+        val service = recognizerService
+        Log.i(VOICE_TAG, "create recognizer: " + (service?.flattenToShortString() ?: "default service"))
+        (if (service == null) SpeechRecognizer.createSpeechRecognizer(this) else SpeechRecognizer.createSpeechRecognizer(this, service)).also {
+            it.setRecognitionListener(listener)
+            recognizer = it
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        // Granted: straight into listening. Refused: voice search simply doesn't start; typing still works.
-        if (requestCode == MIC_REQUEST && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
+    private fun startVoice() {
+        if (isFinishing || isDestroyed) return
+        val r = runCatching { recognizer() }.getOrElse { Log.w(VOICE_TAG, "create failed", it); return }
+        r.cancel() // one session at a time
+        restoreQuery()
+        beforeVoice = input.text.toString()
+        heardSpeech = false
+        listening = true
+        styleVoice()
+        updateClear()
+        Log.i(VOICE_TAG, "startListening (" + (recognizerService?.flattenToShortString() ?: "default service") + ")")
+        runCatching {
+            r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+            })
+        }.onFailure { Log.w(VOICE_TAG, "startListening failed", it); listening = false; styleVoice(); restoreQuery() }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == VOICE_REQUEST && resultCode == RESULT_OK) {
-            val spoken = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim() ?: return
+    /** OK while listening: the service stops and answers with what it heard (results or no match). */
+    private fun stopVoice() {
+        Log.i(VOICE_TAG, "stopListening")
+        runCatching { recognizer?.stopListening() }
+        listening = false
+        styleVoice()
+    }
+
+    /** Back, Clear, leaving the page: drop the session and put the query back. */
+    private fun cancelVoice() {
+        if (listening) Log.i(VOICE_TAG, "cancel")
+        runCatching { recognizer?.cancel() }
+        listening = false
+        styleVoice()
+        restoreQuery()
+    }
+
+    private val listener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) { heardSpeech = true; Log.i(VOICE_TAG, "onReadyForSpeech") }
+        override fun onBeginningOfSpeech() { Log.i(VOICE_TAG, "onBeginningOfSpeech") }
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() { Log.i(VOICE_TAG, "onEndOfSpeech") }
+        override fun onEvent(eventType: Int, params: Bundle?) { Log.i(VOICE_TAG, "onEvent $eventType") }
+
+        override fun onPartialResults(partialResults: Bundle?) {
+            if (beforeVoice == null) return
+            val words = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim()
+            if (!words.isNullOrEmpty()) setHeader(words)
+        }
+
+        override fun onResults(results: Bundle?) {
+            listening = false
+            styleVoice()
+            val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.trim()
+            Log.i(VOICE_TAG, "onResults: " + (if (spoken.isNullOrEmpty()) "nothing" else "${spoken.length} chars"))
+            if (spoken.isNullOrEmpty()) return missed()
+            main.removeCallbacks(restoreHeader)
+            beforeVoice = null
             input.setText(spoken)
             input.setSelection(spoken.length)
             main.removeCallbacks(typed)
             search(true)
         }
+
+        override fun onError(error: Int) {
+            Log.w(VOICE_TAG, "onError $error (${voiceErrorName(error)})" + (recognizerService?.let { " via ${it.flattenToShortString()}" } ?: " via default service"))
+            val wasListening = listening
+            listening = false
+            styleVoice()
+            // The default binding refused before listening began: name Katniss's service outright and try once more.
+            if (wasListening && !heardSpeech && recognizerService == null && error in RETRY_ERRORS) {
+                runCatching { recognizer?.destroy() }
+                recognizer = null
+                recognizerService = katnissService()
+                restoreQuery()
+                return startVoice()
+            }
+            missed()
+        }
+    }
+
+    /** No words: "Didn't catch that" in the header for a moment, then the query as it was. */
+    private fun missed() {
+        if (beforeVoice == null) return
+        setHeader(getString(R.string.search_voice_missed))
+        main.removeCallbacks(restoreHeader)
+        main.postDelayed(restoreHeader, MISSED_SHOWN)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Granted: straight into listening. Refused: voice search simply doesn't start; typing still works.
+        if (requestCode == MIC_REQUEST && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) main.post { startVoice() }
     }
 
     private fun keyRow() = LinearLayout(this).apply {
@@ -424,12 +614,14 @@ class SearchActivity : Screen() {
     }
 
     private fun append(value: String) {
+        restoreQuery()
         val at = input.selectionStart.coerceIn(0, input.length())
         input.text.insert(at, value)
         input.setSelection(at + value.length)
     }
 
     private fun delete() {
+        restoreQuery()
         val at = input.selectionStart.coerceIn(0, input.length())
         if (at > 0) {
             input.text.delete(at - 1, at)
@@ -440,6 +632,8 @@ class SearchActivity : Screen() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val focus = currentFocus
+            // Back while listening cancels it and keeps the page.
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && listening) { cancelVoice(); return true }
             if (event.keyCode == KeyEvent.KEYCODE_BACK &&
                 (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus() || input.hasFocus())) {
                 if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
@@ -670,6 +864,9 @@ class SearchActivity : Screen() {
     }
 
     override fun onDestroy() {
+        main.removeCallbacks(restoreHeader)
+        runCatching { recognizer?.destroy() }
+        recognizer = null
         searchTasks.forEach { it.cancel(true) }
         cards.forEach { it.unload() }
         super.onDestroy()
@@ -781,8 +978,12 @@ class SearchActivity : Screen() {
         const val PER_TYPE = 12
         const val TYPING_PAUSE = 500L
         const val SEARCH_WAIT = 6000L
-        const val VOICE_REQUEST = 101
         const val MIC_REQUEST = 102
+        const val MISSED_SHOWN = 2000L
+        const val VOICE_TAG = "ChadFlixVoice"
+        const val KATNISS = "com.google.android.katniss"
+        // Insufficient permissions, server, client, server disconnected (API 31): the binding itself failed.
+        val RETRY_ERRORS = setOf(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_CLIENT, 11)
         val searchPool = Images.newestFirst(8)
     }
 }
