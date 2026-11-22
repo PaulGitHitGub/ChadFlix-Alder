@@ -609,6 +609,7 @@ class SettingsActivity : Screen() {
                     tabsMenu { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
                 }
                 withTabs { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
+                actionRow(getString(R.string.customize_home), "›", getString(R.string.customize_home_hint), perProfile = true) { customizeHome() }
                 choiceRow(Choice("featuredHome", getString(R.string.featured_home), getString(R.string.featured_home_hint),
                     listOf(false to off, true to on), perProfile = true))
                 choiceRow(Choice("blurThumbnails", getString(R.string.blur_thumbnails), getString(R.string.blur_thumbnails_hint),
@@ -762,6 +763,33 @@ class SettingsActivity : Screen() {
                 withTabs(done)
                 tabsMenu(at, done)
             }
+        }
+    }
+
+    /** ChadFlix: Customize Home: Movies or Shows, then that page's rows (genres, then add-on rows), on or off and in order. */
+    private fun customizeHome() = choose(getString(R.string.customize_home),
+        listOf(getString(R.string.tab_movies), getString(R.string.tab_shows))) { i -> homeRowsMenu(i == 0) }
+
+    /** Like Settings › Tabs: OK on a row turns it on or off or moves it a place, and the list opens again on it. */
+    private fun homeRowsMenu(movie: Boolean, focus: Int = 0) {
+        val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
+        val rows = orderedRows(HomeStyle.rowOrder(this, page), HomeStyle.knownRows(this, page, movie)) { it }
+        val state = HomeStyle.rowsOn(this, page)
+        val hidden = Settings.hiddenRows(this)
+        fun shown(title: String) = HomeStyle.isOn(state, title, movie) && title !in hidden
+        choose(getString(if (movie) R.string.tab_movies else R.string.tab_shows), rows.map { "$it  ·  ${if (shown(it)) on else off}" },
+            focus = focus.coerceIn(0, rows.lastIndex)) { i ->
+            val title = rows[i]
+            val actions = listOfNotNull<Pair<String, () -> Int>>(
+                getString(if (shown(title)) R.string.tab_hide else R.string.tab_show) to {
+                    HomeStyle.setRowOn(this, page, title, !shown(title))
+                    if (!shown(title)) Settings.unhideRow(this, title)
+                    i
+                },
+                if (i > 0) getString(R.string.row_move_up) to { HomeStyle.moveRow(this, page, rows, title, -1); i - 1 } else null,
+                if (i < rows.lastIndex) getString(R.string.row_move_down) to { HomeStyle.moveRow(this, page, rows, title, 1); i + 1 } else null,
+            )
+            choose(title, actions.map { it.first }) { a -> homeRowsMenu(movie, actions[a].second()) }
         }
     }
 

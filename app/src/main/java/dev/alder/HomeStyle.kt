@@ -162,6 +162,9 @@ internal object HomeStyle {
     fun isOn(state: org.json.JSONObject, title: String, movie: Boolean) =
         if (state.has(title)) state.optBoolean(title) else onByDefault(title, movie)
 
+    /** What the page's rows depend on in Customize Home, to tell when coming back that they changed. */
+    fun signature(c: Context, page: String) = rowsOn(c, page).toString() + rowOrder(c, page)
+
     fun setRowOn(c: Context, page: String, title: String, on: Boolean) =
         prefs(c).edit().putString(Settings.profileKey(c, "rowsOn:$page"), rowsOn(c, page).put(title, on).toString()).apply()
 

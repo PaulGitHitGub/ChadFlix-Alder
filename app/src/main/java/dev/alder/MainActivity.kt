@@ -658,6 +658,7 @@ class MainActivity : Screen() {
 
     private var lastFeaturedHome = false
     private var lastHiddenRows: Set<String> = emptySet()
+    private var lastHomeRows = "" // ChadFlix: Customize Home's choices this page was built with
 
     // Back from a title or the player: Continue Watching may have moved on, so this asks Stremio, not the disk. Only
     // the library's rows are redrawn, so the remote stays where it was on the rest of the page.
@@ -665,7 +666,7 @@ class MainActivity : Screen() {
         super.onRestart()
         val featured = Settings.featuredHome(this)
         val hiddenRows = Settings.hiddenRows(this)
-        val hiddenRowsChanged = hiddenRows != lastHiddenRows
+        val hiddenRowsChanged = hiddenRows != lastHiddenRows || HomeStyle.signature(this, page.label) != lastHomeRows
         lastHiddenRows = hiddenRows
         arrangeTabs()
         if (page != Page.HOME && !Settings.tabShown(this, page.tabId)) { // its tab was hidden in Settings › Tabs
@@ -1570,6 +1571,7 @@ class MainActivity : Screen() {
         nextRowHint.visibility = View.GONE
         moreHint.alpha = 0f
         lastHiddenRows = Settings.hiddenRows(this)
+        lastHomeRows = HomeStyle.signature(this, p.label)
         if (p == Page.HOME) { lastFeaturedHome = Settings.featuredHome(this); cinema = emptyList() } // other pages keep Home's, so the screensaver works there too
         focusedSomething = false
         // The last page's title goes with it; an empty page (no library yet, no catalogs) shows none.
@@ -2648,6 +2650,7 @@ class MainActivity : Screen() {
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
     private fun moveRow(title: String, by: Int) {
         HomeStyle.moveRow(this, page.label, pageRows, title, by)
+        lastHomeRows = HomeStyle.signature(this, page.label)
         rebuildRows?.invoke() ?: showPage(page)
         main.post { currentFocus?.let(::snapTo) }
     }
