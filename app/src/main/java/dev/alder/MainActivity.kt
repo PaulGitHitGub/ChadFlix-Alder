@@ -1362,7 +1362,20 @@ class MainActivity : Screen() {
             } else if (heroTask == null) showLibraryArt(item)
             return
         }
-        if (page.polishedRail && changed) {
+        // ChadFlix: no art to wait for on the home pages, so the words switch in the same frame as the focus (what's known
+        // now; details refine them in place). They used to wait HOME_HERO_WAIT (150 ms) for the art, then fade 220 ms.
+        // Along a row they come in from 0.4 quickly; while the rows slide they stay hidden ([slideRows]).
+        if (page.isBrowse) {
+            heroTask?.let(main::removeCallbacks)
+            heroTask = null
+            renderHero(item)
+            if (slideAnim != null) { browseInfo.animate().cancel(); browseInfo.alpha = 0f }
+            else if (changed && mode == Mode.BROWSE) {
+                browseInfo.animate().cancel()
+                browseInfo.alpha = minOf(browseInfo.alpha, 0.4f)
+                browseInfo.animate().alpha(1f).setDuration(INFO_STEP_MS).setInterpolator(EASE_OUT).start()
+            }
+        } else if (page.polishedRail && changed) {
             main.removeCallbacks(artTask)
             // Keep the last complete hero visible until the new focus settles.
             if (art.drawable == null) art.tag = null
@@ -1459,7 +1472,7 @@ class MainActivity : Screen() {
         // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
         heroAbout.text = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
         heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
-        if (mode == Mode.BROWSE) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS)
+        if (mode == Mode.BROWSE && !page.isBrowse) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS) // ChadFlix: showHero fades home's
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
     }
 
@@ -1622,6 +1635,7 @@ class MainActivity : Screen() {
         // The last page's title goes with it; an empty page (no library yet, no catalogs) shows none.
         heroItem = null
         browseInfo.exit(FOCUS_MS).alpha(0f).start()
+        slideAnim.also { slideAnim = null }?.cancel()
         scroller.scrollTo(0, 0)
         mode = Mode.BROWSE
         main.removeCallbacks(advance)
@@ -3216,7 +3230,33 @@ class MainActivity : Screen() {
         val top = offsetIn(rowView)
         val viewportHeight = scroller.height - if (page.isGrid) dp(SAFE_BOTTOM) else 0
         val target = if (page.isGrid) gridScrollTarget(scroller.scrollY, viewportHeight, top, rowView.height) else top.coerceAtLeast(0)
-        scroller.smoothScrollTo(0, target)
+        if (page.isGrid) scroller.smoothScrollTo(0, target) else slideRows(target)
+    }
+
+    private var slideAnim: android.animation.ValueAnimator? = null
+
+    /**
+     * ChadFlix: the rows slide to [target] in [ROW_SLIDE_MS] (ScrollView's own smooth scroll took 250 ms). The info line
+     * hides at once and fades in as soon as the slide ends, so the last title's words never sit over the incoming card.
+     */
+    private fun slideRows(target: Int) {
+        if (scroller.scrollY == target && slideAnim == null) return
+        slideAnim.also { slideAnim = null }?.cancel()
+        browseInfo.animate().cancel()
+        browseInfo.alpha = 0f
+        slideAnim = android.animation.ValueAnimator.ofInt(scroller.scrollY, target).setDuration(ROW_SLIDE_MS).apply {
+            interpolator = EASE_OUT
+            addUpdateListener { scroller.scrollTo(0, it.animatedValue as Int) }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (slideAnim !== animation) return
+                    slideAnim = null
+                    if (heroItem != null && mode == Mode.BROWSE)
+                        browseInfo.animate().alpha(1f).setDuration(INFO_IN_MS).setInterpolator(EASE_OUT).start()
+                }
+            })
+            start()
+        }
     }
 
     private fun libraryPosterWidth() = (artW - dp(2 * PAD + LIST_GAP * (LIST_COLUMNS - 1))) / LIST_COLUMNS
@@ -3333,6 +3373,9 @@ class MainActivity : Screen() {
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
         const val HOME_SYNOPSIS_W = HERO_W
         const val HOME_HERO_WAIT = 150L
+        const val ROW_SLIDE_MS = 200L // ChadFlix: Up/Down between rows
+        const val INFO_IN_MS = 150L // ChadFlix: the info line, once the rows stop
+        const val INFO_STEP_MS = 120L // ChadFlix: the info line, along a row
         const val HOME_ART_EXIT_MS = 100L
         const val HOME_ART_MS = 220L
         const val QUIET = 0.75f // the next row remains visible without competing with the active one
