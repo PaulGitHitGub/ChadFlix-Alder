@@ -24,6 +24,10 @@ class Addon(val descriptor: JSONObject) {
     val official = descriptor.optJSONObject("flags")?.optBoolean("official") == true
     /** Stremio's own that can't be removed (Cinemeta, Local Files); they can still be moved. */
     val locked = descriptor.optJSONObject("flags")?.optBoolean("protected") == true
+    /** Cinemeta speaks only English, so its titles come in the app's language from TMDB; other meta add-ons pick their own. */
+    private val translated get() = id == "com.linvo.cinemeta" && Tmdb.translates
+    private fun List<JSONObject>.inLanguage(offline: Boolean = false, budgetMs: Long = 3_000) =
+        also { if (translated) Tmdb.translateAll(it, offline, budgetMs) }
     val providesStreams: Boolean = manifest.optJSONArray("resources").items().any {
         (it as? String ?: (it as? JSONObject)?.optString("name")) == "stream"
     }
@@ -85,14 +89,14 @@ class Addon(val descriptor: JSONObject) {
     // Catalogs (one [genre] of them with Stremio's `genre` extra) and details are kept on disk as they arrive; the saved*
     // versions read last time's answer, no network.
     fun catalog(c: Catalog, genre: String? = null, timeoutMs: Int = 20_000): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, genre), true, timeoutMs, strict = true)).getJSONArray("metas").objects().metas()
+        JSONObject(Http.get(catalogUrl(c, genre), true, timeoutMs, strict = true)).getJSONArray("metas").objects().inLanguage().metas()
 
     /** The titles after the first [skip] (Stremio's paging extra); not kept on disk. */
     fun catalog(c: Catalog, skip: Int): List<Meta> =
-        JSONObject(Http.get(catalogUrl(c, null, skip), strict = true)).getJSONArray("metas").objects().metas()
+        JSONObject(Http.get(catalogUrl(c, null, skip), strict = true)).getJSONArray("metas").objects().inLanguage().metas()
 
     fun savedCatalog(c: Catalog, genre: String? = null): List<Meta>? =
-        Http.savedAnswer(catalogUrl(c, genre))?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.metas()
+        Http.savedAnswer(catalogUrl(c, genre))?.let { runCatching { JSONObject(it) }.getOrNull() }?.optJSONArray("metas")?.objects()?.inLanguage(offline = true)?.metas()
 
     /** /catalog/type/id/genre=Drama&skip=20.json: the catalog's required extras, the [genre] picked, and the page. */
     private fun catalogUrl(c: Catalog, genre: String?, skip: Int = 0): String {
@@ -123,7 +127,8 @@ class Addon(val descriptor: JSONObject) {
             val path = url(arrayOf("catalog", c.getString("type"), c.getString("id"))).removeSuffix(".json")
             val searchUrl = "$path/search=${Uri.encode(query)}.json"
             val answer = JSONObject(Http.get(searchUrl, timeoutMs = 5_000, strict = true))
-            return answer.getJSONArray("metas").objects().metas()
+            // Inside the search's own 5 s: what TMDB hasn't answered in 1.5 s stays English.
+            return answer.getJSONArray("metas").objects().inLanguage(budgetMs = 1_500).metas()
         }
         val completion = ExecutorCompletionService<Pair<Int, Result<List<Meta>>>>(catalogSearchPool)
         val pending = catalogs.mapIndexed { index, catalog -> completion.submit { index to runCatching { fetch(catalog) } } }
@@ -144,13 +149,19 @@ class Addon(val descriptor: JSONObject) {
         return answers.sortedBy { it.first }.flatMap { it.second } to failure
     }
 
-    fun meta(type: String, id: String): Meta? = get(true, "meta", type, id, strict = true).optJSONObject("meta")?.let { meta(it, id) }
+    /** [episodes]: also each episode's name in the app's language, for the title page. */
+    fun meta(type: String, id: String, episodes: Boolean = false): Meta? =
+        get(true, "meta", type, id, strict = true).optJSONObject("meta")?.let { meta(it, id, episodes, offline = false) }
 
-    fun savedMeta(type: String, id: String, maxAgeMs: Long? = null): Meta? =
-        saved("meta", type, id, maxAgeMs = maxAgeMs)?.optJSONObject("meta")?.let { meta(it, id) }
+    fun savedMeta(type: String, id: String, maxAgeMs: Long? = null, episodes: Boolean = false): Meta? =
+        saved("meta", type, id, maxAgeMs = maxAgeMs)?.optJSONObject("meta")?.let { meta(it, id, episodes, offline = true) }
 
     /** Some add-ons leave the title's own id out of its details: it's the one asked for. */
-    private fun meta(json: JSONObject, id: String) = Meta(if (json.text("id") == null) json.put("id", id) else json)
+    private fun meta(json: JSONObject, id: String, episodes: Boolean, offline: Boolean): Meta {
+        val full = if (json.text("id") == null) json.put("id", id) else json
+        if (translated) Tmdb.translate(full, episodes, offline)
+        return Meta(full)
+    }
 
     /** A title-specific catalog, when an installed addon advertises the protocol's required `similar` extra. */
     fun similar(type: String, id: String): List<Meta>? {
@@ -221,9 +232,9 @@ class Addon(val descriptor: JSONObject) {
  * that waits on the answer: a dead add-on then costs no more than its own wait. Otherwise one at a time, so Home's
  * cards don't ask every add-on for every title.
  */
-fun List<Addon>.meta(type: String, id: String, together: Boolean = false, reportFailure: Boolean = false): Meta? {
+fun List<Addon>.meta(type: String, id: String, together: Boolean = false, reportFailure: Boolean = false, episodes: Boolean = false): Meta? {
     val serving = filter { it.serves("meta", type, id) }
-    fun ask(a: Addon) = runCatching { a.meta(type, id) }
+    fun ask(a: Addon) = runCatching { a.meta(type, id, episodes) }
     val answers = if (!together || serving.size < 2) serving.asSequence().map(::ask)
         else serving.map { a -> metaPool.submit<Result<Meta?>> { ask(a) } }.asSequence().map { it.get() }
     var failure: Throwable? = null
@@ -236,8 +247,8 @@ fun List<Addon>.meta(type: String, id: String, together: Boolean = false, report
 }
 
 /** Last time's details from disk, from the first add-on in the account's order that kept some; no network. */
-fun List<Addon>.savedMeta(type: String, id: String, maxAgeMs: Long? = null): Meta? =
-    filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { runCatching { it.savedMeta(type, id, maxAgeMs) }.getOrNull() }
+fun List<Addon>.savedMeta(type: String, id: String, maxAgeMs: Long? = null, episodes: Boolean = false): Meta? =
+    filter { it.serves("meta", type, id) }.firstNotNullOfOrNull { runCatching { it.savedMeta(type, id, maxAgeMs, episodes) }.getOrNull() }
 
 private val metaPool = java.util.concurrent.Executors.newCachedThreadPool { r ->
     Thread(r, "alder-meta").apply { isDaemon = true }

@@ -198,6 +198,60 @@ object Tmdb {
             }.also { if (it.isNotEmpty()) similarCache[cacheKey] = it }
         }.getOrDefault(emptyList())
     }
+
+    // ---------- Titles in the viewer's language: Cinemeta speaks only English ----------
+
+    private const val MONTH_MS = 30L * 24 * 60 * 60 * 1000
+
+    /** Whether Cinemeta's titles need translating: the app speaks something other than English. */
+    val translates get() = java.util.Locale.getDefault().language != "en"
+
+    /** TMDB's answer from disk when under a month old, else from the network (and kept); [offline] never asks. */
+    private fun answer(url: String, offline: Boolean): JSONObject? =
+        (Http.savedAnswer(url, maxAgeMs = MONTH_MS) ?: if (offline) null else runCatching { Http.get(url, keep = true, timeoutMs = 5_000, strict = true) }.getOrNull())
+            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+
+    /** TMDB's details for a Cinemeta title in the app's language, with its logos in that language. Reads [json] only. */
+    private fun details(json: JSONObject, offline: Boolean): Pair<Int, JSONObject>? {
+        val series = json.optString("type") == "series"
+        val media = if (series) "tv" else "movie"
+        val id = json.optInt("moviedb_id").takeIf { it > 0 } ?: run {
+            val imdb = json.text("imdb_id") ?: json.text("id")?.takeIf { it.startsWith("tt") } ?: return null
+            answer("$BASE/find/$imdb?api_key=$KEY&external_source=imdb_id", offline)
+                ?.optJSONArray(if (series) "tv_results" else "movie_results")?.optJSONObject(0)?.optInt("id")?.takeIf { it > 0 }
+        } ?: return null
+        val url = "$BASE/$media/$id?api_key=$KEY&language=$language&append_to_response=images" +
+            "&include_image_language=${language.substringBefore('-')}"
+        return answer(url, offline)?.let { id to it }
+    }
+
+    /**
+     * Cinemeta's English [json], a catalog entry or a title's details, in the app's language: name, description, poster,
+     * genres and title logo; [episodes] adds each season's episode names. Changes [json] in place; what TMDB lacks stays.
+     */
+    fun translate(json: JSONObject, episodes: Boolean = false, offline: Boolean = false) {
+        val (id, found) = runCatching { details(json, offline) }.getOrNull() ?: return
+        applyTranslation(json, found, language)
+        if (!episodes || json.optString("type") != "series") return
+        val videos = json.optJSONArray("videos").objects()
+        val seasons = videos.map { it.optInt("season") }.filter { it > 0 }.distinct()
+        pool.invokeAll(seasons.map { s -> java.util.concurrent.Callable { s to answer("$BASE/tv/$id/season/$s?api_key=$KEY&language=$language", offline) } })
+            .forEach { f -> runCatching { f.get() }.getOrNull()?.let { (s, a) -> a?.let { applyEpisodes(videos, s, it) } } }
+    }
+
+    /**
+     * [translate] for a catalog's titles at once, without episodes. ponytail: whatever TMDB hasn't answered in [budgetMs]
+     * stays English this time; its answer is on disk for the row's next load. A per-card fetch would lift that ceiling.
+     */
+    fun translateAll(titles: List<JSONObject>, offline: Boolean = false, budgetMs: Long = 3_000) {
+        if (titles.isEmpty()) return
+        // The workers only read; the titles change here, on the caller's thread, once each answer is in.
+        val answers = pool.invokeAll(titles.map { java.util.concurrent.Callable { runCatching { details(it, offline) }.getOrNull() } },
+            budgetMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+        titles.zip(answers).forEach { (json, f) ->
+            if (f.isDone && !f.isCancelled) runCatching { f.get() }.getOrNull()?.let { applyTranslation(json, it.second, language) }
+        }
+    }
 }
 
 /** Discover's filters: [type] is movie, series or anime; [decade] a year like 2010 (0: before 1980); [year] an exact year; [sort] popular, top or new. */
@@ -244,4 +298,43 @@ internal fun discoverMeta(t: JSONObject, imdb: String, movie: Boolean, genreName
         .putOpt("description", t.text("overview"))
         .putOpt("releaseInfo", date?.take(4))
         .put("genres", org.json.JSONArray(t.optJSONArray("genre_ids")?.let { ids -> (0 until ids.length()).mapNotNull { genreNames[ids.optInt(it)] } }.orEmpty())))
+}
+
+/**
+ * TMDB's details [t] (a film or a show) over Cinemeta's English [json]. TMDB answers an untranslated title with its
+ * original one, and 기생충 reads no better than Parasite: then the English name stays.
+ */
+internal fun applyTranslation(json: JSONObject, t: JSONObject, language: String) {
+    val show = !t.has("title")
+    val name = t.text(if (show) "name" else "title")
+    val original = t.text(if (show) "original_name" else "original_title")
+    val translated = name?.takeUnless { it == original && t.optString("original_language") !in setOf(language.substringBefore('-'), "en") }
+    val logo = t.optJSONObject("images")?.optJSONArray("logos").objects().firstNotNullOfOrNull { it.text("file_path") }
+    if (translated != null && translated != json.text("name")) {
+        json.put("name", translated)
+        if (logo == null) json.remove("logo") // Cinemeta's logo is the English title as a picture
+    }
+    logo?.let { json.put("logo", "https://image.tmdb.org/t/p/w500$it") }
+    t.text("overview")?.let { json.put("description", it) }
+    t.text("poster_path")?.let { json.put("poster", "https://image.tmdb.org/t/p/w342$it") }
+    t.optJSONArray("genres").objects().mapNotNull { it.text("name") }.takeIf { it.isNotEmpty() }
+        ?.let { json.put("genres", org.json.JSONArray(it)) }
+}
+
+/** "Épisode 3": TMDB's stand-in for a name nobody translated; the English one says more. */
+private val placeholderEpisode = Regex("""^\S+ \d+$""")
+
+/**
+ * TMDB's [season] in the app's language over Cinemeta's episodes ([videos], all seasons). A season numbered differently
+ * (anime, split seasons) is left alone: a name on the wrong episode is worse than English.
+ */
+internal fun applyEpisodes(videos: List<JSONObject>, season: Int, answer: JSONObject) {
+    val own = videos.filter { it.optInt("season") == season }
+    val theirs = answer.optJSONArray("episodes").objects().associateBy { it.optInt("episode_number") }
+    if (own.size != theirs.size) return
+    for (v in own) {
+        val e = theirs[v.optInt("episode")] ?: continue
+        e.text("name")?.takeUnless(placeholderEpisode::matches)?.let { v.put(if (v.has("title")) "title" else "name", it) }
+        e.text("overview")?.let { v.put("overview", it) }
+    }
 }

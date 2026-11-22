@@ -26,6 +26,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **More streams show up.** Alder now asks every add-on that Stremio asks, and gives slow debrid add-ons 45 seconds to answer. Fewer "no streams found".
 <!-- Spotlight: whats-new/speed.webp -->
 - **Watch at your speed.** Play from 0.75× to 2× with the speed button next to Pause. Alder remembers the speed for each show, so the next episode keeps it.
+- **Movies in your language.** Titles, stories, posters and episode names follow Alder's language, not only English. Select **Settings → Language → App language**.
 - **Fill your screen.** Movies with black bars can fill the TV. In the player, select **Audio & subtitles → Sync & Style → Picture**, then **Zoom** or **Stretch**.
 - **Big text mode.** Larger text, posters and buttons everywhere, for big rooms and far sofas. Select **Settings → Picture & Sound → Text and poster size → Large**.
 - **Use VLC or Just Player.** Alder picks the stream, the subtitles and your resume point, and your favourite player plays it. Select **Settings → Streams → Video player**.
