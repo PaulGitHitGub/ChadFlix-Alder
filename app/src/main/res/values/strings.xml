@@ -154,7 +154,7 @@
     <string name="loading_trailer">Loading trailer…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">After this episode</string>
+    <string name="sleep_after_episode">After This Episode</string>
     <string name="sleep_in_minutes">In %1$d min</string>
     <string name="state_off">Off</string>
     <string name="state_on">On</string>
@@ -175,7 +175,7 @@
     <string name="player_other_sources">Other sources</string>
     <string name="player_source_failed">Source failed</string>
     <string name="player_try_another">Try another source</string>
-    <string name="player_next_episode">Next episode</string>
+    <string name="player_next_episode">Next Episode</string>
     <string name="player_play_episode">Play S%1$d E%2$d</string>
     <string name="player_exit_home">Exit to Home</string>
     <string name="player_still_watching">Still watching?</string>

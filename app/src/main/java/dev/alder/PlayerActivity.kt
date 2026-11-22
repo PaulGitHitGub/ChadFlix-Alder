@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.Bundle
 import android.view.Display
 import android.view.Gravity
@@ -18,7 +17,6 @@ import android.text.TextUtils
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -651,7 +649,7 @@ class PlayerActivity : Screen() {
                 buttonLabels[playPause]?.text = getString(if (playWhenReady) R.string.player_pause else R.string.action_play)
                 pausedShade.visibility = if (playWhenReady) View.GONE else View.VISIBLE
                 if (playWhenReady) { if (shown) showControls(null) }
-                else if (options.visibility != View.VISIBLE && upNextPanel.visibility != View.VISIBLE &&
+                else if (!panelUp() && options.visibility != View.VISIBLE && upNextPanel.visibility != View.VISIBLE &&
                     stallPanel.visibility != View.VISIBLE && stillPanel.visibility != View.VISIBLE) showControls(playPause)
             }
 
@@ -2322,7 +2320,7 @@ class PlayerActivity : Screen() {
     private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
 
     /** The glass frosts the art the title page shows, as the Showing menu's does; with none, the same plain fallback. */
-    override val backdrop: ImageView? get() = (menuArt ?: appearanceArt)?.takeIf { it.drawable != null }
+    override val backdrop: ImageView? get() = (appearanceArt ?: menuArt)?.takeIf { it.drawable != null }
 
     private fun panelUp() = menuOpen || infoOpen
     private fun isRtl() = controls.layoutDirection == View.LAYOUT_DIRECTION_RTL
@@ -2418,7 +2416,7 @@ class PlayerActivity : Screen() {
     private fun pickSubtitle(i: Int, subs: List<Tracks.Group>, loaded: Tracks.Group?) {
         val p = player.trackSelectionParameters.buildUpon()
         val sub = addonSubs.getOrNull(i - 1 - subs.size)
-        val file = if (i == 0 || sub != null) null else subs[i - 1]
+        val file = if (i == 0 || sub != null) null else subs.getOrNull(i - 1) ?: return
         val lang = if (i == 0) "" else sub?.lang ?: file?.getTrackFormat(0)?.language
         remember(lang, addonFile = sub != null,
             pick = when { i == 0 -> ""; sub != null -> "addon:" + sub.url; else -> "file:" + file?.getTrackFormat(0)?.id.orEmpty() })
@@ -2488,7 +2486,7 @@ class PlayerActivity : Screen() {
         menuMoving = false
     }
 
-    /** Down off the last row, or Back from the pill: focus goes back to the button, the menu stays. */
+    /** Down off the last row: focus goes back to the button, the menu stays. */
     private fun focusAudioButton() {
         suppressOpen = true
         audioButton.requestFocus()
@@ -2648,7 +2646,8 @@ class PlayerActivity : Screen() {
     }
 
     private fun rowPicked(col: MenuColumn, row: MenuRow) {
-        val item = row.item
+        // The row's own item can be stale after a reload (new track groups, a shorter add-on list): use the current one.
+        val item = if (row.item == null) null else col.items.firstOrNull { it.track.id == row.key } ?: return
         if (item == null) { // More: every track of this column, from the first that was hidden
             val shownIds = defaultTrackIds(col.items.map { it.track }, originalLanguage)
             val first = col.items.firstOrNull { it.track.id !in shownIds }
@@ -2955,12 +2954,12 @@ class PlayerActivity : Screen() {
         (topName.parent as? ViewGroup)?.removeView(topName)
         box.addView(playerLogo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
         box.addView(topName, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-        stack.addView(box, LinearLayout.LayoutParams(dp(560), dp(75)))
+        stack.addView(box, LinearLayout.LayoutParams(dp(560), -2))
         val soft = 0xB3FFFFFF.toInt()
         val certificate = m?.certification ?: knownCertificate(metaId)
         val length = HomeStyle.runtimeMs(m?.runtime ?: intent.getStringExtra("runtime")).takeIf { it > 0 }
             ?: player.duration.takeIf { it > 0 && !isLive() } ?: 0L
-        val facts = infoFacts(m?.year, certificate, runtimeWords(length, getString(R.string.info_runtime_hours_minutes),
+        val facts = infoFacts(m?.year?.take(4), certificate, runtimeWords(length, getString(R.string.info_runtime_hours_minutes),
             getString(R.string.info_runtime_hours), getString(R.string.info_runtime_minutes)))
         if (facts.isNotEmpty()) stack.addView(text(facts, BODY, color = soft).apply { maxLines = 1 }, wrap().apply { topMargin = dp(13) })
         m?.description?.takeIf { it.isNotBlank() }?.let { plot ->
