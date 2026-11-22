@@ -1559,8 +1559,9 @@ class MainActivity : Screen() {
         wideRow = false
         librarySlot = null
         listShade.visibility = if (grid) View.VISIBLE else View.GONE
-        listShade.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            intArrayOf(0xF20E0C0A.toInt(), 0xE6191512.toInt(), 0xF20E0C0A.toInt()))
+        // The focused title's art shows behind its name and details, then darkens fully before the posters start.
+        listShade.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0x800E0C0A.toInt(), 0xD90E0C0A.toInt(), 0xF20E0C0A.toInt(), 0xF50E0C0A.toInt()))
         val g = ++generation
         loadMoreSections = null
         restoreCatalogFocus = null
