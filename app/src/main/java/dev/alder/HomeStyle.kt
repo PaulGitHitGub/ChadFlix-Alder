@@ -123,6 +123,13 @@ internal object HomeStyle {
         return minutes * 60_000
     }
 
+    /** What's left to watch for the title page's "Ends at": the saved duration minus the progress when resuming,
+     *  else the runtime ("2h 07m"), less any progress; 0 when unknown. */
+    fun endsLeftMs(runtime: String?, duration: Long, resumeAt: Long): Long {
+        val total = if (resumeAt > 0 && duration > resumeAt) duration else runtimeMs(runtime)
+        return if (resumeAt in 1 until total) total - resumeAt else total
+    }
+
     /** The IMDb and Letterboxd tags in white and grey instead of Alder's warm tungsten. */
     fun plainRatings(row: LinearLayout) {
         for (i in 0 until row.childCount) (row.getChildAt(i) as? TextView)?.let { t ->

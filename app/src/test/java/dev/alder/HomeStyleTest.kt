@@ -33,6 +33,13 @@ class HomeStyleTest {
         assertEquals(0L, HomeStyle.runtimeMs("N/A"))
     }
 
+    @Test fun endsAtCountsWhatIsLeft() {
+        assertEquals(127 * 60_000L, HomeStyle.endsLeftMs("2h 07m", 0, 0)) // full runtime
+        assertEquals(30 * 60_000L, HomeStyle.endsLeftMs("2h 07m", 100 * 60_000L, 70 * 60_000L)) // saved duration - progress
+        assertEquals(97 * 60_000L, HomeStyle.endsLeftMs("2h 07m", 0, 30 * 60_000L)) // no duration: runtime - progress
+        assertEquals(0L, HomeStyle.endsLeftMs(null, 0, 0)) // unknown: hidden
+    }
+
     @Test fun genreListsBecomeTmdbFilters() {
         val trending = genreParams(true, 28, "trending", "2026-11-21", "2026-05-21")
         assertEquals("28", trending["with_genres"])

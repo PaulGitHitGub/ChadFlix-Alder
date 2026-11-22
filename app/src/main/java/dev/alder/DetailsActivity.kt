@@ -12,7 +12,6 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextClock
 import android.widget.TextView
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -178,6 +177,15 @@ class DetailsActivity : Screen() {
     private lateinit var key: String
     override val backdrop get() = heroArt
     private lateinit var root: FrameLayout
+    // ChadFlix: "Ends at 9:42 PM" at the top left, in place of the clock at the top right. 0 = runtime unknown, hidden.
+    private var endsLeftMs = 0L
+    private val endsAt by lazy { text("", SMALL, color = TEXT_2).apply { maxLines = 1; visibility = View.GONE } }
+    private val endsTick = object : Runnable {
+        override fun run() {
+            showEnds()
+            root.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000) // on the minute
+        }
+    }
     private lateinit var hero: FrameLayout
     private lateinit var heroArt: ImageView
     private lateinit var guide: FrameLayout
@@ -239,15 +247,6 @@ class DetailsActivity : Screen() {
         root = FrameLayout(this).apply {
             clipChildren = false
             addView(hero, FrameLayout.LayoutParams(-1, -1))
-            addView(TextClock(this@DetailsActivity).apply {
-                format12Hour = "h:mm a"
-                format24Hour = "HH:mm"
-                textSize = SMALL
-                setTextColor(TEXT_2)
-                typeface = text("", SMALL).typeface
-            }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(36); rightMargin = dp(PAD)
-            })
             val (loading, loadingText) = loadingOverlay()
             loadingView = loading
             loadingStatus = loadingText
@@ -447,6 +446,11 @@ class DetailsActivity : Screen() {
         trailerButton = null
         startOverButton = null
         hero.removeAllViews()
+        endsLeftMs = 0L
+        showEnds()
+        hero.addView(endsAt, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
+            leftMargin = dp(PAD); topMargin = dp(36) // the logo box starts at 61 dp
+        })
         val title = text(m?.name ?: name, SERIF_HERO, serif = true).onArt().apply {
             maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.BOTTOM or Gravity.START
             // The box is a fixed height: at large font sizes a two-line name shrinks to fit instead of clipping.
@@ -594,6 +598,8 @@ class DetailsActivity : Screen() {
         }
         val duration = item?.optJSONObject("state")?.optLong("duration") ?: 0L
         val remaining = timeLeft(duration, resumeAt)
+        endsLeftMs = HomeStyle.endsLeftMs(m.runtime, duration, resumeAt)
+        showEnds()
         if (resumeAt > 0) {
             // ChadFlix: no "Stopped at 46:15"; the time left and the bar say where you are.
             val where = listOfNotNull(episode?.let { "S${it.season} E${it.episode}" }, episode?.title?.takeIf { it.isNotBlank() }, remaining)
@@ -1758,7 +1764,24 @@ class DetailsActivity : Screen() {
         startActivity(Intent(this, PlayerActivity::class.java).putExtras(intent))
     }
 
+    private fun showEnds() {
+        val left = endsLeftMs
+        endsAt.visibility = if (left > 0) View.VISIBLE else View.GONE
+        if (left <= 0) return
+        val pattern = if (android.text.format.DateFormat.is24HourFormat(this)) "HH:mm" else "h:mm a"
+        endsAt.text = getString(R.string.details_ends_at,
+            android.text.format.DateFormat.format(pattern, System.currentTimeMillis() + left).toString())
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!::root.isInitialized) return
+        root.removeCallbacks(endsTick)
+        endsTick.run()
+    }
+
     override fun onPause() {
+        if (::root.isInitialized) root.removeCallbacks(endsTick)
         cancelStreamResolution()
         super.onPause()
     }
