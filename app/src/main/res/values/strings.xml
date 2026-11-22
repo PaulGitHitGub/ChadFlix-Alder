@@ -102,6 +102,8 @@
     <string name="remove_failed">Couldn\'t remove it</string>
     <string name="row_move_up" translatable="false">Move Up</string>
     <string name="showing" translatable="false">Showing</string>
+    <string name="kind_movie" translatable="false">Movie</string>
+    <string name="kind_series" translatable="false">Series</string>
     <string name="customize_home" translatable="false">Customize Home</string>
     <string name="customize_home_hint" translatable="false">Choose the rows on Movies and Shows, and their order.</string>
     <string name="showing_default" translatable="false">(Default)</string>

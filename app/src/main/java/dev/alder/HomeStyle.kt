@@ -3,8 +3,6 @@ package dev.alder
 import android.content.Context
 import android.graphics.Outline
 import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.InsetDrawable
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewOutlineProvider
@@ -21,25 +19,29 @@ internal object HomeStyle {
     const val BLACK = 0xFF000000.toInt()
     const val WHITE = 0xFFFFFFFF.toInt()
     const val PLOT = 0xFFCFCFCF.toInt()
-    const val NOTE = 0xFFDDDDDD.toInt()
     const val PLACEHOLDER = 0xFF1A1A1A.toInt()
     const val AVATAR = 0xFF2A2A2A.toInt()
     const val OPEN_TAB = 0x33FFFFFF // the open page's pill while the remote is on another item in the top bar
     const val RED = 0xFFE50914.toInt()
     const val TRACK = 0xFF4A4A4A.toInt()
 
-    const val CARD_W = 110
-    const val CARD_H = 165
+    // Netflix's TV home, measured from the owner's photo at 1080p and halved: 152 x 248 dp posters, the focused one
+    // 441 dp wide (16:9), pinned 33 dp from the left with the card before it peeking in.
+    const val CARD_W = 152
+    const val CARD_H = 248
+    const val WIDE_W = 441
+    const val INSET = 33
     const val CARD_GAP = 8
-    const val CARD_RADIUS = 3.5f
+    const val CARD_RADIUS = 3f
     const val RING = 2.5f // the focused card's white border
-    const val CONTINUE_UNDER = 28 // under a Continue Watching poster: the red bar, then the time left
-    const val ROWS_TOP = 70 // the first row's title, under the top bar
-    const val INFO_GAP = 14 // between the info line and the next row's title
-    const val ROW_TITLE = 17f // sp
-    const val INFO = 13.5f // sp, the "Genre • Year • Runtime • Rating" line
-    const val NOTE_SP = 12f
-    const val ROW_DIM = 0.62f // rows the remote isn't in sit at about 38% brightness
+    const val ROWS_TOP = 76 // the first row's title, under the top bar
+    const val INFO_ABOVE = 14 // between the cards and the info line
+    const val INFO_GAP = 20 // between the info line and the next row's title
+    const val PLOT_LINES = 3 // a fixed-height box: moving along a row never moves the rows
+    const val ROW_TITLE = 16.5f // sp
+    const val TAB_SP = 13f
+    const val INFO = 12f // sp, the "Movie • Drama • 2014 • 1h 41m • PG-13" line
+    const val ROW_DIM = 0.25f // rows the remote isn't in are dimmed only lightly
     const val SEP = "  •  "
 
     private val small = setOf("a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with")
@@ -55,13 +57,13 @@ internal object HomeStyle {
     fun pill(color: Int) = GradientDrawable().apply { setColor(color); cornerRadius = 999f }
 
     /**
-     * A home poster card: the poster sits on top, rounded on its own, so the space under it ([under] px, Continue
-     * Watching's bar and time left) is outside the poster's rounding and placeholder.
+     * A home card: a rounded placeholder until the picture comes, and the picture rounded on its own, so the card can
+     * widen ([MediaCardView.expand]) without a clip of its own.
      */
-    fun posterCard(card: FrameLayout, face: View, under: Int) {
+    fun posterCard(card: FrameLayout, face: View) {
         val c = card.context
         val r = px(c, CARD_RADIUS)
-        card.background = InsetDrawable(GradientDrawable().apply { setColor(PLACEHOLDER); cornerRadius = r }, 0, 0, 0, under)
+        card.background = GradientDrawable().apply { setColor(PLACEHOLDER); cornerRadius = r }
         card.clipToOutline = false
         face.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) = outline.setRoundRect(0, 0, view.width, view.height, r)
@@ -78,31 +80,16 @@ internal object HomeStyle {
         visibility = View.INVISIBLE // INVISIBLE, not GONE: showing it then needs no layout pass
     }
 
-    /**
-     * Under a Continue Watching poster: a red watched-so-far bar on a grey track, then "1h 10m left" or "S2 E4". The views
-     * come back with their layout set; the card adds them.
-     */
-    fun under(screen: Screen, card: FrameLayout, posterH: Int, progress: Float, note: String?): List<View> {
-        val c = card.context
-        val out = mutableListOf<View>()
-        if (progress > 0f) out += LinearLayout(c).apply {
-            val p = progress.coerceIn(0f, 1f)
-            setBackgroundColor(TRACK)
-            addView(View(c).apply { setBackgroundColor(RED) }, LinearLayout.LayoutParams(0, -1, p))
-            addView(View(c), LinearLayout.LayoutParams(0, -1, 1f - p))
-            layoutParams = FrameLayout.LayoutParams(-1, px(c, RING).toInt().coerceAtLeast(2), Gravity.TOP).apply { topMargin = posterH + px(c, 5f).toInt() }
-        }
-        if (!note.isNullOrEmpty()) out += screen.text(note, NOTE_SP, bold = true, color = NOTE).apply {
-            setSingleLine()
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            layoutParams = FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
-                topMargin = posterH + px(c, 11f).toInt()
-                leftMargin = px(c, 2f).toInt()
-            }
-        }
-        return out
+    /** Continue Watching's watched-so-far bar: red on a grey track, along the foot of the card. */
+    fun bar(c: Context, progress: Float) = LinearLayout(c).apply {
+        val p = progress.coerceIn(0f, 1f)
+        setBackgroundColor(TRACK)
+        addView(View(c).apply { setBackgroundColor(RED) }, LinearLayout.LayoutParams(0, -1, p))
+        addView(View(c), LinearLayout.LayoutParams(0, -1, 1f - p))
     }
+
+    /** A view's natural height, measured before it's on screen (the TV's font size changes it). */
+    fun height(v: View): Int = v.run { measure(0, 0); measuredHeight }
 
     /** A title's runtime as Alder writes it ("2h 07m", "47 min") in milliseconds; 0 when it has none. */
     fun runtimeMs(text: String?): Long {

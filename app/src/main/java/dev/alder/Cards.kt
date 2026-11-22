@@ -97,8 +97,8 @@ internal class MediaCardView(
     val fadeIn: Boolean = true,
     val retryOnFailure: Boolean = false,
     val liftShadow: Boolean = true,
-    private val home: Boolean = false, // ChadFlix home rows: HomeStyle's poster, white focus border, no growth
-    note: String? = null, // ChadFlix: the words under a Continue Watching poster ("1h 10m left")
+    private val home: Boolean = false, // ChadFlix home rows: HomeStyle's poster and white focus border, no growth
+    private val wideW: Int = 0, // ChadFlix: focused, a home card widens to this (16:9 at the poster's height); 0 stays a poster
 ) : FrameLayout(screen) {
 
     var payload: Any? = null
@@ -115,10 +115,22 @@ internal class MediaCardView(
     // Darkens the cards beside the focused one. A shade, not transparency: a see-through card would let the
     // art behind it show through and look like it was floating on the poster.
     private val shade = View(screen).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
-    // ChadFlix: a home card's 2:3 poster sits on top; anything taller holds Continue Watching's bar and time left.
-    private val posterH = if (home) minOf(heightPx, widthPx * 3 / 2) else heightPx
     private val ring = if (home) HomeStyle.ring(screen) else null
-    private var underViews: List<View> = emptyList()
+    private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
+    /** ChadFlix: the title's logo, shown at the foot of the widened card ([expand]). */
+    var logoUrl: String? = null
+    private var expanded = false
+    private var widthAnim: ValueAnimator? = null
+    private val logoMade = lazy {
+        ImageView(screen).apply {
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_START
+            maxHeight = screen.dp(56)
+            maxWidth = wideW * 55 / 100
+            visibility = View.GONE
+        }.also { face.addView(it, LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { setMargins(screen.dp(14), 0, 0, screen.dp(14)) }) }
+    }
+    private val logoView by logoMade
 
     private val hasProgress = !grid && progress > 0f
 
@@ -128,7 +140,7 @@ internal class MediaCardView(
                 GradientDrawable.Orientation.BOTTOM_TOP,
                 intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000),
             )
-        }.also { face.addView(it, 1, LayoutParams(-1, posterH * 6 / 10, Gravity.BOTTOM)) }
+        }.also { face.addView(it, 1, LayoutParams(-1, heightPx * 6 / 10, Gravity.BOTTOM)) }
     }
     private val titleShade by titleShadeMade
 
@@ -165,22 +177,22 @@ internal class MediaCardView(
                 outline.setRoundRect(0, 0, view.width, view.height, screen.dp(Screen.CARD_RADIUS).toFloat())
         }
         clipToOutline = true
-        if (home) HomeStyle.posterCard(this, face, heightPx - posterH)
+        if (home) HomeStyle.posterCard(this, face)
 
         face.addView(image, LayoutParams(-1, -1))
         if (wide && !live) titleShade.visibility = View.VISIBLE
         if (wide && !live) nameView.visibility = View.VISIBLE
 
-        addView(face, LayoutParams(-1, posterH))
+        addView(face, LayoutParams(-1, -1))
         if (hasProgress && !home) {
             addView(screen.progressBar(progress), LayoutParams(-1, screen.dp(3), Gravity.BOTTOM).apply {
                 setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(10))
             })
         }
-        setUnder(progress, note)
+        setProgress(progress)
         renderBadge()
         addView(shade, LayoutParams(-1, -1))
-        ring?.let { addView(it, LayoutParams(-1, posterH)) }
+        ring?.let { addView(it, LayoutParams(-1, -1)) }
 
         isFocusable = true
         contentDescription = listOfNotNull(
@@ -198,12 +210,33 @@ internal class MediaCardView(
         }
     }
 
-    /** ChadFlix: Continue Watching's bar and words under a home poster, replaced when the progress becomes known. */
-    fun setUnder(progress: Float, note: String?) {
-        if (!home || heightPx <= posterH) return
-        underViews.forEach(::removeView)
-        underViews = HomeStyle.under(screen, this, posterH, progress, note)
-        underViews.forEach { addView(it, indexOfChild(shade).takeIf { i -> i >= 0 } ?: childCount) }
+    /** ChadFlix: Continue Watching's red bar along the foot of a home card, replaced when the progress becomes known. */
+    fun setProgress(progress: Float) {
+        if (!home) return
+        bar?.let(face::removeView)
+        bar = if (progress <= 0f) null else HomeStyle.bar(screen, progress).also {
+            face.addView(it, LayoutParams(-1, screen.dp(4), Gravity.BOTTOM))
+        }
+    }
+
+    /**
+     * ChadFlix: the focused home card widens from its poster into the title's 16:9 backdrop at the same height, with
+     * its logo (or name) at the foot; unfocused, it's a poster again. Only this card's width animates.
+     */
+    fun expand(on: Boolean) {
+        if (wideW <= 0 || expanded == on) return
+        expanded = on
+        val lp = layoutParams ?: return
+        widthAnim?.cancel()
+        widthAnim = ValueAnimator.ofInt(lp.width, if (on) wideW else widthPx).setDuration(Screen.QUICK_MS).apply {
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { lp.width = it.animatedValue as Int; requestLayout() }
+            start()
+        }
+        if (logoMade.isInitialized()) logoView.visibility = View.GONE
+        if (on || nameMade.isInitialized()) nameView.textSize = if (on) Screen.SERIF_NAME else Screen.SMALL
+        shownUrl = null
+        if (wanted) load()
     }
 
     fun setOnFocusChanged(handler: (Boolean) -> Unit) {
@@ -267,7 +300,7 @@ internal class MediaCardView(
         if (needsCardMeta(live, wide, posterUrl, artUrl)) {
             onRequestMeta?.invoke()
         }
-        val url = pickCardImageUrl(live, wide, settled, posterUrl, artUrl) ?: run {
+        val url = artUrl.takeIf { expanded } ?: pickCardImageUrl(live, wide, settled, posterUrl, artUrl) ?: run {
             if (live) face.background = screen.glass(Screen.CARD_RADIUS)
             nameView.visibility = View.VISIBLE
             face.alpha = 1f
@@ -281,7 +314,8 @@ internal class MediaCardView(
     }
 
     private fun loadUrl(url: String, retry: Boolean) {
-        val imageWidth = (widthPx * Screen.CARD_GROW).toInt()
+        // ChadFlix home cards don't grow: decoded at their own width (as Home prefetches them), the widened one at its own.
+        val imageWidth = if (expanded) wideW else if (home) widthPx else (widthPx * Screen.CARD_GROW).toInt()
         image.animate().cancel()
         image.alpha = 1f
         if (!Images.cached(url, imageWidth) && (grid || live)) {
@@ -308,6 +342,14 @@ internal class MediaCardView(
             if (showTitle) titleShade.visibility = View.VISIBLE
             else if (titleShadeMade.isInitialized()) titleShade.visibility = View.GONE
             if (showTitle || nameMade.isInitialized()) nameView.visibility = if (showTitle) View.VISIBLE else View.INVISIBLE
+            if (expanded) logoUrl?.let { logo ->
+                Images.load(logo, logoView, wideW / 2) {
+                    if (expanded) {
+                        logoView.visibility = View.VISIBLE
+                        nameView.visibility = View.INVISIBLE
+                    }
+                }
+            }
             face.alpha = 1f
             if (!now && fadeIn) {
                 image.alpha = 0f

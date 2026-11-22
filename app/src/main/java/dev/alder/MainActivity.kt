@@ -309,6 +309,9 @@ class MainActivity : Screen() {
     private var browseRowTop = 0
     private var browseRowH = 0
     private var browseEndPad = 0 // ChadFlix: room under the last row, so it can rise to the top like the others
+    private var browseRowBlock = 0 // ChadFlix: one row's height, title to the next row's title
+    private var rowBottom = 0 // ChadFlix: px under a row's cards: the info line and the gaps around it
+    private var factsH = 0 // ChadFlix: the facts line's fixed height (as tall as a rating beside it), so it never shifts
 
     private var artTask = Runnable {}
     private var heroTask: Runnable? = null
@@ -445,7 +448,12 @@ class MainActivity : Screen() {
         val screenH = resources.displayMetrics.heightPixels
         // A row heading's real height: the TV's font size setting can make it taller than any fixed guess.
         val headingH = text("", HomeStyle.ROW_TITLE, bold = true).lineHeight
-        val rowH = headingH + dp(ROW_TOP_ROOM + CARD_H + ROW_BOTTOM_ROOM)
+        // ChadFlix: the info line under the row, measured (the TV's font size changes it): facts, then a fixed 3-line plot.
+        factsH = maxOf(HomeStyle.height(text("", HomeStyle.INFO, bold = true)), HomeStyle.height(text("", SMALL)))
+        rowBottom = dp(HomeStyle.INFO_ABOVE) + factsH + dp(8) +
+            HomeStyle.height(text("", BODY).apply { setLines(HomeStyle.PLOT_LINES) }) + dp(HomeStyle.INFO_GAP)
+        val rowH = headingH + dp(ROW_TOP_ROOM + CARD_H) + rowBottom
+        browseRowBlock = rowH
         // ChadFlix: the row the remote is in sits under the top bar with its info line below it; the next row peeks in.
         val rowTop = dp(HomeStyle.ROWS_TOP)
         browseRowTop = rowTop
@@ -531,7 +539,7 @@ class MainActivity : Screen() {
             addView(browseInfo(), FrameLayout.LayoutParams(dp(HERO_W + 2 * FOCUS_ROOM), -2, Gravity.BOTTOM).apply {
                 heroBottom = screenH - rowTop - rowH + dp(HomeStyle.INFO_GAP) // ChadFlix: under the row
                 // Room inside the block for the focused Resume to grow into (it was cut flat on the left).
-                leftMargin = dp(PAD - FOCUS_ROOM); bottomMargin = heroBottom
+                leftMargin = dp(HomeStyle.INSET - FOCUS_ROOM); bottomMargin = heroBottom
             })
             addView(stage(), FrameLayout.LayoutParams(-1, -1))
             // ChadFlix: no genre chips on Movies and Shows, whose rows sit right under the top bar; My Lists keeps its chips.
@@ -649,7 +657,7 @@ class MainActivity : Screen() {
                 if (answers.containsKey(key)) return@forEachIndexed
                 val kept = sources.map { (c, _) -> (c.addon.savedCatalog(c, picked) ?: return@forEachIndexed) to true }
                 answers.putIfAbsent(key, kept)
-                if (i < 2) kept.flatMap { it.first }.take(FIRST).forEach { Images.prefetch(it.poster ?: it.background, (dp(CARD_W) * CARD_GROW).toInt()) }
+                if (i < 2) kept.flatMap { it.first }.take(FIRST).forEach { Images.prefetch(it.poster ?: it.background, dp(CARD_W)) }
                 // The first title's full-screen art too, so the page opens on its own picture, not the last page's.
                 if (i == 0) kept.firstOrNull()?.first?.firstOrNull()?.background?.let { Images.prefetch(it, artW, look = shaded) }
             }
@@ -848,7 +856,7 @@ class MainActivity : Screen() {
                 if (hasFocus() || direction != View.FOCUS_UP || current == null) super.addFocusables(views, direction, focusableMode)
                 else views.add(current)
             }
-        }.apply { setPadding(dp(PAD), dp(16), dp(PAD), dp(8)) }
+        }.apply { setPadding(dp(PAD), 0, dp(PAD), dp(12)) } // ChadFlix: the bar's centre 32 dp down, as on Netflix
 
         // The profile: a small round avatar on the margin. OK opens a small menu (switch profile, settings).
         val avatar = text(profile.name.take(1).uppercase(), SMALL, bold = true, color = TUNGSTEN).apply {
@@ -927,7 +935,7 @@ class MainActivity : Screen() {
     private lateinit var navBar: LinearLayout
 
     /** A page's name in the top bar; OK on it opens it, or goes down into it when it's already open. */
-    private fun navItem(p: Page) = text(pageName(p), BODY).apply {
+    private fun navItem(p: Page) = text(pageName(p), HomeStyle.TAB_SP).apply {
         id = View.generateViewId()
         navItems[p] = this
         gravity = Gravity.CENTER
@@ -1240,10 +1248,12 @@ class MainActivity : Screen() {
         // adjustViewBounds resets the scale type to FIT_CENTER, so FIT_START comes after it (logo on the margin).
         heroLogo = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_START; maxHeight = dp(55) }
         heroYear = text("", SERIF_TITLE * 0.65f, serif = true, color = TEXT_2).onArt().apply { visibility = View.GONE }
-        heroFacts = text("", HomeStyle.INFO, bold = true, color = HomeStyle.WHITE).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        heroFacts = text("", HomeStyle.INFO, bold = true, color = HomeStyle.WHITE).onArt().apply {
+            maxLines = 1; ellipsize = TextUtils.TruncateAt.END; minHeight = factsH; gravity = Gravity.CENTER_VERTICAL
+        }
         // Small tags, as tall as the letters: SMALL's leading and font padding made them blocks twice the mock's.
         heroRatings = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        heroAbout = text("", BODY, color = HomeStyle.PLOT).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        heroAbout = text("", BODY, color = HomeStyle.PLOT).onArt().apply { setLines(HomeStyle.PLOT_LINES); ellipsize = TextUtils.TruncateAt.END }
         heroResume = pill(R.string.action_resume, R.drawable.ic_play).apply {
             setOnClickListener { heroItem?.let(::play) }
             setOnLongClickListener { heroItem?.let { play(it, pick = true) }; true }
@@ -1385,8 +1395,11 @@ class MainActivity : Screen() {
         // A show in progress describes its next episode, so the line names that episode rather than the show.
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
-        if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() })
-        else factsList += listOfNotNull(genre, year, length, meta?.certification) // ChadFlix: Genre • Year • Runtime • Rating
+        // ChadFlix: "Movie • Drama • 2014 • 1h 41m • PG-13", and Continue Watching's time left (its card only has the bar).
+        val left = item.timeLeft ?: HomeStyle.runtimeMs(meta?.runtime).takeIf { item.resumeAt in 1L until it }?.let { timeLeft(it, item.resumeAt) }
+        val kind = getString(if (item.type == "movie") R.string.kind_movie else R.string.kind_series).takeIf { !HomeStyle.isTile(item.id) }
+        if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() }, left)
+        else factsList += listOfNotNull(kind, genre, year, length, meta?.certification, left)
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
         // Letterboxd comes from this session or the disk at once; a film never asked yet fills in when MDBList answers.
@@ -1403,19 +1416,8 @@ class MainActivity : Screen() {
         addRatings(heroRatings, ratings)
         HomeStyle.plainRatings(heroRatings)
         val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
-        val synopsisLines = 1 // ChadFlix: the plot is one line
-        heroAbout.maxLines = synopsisLines
-        val description = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
-        heroAbout.text = description
-        heroAbout.post {
-            if (heroItem !== item || heroAbout.text.toString() != description) return@post
-            val layout = heroAbout.layout ?: return@post
-            val lastLine = (heroAbout.maxLines - 1).coerceAtLeast(0)
-            if (layout.lineCount > lastLine && layout.getEllipsisCount(lastLine) > 0) {
-                val end = layout.getLineStart(lastLine) + layout.getEllipsisStart(lastLine)
-                heroAbout.text = synopsisAtSentence(description, end)
-            }
-        }
+        // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
+        heroAbout.text = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
         heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
         if (mode == Mode.BROWSE) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS)
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
@@ -1521,6 +1523,7 @@ class MainActivity : Screen() {
         }
         content.setPadding(0, 0, 0, if (grid) 0 else browseEndPad)
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
+            leftMargin = dp((if (grid) PAD else HomeStyle.INSET) - FOCUS_ROOM)
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
             topMargin = if (grid) dp(GRID_HERO_TOP) else 0
             bottomMargin = if (grid) 0 else heroBottom
@@ -2751,7 +2754,8 @@ class MainActivity : Screen() {
     private inner class Row(val title: String, first: List<Item>, private var more: ((Int) -> List<Item>)?, val wide: Boolean = false,
                             val grid: Boolean = false, val continueRow: Boolean = false) {
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
-        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H + if (continueRow) HomeStyle.CONTINUE_UNDER else 0)
+        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
+        private val homeRow = !wide && !grid // ChadFlix: Netflix's row: posters, the focused one widened, pinned left
         private val polishedRail = page.polishedRail
         private val gap = if (grid) LIST_GAP else HomeStyle.CARD_GAP
         val cardStep = cardWidth + dp(gap)
@@ -2761,16 +2765,17 @@ class MainActivity : Screen() {
         var active = false
         var loaded = false
 
-        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(PAD)
+        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow) HomeStyle.INSET else PAD)
         val rail = HorizontalCardRail(
             screen = this@MainActivity,
             cardGapPx = dp(gap),
             paddingStartPx = inset,
             paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
             paddingEndPx = inset,
-            paddingBottomPx = dp(if (grid) GRID_ROW_BOTTOM else ROW_BOTTOM_ROOM - if (continueRow) HomeStyle.CONTINUE_UNDER else 0),
+            paddingBottomPx = if (grid) dp(GRID_ROW_BOTTOM) else rowBottom,
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
+            cullLeft = !homeRow, // the card before the focused one peeks in at the left edge
         ).apply {
             onScroll = {
                 if (scroller.hasFocus()) placeCaption()
@@ -2787,7 +2792,7 @@ class MainActivity : Screen() {
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
-            setPadding(dp(PAD), 0, dp(PAD), 0)
+            setPadding(inset, 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
             maxWidth = dp(PAD + HERO_W) // a long "Because you watched…" stops at the hero's width
@@ -2816,23 +2821,24 @@ class MainActivity : Screen() {
             live = item.live,
             settled = item.settled,
             liftShadow = !page.hasGenreShortcuts,
-            home = !wide && !grid,
-            note = if (continueRow) item.timeLeft ?: episodeLabel(item)
-                ?: getString(R.string.player_next_episode).takeIf { item.nextEpisodePending } else null,
+            home = homeRow,
+            wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
+            logoUrl = item.logo
             dim(grid || !active, animate = false)
             payload = item
             tag = "card:${item.id}"
             onRequestMeta = { fill(item) }
             item.onFill += {
                 setNewEpisodes(item.newEpisodeCount)
+                logoUrl = item.logo
                 refresh(item.poster, item.art, item.settled)
             }
-            // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar and time left.
+            // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
             if (continueRow && item.progress == 0f && item.resumeAt > 0) {
                 item.onFill += {
                     val ms = HomeStyle.runtimeMs(metas[item.id]?.runtime)
-                    if (ms > item.resumeAt) setUnder(item.resumeAt.toFloat() / ms, timeLeft(ms, item.resumeAt))
+                    if (ms > item.resumeAt) setProgress(item.resumeAt.toFloat() / ms)
                 }
                 fill(item)
             }
@@ -2855,7 +2861,7 @@ class MainActivity : Screen() {
         fun light(on: Boolean) {
             if (active == on) return
             active = on
-            if (on) peek(true) else rail.clearHeld()
+            if (on) peek(true) else { rail.clearHeld(); cards.getOrNull(selected)?.expand(false) }
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
             cards.forEachIndexed { i, c -> c.dim(!on || (grid && i != selected)) } // ChadFlix: the whole row lights up
         }
@@ -2875,6 +2881,11 @@ class MainActivity : Screen() {
             if (active) {
                 if (previous != index && grid) { cards[previous].dim(true); cards[index].dim(false) }
             } else light(true)
+            if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
+                if (previous != index) cards.getOrNull(previous)?.expand(false)
+                cards[index].expand(true)
+                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W)) }
+            }
             if (page.isBrowse) updateNextRow()
             if (page.isCatalog) markChip(title)
             if (!grid) fill(items[index])
@@ -2915,7 +2926,7 @@ class MainActivity : Screen() {
                     val card = makeCard(item, items.size)
                     items += item
                     rail.appendCard(card)
-                    card.show(false) // shows once focus moves near, like the cards past the right margin
+                    card.show(homeRow) // shows once focus moves near, like the cards past the right margin (home rows don't cull)
                 }
                 if (loaded) loadRest(this@Row)
                 if (active && !grid) rail.strip.post {
@@ -3097,7 +3108,8 @@ class MainActivity : Screen() {
 
     private fun updateImages() {
         val top = scroller.scrollY
-        val height = scroller.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        // ChadFlix: home rows go by one row's height, not the taller scroller's.
+        val height = if (!page.isGrid) browseRowBlock else scroller.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
         // Requests run newest first, so the bottom rows are asked for first and the top row last: it loads first.
         for (r in rows.filter { it.view.isAttachedToWindow }.sortedByDescending { offsetIn(it.view) }) {
             val y = offsetIn(r.view)
@@ -3199,15 +3211,14 @@ class MainActivity : Screen() {
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
-        const val ROW_TOP_ROOM = 12 // dp between the row title and its cards (ChadFlix cards don't grow)
-        const val ROW_BOTTOM_ROOM = 96 // ChadFlix: Continue Watching's bar and time left, the info line, and a gap
+        const val ROW_TOP_ROOM = 2 // dp between the row title and its cards (ChadFlix cards don't grow)
         const val SAFE_BOTTOM = 28
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
         const val HOME_SYNOPSIS_W = HERO_W
         const val HOME_HERO_WAIT = 150L
         const val HOME_ART_EXIT_MS = 100L
         const val HOME_ART_MS = 220L
-        const val QUIET = 0.5f // the next row remains visible without competing with the active one
+        const val QUIET = 0.75f // the next row remains visible without competing with the active one
         const val HERO_GAP = SECTION_GAP // dp between the focused title's block and the row heading below it
         const val RISE = 200 // dp the rows travel when they come up from the cinema
         // Cards a row starts with (a screenful and a bit), then how many come at a time as the remote nears its end.
