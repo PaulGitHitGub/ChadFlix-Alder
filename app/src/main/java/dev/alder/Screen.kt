@@ -919,11 +919,16 @@ abstract class Screen : Activity() {
      */
     protected fun choose(title: String, items: List<String>, message: String? = null, checked: Int = -1,
                          focus: Int = maxOf(checked, 0), widthDp: Int = if (items.size > 8) 300 else 340,
-                         right: ((Int) -> Unit)? = null, left: (() -> Unit)? = null, // ChadFlix: Right / Left on a row, for a two-level list
+                         // ChadFlix, for a two-level list: [right] gives what Right does on a row (null: nothing), [left]
+                         // what Left does, [back] what Back does instead of only closing.
+                         right: ((Int) -> (() -> Unit)?)? = null, left: (() -> Unit)? = null, back: (() -> Unit)? = null,
+                         header: Boolean = false, // ChadFlix: the title as a heading (centred, larger), not like a line
                          pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
-        val words = column(Gravity.START, text(title, BODY, bold = true)).apply { setPadding(dp(16), 0, dp(16), dp(10)) }
+        val words = column(if (header) Gravity.CENTER_HORIZONTAL else Gravity.START, text(title, if (header) BODY + 2f else BODY, bold = true).apply {
+            if (header) { gravity = Gravity.CENTER; setTextColor(HomeStyle.WHITE) }
+        }).apply { setPadding(dp(16), 0, dp(16), dp(if (header) 16 else 10)) }
         message?.let { words.addView(text(it, SMALL, color = TEXT_2).marginTop(6)) }
         list.addView(words, LinearLayout.LayoutParams(-1, -2))
         val rows = items.mapIndexed { i, label ->
@@ -940,7 +945,7 @@ abstract class Screen : Activity() {
                 setOnClickListener { dialog.dismiss(); pick(i) }
                 if (right != null || left != null) setOnKeyListener { _, code, e ->
                     val act = if (e.action != android.view.KeyEvent.ACTION_DOWN) null
-                        else if (code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT && right != null) ({ right(i) })
+                        else if (code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT && right != null) right(i)
                         else if (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT && left != null) left
                         else null
                     act?.let { dialog.dismiss(); it(); true } ?: false
@@ -966,6 +971,7 @@ abstract class Screen : Activity() {
             setLayout(dp(widthDp), -2) // a long list of names needs less width
             setDimAmount(0.6f)
         }
+        if (back != null) dialog.setOnCancelListener { back() } // Back cancels; a pick dismisses, which isn't a cancel
         dialog.show()
         rows.getOrNull(focus)?.requestFocus()
     }
