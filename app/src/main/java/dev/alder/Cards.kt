@@ -197,7 +197,11 @@ internal class MediaCardView(
         setProgress(progress)
         renderBadge()
         addView(shade, LayoutParams(-1, -1))
-        ring?.let { addView(it, LayoutParams(-1, -1)) }
+        ring?.let { // ChadFlix: the border sits just outside the card, so the card lets it draw there
+            clipChildren = false
+            val m = -HomeStyle.ringOut(screen)
+            addView(it, LayoutParams(-1, -1).apply { setMargins(m, m, m, m) })
+        }
 
         isFocusable = true
         contentDescription = listOfNotNull(
@@ -220,7 +224,8 @@ internal class MediaCardView(
         if (!home) return
         bar?.let(face::removeView)
         bar = if (progress <= 0f) null else HomeStyle.bar(screen, progress).also {
-            face.addView(it, LayoutParams(-1, screen.dp(4), Gravity.BOTTOM))
+            // Inside the rounded corners, as ChadFlix on Kodi has it, so even a little progress shows on the widened card too.
+            face.addView(it, LayoutParams(-1, screen.dp(4), Gravity.BOTTOM).apply { setMargins(screen.dp(8), 0, screen.dp(8), screen.dp(6)) })
         }
     }
 

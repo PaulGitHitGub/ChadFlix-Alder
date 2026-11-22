@@ -32,8 +32,11 @@ internal object HomeStyle {
     const val WIDE_W = 441
     const val INSET = 33
     const val CARD_GAP = 8
-    const val CARD_RADIUS = 3f
-    const val RING = 2.5f // the focused card's white border
+    // As ChadFlix on Kodi draws it (measured at 4K): pictures rounded 6.5 dp, and focus a thin soft #F2F2F2 line just
+    // outside the card, 8 dp round on its outer edge.
+    const val CARD_RADIUS = 6.5f
+    const val RING = 1.5f // the focus border's width, outside the card
+    const val RING_COLOR = 0xFFF2F2F2.toInt()
     const val ROWS_TOP = 76 // the first row's title, under the top bar
     const val INFO_ABOVE = 14 // between the cards and the info line
     const val INFO_GAP = 20 // between the info line and the next row's title
@@ -71,11 +74,15 @@ internal object HomeStyle {
         face.clipToOutline = true
     }
 
-    /** The focused card's white border, drawn over the poster. */
+    /**
+     * The focus border: a static drawable on a view [ringOut] px bigger than the card all round. Its stroke is drawn inside
+     * its bounds, so the line runs from the card's edge (6.5 dp round) outwards (8 dp round).
+     */
     fun ring(c: Context) = View(c).apply {
         background = GradientDrawable().apply {
-            cornerRadius = px(c, CARD_RADIUS)
-            setStroke(px(c, RING).toInt().coerceAtLeast(2), WHITE)
+            val w = ringOut(c)
+            cornerRadius = px(c, CARD_RADIUS) + w / 2f
+            setStroke(w, RING_COLOR)
         }
         visibility = View.INVISIBLE // INVISIBLE, not GONE: showing it then needs no layout pass
     }
@@ -97,6 +104,9 @@ internal object HomeStyle {
         addView(View(c).apply { setBackgroundColor(RED) }, LinearLayout.LayoutParams(0, -1, p))
         addView(View(c), LinearLayout.LayoutParams(0, -1, 1f - p))
     }
+
+    /** The focus border's width in px (at least 1). */
+    fun ringOut(c: Context) = Math.round(px(c, RING)).coerceAtLeast(1)
 
     /** A view's natural height, measured before it's on screen (the TV's font size changes it). */
     fun height(v: View): Int = v.run { measure(0, 0); measuredHeight }
