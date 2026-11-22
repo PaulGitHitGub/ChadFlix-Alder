@@ -31,9 +31,24 @@ class PlaybackAudioTest {
         val formats = listOf(commentary, default, lossless)
         val supportsLossless: (Format) -> Boolean = { losslessEncoding(it) != null }
 
-        assertEquals(lossless, bestAudioFormat(formats, "en", emptySet(), supportsLossless))
+        assertEquals(lossless, bestAudioFormat(formats, "en", emptySet(), hasLosslessOutput = supportsLossless))
         assertEquals(default, bestAudioFormat(formats, "en", emptySet()) { false })
-        assertEquals(default, bestAudioFormat(formats, "en", setOf(lossless), supportsLossless))
+        assertEquals(default, bestAudioFormat(formats, "en", setOf(lossless), hasLosslessOutput = supportsLossless))
+    }
+
+    @Test fun requiredAudioRejectsHindiWhenPolishIsMissingOrFails() {
+        // Media3's builder normalizes languages through Android TextUtils, which is stubbed in JVM tests.
+        val language = Format::class.java.getField("language").apply { isAccessible = true }
+        val hindi = format(MimeTypes.AUDIO_AC3).buildUpon().setSelectionFlags(C.SELECTION_FLAG_DEFAULT).build()
+            .also { language.set(it, "hi") }
+        val polish = format(MimeTypes.AUDIO_AC3).also { language.set(it, "pol") }
+        val untagged = format(MimeTypes.AUDIO_AC3)
+        val formats = listOf(hindi, polish, untagged)
+
+        assertEquals(polish, bestAudioFormat(formats, "pl", emptySet(), requireLanguage = true) { false })
+        assertNull(bestAudioFormat(formats, "pl", setOf(polish), requireLanguage = true) { false })
+        assertNull(bestAudioFormat(listOf(hindi, untagged), "pl", emptySet(), requireLanguage = true) { false })
+        assertEquals(hindi, bestAudioFormat(formats, "pl", setOf(polish)) { false })
     }
 
     @Test fun onlyAudioOutputErrorsTriggerPcmRecovery() {

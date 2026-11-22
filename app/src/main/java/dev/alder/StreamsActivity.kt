@@ -49,6 +49,12 @@ class StreamsActivity : Screen() {
         val key = authKey ?: return finish()
         val type = intent.getStringExtra("type") ?: "movie"
         val videoId = intent.getStringExtra("videoId")!!
+        val languages = StreamsResolver.automaticLanguages(this, intent.getStringExtra("id"))
+        if (!pick && languages.isNotEmpty()) {
+            // The ordered retry queue stays in the player so large add-on lists never go through an Intent.
+            startActivity(Intent(this, PlayerActivity::class.java).putExtras(intent).apply { removeExtra("sources") })
+            return finish()
+        }
         val name = intent.getStringExtra("name") ?: ""
         val episode = intent.getStringExtra("episode") ?: intent.getStringExtra("label")?.removePrefix(name)?.trim(' ', '·')
         val where = episode?.split("·")?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
@@ -206,8 +212,12 @@ class StreamsActivity : Screen() {
                 val shown = audio?.let { lang -> ordered.filter { speaks(it, lang) } } ?: ordered
                 count.text = plural(R.plurals.streams_count, shown.size)
                 rows.removeAllViews()
-                playbackMessage?.let { message ->
-                    rows.addView(text(message, SMALL, color = TEXT_2).onArt().apply { setPadding(dp(12), 0, 0, dp(8)) })
+                val message = playbackMessage ?: getString(R.string.streams_no_preferred_audio).takeIf {
+                    languages.isNotEmpty() && ordered.isNotEmpty() &&
+                        eligible.none { stream -> languages.any { StreamsResolver.matchesAutomaticLanguage(stream, it) } }
+                }
+                message?.let {
+                    rows.addView(text(it, SMALL, color = TEXT_2).onArt().apply { setPadding(dp(12), 0, 0, dp(8)) })
                 }
                 cols.visibility = if (shown.isEmpty()) View.GONE else View.VISIBLE
                 val names = addons.map { it.name }
@@ -238,7 +248,7 @@ class StreamsActivity : Screen() {
                     addons[i].configureUrl != null && (failures[i]?.let(::refusedKey) ?: (torrents[i] > 0))
                 }?.let { i -> setupCode(addons[i], torrentsOnly = failures[i] == null)?.let { rows.addView(it, LinearLayout.LayoutParams(-1, -2)) } }
                 if (shown.isEmpty()) tryAgain(focusList)
-                else if (focusList) rows.getChildAt(if (playbackMessage == null) 0 else 1).requestFocus()
+                else if (focusList) rows.getChildAt(if (message == null) 0 else 1).requestFocus()
             }
             fun showList() {
                 listed = true
@@ -293,7 +303,7 @@ class StreamsActivity : Screen() {
      */
     private fun showLanguages(streams: List<Stream>, redraw: () -> Unit) {
         val hasEnglish = streams.any { it.audioLanguages.isEmpty() || it.multiAudio }
-        val mine = Languages.base(Settings.audioLanguage(this))
+        val mine = Languages.base(Settings.preferredAudio(this, intent.getStringExtra("id")))
         val codes = (streams.flatMap { it.audioLanguages } + listOfNotNull("en".takeIf { hasEnglish })).distinct()
             .sortedWith(compareBy({ it != mine }, { it != "en" }, ::languageName))
         if (!audioOpened) {

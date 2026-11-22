@@ -597,7 +597,7 @@ private val languageWords = mapOf("english" to "en", "eng" to "en", "hindi" to "
     "korean" to "ko", "kor" to "ko", "chinese" to "zh", "mandarin" to "zh", "cantonese" to "zh", "dutch" to "nl",
     // Dutch releases: "NL Gesproken", "100%NL", "NLD", Flemish ("Vlaams"); "NL subs" is taken out first.
     "nl" to "nl", "nld" to "nl", "dut" to "nl", "nederlands" to "nl", "vlaams" to "nl", "flemish" to "nl",
-    "polish" to "pl", "turkish" to "tr", "swedish" to "sv", "danish" to "da", "norwegian" to "no", "finnish" to "fi",
+    "polish" to "pl", "polski" to "pl", "pol" to "pl", "turkish" to "tr", "swedish" to "sv", "danish" to "da", "norwegian" to "no", "finnish" to "fi",
     "greek" to "el", "hebrew" to "he", "arabic" to "ar", "thai" to "th", "vietnamese" to "vi", "indonesian" to "id",
     "ukrainian" to "uk", "czech" to "cs", "hungarian" to "hu", "romanian" to "ro", "persian" to "fa", "urdu" to "ur",
     "bengali" to "bn", "tamil" to "ta", "tam" to "ta", "telugu" to "te", "tel" to "te", "malayalam" to "ml",

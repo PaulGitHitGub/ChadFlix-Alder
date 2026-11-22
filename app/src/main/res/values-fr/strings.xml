@@ -256,7 +256,7 @@
     <string name="player_no_other_app">Aucun autre lecteur vidéo sur ce téléviseur. Alder lit la vidéo.</string>
     <string name="clear_dialogue_setting_hint">Fait ressortir les voix par-dessus la musique et les effets forts sur les haut-parleurs du téléviseur.</string>
     <string name="dubbed">Versions doublées</string>
-    <string name="dubbed_hint">VO d’abord place les versions doublées en dernier ; Ma langue d’abord utilise la langue audio de ce profil.</string>
+    <string name="dubbed_hint">VO d’abord place les versions doublées en dernier. Ma langue d’abord vérifie la langue audio dans le lecteur Alder avant la lecture automatique. Vous pouvez toujours choisir une source.</string>
     <string name="dubbed_original">VO d’abord</string>
     <string name="dubbed_mine">Ma langue d’abord</string>
     <string name="subs_default">Sous-titres par défaut</string>
@@ -571,4 +571,9 @@
     <string name="library_load_failed">Impossible de charger votre bibliothèque Stremio</string>
     <string name="filmography_loading">Recherche de titres…</string>
     <string name="filmography_empty">Aucun autre titre trouvé dans vos catalogues.</string>
+    <string name="streams_no_preferred_audio">Aucune source ne correspond aux langues choisies pour la lecture automatique. Choisissez une source pour continuer.</string>
+    <string name="audio_fallback">Langue audio de secours</string>
+    <string name="audio_fallback_hint">Avec Ma langue d’abord, Alder essaie votre langue, cette langue de secours, puis l’anglais. Sélectionnez Désactivé pour utiliser uniquement votre langue.</string>
+    <string name="failure_preferred_audio">aucune piste audio prise en charge dans votre langue préférée</string>
+    <string name="failure_advice_preferred_audio">Choisissez une source avec votre langue audio.</string>
 </resources>

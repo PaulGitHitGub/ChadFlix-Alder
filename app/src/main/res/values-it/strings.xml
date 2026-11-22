@@ -256,7 +256,7 @@
     <string name="player_no_other_app">Su questa TV non c’è un altro lettore video. Alder riproduce il video.</string>
     <string name="clear_dialogue_setting_hint">Mette in risalto le voci sopra musica ed effetti forti con gli altoparlanti della TV.</string>
     <string name="dubbed">Versioni doppiate</string>
-    <string name="dubbed_hint">Prima l’originale mette in fondo le versioni doppiate; Prima la mia lingua usa la lingua audio di questo profilo.</string>
+    <string name="dubbed_hint">Prima l’originale mette in fondo le versioni doppiate. Prima la mia lingua verifica l’audio nel lettore di Alder prima della riproduzione automatica. Puoi ancora scegliere qualsiasi fonte.</string>
     <string name="dubbed_original">Prima l’originale</string>
     <string name="dubbed_mine">Prima la mia lingua</string>
     <string name="subs_default">Sottotitoli predefiniti</string>
@@ -571,4 +571,9 @@
     <string name="library_load_failed">Impossibile caricare la tua libreria Stremio</string>
     <string name="filmography_loading">Ricerca titoli…</string>
     <string name="filmography_empty">Nessun altro titolo trovato nei tuoi cataloghi.</string>
+    <string name="streams_no_preferred_audio">Nessuna fonte corrisponde alle lingue per la riproduzione automatica. Scegli una fonte per continuare.</string>
+    <string name="audio_fallback">Lingua audio di riserva</string>
+    <string name="audio_fallback_hint">Con Prima la mia lingua, Alder prova la tua lingua, questa lingua di riserva e infine l’inglese. Seleziona Disattivato per usare solo la tua lingua.</string>
+    <string name="failure_preferred_audio">nessuna traccia audio supportata nella tua lingua preferita</string>
+    <string name="failure_advice_preferred_audio">Scegli una fonte con la tua lingua audio.</string>
 </resources>

@@ -255,7 +255,7 @@
     <string name="player_no_other_app">Auf diesem Fernseher ist kein anderer Videoplayer. Alder spielt das Video ab.</string>
     <string name="clear_dialogue_setting_hint">Hebt Stimmen über Musik und laute Effekte, wenn die TV-Lautsprecher genutzt werden.</string>
     <string name="dubbed">Synchronfassungen</string>
-    <string name="dubbed_hint">Original zuerst setzt Synchronfassungen ans Ende; Meine Sprache zuerst nutzt die Audiosprache dieses Profils.</string>
+    <string name="dubbed_hint">Original zuerst setzt Synchronfassungen ans Ende. Meine Sprache zuerst prüft die Audiosprache vor der automatischen Wiedergabe im Alder-Player. Du kannst weiterhin jede Quelle selbst wählen.</string>
     <string name="dubbed_original">Original zuerst</string>
     <string name="dubbed_mine">Meine Sprache zuerst</string>
     <string name="subs_default">Untertitel standardmäßig</string>
@@ -567,4 +567,9 @@
     <string name="library_load_failed">Deine Stremio-Bibliothek konnte nicht geladen werden</string>
     <string name="filmography_loading">Suche Titel…</string>
     <string name="filmography_empty">Keine weiteren Titel in deinen Katalogen gefunden.</string>
+    <string name="streams_no_preferred_audio">Keine Quelle entspricht deinen Sprachen für die automatische Wiedergabe. Wähle eine Quelle aus.</string>
+    <string name="audio_fallback">Fallback-Audiosprache</string>
+    <string name="audio_fallback_hint">Mit Meine Sprache zuerst versucht Alder zuerst deine gewählte Sprache, dann diese Ausweichsprache und dann Englisch. Wähle Aus, um nur deine gewählte Sprache zu verwenden.</string>
+    <string name="failure_preferred_audio">keine unterstützte Tonspur in deiner bevorzugten Sprache</string>
+    <string name="failure_advice_preferred_audio">Wähle eine Quelle mit deiner Audiosprache.</string>
 </resources>
