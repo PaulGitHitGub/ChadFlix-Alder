@@ -214,12 +214,17 @@ internal object HomeStyle {
      * forgotten, so an add-on row with the same name ("Netflix" from a catalog add-on) starts off as add-on rows do.
      */
     fun forgetPlatformsOnMoviesAndShows(c: Context) {
-        val done = Settings.profileKey(c, "platformsMoved")
+        val done = Settings.profileKey(c, "platformsMoved2")
         if (prefs(c).getBoolean(done, false)) return
+        val names = platforms.map { it.name }.toSet()
         for (page in listOf("Movies", "Shows")) {
             val state = rowsOn(c, page)
-            platforms.forEach { state.remove(it.name) }
+            names.forEach { state.remove(it) }
             prefs(c).edit().putString(Settings.profileKey(c, "rowsOn:$page"), state.toString()).apply()
+            // Their places in the order and in the known rows go too; an add-on row of the same name is listed anew.
+            saveRowOrder(c, page, rowOrder(c, page).filterNot { it in names })
+            runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }.getOrNull()
+                ?.let { rememberRows(c, page, it.filterNot { t -> t in names }) }
         }
         prefs(c).edit().putBoolean(done, true).apply()
     }
@@ -234,8 +239,7 @@ internal object HomeStyle {
     fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
         val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
             .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second }
-        // Movies and Shows built before the Services tab listed the platform rows too: not any more.
-        return if (page == SERVICES) known else known.filterNot { t -> platforms.any { it.name == t } }
+        return known
     }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
@@ -307,10 +311,9 @@ internal object HomeStyle {
         prefs(c).edit().putBoolean(Settings.profileKey(c, "excl:$page:p$i"), on).apply()
 
     /** A row's Showing key: its TMDb genre id, or "p<n>" for a platform row; null for any other row. */
-    fun rowKey(movie: Boolean, title: String): String? =
-        genres(movie).firstOrNull { it.second == title }?.first?.toString()
-            ?: platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" }
-            ?: "a".takeIf { title == ANIME }
+    fun rowKey(movie: Boolean, title: String, page: String): String? =
+        if (page == SERVICES) platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" } // only there: an
+        else genres(movie).firstOrNull { it.second == title }?.first?.toString() ?: "a".takeIf { title == ANIME } // add-on "Netflix" row is its own
 
     // ---------- the Anime row (Movies and Shows): TMDb Animation in Japanese, a genre and a sort in one query ----------
 
@@ -365,7 +368,7 @@ internal object HomeStyle {
 
     /** What genre or platform row [title] shows on [page] ("Trending", "Trending · Exclusives"), or null for any other row. */
     fun rowList(c: Context, page: String, movie: Boolean, title: String): String? {
-        val key = rowKey(movie, title) ?: return null
+        val key = rowKey(movie, title, page) ?: return null
         val lists = listsFor(movie, key)
         val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
         if (key == "a") return listOfNotNull(animeGenres(movie).firstOrNull { it.first == animeGenre(c, page) }?.second, list).joinToString(" · ")

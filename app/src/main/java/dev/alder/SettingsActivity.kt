@@ -901,6 +901,9 @@ class SettingsActivity : Screen() {
             grip?.imageTintList = ColorStateList.valueOf(if (lit || up) 0xFF3A3A3A.toInt() else 0x80FFFFFF.toInt())
         }
         lateinit var render: (Boolean, Int, Boolean) -> Unit // (in On, at index, move the remote there)
+        val restyles = mutableListOf<() -> Unit>() // every row's own restyle, for edit mode in and out without a rebuild
+        var swallowUp = false // a held OK's release: it clicks nothing
+        fun editMode(on: Boolean) { edit = on; picked = -1; restyles.forEach { it() }; jiggle() } // rows settle (150 ms) as they stop
         fun row(title: String, isOn: Boolean, index: Int): View {
             val name = text(title, BODY).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
             val grip = if (isOn) ImageView(this).apply { setImageResource(R.drawable.ic_grip) } else null
@@ -912,6 +915,7 @@ class SettingsActivity : Screen() {
                 grip?.let { addView(it, LinearLayout.LayoutParams(dp(14), dp(14))) }
             }
             fun restyle() = style(v, name, grip, v.isFocused, isOn, isOn && index == picked)
+            restyles += ::restyle
             v.setOnFocusChangeListener { _, has -> restyle(); if (has) hint.text = getString(R.string.hint_customize) }
             v.setOnClickListener {
                 when {
@@ -929,11 +933,14 @@ class SettingsActivity : Screen() {
                 }
             }
             v.setOnKeyListener { _, code, event ->
+                val confirm = code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_ENTER
+                if (event.action == android.view.KeyEvent.ACTION_UP && confirm && swallowUp) { swallowUp = false; v.isPressed = false; return@setOnKeyListener true }
                 if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
                 // Hold OK: OK repeating (the remote held) toggles edit mode once; the lists are rebuilt, so the key's
                 // release lands on a fresh row and clicks nothing.
-                if ((code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_ENTER) && event.repeatCount > 0) {
-                    if (isOn && event.repeatCount == 1) { edit = !edit; picked = -1; render(true, index, true) }
+                if (confirm && event.repeatCount > 0) {
+                    swallowUp = true // in either column, a held OK's release is no click
+                    if (isOn && event.repeatCount == 1) editMode(!edit)
                     return@setOnKeyListener true
                 }
                 val list = if (isOn) onRows else offRows
@@ -957,6 +964,7 @@ class SettingsActivity : Screen() {
                                 }
                                 true
                             }
+                            isOn && edit && j < 0 -> true // while rows wobble, the remote stays in the column
                             j > list.lastIndex -> true // the list ends here
                             else -> false
                         }
@@ -970,7 +978,7 @@ class SettingsActivity : Screen() {
         render = { inOn, at, refocus ->
             if (refocus) openPill().requestFocus() // focus waits on the panel's own pill while the lists are rebuilt
             stopJiggle()
-            onList.removeAllViews(); offList.removeAllViews(); onViews.clear(); offViews.clear()
+            onList.removeAllViews(); offList.removeAllViews(); onViews.clear(); offViews.clear(); restyles.clear()
             if (tab < 2) onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off (not on Services)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), 0, dp(14), 0)
@@ -1011,12 +1019,12 @@ class SettingsActivity : Screen() {
         customOwnsLeft = { v -> (v in tabViews && v !== tabViews[0]) || v in offViews || (edit && v in onViews) }
         customBack = {
             when {
-                picked >= 0 -> { picked = -1; render(true, onViews.indexOfFirst { it.isFocused }.coerceAtLeast(0), true); true } // drop it first
-                edit -> { edit = false; render(true, onViews.indexOfFirst { it.isFocused }.coerceAtLeast(0), true); true } // leave edit mode
+                picked >= 0 -> { picked = -1; restyles.forEach { it() }; jiggle(); true } // drop it first
+                edit -> { editMode(false); true } // leave edit mode
                 else -> false
             }
         }
-        customStop = { edit = false; picked = -1; stopJiggle() }
+        customStop = { edit = false; picked = -1; stopJiggle(); restyles.forEach { it() } } // no picked-up style left either
         load()
         styleTabs()
     }

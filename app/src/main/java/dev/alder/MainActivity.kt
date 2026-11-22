@@ -2898,7 +2898,7 @@ class MainActivity : Screen() {
 
     private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
-        val key = HomeStyle.rowKey(movie, row.title) ?: return
+        val key = HomeStyle.rowKey(movie, row.title, page.label) ?: return
         if (key == "a") return animeMenu(row)
         val lists = HomeStyle.listsFor(movie, key)
         val current = HomeStyle.showing(this, page.label, key)
