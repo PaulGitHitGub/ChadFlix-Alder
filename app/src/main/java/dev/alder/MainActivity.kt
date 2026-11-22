@@ -589,6 +589,8 @@ class MainActivity : Screen() {
         setIntent(intent)
         Page.find(intent.getStringExtra("page"))
             ?.takeIf { it != page }?.let(::showPage)
+        // ChadFlix: back from the search page by its top bar: the remote lands on the page's name, not on Search again.
+        if (search?.isFocused == true) navItems[page]?.requestFocus()
     }
 
     /**
@@ -2417,7 +2419,8 @@ class MainActivity : Screen() {
         Page.LIBRARY -> lastListChip ?: listFilterChips[listFilter]
         Page.DISCOVER -> discoverChipIndex(discoverChips.map { it.tag as String },
             lastListChip?.takeIf { it in discoverChips }?.tag as? String, discover.type)?.let(discoverChips::get)
-        else -> genreChips[genre]
+        // ChadFlix: Movies and Shows hide their genre chips, and a view in a hidden strip can still take focus: none then.
+        else -> genreChips[genre]?.takeIf { genreStrip.visibility == View.VISIBLE }
     }
 
     // ---------- Discover ----------
