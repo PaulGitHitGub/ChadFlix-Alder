@@ -380,7 +380,7 @@ class SearchActivity : Screen() {
                 isFocusable = true
                 contentDescription = getString(R.string.search_voice)
                 fun style(has: Boolean) {
-                    background = HomeStyle.pill(if (has) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
+                    background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
                     icon.imageTintList = ColorStateList.valueOf(if (listening) HomeStyle.LIST_RED else if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                     label.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                     label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
@@ -414,7 +414,7 @@ class SearchActivity : Screen() {
             visibility = View.GONE
             contentDescription = getString(R.string.search_clear_pill)
             fun style(has: Boolean) {
-                background = HomeStyle.pill(if (has) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
+                background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
                 clearIcon.imageTintList = ColorStateList.valueOf(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                 clearLabel.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
             }
