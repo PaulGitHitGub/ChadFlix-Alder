@@ -1279,17 +1279,9 @@ class MainActivity : Screen() {
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
-            val year = if (page == Page.LIBRARY) null
-                else metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
-            val title = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
-                if (year != null) {
-                    val start = item.name.length
-                    setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
-                    setSpan(android.text.style.RelativeSizeSpan(0.65f), start, length, 0)
-                }
-            }
-            showHeroTitle(item, title, year?.let { "$DOT$it" })
-            if (page == Page.LIBRARY) renderLibraryMetadata(item, requestLetterboxd = !changed && heroTask == null)
+            // The year sits in the facts line below the title, with the genre, seasons and ratings.
+            showHeroTitle(item, item.name, null)
+            renderGridMetadata(item, requestLetterboxd = !changed && heroTask == null)
             browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
             main.post(::placeCaption)
             if (changed) {
@@ -1298,7 +1290,7 @@ class MainActivity : Screen() {
                 heroTask = Runnable {
                     heroTask = null
                     if (page.isGrid && heroItem === item && !isDestroyed) {
-                        if (page == Page.LIBRARY && item.settled) renderLibraryMetadata(item, requestLetterboxd = true)
+                        if (item.settled) renderGridMetadata(item, requestLetterboxd = true)
                         fill(item)
                         if (item.settled) showLibraryArt(item)
                     }
@@ -1322,10 +1314,15 @@ class MainActivity : Screen() {
         else if (item.settled) clearArt()
     }
 
-    private fun renderLibraryMetadata(item: Item, requestLetterboxd: Boolean) {
+    /** My Alder's and Discover's facts line: year or run, genre, seasons, ratings (and on My Alder, the date added). */
+    private fun renderGridMetadata(item: Item, requestLetterboxd: Boolean) {
         val meta = metas[item.id]
-        heroFacts.text = listOfNotNull(meta?.year, meta?.genres?.firstOrNull(), seasonCount(item, meta)).joinToString(DOT)
-        renderHeroRatings(item, meta?.rating, requestLetterboxd)
+        // Before its details arrive, a Discover title shows what the catalog sent (year, genres, IMDb).
+        val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
+        val genre = meta?.genres?.firstOrNull()
+            ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
+        heroFacts.text = listOfNotNull(year, genre, seasonCount(item, meta)).joinToString(DOT)
+        renderHeroRatings(item, meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "), requestLetterboxd)
         episodeDate(item.addedAt)?.let { date ->
             val gap = if (heroFacts.text.isNotEmpty() || heroRatings.childCount > 0) DOT else ""
             heroRatings.addView(text(gap + getString(R.string.list_added_on, date), SMALL, color = TEXT_2).onArt().apply {
@@ -1430,13 +1427,13 @@ class MainActivity : Screen() {
                 if (r.getOrNull() != null && heroItem === item && mode == Mode.BROWSE) showHero(item)
             }
         }
-        val libraryPage = page == Page.LIBRARY
-        val ratings = shownRatings(if (libraryPage) "both" else Settings.ratings(this), imdb, score)
+        val gridPage = page.isGrid
+        val ratings = shownRatings(if (gridPage) "both" else Settings.ratings(this), imdb, score)
         heroRatings.removeAllViews()
         addRatings(
             heroRatings, ratings,
-            tagSp = if (libraryPage) 9.5f else SMALL,
-            firstGap = if (libraryPage && heroFacts.text.isEmpty()) 0 else 10,
+            tagSp = if (gridPage) 9.5f else SMALL,
+            firstGap = if (gridPage && heroFacts.text.isEmpty()) 0 else 10,
         )
     }
 
@@ -1533,8 +1530,7 @@ class MainActivity : Screen() {
         }
         page = p
         val grid = p.isGrid
-        val libraryPage = p == Page.LIBRARY
-        val gridTop = GRID_TOP + if (libraryPage) 40 else 0
+        val gridTop = GRID_TOP + 40
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
             topMargin = if (grid) dp(gridTop) else browseRowTop
@@ -1542,7 +1538,7 @@ class MainActivity : Screen() {
         }
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
-            topMargin = if (grid) dp(GRID_HERO_TOP + if (libraryPage) 12 else 0) else 0
+            topMargin = if (grid) dp(GRID_HERO_TOP + 12) else 0
             bottomMargin = if (grid) 0 else heroBottom
             width = if (grid) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
@@ -1555,9 +1551,9 @@ class MainActivity : Screen() {
         heroLogo.maxHeight = dp(if (grid) 46 else 55)
         heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
-        browseInfo.getChildAt(1).marginTop(if (libraryPage) 12 else 8)
+        browseInfo.getChildAt(1).marginTop(if (grid) 12 else 8)
         for (i in 1 until browseInfo.childCount) {
-            browseInfo.getChildAt(i).visibility = if (!grid || (libraryPage && i == 1)) View.VISIBLE else View.GONE
+            browseInfo.getChildAt(i).visibility = if (!grid || i == 1) View.VISIBLE else View.GONE
         }
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
