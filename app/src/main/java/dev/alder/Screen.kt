@@ -625,7 +625,7 @@ abstract class Screen : Activity() {
         ratings.forEachIndexed { i, (source, value) ->
             val (logo, width) = when (source) {
                 ROTTEN -> R.drawable.ic_rating_tomato to 14
-                LETTERBOXD -> R.drawable.ic_rating_letterboxd to 29
+                LETTERBOXD -> R.drawable.ic_rating_letterboxd to 38
                 else -> R.drawable.ic_rating_imdb to 27
             }
             row.addView(ImageView(this).apply { setImageResource(logo) },
