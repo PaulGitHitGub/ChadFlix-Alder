@@ -511,7 +511,9 @@ internal class HorizontalCardRail(
     }
 
     /** [widenBy]: ChadFlix, how much wider the card is about to be (the row's end stops later by that much). */
-    fun scrollToCard(index: Int, widenBy: Int = 0, pinAt: Int = index): Int { // pinAt: ChadFlix, the card the row scrolls to
+    // pinAt: ChadFlix, the card the row scrolls to; snap: ChadFlix, no glide (a card came in or went out wide at once):
+    // the row goes there now and again after its next layout, so the width change can't make it jump or clip.
+    fun scrollToCard(index: Int, widenBy: Int = 0, pinAt: Int = index, snap: Boolean = false): Int {
         selected = index
         anim?.cancel()
         val startScroll = scroller.scrollX
@@ -519,6 +521,17 @@ internal class HorizontalCardRail(
             strip.paddingLeft + strip.paddingRight + cards.sumOf { it.widthPx } + cardGapPx * (cards.size - 1) + widenBy
         val targetScroll = railTargetScroll(pinAt, stepPx, stripW, scroller.width)
         if (cullLeft) showVisibleCards()
+        if (snap) {
+            scroller.scrollTo(targetScroll, 0)
+            strip.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    strip.viewTreeObserver.removeOnPreDrawListener(this)
+                    if (selected == index) scroller.scrollTo(targetScroll, 0)
+                    return true
+                }
+            })
+            return targetScroll
+        }
         val glideTime = rowGlideDuration(held, wideMotion, ViewConfiguration.getKeyRepeatDelay().toLong())
         anim = ValueAnimator.ofInt(startScroll, targetScroll).setDuration(glideTime).apply {
             interpolator = if (held) LinearInterpolator() else DecelerateInterpolator()

@@ -84,9 +84,10 @@ object Images {
      * Fetches [url] into the cache ahead of time, so the next card's art is ready the moment it's focused. [urgent]
      * for the picture about to fill the screen (Home's first title at launch).
      */
-    fun prefetch(url: String?, widthPx: Int, urgent: Boolean = false, look: Look? = null, wide: Boolean = false) {
+    fun prefetch(url: String?, widthPx: Int, urgent: Boolean = false, look: Look? = null, wide: Boolean = false,
+                 still: (() -> Boolean)? = null) { // still: ChadFlix, asked again just before the work; false drops it
         if (cache(widthPx, wide).get(key(url ?: return, widthPx, look)) != null) return
-        (if (urgent) urgentPool else aheadPool).execute { bitmap(url, widthPx, look, wide) }
+        (if (urgent) urgentPool else aheadPool).execute { if (still?.invoke() != false) bitmap(url, widthPx, look, wide) }
     }
 
     /**

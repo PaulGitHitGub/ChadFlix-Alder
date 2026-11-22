@@ -699,22 +699,29 @@ class MainActivity : Screen() {
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
 
-    /** ChadFlix: the backdrop of the card [row] would widen when the remote comes into it, fetched at the wide size. */
-    private fun prefetchLanding(row: Row?) {
-        val item = row?.takeIf { page.isBrowse }?.landing ?: return
+    /**
+     * ChadFlix: the backdrop of the card [row] would widen when the remote comes into it, fetched at the wide size. A
+     * fetch still queued when the remote has moved on to other rows is dropped ([landingTargets]).
+     */
+    private fun prefetchLanding(row: Row?, round: Int) {
+        val item = row?.takeIf { page.isBrowse && it.homeRow }?.landing ?: return
+        val still = { round == landingTargets }
         val url = item.art
-        if (url != null) return Images.prefetch(url, dp(HomeStyle.WIDE_W), wide = true)
+        if (url != null) return Images.prefetch(url, dp(HomeStyle.WIDE_W), wide = true, still = still)
         if (item.filled || HomeStyle.isTile(item.id)) return
-        item.onFill += { item.art?.let { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) } }
+        item.onFill += { if (still()) item.art?.let { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true, still = still) } }
         fill(item)
     }
 
+    @Volatile private var landingTargets = 0 // ChadFlix: which round of landing prefetches is current
+
     /** ChadFlix: the landing cards of the rows above and below [row]. */
     private fun prefetchNeighbours(row: Row) {
+        val round = ++landingTargets
         val ordered = rows.filter { it.view.isAttachedToWindow && !it.grid }.sortedBy { offsetIn(it.view) }
         val at = ordered.indexOf(row).takeIf { it >= 0 } ?: return
-        prefetchLanding(ordered.getOrNull(at - 1))
-        prefetchLanding(ordered.getOrNull(at + 1))
+        prefetchLanding(ordered.getOrNull(at - 1), round)
+        prefetchLanding(ordered.getOrNull(at + 1), round)
     }
 
     /** ChadFlix: where the remote goes back to in the rows: the last card, but a genre row's title rather than its tile. */
@@ -1063,7 +1070,7 @@ class MainActivity : Screen() {
      */
     private fun styleNav() {
         val inBar = header.findFocus() != null
-        if (inBar) prefetchLanding(firstRow()) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
+        if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar)
             item.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
@@ -2816,7 +2823,7 @@ class MainActivity : Screen() {
                             val grid: Boolean = false, val continueRow: Boolean = false) {
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
         private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
-        private val homeRow = !wide && !grid // ChadFlix: Netflix's row: posters, the focused one widened, pinned left
+        val homeRow = !wide && !grid // ChadFlix: Netflix's row: posters, the focused one widened, pinned left
         private val polishedRail = page.polishedRail
         private val gap = if (grid) LIST_GAP else HomeStyle.CARD_GAP
         val cardStep = cardWidth + dp(gap)
@@ -2944,6 +2951,7 @@ class MainActivity : Screen() {
                 rail.clearHeld()
                 cards.getOrNull(selected)?.expand(false, animate = false) // leaving the row: a poster again at once
                 if (tileRow && selected == 0 && cards.size > 1) rail.selectIndex(1) // back in, the remote lands on a title
+                if (homeRow) rail.scrollToCard(selected, 0, pinOf(selected), snap = true) // and it stays put, near its end too
             }
             styleTile()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
@@ -2954,8 +2962,8 @@ class MainActivity : Screen() {
         fun focusFirst() = rail.focusSelected()
 
         /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
-        fun pin(index: Int): Int {
-            val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
+        fun pin(index: Int, snap: Boolean = false): Int {
+            val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index), snap)
             // Kept on screen: near a row's end the card sits far right, and the info box is wider than what's left.
             // The set width, not the measured one: right after a page switch the box may still measure at the old page's width.
             val info = browseInfo.layoutParams as FrameLayout.LayoutParams
@@ -2968,7 +2976,7 @@ class MainActivity : Screen() {
         fun settle(animate: Boolean = true) {
             if (!homeRow) return
             cards.getOrNull(selected)?.expand(true, animate) ?: return
-            pin(selected)
+            pin(selected, snap = !animate)
             prefetchNeighbours(this)
         }
 
@@ -2992,9 +3000,9 @@ class MainActivity : Screen() {
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
                 if (!held) cards[index].expand(true, animate = !entering)
-                if (!held && entering) prefetchNeighbours(this)
                 if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
+            if (!held && entering) prefetchNeighbours(this) // ChadFlix: also beside rows that never widen
             if (page.isBrowse) updateNextRow()
             if (page.isCatalog) markChip(title)
             if (!grid) fill(items[index])
@@ -3008,7 +3016,7 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            val targetScroll = pin(index)
+            val targetScroll = pin(index, snap = entering)
             loadRest(this@Row)
             val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
