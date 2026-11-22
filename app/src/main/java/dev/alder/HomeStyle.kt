@@ -238,8 +238,11 @@ internal object HomeStyle {
 
     fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
         val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
-            .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second }
-        return known
+            .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second } + ANIME
+        // The Anime row is listed even before the page has been built with it (it's added after the genres).
+        if (page == SERVICES || ANIME in known) return known
+        val at = known.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
+        return known.take(at) + ANIME + known.drop(at)
     }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */

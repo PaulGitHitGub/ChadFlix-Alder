@@ -2872,7 +2872,7 @@ class MainActivity : Screen() {
      * ChadFlix: the Anime row's Showing card, in two levels: its genre (All, then genres that go with Animation); OK or
      * Right on one opens that genre's sorts, where Left goes back and OK applies genre and sort together.
      */
-    private fun animeMenu(row: Row) {
+    private fun animeMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
         val genres = listOf(0 to getString(R.string.filter_all)) + HomeStyle.animeGenres(movie)
         val now = HomeStyle.animeGenre(this, page.label)
@@ -2882,7 +2882,8 @@ class MainActivity : Screen() {
             val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
             val genreName = genres.first { it.first == g }.second
             choose("${HomeStyle.ANIME} · $genreName", names,
-                checked = if (g == now) lists.indexOfFirst { it.first == current } else -1, left = { animeMenu(row) }) { i ->
+                checked = if (g == now) lists.indexOfFirst { it.first == current } else -1,
+                left = { animeMenu(row, genres.indexOfFirst { it.first == g }) }) { i -> // back on the genre it came from
                 if (g == now && lists[i].first == current) return@choose
                 val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
                 showingChanged[changing] = "a" to (showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, "a", movie))
@@ -2892,7 +2893,8 @@ class MainActivity : Screen() {
             }
         }
         val names = genres.mapIndexed { i, (_, name) -> name + if (i == 0) " " + getString(R.string.showing_default) else "" }
-        choose("${HomeStyle.ANIME} · ${getString(R.string.showing)}", names, checked = genres.indexOfFirst { it.first == now }.coerceAtLeast(0),
+        val checked = genres.indexOfFirst { it.first == now }.coerceAtLeast(0)
+        choose("${HomeStyle.ANIME} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked,
             right = { i -> sorts(genres[i].first) }) { i -> sorts(genres[i].first) }
     }
 

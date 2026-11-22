@@ -874,6 +874,7 @@ class SettingsActivity : Screen() {
             val want = edit && visible && i != picked && !still
             val a = jiggles[v]
             if (want && a == null) jiggles[v] = android.animation.ValueAnimator.ofFloat(-1f, 1f).apply {
+                v.animate().cancel() // a settle still running would fight the new wobble
                 duration = (250L..300L).random()
                 repeatCount = android.animation.ValueAnimator.INFINITE
                 repeatMode = android.animation.ValueAnimator.REVERSE
@@ -887,7 +888,7 @@ class SettingsActivity : Screen() {
                 v.animate().rotation(0f).translationY(0f).setDuration(Screen.FOCUS_MS).setInterpolator(Screen.EASE_OUT).start()
             }
         }
-        fun stopJiggle() { jiggles.forEach { (v, a) -> a.cancel(); v.rotation = 0f; v.translationY = 0f }; jiggles.clear() }
+        fun stopJiggle() { jiggles.forEach { (v, a) -> a.cancel(); v.animate().cancel(); v.rotation = 0f; v.translationY = 0f }; jiggles.clear() }
         fun style(v: View, name: TextView, grip: ImageView?, lit: Boolean, isOn: Boolean, up: Boolean) {
             v.background = when {
                 up -> android.graphics.drawable.GradientDrawable().apply { setColor(HomeStyle.WHITE); cornerRadius = 999f; setStroke(dp(2), HomeStyle.LIST_RED) }
