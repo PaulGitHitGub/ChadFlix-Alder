@@ -637,14 +637,16 @@ class SettingsActivity : Screen() {
                 detailRows.addView(brand(SERIF_TITLE), LinearLayout.LayoutParams(-2, -2).apply {
                     marginStart = dp(12); bottomMargin = dp(14)
                 })
-                actionRow("Alder", getString(R.string.version, Updates.mine(this)), getString(R.string.about_hint)) {
-                    choose("Alder", listOf(getString(R.string.action_ok)), getString(R.string.about_desc) + "\n\n" + getString(R.string.tmdb_notice)) {}
+                actionRow(getString(R.string.app_name), getString(R.string.version, Updates.mine(this)), getString(R.string.about_hint)) {
+                    choose(getString(R.string.app_name), listOf(getString(R.string.action_ok)), getString(R.string.about_desc) + "\n\n" + getString(R.string.tmdb_notice)) {}
                 }
+                actionRow(getString(R.string.about_credit), "", getString(R.string.about_credit_desc)) {} // ChadFlix: GPL credit
                 actionRow(getString(R.string.whats_new), getString(R.string.version, Updates.mine(this)), getString(R.string.whats_new_hint)) { whatsNew() }
                 // Only while a crash waits to be sent: answered "No" on Home, or the send failed.
                 if (Crashes.sendable(this)) actionRow(getString(R.string.report_send), "", getString(R.string.report_send_hint)) {
                     sendReport { showGroup(Group.ABOUT) }
                 }
+                if (Updates.ENABLED) { // ChadFlix fork: no self-updates, so no Updates row
                 var found: Updates.Release? = null
                 val value = actionRow(getString(R.string.updates), getString(R.string.updates_checking), getString(R.string.updates_hint)) {
                     found?.let(::installUpdate) ?: showGroup(Group.ABOUT)
@@ -658,6 +660,7 @@ class SettingsActivity : Screen() {
                         release == null -> getString(R.string.updates_check_failed)
                         else -> getString(R.string.updates_up_to_date)
                     }
+                }
                 }
             }
         }

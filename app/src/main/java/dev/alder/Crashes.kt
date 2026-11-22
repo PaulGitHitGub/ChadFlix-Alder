@@ -57,7 +57,7 @@ internal object Crashes {
     }
 
     // The crash worker (crash-worker/README.md). Empty hides Send report.
-    private const val ENDPOINT = "https://alder-crash.alder-tv.workers.dev/"
+    private const val ENDPOINT = "" // ChadFlix fork: never send crash reports to Alder's worker
 
     /** Version, build, Android and device: enough to repeat a report, and nothing about the viewer. */
     fun describe(c: Context): String {

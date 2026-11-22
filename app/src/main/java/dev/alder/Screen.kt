@@ -592,9 +592,9 @@ abstract class Screen : Activity() {
     /** Alder's mark beside the serif "Alder": top left of the picker and sign-in, and Settings › About. */
     protected fun brand(size: Float = WORDMARK) = LinearLayout(this).apply {
         gravity = Gravity.CENTER_VERTICAL
-        val mark = (size * 1.3f).toInt() // the mark's art fills about two thirds of its square
-        addView(ImageView(context).apply { setImageResource(R.drawable.ic_alder_mark) }, LinearLayout.LayoutParams(dp(mark), dp(mark)))
-        addView(text("Alder", size, serif = true).onArt(), wrap().apply { marginStart = dp(4) })
+        // ChadFlix fork: the ChadFlix wordmark (320 x 92) in place of Alder's mark and serif name.
+        addView(ImageView(context).apply { setImageResource(R.drawable.chadflix_wordmark); adjustViewBounds = true },
+            LinearLayout.LayoutParams(-2, dp((size * 1.3f).toInt())))
     }
 
     /** The source's tag beside a rating ("IMDb", "Letterboxd"), as tall as the letters. */

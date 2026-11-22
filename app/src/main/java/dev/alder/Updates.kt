@@ -17,13 +17,15 @@ import java.net.URL
 object Updates {
     private const val LATEST = "https://api.github.com/repos/aradhyas8/Alder/releases/latest"
     private const val CHECK_INTERVAL = 4 * 3600_000L // 4 hours instead of once a day
+    /** ChadFlix fork: off. Alder's releases would replace this app with Alder; the code stays for easy merges. */
+    const val ENABLED = false
 
     class Release(val version: String, val apk: String)
 
     fun mine(c: Context): String = c.packageManager.getPackageInfo(c.packageName, 0).versionName.orEmpty()
 
     /** The newest release, or null if the check failed or it has no .apk. Blocks: run it off the main thread. */
-    fun latest(c: Context): Release? = runCatching {
+    fun latest(c: Context): Release? = if (!ENABLED) null else runCatching {
         val json = JSONObject(Http.get(LATEST, timeoutMs = 10_000))
         // No release published yet: GitHub answers "Not Found", so nothing is newer than this version.
         val release = if (json.optString("message") == "Not Found") Release(mine(c), "") else {
@@ -44,10 +46,11 @@ object Updates {
     }.onFailure { android.util.Log.w("Alder", "update check failed: $it") }.getOrNull()
 
     /** 4 hours since the last check: Home checks in the background; Settings checks whenever opened. */
-    fun due(c: Context) = System.currentTimeMillis() - prefs(c).getLong("checked", 0) > CHECK_INTERVAL
+    fun due(c: Context) = ENABLED && System.currentTimeMillis() - prefs(c).getLong("checked", 0) > CHECK_INTERVAL
 
     /** The cached available newer release, or null if up-to-date or none found yet. Synchronous. */
     fun available(c: Context): Release? {
+        if (!ENABLED) return null
         val ver = prefs(c).getString("available_version", null) ?: return null
         val apk = prefs(c).getString("available_apk", null) ?: return null
         return if (newerVersion(ver, mine(c))) Release(ver, apk) else null
