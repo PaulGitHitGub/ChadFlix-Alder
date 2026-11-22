@@ -3582,7 +3582,7 @@ class MainActivity : Screen() {
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
-        const val ROW_TOP_ROOM = 2 // dp between the row title and its cards (ChadFlix cards don't grow)
+        const val ROW_TOP_ROOM = 10 // dp between the row title box and its cards (was 2: the title nearly touched the focus border); ROWS_TOP and INFO_GAP give the 8 back, so the cards, info line and peek stay put
         const val SAFE_BOTTOM = 28
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
         const val HOME_SYNOPSIS_W = HERO_W

@@ -38,9 +38,9 @@ internal object HomeStyle {
     const val RING = 1.5f // the focus border's width, outside the card
     const val RING_COLOR = 0xFFF2F2F2.toInt()
     const val NAV_WAIT = 300L // ms resting on a top bar item before it opens (Home's SWITCH_WAIT)
-    const val ROWS_TOP = 76 // the first row's title, under the top bar
+    const val ROWS_TOP = 68 // the first row's title, under the top bar (76 before the title gap grew by 8 dp; the cards stay where they were)
     const val INFO_ABOVE = 14 // between the cards and the info line
-    const val INFO_GAP = 20 // between the info line and the next row's title
+    const val INFO_GAP = 12 // between the info line and the next row's title (20 before the title gap grew by 8 dp; the peeking row's cards stay where they were)
     const val PLOT_LINES = 3 // a fixed-height box: moving along a row never moves the rows
     const val ROW_TITLE = 16.5f // sp
     const val TAB_SP = 13f
