@@ -9,8 +9,7 @@
 
   <p>
     <a href="#features"><b>Features</b></a> ·
-    <a href="#install"><b>Install</b></a> ·
-    <a href="#ratings">Ratings</a>
+    <a href="#install"><b>Install</b></a>
   </p>
 </div>
 
@@ -45,23 +44,11 @@ off don't load.
 
 <p align="center"><img src="docs/chadflix/customize-home.jpg" alt="Customize Home" width="60%"></p>
 
-### Anime Row
-
-An optional row on Movies and Shows. Pick a genre, then a list.
-
-<p align="center"><img src="docs/chadflix/anime.jpg" alt="Anime row menu" width="75%"></p>
-
 ### Continue Watching
 
 A progress bar on each card and the time left under the row.
 
 <img src="docs/chadflix/continue-watching.jpg" alt="Continue Watching" width="100%">
-
-### Title Page
-
-IMDb, Rotten Tomatoes and Letterboxd ratings, and when the title ends if you start it now.
-
-<p align="center"><img src="docs/chadflix/title-page.jpg" alt="Title page" width="75%"></p>
 
 ## Install
 
@@ -73,10 +60,6 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
 It installs as **ChadFlix**, next to Alder if you have it. Sign in with your Stremio account.
-
-## Ratings
-
-Rotten Tomatoes and Letterboxd need a free MDBList key: Settings → **MDBList key** (from mdblist.com/preferences).
 
 ---
 
