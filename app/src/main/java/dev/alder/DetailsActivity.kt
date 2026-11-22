@@ -216,7 +216,7 @@ class DetailsActivity : Screen() {
     private var trailerRequested = false
     private var certificate: String? = null
     private var certificateRequested = false
-    private var letterboxdScore: String? = null
+    private var mdbScores: Map<String, String> = emptyMap() // Rotten Tomatoes and Letterboxd, from one MDBList request
     private var letterboxdRequested = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -242,7 +242,7 @@ class DetailsActivity : Screen() {
             loadingStatus = loadingText
             addView(loadingView, FrameLayout.LayoutParams(-1, -1))
         }
-        setWindowed(root, heroArt)
+        setWindowed(root, heroArt, vignette = false)
 
         // The art arrives: a touch close, settling back as the page opens (a transform only, no redraw of the art).
         (initialArt ?: poster)?.let { Images.load(it, heroArt, artWidth, urgent = true) {
@@ -275,14 +275,15 @@ class DetailsActivity : Screen() {
                     }
                 }
             }
-            if (!letterboxdRequested && Settings.wantsLetterboxd(this, type, m.id)) {
+            // With an MDBList key every available rating shows, films and shows alike; one request per page open.
+            if (!letterboxdRequested && m.id.startsWith("tt") && Settings.mdblistKey(this).isNotEmpty()) {
                 letterboxdRequested = true
-                letterboxdScore = knownLetterboxd(m.id)
+                mdbScores = knownRatings(m.id).orEmpty()
                 val key = Settings.mdblistKey(this)
-                background({ letterboxd(m.id, key, fresh = true) }) { r ->
-                    val score = r.getOrNull()
-                    if (score != null && score != letterboxdScore) {
-                        letterboxdScore = score
+                background({ mdbRatings(m.id, key, type, fresh = true) }) { r ->
+                    val scores = r.getOrNull()
+                    if (scores != null && scores != mdbScores) {
+                        mdbScores = scores
                         if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                     }
                 }
@@ -411,23 +412,23 @@ class DetailsActivity : Screen() {
         startOverButton = null
         hero.removeAllViews()
         val title = text(m?.name ?: name, SERIF_HERO, serif = true).onArt().apply {
-            maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.BOTTOM or Gravity.START
+            maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.TOP or Gravity.START
             // The box is a fixed height: at large font sizes a two-line name shrinks to fit instead of clipping.
             // Android 8+ only; older TVs ellipsize the second line instead.
             if (android.os.Build.VERSION.SDK_INT >= 26)
                 setAutoSizeTextTypeUniformWithConfiguration(20, SERIF_HERO.toInt(), 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         }
         val titleArea = FrameLayout(this).apply {
-            addView(title, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.START))
+            addView(title, FrameLayout.LayoutParams(-1, -2, Gravity.TOP or Gravity.START))
             if (m != null) {
                 val logo = ImageView(this@DetailsActivity).apply {
                     adjustViewBounds = true
                     scaleType = ImageView.ScaleType.FIT_START
-                    maxWidth = dp(260)
-                    maxHeight = dp(75)
+                    maxWidth = dp(132)
+                    maxHeight = dp(68)
                     visibility = View.GONE
                 }
-                addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+                addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
                 Images.load(m.logo ?: Images.logoFor(m.id), logo, dp(520), urgent = true, failed = {
                     title.visibility = View.VISIBLE; logo.visibility = View.GONE
                 }) {
@@ -442,11 +443,11 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
-            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(12) })
+            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(10) })
             m.description?.takeIf { it.isNotBlank() }?.let {
                 stack.addView(text(it, BODY, color = TEXT).onArt().apply {
-                    maxLines = 3; ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(dp(470), -2).apply { topMargin = dp(8) })
+                    maxLines = 5; ellipsize = TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(dp(330), -2).apply { topMargin = dp(10) })
             }
             val initialCast = richCast.ifEmpty {
                 val dirMembers = m.directors.map { CastMember(it, character = getString(R.string.cast_director), role = "director") }
@@ -463,8 +464,8 @@ class DetailsActivity : Screen() {
             }
             addWatch(m, stack)
         }
-        hero.addView(stack, FrameLayout.LayoutParams(dp(HERO_W), -2, Gravity.BOTTOM or Gravity.START).apply {
-            leftMargin = dp(PAD); bottomMargin = dp(92)
+        hero.addView(stack, FrameLayout.LayoutParams(dp(HERO_W), -2, Gravity.TOP or Gravity.START).apply {
+            leftMargin = dp(PAD); topMargin = dp(61)
         })
         val hasEpisodes = hasEpisodes(type, m?.videos) && m?.videos?.isNotEmpty() == true
         if (hasEpisodes || ::similarOverlay.isInitialized) {
@@ -611,10 +612,10 @@ class DetailsActivity : Screen() {
                     maxLines = 1; ellipsize = TextUtils.TruncateAt.END
                 })
             }
-            val ratings = shownRatings(Settings.ratings(this@DetailsActivity), m.rating, letterboxdScore)
+            val ratings = shownRatings("both", m.rating, mdbScores["letterboxd"], mdbScores["tomatoes"])
             if (ratings.isNotEmpty()) {
                 if (facts.isNotBlank() || certificate != null) addView(text(DOT, SMALL, color = TEXT_2).onArt())
-                addRatings(this, ratings, tagSp = 9.5f, firstGap = 0)
+                addRatingLogos(this, ratings)
             }
         }
     }

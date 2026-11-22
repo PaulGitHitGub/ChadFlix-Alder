@@ -257,8 +257,9 @@ abstract class Screen : Activity() {
         }
     }
 
-    /** Sharp film art fills the screen; shade stays behind text and the bottom row. */
-    protected fun setWindowed(content: View, backdrop: View = View(this).apply { background = mood() }) {
+    /** Sharp film art fills the screen; shade stays behind text and the bottom row. [vignette]: darkened edges around the art. */
+    protected fun setWindowed(content: View, backdrop: View = View(this).apply { background = mood() },
+        vignette: Boolean = true) {
         windowArt = backdrop as? ImageView
         shadeSource = null
         window.setBackgroundDrawable(null) // the scene paints the whole screen
@@ -274,7 +275,7 @@ abstract class Screen : Activity() {
                 background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                     intArrayOf(0x8C0E0C0A.toInt(), 0x000E0C0A, 0x000E0C0A, 0x000E0C0A, 0x000E0C0A, 0x000E0C0A, 0x000E0C0A))
             }, FrameLayout.LayoutParams(-1, -1))
-            for (edge in listOf(GradientDrawable.Orientation.LEFT_RIGHT, GradientDrawable.Orientation.RIGHT_LEFT,
+            if (vignette) for (edge in listOf(GradientDrawable.Orientation.LEFT_RIGHT, GradientDrawable.Orientation.RIGHT_LEFT,
                 GradientDrawable.Orientation.TOP_BOTTOM, GradientDrawable.Orientation.BOTTOM_TOP)) {
                 addView(View(context).apply {
                     background = GradientDrawable(edge,
@@ -614,6 +615,22 @@ abstract class Screen : Activity() {
         ratings.forEachIndexed { i, (source, value) ->
             row.addView(ratingTag(source, tagSp), wrap().apply { marginStart = dp(if (i == 0) firstGap else 10) })
             row.addView(text(value, SMALL, color = TEXT_2).onArt(), wrap().apply { marginStart = dp(6) })
+        }
+
+    /**
+     * [ratings] as white logos, each with its score, into [row] (the title page): "IMDb" box, tomato, three dots.
+     * Logos as tall as the letters (13 dp), 5 dp from logo to score, 12 dp between pairs.
+     */
+    protected fun addRatingLogos(row: LinearLayout, ratings: List<Pair<String, String>>, firstGap: Int = 0) =
+        ratings.forEachIndexed { i, (source, value) ->
+            val (logo, width) = when (source) {
+                ROTTEN -> R.drawable.ic_rating_tomato to 14
+                LETTERBOXD -> R.drawable.ic_rating_letterboxd to 29
+                else -> R.drawable.ic_rating_imdb to 27
+            }
+            row.addView(ImageView(this).apply { setImageResource(logo) },
+                LinearLayout.LayoutParams(dp(width), dp(13)).apply { marginStart = dp(if (i == 0) firstGap else 12) })
+            row.addView(text(value, SMALL, color = TEXT_2).onArt(), wrap().apply { marginStart = dp(5) })
         }
 
     /** One line of typing (an addon address, an API key) on glass; OK on the keyboard or the button hands it over, trimmed. */

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Letterboxd mark for the title page's ratings: three dots fading from white, drawn for Alder. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="29dp"
+    android:height="13dp"
+    android:viewportWidth="29"
+    android:viewportHeight="13">
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="1.0" android:pathData="M4.7,6.5m-4.7,0a4.7,4.7 0 1 1 9.4,0a4.7,4.7 0 1 1 -9.4,0" />
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.72" android:pathData="M14.5,6.5m-4.7,0a4.7,4.7 0 1 1 9.4,0a4.7,4.7 0 1 1 -9.4,0" />
+    <path android:fillColor="#FFFFFFFF" android:fillAlpha="0.45" android:pathData="M24.3,6.5m-4.7,0a4.7,4.7 0 1 1 9.4,0a4.7,4.7 0 1 1 -9.4,0" />
+</vector>
