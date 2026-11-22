@@ -401,6 +401,29 @@ class SettingsActivity : Screen() {
         rowsScroll = object : ScrollView(this) {
             override fun onMeasure(widthSpec: Int, heightSpec: Int) =
                 super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(rowsMax, MeasureSpec.AT_MOST))
+
+            // ChadFlix: a thin bar on the right whenever the rows run past the panel, so it's clear there's more below.
+            private val track = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AFFFFFF }
+            private val thumb = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x59FFFFFF }
+            private val box = android.graphics.RectF()
+
+            override fun dispatchDraw(canvas: android.graphics.Canvas) {
+                super.dispatchDraw(canvas)
+                val content = getChildAt(0)?.height ?: return
+                val range = content + paddingTop + paddingBottom - height
+                if (range <= 0) return
+                val w = dp(3).toFloat()
+                val r = w / 2
+                val x = width - dp(6) - w // in the rows' right padding
+                val top = scrollY + paddingTop.toFloat()
+                val trackH = height - paddingTop - paddingBottom.toFloat()
+                box.set(x, top, x + w, top + trackH)
+                canvas.drawRoundRect(box, r, r, track)
+                val thumbH = maxOf(dp(24).toFloat(), trackH * height / (content + paddingTop + paddingBottom))
+                val thumbTop = top + (trackH - thumbH) * scrollY / range
+                box.set(x, thumbTop, x + w, thumbTop + thumbH)
+                canvas.drawRoundRect(box, r, r, thumb)
+            }
         }.apply {
             isVerticalScrollBarEnabled = false
             clipToPadding = false
