@@ -210,11 +210,56 @@ internal object HomeStyle {
         runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
             .getOrNull() ?: genres(movie).map { it.second }
 
-    /** What genre [id]'s row shows on [page] ("trending" until the Showing tile picks another list). */
-    fun showing(c: Context, page: String, id: Int): String =
-        prefs(c).getString(Settings.profileKey(c, "showing:$page:$id"), "trending").orEmpty()
+    /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
+    fun showing(c: Context, page: String, key: String): String =
+        prefs(c).getString(Settings.profileKey(c, "showing:$page:$key"), "trending").orEmpty()
 
-    fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, id)}"
+    fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, "$id")}"
+
+    // ---------- platform rows: what streams on a service (TMDb watch providers, US), off until Customize Home ----------
+
+    /**
+     * A streaming service: its TMDb watch provider ids (what streams there), TV network ids and film company ids (what it
+     * made: "Exclusives Only"). Checked against TMDb on 2026-11-22 through the app's key. No company makes a reliable
+     * film filter for Disney+, Hulu, Paramount+ or Peacock (TMDb has no such company, or only a foreign one), so their
+     * film rows have no Exclusives switch.
+     */
+    class Platform(val name: String, val providers: String, val networks: String, val companies: String?)
+
+    val platforms = listOf(
+        Platform("Netflix", "8", "213", "178464|145174|171251"), // Netflix, Netflix International Pictures, Netflix Animation Studios
+        Platform("Apple TV+", "350", "2552", "194232"), // Apple Studios (TMDb's "Apple Original Films")
+        Platform("Disney+", "337", "2739", null),
+        Platform("Prime Video", "9", "1024", "210099|20580"), // Amazon MGM Studios, Amazon Studios
+        Platform("Max", "1899", "3186|49", "7429|158691|138252"), // HBO Max and HBO networks; HBO Films, HBO Max, Warner Max
+        Platform("Hulu", "15", "453", null),
+        Platform("Paramount+", "2303|2616", "4330", null), // Premium and Essential
+        Platform("Peacock", "386|387", "3353", null), // Premium and Premium Plus
+    )
+
+    fun platformSource(c: Context, page: String, i: Int, movie: Boolean) =
+        "${TMDB}p$i:${showing(c, page, "p$i")}${if (exclusive(c, page, i, movie)) "!" else ""}"
+
+    /** Whether platform row [i] has an Exclusives Only switch on this tab (films need a company to filter by). */
+    fun canExclusive(i: Int, movie: Boolean) = !movie || platforms[i].companies != null
+
+    /** Platform row [i]'s Exclusives Only switch: on by default for shows, off for films (their "made by" data is thinner). */
+    fun exclusive(c: Context, page: String, i: Int, movie: Boolean) = canExclusive(i, movie) &&
+        prefs(c).getBoolean(Settings.profileKey(c, "excl:$page:p$i"), !movie)
+
+    fun setExclusive(c: Context, page: String, i: Int, on: Boolean) =
+        prefs(c).edit().putBoolean(Settings.profileKey(c, "excl:$page:p$i"), on).apply()
+
+    /** A row's Showing key: its TMDb genre id, or "p<n>" for a platform row; null for any other row. */
+    fun rowKey(movie: Boolean, title: String): String? =
+        genres(movie).firstOrNull { it.second == title }?.first?.toString()
+            ?: platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" }
+
+    /** The lists a row can show, the default first: genre rows [lists]; platform rows Trending, New Releases, Top Rated (and Most Watched for films). */
+    fun listsFor(movie: Boolean, key: String): List<Pair<String, Int>> = if (!key.startsWith("p")) lists(movie)
+        else listOfNotNull("trending" to R.string.showing_trending,
+            "new" to if (movie) R.string.showing_new_releases else R.string.showing_new_series,
+            "top_rated" to R.string.showing_top_rated, ("most_watched" to R.string.showing_most_watched).takeIf { movie })
 
     /** A genre row's place on the page, whatever list it shows: "tmdb:<id>". */
     fun slotSource(source: String) = source.substringBeforeLast(':')
@@ -222,8 +267,8 @@ internal object HomeStyle {
     /** Genre rows fetch on two threads of their own, so title pages and sources never wait behind them. */
     val rowPool: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(2)
 
-    fun setShowing(c: Context, page: String, id: Int, list: String) =
-        prefs(c).edit().putString(Settings.profileKey(c, "showing:$page:$id"), list).apply()
+    fun setShowing(c: Context, page: String, key: String, list: String) =
+        prefs(c).edit().putString(Settings.profileKey(c, "showing:$page:$key"), list).apply()
 
     /** The lists a genre row can show, the default first: key to its name. */
     fun lists(movie: Boolean): List<Pair<String, Int>> = if (movie) listOf("trending" to R.string.showing_trending,
@@ -237,11 +282,13 @@ internal object HomeStyle {
     const val LIST_RED = 0xFFFF3B47.toInt() // #EF4B55 at full saturation
     const val LABEL_GREY = 0xFF9A9A9A.toInt()
 
-    /** The name of the list genre row [title] shows on [page] ("Trending"), or null when it isn't a genre row. */
+    /** What genre or platform row [title] shows on [page] ("Trending", "Trending · Exclusives"), or null for any other row. */
     fun rowList(c: Context, page: String, movie: Boolean, title: String): String? {
-        val id = genres(movie).firstOrNull { it.second == title }?.first ?: return null
-        val key = showing(c, page, id)
-        return c.getString((lists(movie).firstOrNull { it.first == key } ?: lists(movie)[0]).second)
+        val key = rowKey(movie, title) ?: return null
+        val lists = listsFor(movie, key)
+        val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
+        val excl = key.startsWith("p") && exclusive(c, page, key.drop(1).toInt(), movie)
+        return if (excl) "$list · ${c.getString(R.string.showing_exclusives)}" else list
     }
 
     /** "Action · Trending": the list in red on the row the remote is in, all of it quiet on the others. */
@@ -300,8 +347,12 @@ internal object HomeStyle {
         val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series").put("name", ""))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
-        val (titles, complete) = Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
-            day.format(java.util.Date()), day.format(since)), genres(movie).toMap())
+        val list = parts.getOrElse(1) { "trending" }
+        val params = if (parts[0].startsWith("p")) platforms[parts[0].drop(1).toInt()].let { p -> // a platform row
+            platformParams(movie, p.providers, p.networks, p.companies, list.removeSuffix("!"), list.endsWith("!"), Tmdb.region,
+                day.format(java.util.Date()))
+        } else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
+        val (titles, complete) = Tmdb.discoverRow(movie, params, genres(movie).toMap())
         return listOf(tile) + titles to complete
     }
 }
@@ -357,4 +408,23 @@ internal fun washPixel(p: Int, shade: Float): Int {
     val l = 0.299f * r + 0.587f * g + 0.114f * b
     fun c(v: Int) = ((l + (v - l) * 1.2f) * shade).toInt().coerceIn(0, 255)
     return (255 shl 24) or (c(r) shl 16) or (c(g) shl 8) or c(b)
+}
+
+/**
+ * TMDb discover filters for a platform row: what streams on the service by subscription in [region], sorted by [list]
+ * (Trending = most popular, New Releases, Top Rated, Most Watched); [exclusive] keeps what it made itself: shows by its
+ * networks, films by its companies.
+ */
+internal fun platformParams(movie: Boolean, providers: String, networks: String, companies: String?, list: String,
+                            exclusive: Boolean, region: String, today: String): Map<String, String> {
+    val date = if (movie) "primary_release_date" else "first_air_date"
+    val p = linkedMapOf("with_watch_providers" to providers, "watch_region" to region, "with_watch_monetization_types" to "flatrate")
+    if (exclusive) { if (!movie) p["with_networks"] = networks else if (companies != null) p["with_companies"] = companies }
+    when (list) {
+        "new" -> { p["sort_by"] = "$date.desc"; p["$date.lte"] = today; p["vote_count.gte"] = "20" }
+        "top_rated" -> { p["sort_by"] = "vote_average.desc"; p["vote_count.gte"] = if (movie) "500" else "200" }
+        "most_watched" -> p["sort_by"] = "vote_count.desc"
+        else -> p["sort_by"] = "popularity.desc"
+    }
+    return p
 }

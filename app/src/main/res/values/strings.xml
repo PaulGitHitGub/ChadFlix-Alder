@@ -111,6 +111,8 @@
     <string name="always_first" translatable="false">Always First</string>
     <string name="hint_customize" translatable="false">The rows Movies and Shows show, and their order, for this profile.</string>
     <string name="showing_default" translatable="false">(Default)</string>
+    <string name="showing_exclusives" translatable="false">Exclusives</string>
+    <string name="showing_exclusives_only" translatable="false">Exclusives Only</string>
     <string name="showing_trending" translatable="false">Trending</string>
     <string name="showing_new_releases" translatable="false">New Releases</string>
     <string name="showing_new_series" translatable="false">New Series</string>

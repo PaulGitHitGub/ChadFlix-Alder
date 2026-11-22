@@ -100,7 +100,8 @@ object Settings {
             "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
         ).forEach { remove("$it@$profileId") }
         prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:") ||
-            it.startsWith("rowsOn:") || it.startsWith("rowsKnown:") || it.startsWith("showing:")) && it.endsWith("@$profileId") }.forEach(::remove)
+            it.startsWith("rowsOn:") || it.startsWith("rowsKnown:") || it.startsWith("showing:") ||
+            it.startsWith("excl:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 
     /**

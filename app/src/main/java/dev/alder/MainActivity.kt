@@ -697,7 +697,7 @@ class MainActivity : Screen() {
     private var refreshAddons: (() -> Unit)? = null // the open page's add-on check, run again on coming back to Alder
     private var rebuildRows: (() -> Unit)? = null // ChadFlix: the open page's rows again, after Move Up / Move Down
     private var pageRows: List<String> = emptyList() // ChadFlix: the open page's row titles, in order
-    private val showingChanged = mutableMapOf<String, Pair<Int, String>>() // ChadFlix: "page:row" to (genre, the list last shown)
+    private val showingChanged = mutableMapOf<String, Pair<String, String>>() // ChadFlix: "page:row" to (row key, the choice last shown; "!" = Exclusives)
 
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
@@ -1967,7 +1967,11 @@ class MainActivity : Screen() {
             val candidates = if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
                 HomeStyle.genres(movie).map { (id, name) ->
                     Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
-                } + sections(p, shelves, featuredHome).filterNot { s -> HomeStyle.genres(movie).any { it.second.equals(s.first, true) } }
+                } + HomeStyle.platforms.mapIndexed { i, platform -> // ChadFlix: then one row per streaming service, off by default
+                    Triple(platform.name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.platformSource(this@MainActivity, p.label, i, movie) as String?)
+                } + sections(p, shelves, featuredHome).filterNot { s ->
+                    HomeStyle.genres(movie).any { it.second.equals(s.first, true) } || HomeStyle.platforms.any { it.name.equals(s.first, true) }
+                }
             if (p.hasGenreShortcuts) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
             val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
             val sections = orderedRows(HomeStyle.rowOrder(this@MainActivity, p.label), candidates.filter {
@@ -2120,8 +2124,10 @@ class MainActivity : Screen() {
                         // Kept even if the page moved on; a row whose titles mostly lacked IMDb ids is asked again next time.
                         r.getOrNull()?.takeIf { it.second }?.let { answers[key] = listOf(it.first to false) }
                         if (g != generation || build != catalogBuild) return@background
-                        if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove("${p.label}:$title")?.let { (id, was) ->
-                            HomeStyle.setShowing(this@MainActivity, p.label, id, was) // the new list failed: the old row stays,
+                        if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove("${p.label}:$title")?.let { (rowKey, was) ->
+                            // the new choice failed: the old row stays,
+                            HomeStyle.setShowing(this@MainActivity, p.label, rowKey, was.removeSuffix("!"))
+                            if (rowKey.startsWith("p")) HomeStyle.setExclusive(this@MainActivity, p.label, rowKey.drop(1).toInt(), was.endsWith("!"))
                             return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
                         onAnswer(r.map { listOf(it.first to false) })
@@ -2857,17 +2863,31 @@ class MainActivity : Screen() {
     }
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
-    private fun showingMenu(row: Row) {
+    private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
-        val id = HomeStyle.genres(movie).firstOrNull { it.second == row.title }?.first ?: return
-        val lists = HomeStyle.lists(movie)
-        val current = HomeStyle.showing(this, page.label, id)
-        val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
-        choose("${row.title} · ${getString(R.string.showing)}", names, checked = lists.indexOfFirst { it.first == current }.coerceAtLeast(0)) { i ->
-            if (lists[i].first == current) return@choose
-            val changing = "${page.label}:${row.title}" // picking again before it answered: back to the list last shown
-            showingChanged[changing] = id to (showingChanged[changing]?.second ?: current)
-            HomeStyle.setShowing(this, page.label, id, lists[i].first)
+        val key = HomeStyle.rowKey(movie, row.title) ?: return
+        val lists = HomeStyle.listsFor(movie, key)
+        val current = HomeStyle.showing(this, page.label, key)
+        // ChadFlix: a platform row's picker starts with its Exclusives Only switch (where the tab has a filter for it).
+        val platform = key.takeIf { it.startsWith("p") }?.drop(1)?.toInt()?.takeIf { HomeStyle.canExclusive(it, movie) }
+        val excl = platform?.let { HomeStyle.exclusive(this, page.label, it, movie) }
+        val switch = excl?.let { listOf("${getString(R.string.showing_exclusives_only)}  ·  ${getString(if (it) R.string.state_on else R.string.state_off)}") }.orEmpty()
+        val names = switch + lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
+        val checked = switch.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
+        choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked) { picked ->
+            val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
+            val shown = showingChanged[changing]?.second ?: (current + if (excl == true) "!" else "")
+            if (platform != null && picked == 0) {
+                showingChanged[changing] = key to shown
+                HomeStyle.setExclusive(this, page.label, platform, excl != true)
+                rebuildRows?.invoke() ?: showPage(page)
+                main.post { showingMenu(row, 0) } // the switch stays in reach to flip back or pick a sort
+                return@choose
+            }
+            val list = lists[picked - switch.size].first
+            if (list == current) return@choose
+            showingChanged[changing] = key to shown
+            HomeStyle.setShowing(this, page.label, key, list)
             rebuildRows?.invoke() ?: showPage(page)
         }
     }

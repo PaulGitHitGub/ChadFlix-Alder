@@ -58,4 +58,29 @@ class HomeStyleTest {
         val lifted = washPixel(0xFF804040.toInt(), 1f)
         assertEquals(true, (lifted shr 16 and 255) > 0x80 && (lifted and 255) < 0x40)
     }
+
+    /** The ids were checked against TMDb (watch providers, networks, companies) on 2026-11-22; a change here should be checked again. */
+    @Test fun platformIdsAreTheCheckedOnes() {
+        val ids = HomeStyle.platforms.associate { it.name to listOf(it.providers, it.networks, it.companies) }
+        assertEquals(listOf("8", "213", "178464|145174|171251"), ids["Netflix"])
+        assertEquals(listOf("350", "2552", "194232"), ids["Apple TV+"])
+        assertEquals(listOf("337", "2739", null), ids["Disney+"])
+        assertEquals(listOf("9", "1024", "210099|20580"), ids["Prime Video"])
+        assertEquals(listOf("1899", "3186|49", "7429|158691|138252"), ids["Max"])
+        assertEquals(listOf("15", "453", null), ids["Hulu"])
+        assertEquals(listOf("2303|2616", "4330", null), ids["Paramount+"])
+        assertEquals(listOf("386|387", "3353", null), ids["Peacock"])
+    }
+
+    @Test fun platformRowsFilterByServiceAndExclusives() {
+        val shows = platformParams(false, "8", "213", null, "trending", true, "US", "2026-11-22")
+        assertEquals("8", shows["with_watch_providers"]); assertEquals("US", shows["watch_region"])
+        assertEquals("flatrate", shows["with_watch_monetization_types"]); assertEquals("213", shows["with_networks"])
+        assertEquals("popularity.desc", shows["sort_by"])
+        val films = platformParams(true, "8", "213", "178464", "most_watched", true, "US", "2026-11-22")
+        assertEquals("178464", films["with_companies"]); assertEquals(null, films["with_networks"])
+        assertEquals("vote_count.desc", films["sort_by"])
+        assertEquals(null, platformParams(true, "337", "2739", null, "new", true, "US", "2026-11-22")["with_companies"])
+        assertEquals(null, platformParams(false, "8", "213", null, "top_rated", false, "US", "")["with_networks"])
+    }
 }
