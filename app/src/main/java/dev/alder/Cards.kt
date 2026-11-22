@@ -117,8 +117,7 @@ internal class MediaCardView(
     private val shade = View(screen).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
     private val ring = if (home) HomeStyle.ring(screen) else null
     private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
-    private var badge: LinearLayout? = null // ChadFlix: the rating in the bottom-right corner
-    private var scrim: View? = null
+    val hasBar: Boolean get() = bar != null
     /** ChadFlix: the title's logo, shown at the foot of the widened card ([expand]). */
     var logoUrl: String? = null
     private var shownWide = false // ChadFlix: the picture showing was decoded at the widened size
@@ -226,26 +225,6 @@ internal class MediaCardView(
     }
 
     /**
-     * ChadFlix: the rating mark and [score] in the bottom-right corner over a soft dark corner (none on the widened card,
-     * whose foot is shaded already). Made once, when the score is first known; [fade] brings it in over 150 ms.
-     */
-    fun setRating(mark: Int, score: String?, fade: Boolean) {
-        if (!home || score.isNullOrBlank()) return
-        val b = badge ?: HomeStyle.badge(screen).also { b ->
-            badge = b
-            val s = HomeStyle.scrim(screen).also { scrim = it }
-            addView(s, indexOfChild(shade), LayoutParams(screen.dp(HomeStyle.SCRIM), screen.dp(HomeStyle.SCRIM), Gravity.BOTTOM or Gravity.END))
-            addView(b, indexOfChild(shade), LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
-                rightMargin = screen.dp(8); bottomMargin = screen.dp(if (bar != null) 12 else 8) // above Continue Watching's bar
-            })
-            s.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
-            if (fade) for (v in listOf(b, s)) { v.alpha = 0f; v.animate().alpha(1f).setDuration(Screen.FOCUS_MS).start() }
-        }
-        (b.getChildAt(0) as ImageView).setImageResource(mark)
-        (b.getChildAt(1) as TextView).text = score
-    }
-
-    /**
      * ChadFlix: the focused home card widens from its poster into the title's 16:9 backdrop at the same height, with
      * its logo (or name) at the foot; unfocused, it's a poster again. Only this card's width animates, and only when
      * [animate] (Left/Right along a row); a card the remote lands on from another row is simply wide.
@@ -260,8 +239,12 @@ internal class MediaCardView(
 
     /** A title with no backdrop yet stays a poster until one comes ([refresh]). */
     private fun widen(animate: Boolean = true) {
-        scrim?.visibility = if (expanded) View.INVISIBLE else View.VISIBLE
         if (expanded || nameMade.isInitialized()) nameView.textSize = if (expanded) Screen.SERIF_NAME else Screen.SMALL
+        // ChadFlix: on the widened card the name stops short of the rating badge in the corner.
+        if (nameMade.isInitialized()) (nameView.layoutParams as? MarginLayoutParams)?.let { lp ->
+            val end = screen.dp(if (expanded) 96 else insetDp)
+            if (lp.rightMargin != end) { lp.rightMargin = end; nameView.layoutParams = lp }
+        }
         val lp = layoutParams ?: return
         val to = if (expanded) wideW else widthPx
         widthAnim?.cancel()

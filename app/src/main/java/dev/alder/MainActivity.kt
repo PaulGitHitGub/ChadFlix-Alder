@@ -439,6 +439,7 @@ class MainActivity : Screen() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         profile = Profiles.active(this) ?: return switchProfile()
+        ratingPick = Settings.ratings(this)
         main.postDelayed({ if (!isFinishing) whatsNewOnce() }, WHATS_NEW_WAIT)
         // Last launch's first cinema title: start its art and logo now, while the library is still being read.
         getSharedPreferences("home", MODE_PRIVATE).let { prefs ->
@@ -811,6 +812,11 @@ class MainActivity : Screen() {
         super.onResume()
         if (!::profile.isInitialized) return
         startFps()
+        // ChadFlix: Settings › Ratings may have changed: the focused card's badge follows (no score hides it).
+        Settings.ratings(this).takeIf { it != ratingPick }?.let { pick ->
+            ratingPick = pick
+            rows.firstOrNull { it.active }?.let { r -> r.cards.getOrNull(r.selected)?.let { c -> r.hideBadge(); r.rate(c, r.items[r.selected], fade = false) } }
+        }
         washOn = Settings.wash(this) // back from Settings: the choice there applies
         if (!washOn && page.isBrowse) { main.removeCallbacks(artTask); resetArt() }
         val key = profile.authKey
@@ -1211,6 +1217,7 @@ class MainActivity : Screen() {
      * the two views holds a picture, so the screen gets one extra layer.
      */
     private var washOn = true
+    private var ratingPick = "" // ChadFlix: Settings › Ratings, for the focused card's badge (read in onCreate and onResume)
 
     private fun showWash(item: Item) {
         if (!washOn) return // Settings › Background wash off: black, and nothing runs
@@ -1578,7 +1585,8 @@ class MainActivity : Screen() {
     private fun showRatings(item: Item, meta: Meta?) {
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
         // Letterboxd comes from this session or the disk at once; a film never asked yet fills in when MDBList answers.
-        val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
+        // ChadFlix: on the home pages only "Letterboxd" asks MDBList (with "Both" the card's badge shows IMDb).
+        val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id) && (!page.isBrowse || ratingPick == "letterboxd")
         val letterboxdScore = if (wantsLetterboxd) knownLetterboxd(item.id) else null
         if (wantsLetterboxd && letterboxdScore == null) {
             val key = Settings.mdblistKey(this)
@@ -3015,7 +3023,6 @@ class MainActivity : Screen() {
         // remote is on the tile or that first title the row doesn't scroll, so the tile stays in view.
         private val tileRow = homeRow && first.firstOrNull()?.id?.let(HomeStyle::isTile) == true
         private var tileLook: ((Int) -> Unit)? = null
-        private val ratingPick = Settings.ratings(this@MainActivity) // ChadFlix: Settings › Ratings, read once per row (before the cards)
         private fun pinOf(i: Int) = if (tileRow && i <= 1) 0 else i
         private fun styleTile() = tileLook?.invoke(when { cards.firstOrNull()?.isFocused == true -> 2; active -> 1; else -> 0 })
 
@@ -3044,7 +3051,6 @@ class MainActivity : Screen() {
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
-            rate(this, item, fade = false)
             if (HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
             dim(grid || !active, animate = false)
             payload = item
@@ -3054,7 +3060,7 @@ class MainActivity : Screen() {
                 setNewEpisodes(item.newEpisodeCount)
                 logoUrl = item.logo
                 refresh(item.poster, item.art, item.settled)
-                rate(this, item, fade = true) // its score came with its details
+                rate(this, item, fade = true) // its score came with its details (focused card only)
                 if (homeRow && active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
             }
             // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
@@ -3089,6 +3095,7 @@ class MainActivity : Screen() {
             active = on
             if (on) peek(true) else {
                 rail.clearHeld()
+                hideBadge()
                 cards.getOrNull(selected)?.expand(false, animate = false) // leaving the row: a poster again at once
                 if (tileRow && selected == 0 && cards.size > 1) rail.selectIndex(1) // back in, the remote lands on a title
                 if (homeRow) rail.scrollToCard(selected, 0, pinOf(selected), snap = true) // and it stays put, near its end too
@@ -3101,16 +3108,32 @@ class MainActivity : Screen() {
 
         fun focusFirst() = rail.focusSelected()
 
+        private var badge: LinearLayout? = null // ChadFlix: the row's one rating badge, on its widened card
+
         /**
-         * ChadFlix: [card]'s corner rating, from what's known without asking anyone: IMDb (also for "Both"), or Letterboxd
-         * from this session's MDBList answers. Nothing until it's known.
+         * ChadFlix: the widened card's rating in its bottom-right corner (its foot is shaded already), from what's known
+         * without asking anyone: IMDb (also for "Both"), or Letterboxd from this session's MDBList answers. Nothing until
+         * it's known. One badge per row moves to the card the remote is on; other cards have none.
          */
         fun rate(card: MediaCardView, item: Item, fade: Boolean) {
-            if (!homeRow || HomeStyle.isTile(item.id)) return
+            if (!homeRow || HomeStyle.isTile(item.id) || !active || cards.getOrNull(selected) !== card || card.widensBy <= 0) return
             val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)
                 else R.drawable.ic_rating_imdb to (metas[item.id]?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "))
-            card.setRating(mark, score, fade)
+            if (score.isNullOrBlank()) return hideBadge()
+            val b = badge ?: HomeStyle.badge(this@MainActivity).also { badge = it }
+            if (b.parent !== card) {
+                (b.parent as? android.view.ViewGroup)?.removeView(b)
+                card.addView(b, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
+                    rightMargin = dp(8); bottomMargin = dp(if (card.hasBar) 12 else 8) // above Continue Watching's bar
+                })
+            }
+            (b.getChildAt(0) as ImageView).setImageResource(mark)
+            (b.getChildAt(1) as TextView).text = score
+            b.animate().cancel()
+            if (fade) { b.alpha = 0f; b.animate().alpha(1f).setDuration(FOCUS_MS).start() } else b.alpha = 1f
         }
+
+        fun hideBadge() { badge?.let { (it.parent as? android.view.ViewGroup)?.removeView(it) } }
 
         /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
         fun pin(index: Int, snap: Boolean = false): Int {
@@ -3127,6 +3150,7 @@ class MainActivity : Screen() {
         fun settle(animate: Boolean = true) {
             if (!homeRow) return
             cards.getOrNull(selected)?.expand(true, animate) ?: return
+            items.getOrNull(selected)?.let { rate(cards[selected], it, fade = false) }
             pin(selected, snap = !animate)
             if (cards[selected].isFocused) fetchTitleSoon(items.getOrNull(selected))
             prefetchNeighbours(this)
@@ -3152,6 +3176,8 @@ class MainActivity : Screen() {
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
                 if (!held) cards[index].expand(true, animate = !entering)
+                hideBadge()
+                rate(cards[index], items[index], fade = false)
                 if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
             if (!held && entering) prefetchNeighbours(this) // ChadFlix: also beside rows that never widen
