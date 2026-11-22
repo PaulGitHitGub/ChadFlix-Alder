@@ -14,9 +14,9 @@
     <string name="key_exit">Quitter</string>
 
     <!-- Updates -->
-    <string name="updates_allow_title">Autoriser Alder à installer des mises à jour</string>
-    <string name="updates_allow_steps">Sur Fire TV : Paramètres › Mon Fire TV › Options pour les développeurs › Installer des applis inconnues, puis activez Alder. Sur Google TV : Paramètres › Applis › Sécurité et restrictions › Sources inconnues, puis activez Alder. Sélectionnez ensuite Installer à nouveau.</string>
-    <string name="updates_downloading">Téléchargement d’Alder %1$s… Alder se ferme pour se mettre à jour. Rouvrez-le ensuite.</string>
+    <string name="updates_allow_title">Autoriser ChadFlix à installer des mises à jour</string>
+    <string name="updates_allow_steps">Sur Fire TV : Paramètres › Mon Fire TV › Options pour les développeurs › Installer des applis inconnues, puis activez ChadFlix. Sur Google TV : Paramètres › Applis › Sécurité et restrictions › Sources inconnues, puis activez ChadFlix. Sélectionnez ensuite Installer à nouveau.</string>
+    <string name="updates_downloading">Téléchargement de ChadFlix %1$s… ChadFlix se ferme pour se mettre à jour. Rouvrez-le ensuite.</string>
     <string name="updates_download_failed">Impossible de télécharger la mise à jour</string>
     <string name="updates_download_failed_desc">Vérifiez la connexion du téléviseur et réessayez depuis Paramètres › À propos.</string>
 
@@ -61,7 +61,7 @@
     <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">Profil</string>
     <string name="nav_search">Rechercher</string>
-    <string name="updates_ready">Alder %1$s est prêt</string>
+    <string name="updates_ready">ChadFlix %1$s est prêt</string>
     <string name="updates_ready_desc">L’installer maintenant ? Cela prend une minute, et vos profils et paramètres sont conservés.</string>
     <string name="action_later">Plus tard</string>
     <string name="action_install">Installer</string>
@@ -350,7 +350,7 @@
     <string name="whats_new_hint">Les modifications de la version installée sur ce téléviseur.</string>
     <string name="updates">Mises à jour</string>
     <string name="updates_checking">Vérification…</string>
-    <string name="updates_hint">Les nouvelles versions viennent des publications d’Alder sur GitHub.</string>
+    <string name="updates_hint">Les nouvelles versions viennent des publications de ChadFlix sur GitHub.</string>
     <string name="updates_install">Installer %1$s  ›</string>
     <string name="updates_check_failed">Vérification impossible · Réessayer  ›</string>
     <string name="updates_up_to_date">À jour</string>

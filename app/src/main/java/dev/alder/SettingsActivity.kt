@@ -666,7 +666,7 @@ class SettingsActivity : Screen() {
                 if (Crashes.sendable(this)) actionRow(getString(R.string.report_send), "", getString(R.string.report_send_hint)) {
                     sendReport { showGroup(Group.ABOUT) }
                 }
-                if (Updates.ENABLED) { // ChadFlix fork: no self-updates, so no Updates row
+                if (Updates.ENABLED) { // ChadFlix fork: the switch for self-updates is in Updates.kt
                 var found: Updates.Release? = null
                 val value = actionRow(getString(R.string.updates), getString(R.string.updates_checking), getString(R.string.updates_hint)) {
                     found?.let(::installUpdate) ?: showGroup(Group.ABOUT)

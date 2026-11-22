@@ -15,10 +15,10 @@ import java.net.URL
  * on an older version, and Android's package installer puts it in place (same signing key, so data stays).
  */
 object Updates {
-    private const val LATEST = "https://api.github.com/repos/aradhyas8/Alder/releases/latest"
+    private const val LATEST = "https://api.github.com/repos/PaulGitHitGub/ChadFlix-Alder/releases/latest"
     private const val CHECK_INTERVAL = 4 * 3600_000L // 4 hours instead of once a day
-    /** ChadFlix fork: off. Alder's releases would replace this app with Alder; the code stays for easy merges. */
-    const val ENABLED = false
+    /** ChadFlix fork: on, from ChadFlix's own releases (never Alder's, which would be another app). */
+    const val ENABLED = true
 
     class Release(val version: String, val apk: String)
 
@@ -145,13 +145,17 @@ object Updates {
     private fun prefs(c: Context) = c.getSharedPreferences("updates", Context.MODE_PRIVATE)
 }
 
-/** True when version [a] is newer than [b] ("1.10" > "1.9"; missing parts count as 0). */
+/**
+ * True when version [a] is newer than [b] ("1.10" > "1.9"; missing parts count as 0). ChadFlix: the Alder part decides
+ * first, then the fork's build ("1.3.2-chadflix.1" > "1.3.1-chadflix.10" > "1.3.1-chadflix.9" > "1.3.1").
+ */
 internal fun newerVersion(a: String, b: String): Boolean {
-    val x = a.split('.').map { it.toIntOrNull() ?: 0 }
-    val y = b.split('.').map { it.toIntOrNull() ?: 0 }
+    val x = a.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
+    val y = b.substringBefore('-').split('.').map { it.toIntOrNull() ?: 0 }
     for (i in 0 until maxOf(x.size, y.size)) {
         val d = x.getOrElse(i) { 0 } - y.getOrElse(i) { 0 }
         if (d != 0) return d > 0
     }
-    return false
+    fun build(v: String) = v.substringAfter("-chadflix.", "").toIntOrNull() ?: 0
+    return build(a) > build(b)
 }

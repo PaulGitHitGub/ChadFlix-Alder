@@ -14,9 +14,9 @@
     <string name="key_exit">خروج</string>
 
     <!-- Updates -->
-    <string name="updates_allow_title">السماح لـ Alder بتثبيت التحديثات</string>
-    <string name="updates_allow_steps">على Fire TV، انتقل إلى الإعدادات › My Fire TV › خيارات المطوّر › تثبيت التطبيقات غير المعروفة، ثم فعّل Alder. على Google TV، انتقل إلى الإعدادات › التطبيقات › الأمان والقيود › مصادر غير معروفة، ثم فعّل Alder. بعد ذلك، اختر تثبيت مرة أخرى.</string>
-    <string name="updates_downloading">جارٍ تنزيل Alder %1$s… سيُغلق Alder لتثبيت التحديث. افتحه من جديد بعد ذلك.</string>
+    <string name="updates_allow_title">السماح لـ ChadFlix بتثبيت التحديثات</string>
+    <string name="updates_allow_steps">على Fire TV، انتقل إلى الإعدادات › My Fire TV › خيارات المطوّر › تثبيت التطبيقات غير المعروفة، ثم فعّل ChadFlix. على Google TV، انتقل إلى الإعدادات › التطبيقات › الأمان والقيود › مصادر غير معروفة، ثم فعّل ChadFlix. بعد ذلك، اختر تثبيت مرة أخرى.</string>
+    <string name="updates_downloading">جارٍ تنزيل ChadFlix %1$s… سيُغلق ChadFlix لتثبيت التحديث. افتحه من جديد بعد ذلك.</string>
     <string name="updates_download_failed">تعذّر تنزيل التحديث</string>
     <string name="updates_download_failed_desc">تحقّق من اتصال التلفزيون وحاول مرة أخرى من الإعدادات › حول.</string>
 
@@ -67,7 +67,7 @@
     <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">الملف الشخصي</string>
     <string name="nav_search">بحث</string>
-    <string name="updates_ready">Alder %1$s جاهز للتثبيت</string>
+    <string name="updates_ready">ChadFlix %1$s جاهز للتثبيت</string>
     <string name="updates_ready_desc">هل تريد تثبيته الآن؟ يستغرق ذلك دقيقة وتبقى ملفاتك الشخصية وإعداداتك محفوظة.</string>
     <string name="action_later">لاحقًا</string>
     <string name="action_install">تثبيت</string>
@@ -360,7 +360,7 @@
     <string name="whats_new_hint">التغييرات في الإصدار المثبّت على هذا التلفزيون.</string>
     <string name="updates">التحديثات</string>
     <string name="updates_checking">جارٍ التحقّق…</string>
-    <string name="updates_hint">تتوفّر إصدارات Alder الجديدة على GitHub.</string>
+    <string name="updates_hint">تتوفّر إصدارات ChadFlix الجديدة على GitHub.</string>
     <string name="updates_install">تثبيت %1$s  ›</string>
     <string name="updates_check_failed">تعذّر التحقّق · حاول مرة أخرى  ›</string>
     <string name="updates_up_to_date">لديك أحدث إصدار</string>

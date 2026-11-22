@@ -14,9 +14,9 @@
     <string name="key_exit">Salir</string>
 
     <!-- Updates -->
-    <string name="updates_allow_title">Permite que Alder instale actualizaciones</string>
-    <string name="updates_allow_steps">En Fire TV: Configuración › Mi Fire TV › Opciones para desarrolladores › Instalar apps desconocidas y activa Alder. En Google TV: Configuración › Apps › Seguridad y restricciones › Fuentes desconocidas y activa Alder. Después selecciona Instalar de nuevo.</string>
-    <string name="updates_downloading">Descargando Alder %1$s… Alder se cierra para actualizarse. Ábrelo de nuevo después.</string>
+    <string name="updates_allow_title">Permite que ChadFlix instale actualizaciones</string>
+    <string name="updates_allow_steps">En Fire TV: Configuración › Mi Fire TV › Opciones para desarrolladores › Instalar apps desconocidas y activa ChadFlix. En Google TV: Configuración › Apps › Seguridad y restricciones › Fuentes desconocidas y activa ChadFlix. Después selecciona Instalar de nuevo.</string>
+    <string name="updates_downloading">Descargando ChadFlix %1$s… ChadFlix se cierra para actualizarse. Ábrelo de nuevo después.</string>
     <string name="updates_download_failed">No se pudo descargar la actualización</string>
     <string name="updates_download_failed_desc">Revisa la conexión del televisor y vuelve a intentarlo desde Configuración › Acerca de.</string>
 
@@ -61,7 +61,7 @@
     <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">Perfil</string>
     <string name="nav_search">Buscar</string>
-    <string name="updates_ready">Alder %1$s está listo</string>
+    <string name="updates_ready">ChadFlix %1$s está listo</string>
     <string name="updates_ready_desc">¿Instalar ahora? Tarda un minuto y tus perfiles y ajustes se conservan.</string>
     <string name="action_later">Más tarde</string>
     <string name="action_install">Instalar</string>
@@ -350,7 +350,7 @@
     <string name="whats_new_hint">Los cambios de la versión instalada en este TV.</string>
     <string name="updates">Actualizaciones</string>
     <string name="updates_checking">Comprobando…</string>
-    <string name="updates_hint">Las nuevas versiones vienen de las publicaciones de Alder en GitHub.</string>
+    <string name="updates_hint">Las nuevas versiones vienen de las publicaciones de ChadFlix en GitHub.</string>
     <string name="updates_install">Instalar %1$s  ›</string>
     <string name="updates_check_failed">No se pudo comprobar · Reintentar  ›</string>
     <string name="updates_up_to_date">Al día</string>

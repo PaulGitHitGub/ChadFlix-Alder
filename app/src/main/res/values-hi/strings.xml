@@ -14,9 +14,9 @@
     <string name="key_exit">बाहर निकलें</string>
 
     <!-- Updates -->
-    <string name="updates_allow_title">Alder को अपडेट इंस्टॉल करने दें</string>
-    <string name="updates_allow_steps">Fire TV पर: Settings › My Fire TV › Developer options › Install unknown apps में जाकर Alder चालू करें। Google TV पर: Settings › Apps › Security &amp; restrictions › Unknown sources में जाकर Alder चालू करें। फिर Install दोबारा चुनें।</string>
-    <string name="updates_downloading">Alder %1$s डाउनलोड हो रहा है… अपडेट के लिए Alder बंद होगा। बाद में इसे फिर खोलें।</string>
+    <string name="updates_allow_title">ChadFlix को अपडेट इंस्टॉल करने दें</string>
+    <string name="updates_allow_steps">Fire TV पर: Settings › My Fire TV › Developer options › Install unknown apps में जाकर ChadFlix चालू करें। Google TV पर: Settings › Apps › Security &amp; restrictions › Unknown sources में जाकर ChadFlix चालू करें। फिर Install दोबारा चुनें।</string>
+    <string name="updates_downloading">ChadFlix %1$s डाउनलोड हो रहा है… अपडेट के लिए ChadFlix बंद होगा। बाद में इसे फिर खोलें।</string>
     <string name="updates_download_failed">अपडेट डाउनलोड नहीं हो सका</string>
     <string name="updates_download_failed_desc">टीवी का कनेक्शन जाँचें और सेटिंग › जानकारी से फिर कोशिश करें।</string>
 
@@ -59,7 +59,7 @@
     <string name="tab_my_list">My Alder</string>
     <string name="nav_profile">प्रोफ़ाइल</string>
     <string name="nav_search">खोजें</string>
-    <string name="updates_ready">Alder %1$s तैयार है</string>
+    <string name="updates_ready">ChadFlix %1$s तैयार है</string>
     <string name="updates_ready_desc">अभी इंस्टॉल करें? इसमें एक मिनट लगता है, और आपकी प्रोफ़ाइलें और सेटिंग बनी रहती हैं।</string>
     <string name="action_later">बाद में</string>
     <string name="action_install">इंस्टॉल करें</string>
@@ -347,7 +347,7 @@
     <string name="whats_new_hint">इस टीवी पर मौजूद वर्शन के बदलाव।</string>
     <string name="updates">अपडेट</string>
     <string name="updates_checking">जाँच हो रही है…</string>
-    <string name="updates_hint">नए वर्शन GitHub पर Alder की रिलीज़ से आते हैं।</string>
+    <string name="updates_hint">नए वर्शन GitHub पर ChadFlix की रिलीज़ से आते हैं।</string>
     <string name="updates_install">%1$s इंस्टॉल करें  ›</string>
     <string name="updates_check_failed">जाँच नहीं हो सकी · फिर से कोशिश करें  ›</string>
     <string name="updates_up_to_date">अप टू डेट</string>
