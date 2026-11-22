@@ -54,6 +54,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **Errors tell you what to do.** Messages name the add-on or service that failed and say what to try next.
 
 ### Fixes
+- **Full row names.** **More like** rows show the whole movie name, and long row names end with a whole word instead of stopping mid-word.
 - **Keep your audio language.** **My language first** tries your language, then English. Select **Settings → Picture & Sound → Fallback audio language** to try another language before English or turn fallback off.
 - **Your place is safe.** Progress syncs correctly with your phone, survives going offline, and is saved the moment you stop.
 - **Resume works everywhere.** **Continue Watching**, the title page and the player agree on where you stopped.

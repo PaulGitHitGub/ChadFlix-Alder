@@ -132,6 +132,8 @@ class ScreenDesignTest {
         assertEquals("More like Dune", homeRowName("Because you watched Dune"))
         assertEquals("More like Crayon Shin-chan", homeRowName("Because you watched Crayon Shin-chan: Pursuit"))
         assertEquals("Popular", homeRowName("Popular"))
+        assertEquals("More like Doctor Strange in the Multiverse of Madness",
+            homeRowName("Because you watched Doctor Strange in the Multiverse of Madness"))
     }
 
     @Test fun seasonCountIsSingularForOne() {
@@ -167,6 +169,7 @@ class ScreenDesignTest {
         assertEquals("Recommended in India", shortRowName("Recommended in India"))
         assertEquals("Comedy Sci-Fi", shortRowName("Comedy Science Fiction"))
         assertEquals("Adventure", shortRowName("Short & Sweet Adventure", listOf("Drama", "Adventure")))
+        assertEquals("Top Rated Korean Dramas Of…", shortRowName("Top Rated Korean Dramas Of All Time"))
     }
 
     @Test fun homeRowsIdentifyMoviesAndShows() {

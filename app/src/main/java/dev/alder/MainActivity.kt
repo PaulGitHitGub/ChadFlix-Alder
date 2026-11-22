@@ -41,18 +41,23 @@ internal fun synopsisAtSentence(text: String, limit: Int): String {
     return whole.trimEnd(' ', ',', ';', ':', '-', '.', '!', '?') + "…"
 }
 
-/** "Because you watched Crayon Shin-chan: Pursuit" → "More like Crayon Shin-chan". */
+/** [s] up to [max] letters, cut at a whole word with "…". */
+private fun cap(s: String, max: Int): String {
+    val clean = s.trim()
+    if (clean.length <= max) return clean
+    val cut = clean.take(max).substringBeforeLast(' ', "").trimEnd(' ', ',', ';', ':', '-', '&')
+    return (if (cut.isNotEmpty()) cut else clean.take(max).trimEnd()) + "…"
+}
+
+/**
+ * "Because you watched Crayon Shin-chan: Pursuit" → "More like Crayon Shin-chan". The title is whole: the row heading
+ * ends it with "…" only when it is wider than the hero.
+ */
 internal fun homeRowName(name: String): String {
-    fun cap(s: String, max: Int): String {
-        val clean = s.trim()
-        if (clean.length <= max) return clean
-        val cut = clean.take(max).substringBeforeLast(' ', "").trimEnd()
-        return (if (cut.isNotEmpty()) cut else clean.take(max).trimEnd()) + "…"
-    }
     val prefix = "Because you watched "
     if (!name.startsWith(prefix, ignoreCase = true)) return cap(name, 36)
     val title = name.substring(prefix.length).substringBefore(":").substringBefore(" (").substringBefore(" - ")
-    return "More like ${cap(title, 26)}"
+    return "More like ${title.trim()}"
 }
 
 internal fun seasons(count: Int) = if (count == 1) "1 season" else "$count seasons"
@@ -87,7 +92,7 @@ internal fun shortRowName(name: String, genres: Collection<String> = emptyList()
         n.contains("pick", true) || n.contains("recommend", true) -> "For you"
         n.contains("popular", true) || n.contains("trending", true) -> "Popular"
         n.length <= 18 -> n
-        else -> genres.map(::genreLabel).distinct().filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { n.take(28).trimEnd() }
+        else -> genres.map(::genreLabel).distinct().filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { cap(n, 28) }
     }
 }
 
