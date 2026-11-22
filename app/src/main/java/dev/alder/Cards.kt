@@ -119,7 +119,10 @@ internal class MediaCardView(
     private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
     /** ChadFlix: the title's logo, shown at the foot of the widened card ([expand]). */
     var logoUrl: String? = null
-    private var expanded = false
+    private var wantWide = false // focused: widen as soon as there's a backdrop to show
+    private val expanded get() = wantWide && artUrl != null
+    /** How much wider than a poster this card is about to be (its row scrolls for that). */
+    val widensBy: Int get() = if (expanded) wideW - widthPx else 0
     private var widthAnim: ValueAnimator? = null
     private val logoMade = lazy {
         ImageView(screen).apply {
@@ -224,19 +227,25 @@ internal class MediaCardView(
      * its logo (or name) at the foot; unfocused, it's a poster again. Only this card's width animates.
      */
     fun expand(on: Boolean) {
-        if (wideW <= 0 || expanded == on) return
-        expanded = on
+        if (wideW <= 0 || wantWide == on) return
+        wantWide = on
+        widen()
+        if (logoMade.isInitialized()) logoView.run { visibility = View.GONE; tag = null; setImageDrawable(null) }
+        if (wanted) load()
+    }
+
+    /** A title with no backdrop yet stays a poster until one comes ([refresh]). */
+    private fun widen() {
+        if (expanded || nameMade.isInitialized()) nameView.textSize = if (expanded) Screen.SERIF_NAME else Screen.SMALL
         val lp = layoutParams ?: return
+        val to = if (expanded) wideW else widthPx
+        if (lp.width == to) return
         widthAnim?.cancel()
-        widthAnim = ValueAnimator.ofInt(lp.width, if (on) wideW else widthPx).setDuration(Screen.QUICK_MS).apply {
+        widthAnim = ValueAnimator.ofInt(lp.width, to).setDuration(Screen.QUICK_MS).apply {
             interpolator = DecelerateInterpolator()
             addUpdateListener { lp.width = it.animatedValue as Int; requestLayout() }
             start()
         }
-        if (logoMade.isInitialized()) logoView.visibility = View.GONE
-        if (on || nameMade.isInitialized()) nameView.textSize = if (on) Screen.SERIF_NAME else Screen.SMALL
-        shownUrl = null
-        if (wanted) load()
     }
 
     fun setOnFocusChanged(handler: (Boolean) -> Unit) {
@@ -247,6 +256,7 @@ internal class MediaCardView(
         posterUrl = poster
         artUrl = art
         settled = isSettled
+        if (wantWide) widen() // ChadFlix: the backdrop came: the focused card widens now
         if (wanted) load()
     }
 
@@ -314,17 +324,19 @@ internal class MediaCardView(
     }
 
     private fun loadUrl(url: String, retry: Boolean) {
-        // ChadFlix home cards don't grow: decoded at their own width (as Home prefetches them), the widened one at its own.
-        val imageWidth = if (expanded) wideW else if (home) widthPx else (widthPx * Screen.CARD_GROW).toInt()
+        // ChadFlix home cards don't grow: decoded at their own width (as Home prefetches them); a widened card's backdrop
+        // at its own, kept with the full-screen art rather than pushing posters out.
+        val backdrop = expanded && url == artUrl
+        val imageWidth = if (backdrop) wideW else if (home) widthPx else (widthPx * Screen.CARD_GROW).toInt()
         image.animate().cancel()
         image.alpha = 1f
-        if (!Images.cached(url, imageWidth) && (grid || live)) {
+        if (!Images.cached(url, imageWidth, wide = backdrop) && (grid || live)) {
             nameView.visibility = View.VISIBLE
             face.alpha = 1f
         }
         var now = true // from memory: no fade, it's simply there
         val fallbackArt = artUrl?.takeIf { it != url && !wide }
-        Images.load(url, image, imageWidth, orElse = fallbackArt, failed = {
+        Images.load(url, image, imageWidth, orElse = fallbackArt, wide = backdrop, failed = {
             if (retryOnFailure) {
                 android.util.Log.w("Alder", "search poster failed: ${android.net.Uri.parse(url).host ?: "none"}" +
                     if (retry) ", trying again" else "")
@@ -370,6 +382,7 @@ internal class MediaCardView(
         image.tag = null
         image.setImageDrawable(null)
         image.setPadding(0, 0, 0, 0)
+        if (logoMade.isInitialized()) logoView.run { tag = null; setImageDrawable(null) } // ChadFlix: logos let go too
         face.background = null
         face.alpha = 0f
     }
@@ -492,11 +505,14 @@ internal class HorizontalCardRail(
         }
     }
 
-    fun scrollToCard(index: Int): Int {
+    /** [widenBy]: ChadFlix, how much wider the card is about to be (the row's end stops later by that much). */
+    fun scrollToCard(index: Int, widenBy: Int = 0): Int {
         selected = index
         anim?.cancel()
         val startScroll = scroller.scrollX
-        val targetScroll = railTargetScroll(index, stepPx, strip.width, scroller.width)
+        val stripW = if (widenBy <= 0) strip.width else
+            strip.paddingLeft + strip.paddingRight + cards.sumOf { it.widthPx } + cardGapPx * (cards.size - 1) + widenBy
+        val targetScroll = railTargetScroll(index, stepPx, stripW, scroller.width)
         if (cullLeft) showVisibleCards()
         val glideTime = rowGlideDuration(held, wideMotion, ViewConfiguration.getKeyRepeatDelay().toLong())
         anim = ValueAnimator.ofInt(startScroll, targetScroll).setDuration(glideTime).apply {

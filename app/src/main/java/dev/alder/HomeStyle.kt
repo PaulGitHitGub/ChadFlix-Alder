@@ -121,8 +121,10 @@ internal object HomeStyle {
         runCatching { org.json.JSONArray(prefs(c).getString(key(c, page), "[]")).strings() }.getOrDefault(emptyList())
 
     /** Moves [title] [by] places among the page's [shown] rows and keeps that order. */
-    fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) =
-        prefs(c).edit().putString(key(c, page), org.json.JSONArray(movedRow(shown, title, by)).toString()).apply()
+    fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) = saveRowOrder(c, page, movedRow(shown, title, by))
+
+    fun saveRowOrder(c: Context, page: String, titles: List<String>) =
+        prefs(c).edit().putString(key(c, page), org.json.JSONArray(titles).toString()).apply()
 
     // ---------- genre rows from TMDb (Movies and Shows), and which rows are on, per profile and page ----------
 
@@ -169,6 +171,12 @@ internal object HomeStyle {
 
     fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, id)}"
 
+    /** A genre row's place on the page, whatever list it shows: "tmdb:<id>". */
+    fun slotSource(source: String) = source.substringBeforeLast(':')
+
+    /** Genre rows fetch on two threads of their own, so title pages and sources never wait behind them. */
+    val rowPool: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(2)
+
     fun setShowing(c: Context, page: String, id: Int, list: String) =
         prefs(c).edit().putString(Settings.profileKey(c, "showing:$page:$id"), list).apply()
 
@@ -187,23 +195,34 @@ internal object HomeStyle {
 
     /**
      * A genre row's titles, one TMDb page, after its Showing tile (a card with no picture: "Showing" over the list's
-     * name). Blocks: run it off the main thread.
+     * name), and whether it's worth keeping (most titles found their IMDb id). Blocks: run it off the main thread.
      */
-    fun genreTitles(c: Context, movie: Boolean, source: String): List<Meta> {
+    fun genreTitles(c: Context, movie: Boolean, source: String): Pair<List<Meta>, Boolean> {
         val parts = source.removePrefix(TMDB).split(":")
         val list = lists(movie).firstOrNull { it.first == parts.getOrElse(1) { "" } } ?: lists(movie)[0]
         val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series")
             .put("name", c.getString(R.string.showing) + "\n" + c.getString(list.second)))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
-        return listOf(tile) + Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
+        val (titles, complete) = Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
             day.format(java.util.Date()), day.format(since)), genres(movie).toMap())
+        return listOf(tile) + titles to complete
     }
 }
 
 /** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
 internal fun <T> orderedRows(saved: List<String>, items: List<T>, title: (T) -> String): List<T> =
     if (saved.isEmpty()) items else items.sortedBy { saved.indexOf(title(it)).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+
+/**
+ * [title] moved [by] places among the rows on screen ([shown]), in the order of every row the page could show ([all]):
+ * it trades places with its nearest shown neighbour, so rows that are off keep theirs.
+ */
+internal fun movedAmong(all: List<String>, shown: List<String>, title: String, by: Int): List<String> {
+    val other = shown.getOrNull(shown.indexOf(title).takeIf { it >= 0 }?.plus(by) ?: return all) ?: return all
+    if (title !in all || other !in all) return movedRow(shown, title, by)
+    return all.map { when (it) { title -> other; other -> title; else -> it } }
+}
 
 internal fun movedRow(titles: List<String>, title: String, by: Int): List<String> {
     val from = titles.indexOf(title)

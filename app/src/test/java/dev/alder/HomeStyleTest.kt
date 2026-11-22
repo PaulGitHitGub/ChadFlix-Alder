@@ -43,4 +43,11 @@ class HomeStyleTest {
         assertEquals("3", genreParams(false, 18, "complete", "", "")["with_status"])
         assertEquals("revenue.desc", genreParams(true, 28, "blockbusters", "", "")["sort_by"])
     }
+
+    @Test fun movingAShownRowKeepsTheOffRowsPlaces() {
+        val all = listOf("Action", "Western", "Comedy", "Drama")
+        val shown = listOf("Action", "Comedy", "Drama")
+        assertEquals(listOf("Comedy", "Western", "Action", "Drama"), movedAmong(all, shown, "Comedy", -1))
+        assertEquals(all, movedAmong(all, shown, "Action", -1))
+    }
 }

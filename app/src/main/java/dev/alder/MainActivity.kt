@@ -693,6 +693,7 @@ class MainActivity : Screen() {
     private var refreshAddons: (() -> Unit)? = null // the open page's add-on check, run again on coming back to Alder
     private var rebuildRows: (() -> Unit)? = null // ChadFlix: the open page's rows again, after Move Up / Move Down
     private var pageRows: List<String> = emptyList() // ChadFlix: the open page's row titles, in order
+    private val showingChanged = mutableMapOf<String, Pair<Int, String>>() // ChadFlix: row title to (genre, the list before)
 
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
@@ -1795,8 +1796,10 @@ class MainActivity : Screen() {
                 val key = catalogAnswerKey(p.label, title, picked, rowCatalogs.map { c ->
                     "${c.addon.transportUrl}/${c.type}/${c.id}"
                 })
-                val reused = oldSlots.remove(key)
-                val slot = (reused ?: slot()).also { catalogSlots[key] = it }
+                // ChadFlix: a genre row keeps its slot when its Showing list changes; only its answers are per list.
+                val slotKey = if (picked?.startsWith(HomeStyle.TMDB) == true) catalogAnswerKey(p.label, title, HomeStyle.slotSource(picked), emptyList()) else key
+                val reused = oldSlots.remove(slotKey)
+                val slot = (reused ?: slot()).also { catalogSlots[slotKey] = it }
                 val kept = answers[key]
                 val sourceAnswers = arrayOfNulls<Pair<List<Meta>, Boolean>>(rowCatalogs.size)
                 val failures = arrayOfNulls<Failure>(rowCatalogs.size)
@@ -1865,6 +1868,15 @@ class MainActivity : Screen() {
                         if (g != generation || build != catalogBuild || version != rowVersion) return
                         if (items.isEmpty()) { if (completed == rowCatalogs.size) main.post { loadMoreSections?.invoke() }; return }
                         val old = rows.firstOrNull { it.view.parent === slot }
+                        if (old != null && showingChanged.remove(title) != null) { // ChadFlix: the new list replaces the row, focus and all
+                            val made = row(title, items.take(initialRowCards(false)), more)
+                            slot.addView(made.view)
+                            if (old.view.hasFocus()) made.focusFirst()
+                            old.cards.forEach { card -> card.unload() }
+                            rows.remove(old)
+                            slot.removeView(old.view)
+                            return
+                        }
                         if (old != null && reused != null && old.pendingUpdate == null && results == kept) return
                         if (old?.view?.hasFocus() == true) { old.pendingUpdate = ::add; return }
                         old?.let { it.cards.forEach { card -> card.unload() }; rows.remove(it); slot.removeAllViews() }
@@ -1906,10 +1918,14 @@ class MainActivity : Screen() {
                 }
                 if (picked?.startsWith(HomeStyle.TMDB) == true) { // ChadFlix: a TMDb genre row, kept for the session
                     if (kept != null) return onAnswer(Result.success(kept))
-                    background({ listOf(HomeStyle.genreTitles(applicationContext, p == Page.MOVIES, picked) to false) }) { r ->
+                    background({ HomeStyle.genreTitles(applicationContext, p == Page.MOVIES, picked) }, HomeStyle.rowPool) { r ->
+                        // Kept even if the page moved on; a row whose titles mostly lacked IMDb ids is asked again next time.
+                        r.getOrNull()?.takeIf { it.second }?.let { answers[key] = listOf(it.first to false) }
                         if (g != generation || build != catalogBuild) return@background
-                        r.getOrNull()?.takeIf { it.first().first.size > 1 }?.let { answers[key] = it }
-                        onAnswer(r)
+                        if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove(title)?.let { (id, was) ->
+                            HomeStyle.setShowing(this@MainActivity, p.label, id, was) // the new list failed: the old row stays
+                        }
+                        onAnswer(r.map { listOf(it.first to false) })
                     }
                     return
                 }
@@ -2630,7 +2646,11 @@ class MainActivity : Screen() {
             (getString(R.string.action_choose_source) to { play(item, pick = true) }).takeIf { !HomeStyle.isTile(item.id) },
             (getString(R.string.row_move_up) to { moveRow(row.title, -1) }).takeIf { at > 0 },
             (getString(R.string.row_move_down) to { moveRow(row.title, 1) }).takeIf { at >= 0 && at < pageRows.lastIndex },
-            (getString(R.string.action_hide_row, row.title) to { Settings.hideRow(this, row.title); showPage(page) })
+            (getString(R.string.action_hide_row, row.title) to {
+                // ChadFlix: on Movies and Shows a row is turned off for that page only (Drama on Movies, not on Shows)
+                if (page.hasGenreShortcuts) HomeStyle.setRowOn(this, page.label, row.title, false) else Settings.hideRow(this, row.title)
+                showPage(page)
+            })
                 .takeIf { row.title.isNotEmpty() },
         )
         choose(item.name, actions.map { it.first }) { actions[it].second() }
@@ -2645,6 +2665,7 @@ class MainActivity : Screen() {
         val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         choose("${row.title} · ${getString(R.string.showing)}", names, checked = lists.indexOfFirst { it.first == current }.coerceAtLeast(0)) { i ->
             if (lists[i].first == current) return@choose
+            showingChanged[row.title] = id to current
             HomeStyle.setShowing(this, page.label, id, lists[i].first)
             rebuildRows?.invoke() ?: showPage(page)
         }
@@ -2652,7 +2673,10 @@ class MainActivity : Screen() {
 
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
     private fun moveRow(title: String, by: Int) {
-        HomeStyle.moveRow(this, page.label, pageRows, title, by)
+        // Among every row the page could show, so rows that are off keep their places.
+        val all = if (page.hasGenreShortcuts) orderedRows(HomeStyle.rowOrder(this, page.label),
+            HomeStyle.knownRows(this, page.label, page == Page.MOVIES)) { it } else pageRows
+        HomeStyle.saveRowOrder(this, page.label, movedAmong(all, pageRows, title, by))
         lastHomeRows = HomeStyle.signature(this, page.label)
         rebuildRows?.invoke() ?: showPage(page)
         main.post { currentFocus?.let(::snapTo) }
@@ -2783,6 +2807,8 @@ class MainActivity : Screen() {
             }
             onHoldEnd = { sel ->
                 if (!grid && !polishedRail) items.getOrNull(sel)?.let(::showArt)
+                // ChadFlix: racing along a row passes the cards as posters; the one the remote stops on widens.
+                if (homeRow) cards.getOrNull(sel)?.let { it.expand(true); scrollToCard(sel, it.widensBy) }
             }
         }
         val cards: MutableList<MediaCardView> get() = rail.cards
@@ -2883,8 +2909,8 @@ class MainActivity : Screen() {
             } else light(true)
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
-                cards[index].expand(true)
-                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W)) }
+                if (!held) cards[index].expand(true)
+                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
             if (page.isBrowse) updateNextRow()
             if (page.isCatalog) markChip(title)
@@ -2899,7 +2925,7 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            val targetScroll = rail.scrollToCard(index)
+            val targetScroll = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0)
             loadRest(this@Row)
             val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()

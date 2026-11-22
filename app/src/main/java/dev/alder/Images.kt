@@ -26,7 +26,7 @@ object Images {
     private val softwareBitmaps = android.os.Build.VERSION.SDK_INT < 26
     private val cards = store(Runtime.getRuntime().maxMemory() / if (softwareBitmaps) 8 else 4)
     private val screens = store(Runtime.getRuntime().maxMemory() / if (softwareBitmaps) 12 else 6)
-    private fun cache(widthPx: Int) = if (widthPx > 1000) screens else cards
+    private fun cache(widthPx: Int, wide: Boolean = false) = if (wide || widthPx > 1000) screens else cards // wide: ChadFlix's widened cards
     // Home asks only for posters near the screen and lets far ones go, so this pool and cache stay small.
     /** Threads in the card pool: the first this many requests start at once, ahead of the newest-first queue. */
     const val THREADS = 8
@@ -58,7 +58,7 @@ object Images {
      */
     fun load(
         url: String?, into: ImageView, widthPx: Int, orElse: String? = null, urgent: Boolean = false, look: Look? = null,
-        failed: (() -> Unit)? = null, done: (() -> Unit)? = null,
+        failed: (() -> Unit)? = null, wide: Boolean = false, done: (() -> Unit)? = null,
     ) {
         if (url == null) {
             if (orElse != null) load(orElse, into, widthPx, look = look, failed = failed, done = done)
@@ -66,12 +66,12 @@ object Images {
             return
         }
         into.tag = url
-        into.setImageDrawable(null)
         val key = key(url, widthPx, look)
-        cache(widthPx).get(key)?.let { into.setImageBitmap(it); done?.invoke(); return }
+        cache(widthPx, wide).get(key)?.let { into.setImageBitmap(it); done?.invoke(); return }
+        into.setImageDrawable(null)
         (if (urgent) urgentPool else pool).execute {
             if (into.tag != url) return@execute // the view moved on (scrolled away, another title) while this waited
-            val bitmap = bitmap(url, widthPx, look)
+            val bitmap = bitmap(url, widthPx, look, wide)
             if (bitmap == null) {
                 main.post { if (into.tag == url) { if (orElse != null) load(orElse, into, widthPx, look = look, failed = failed, done = done) else failed?.invoke() } }
                 return@execute
@@ -84,9 +84,9 @@ object Images {
      * Fetches [url] into the cache ahead of time, so the next card's art is ready the moment it's focused. [urgent]
      * for the picture about to fill the screen (Home's first title at launch).
      */
-    fun prefetch(url: String?, widthPx: Int, urgent: Boolean = false, look: Look? = null) {
-        if (cache(widthPx).get(key(url ?: return, widthPx, look)) != null) return
-        (if (urgent) urgentPool else aheadPool).execute { bitmap(url, widthPx, look) }
+    fun prefetch(url: String?, widthPx: Int, urgent: Boolean = false, look: Look? = null, wide: Boolean = false) {
+        if (cache(widthPx, wide).get(key(url ?: return, widthPx, look)) != null) return
+        (if (urgent) urgentPool else aheadPool).execute { bitmap(url, widthPx, look, wide) }
     }
 
     /**
@@ -102,21 +102,21 @@ object Images {
      * The picture at this size: from memory, or downloaded and decoded once however many ask at the same time (a
      * prefetch and then the view it was for wait on the same work instead of doing it twice).
      */
-    private fun bitmap(url: String, widthPx: Int, look: Look? = null): Bitmap? {
+    private fun bitmap(url: String, widthPx: Int, look: Look? = null, wide: Boolean = false): Bitmap? {
         val key = key(url, widthPx, look)
-        cache(widthPx).get(key)?.let { return it }
+        cache(widthPx, wide).get(key)?.let { return it }
         val mine = FutureTask {
             runCatching {
                 val bytes = Http.bytes(sized(url, widthPx))
                 if (look == null) decode(bytes, widthPx) else decode(bytes, widthPx, Bitmap.Config.ARGB_8888)?.let(look.paint)
-            }.getOrNull()?.also { cache(widthPx).put(key, it) }
+            }.getOrNull()?.also { cache(widthPx, wide).put(key, it) }
         }
         val task = inFlight.putIfAbsent(key, mine) ?: mine
         if (task === mine) try { mine.run() } finally { inFlight.remove(key) }
         return runCatching { task.get() }.getOrNull()
     }
 
-    fun cached(url: String, widthPx: Int, look: Look? = null) = cache(widthPx).get(key(url, widthPx, look)) != null
+    fun cached(url: String, widthPx: Int, look: Look? = null, wide: Boolean = false) = cache(widthPx, wide).get(key(url, widthPx, look)) != null
 
     /**
      * [src] frosted for glass, as Plume does it: shrunk to [w] px wide and box-blurred twice. Works on every Android

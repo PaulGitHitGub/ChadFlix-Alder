@@ -164,21 +164,28 @@ object Tmdb {
 
     private const val SERVICES = 14
 
-    /** ChadFlix: one page of a home genre row, TMDb's discover with [params], as playable metas (IMDb ids only). */
-    fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>): List<Meta> {
+    /**
+     * ChadFlix: one page of a home genre row, TMDb's discover with [params], as playable metas (IMDb ids only), and
+     * whether at least half its titles found theirs. The page is kept on disk for 12 hours and IMDb ids for good (they
+     * never change); an error answer (429 too many requests) throws.
+     */
+    fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>): Pair<List<Meta>, Boolean> {
         val media = if (movie) "movie" else "tv"
         val query = (mapOf("api_key" to KEY, "language" to language, "include_adult" to "false", "page" to "1") + params)
             .entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
-        val found = JSONObject(Http.get("$BASE/discover/$media?$query")).optJSONArray("results").objects()
+        fun kept(url: String, maxAgeMs: Long?) = Http.savedAnswer(url, maxAgeMs = maxAgeMs) ?: Http.get(url, keep = true, timeoutMs = ROW_WAIT, strict = true)
+        val found = JSONObject(kept("$BASE/discover/$media?$query", 12 * 3600_000L)).optJSONArray("results").objects()
         val ids = pool.invokeAll(found.map { t ->
             java.util.concurrent.Callable {
-                runCatching {
-                    JSONObject(Http.get("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", keep = true)).text("imdb_id")
-                }.getOrNull()?.takeIf { it.startsWith("tt") }
+                runCatching { JSONObject(kept("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", null)).text("imdb_id") }
+                    .getOrNull()?.takeIf { it.startsWith("tt") }
             }
         }).map { runCatching { it.get() }.getOrNull() }
-        return found.zip(ids).mapNotNull { (t, imdb) -> imdb?.let { discoverMeta(t, it, movie, genreNames) } }
+        val titles = found.zip(ids).mapNotNull { (t, imdb) -> imdb?.let { discoverMeta(t, it, movie, genreNames) } }
+        return titles to (titles.size * 2 >= found.size && found.isNotEmpty())
     }
+
+    private const val ROW_WAIT = 8_000
 
     /**
      * Fallback recommendations from TMDB when installed Stremio add-ons do not advertise a `similar` catalog.
