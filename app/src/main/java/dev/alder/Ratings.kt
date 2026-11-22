@@ -65,11 +65,13 @@ internal fun mdbRatings(imdbId: String, apiKey: String, type: String = "movie", 
     val kind = if (type == "movie") "movie" else "show"
     val url = "https://api.mdblist.com/imdb/$kind/$imdbId?apikey=${android.net.Uri.encode(apiKey)}"
     val saved = Http.savedAnswer(url)
-    val raw = if (saved != null && !fresh) saved else runCatching { Http.get(url, keep = true, timeoutMs = 5_000) }
+    val raw = if (saved != null && !fresh) saved else runCatching { Http.get(url, keep = true, timeoutMs = 5_000, strict = true) }
         .onFailure { android.util.Log.w("Alder", "MDBList ratings for $imdbId failed: ${it.javaClass.simpleName}") }
         .getOrNull() ?: saved
-    val found = raw?.let { runCatching { parseRatings(JSONObject(it)) }.getOrNull() }.orEmpty()
-    ratingsCache[imdbId] = found
+    val answered = raw?.let { runCatching { JSONObject(it) }.getOrNull() }?.takeIf { it.has("ratings") }
+    val found = answered?.let { runCatching { parseRatings(it) }.getOrNull() }.orEmpty()
+    // ChadFlix: only a real answer is remembered; an error body (429, 404) must not hide a good saved one.
+    if (answered != null) ratingsCache[imdbId] = found
     return found.ifEmpty { null }
 }
 

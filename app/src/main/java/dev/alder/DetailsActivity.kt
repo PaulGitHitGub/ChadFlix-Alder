@@ -419,7 +419,7 @@ class DetailsActivity : Screen() {
                 setAutoSizeTextTypeUniformWithConfiguration(20, SERIF_HERO.toInt(), 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         }
         val titleArea = FrameLayout(this).apply {
-            addView(title, FrameLayout.LayoutParams(-1, -2, Gravity.TOP or Gravity.START))
+            addView(title, FrameLayout.LayoutParams(-1, -1, Gravity.TOP or Gravity.START))
             if (m != null) {
                 val logo = ImageView(this@DetailsActivity).apply {
                     adjustViewBounds = true
@@ -436,7 +436,7 @@ class DetailsActivity : Screen() {
                 }
             }
         }
-        val stack = column(Gravity.START).apply { addView(titleArea, LinearLayout.LayoutParams(-1, -2)) }
+        val stack = column(Gravity.START).apply { addView(titleArea, LinearLayout.LayoutParams(-1, dp(68))) } // ChadFlix: fixed, so the logo arriving never moves what is below
         if (m == null) {
             val error = failed(failure?.let { failureMessage(R.string.details_load_failed, it) }
                 ?: getString(R.string.details_load_failed)) { recreate() }
