@@ -75,7 +75,7 @@ internal object HomeStyle {
             cornerRadius = px(c, CARD_RADIUS)
             setStroke(px(c, RING).toInt().coerceAtLeast(2), WHITE)
         }
-        visibility = View.GONE
+        visibility = View.INVISIBLE // INVISIBLE, not GONE: showing it then needs no layout pass
     }
 
     /**

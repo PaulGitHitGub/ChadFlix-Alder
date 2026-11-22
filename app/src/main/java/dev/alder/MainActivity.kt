@@ -942,7 +942,7 @@ class MainActivity : Screen() {
             main.removeCallbacks(switchPage)
             when {
                 p != page -> { jump = true; showPage(p) }
-                p.isCatalog -> (genreChips[genre] ?: warning() ?: firstRow()?.cards?.firstOrNull())?.requestFocus()
+                p.isCatalog -> (genreChips[genre]?.takeIf { it.isShown } ?: warning() ?: firstRow()?.cards?.firstOrNull())?.requestFocus()
                 p.isGrid -> pageChip()?.requestFocus()
                 else -> firstRow()?.focusFirst()
             }
@@ -2786,7 +2786,7 @@ class MainActivity : Screen() {
 
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
-        private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true).onArt().apply {
+        private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
             setPadding(dp(PAD), 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END

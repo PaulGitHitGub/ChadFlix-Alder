@@ -134,7 +134,7 @@ internal class MediaCardView(
 
     // Keep the title on backdrop substitutes: cropped art may have no lettering.
     private val nameMade = lazy {
-        screen.text(titleName, if (wide) Screen.BODY else Screen.SMALL, bold = true).apply {
+        screen.text(titleName, if (wide) Screen.BODY else Screen.SMALL, bold = true, color = if (home) HomeStyle.WHITE else Screen.TEXT).apply {
             maxLines = if (wide) 1 else 2
             ellipsize = TextUtils.TruncateAt.END
             if (live) gravity = Gravity.CENTER
@@ -192,7 +192,7 @@ internal class MediaCardView(
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         face.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         setOnFocusChangeListener { _, has ->
-            if (ring != null) ring.visibility = if (has) View.VISIBLE else View.GONE
+            if (ring != null) ring.visibility = if (has) View.VISIBLE else View.INVISIBLE
             else screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
             onFocusHandler?.invoke(has)
         }
@@ -229,9 +229,9 @@ internal class MediaCardView(
             badgeView?.let { removeView(it); badgeView = null }
             return
         }
-        val view = badgeView ?: screen.text("", Screen.SMALL, bold = true, color = Screen.TUNGSTEN).apply {
+        val view = badgeView ?: screen.text("", Screen.SMALL, bold = true, color = if (home) HomeStyle.WHITE else Screen.TUNGSTEN).apply {
             gravity = Gravity.CENTER
-            background = screen.rounded(Screen.BASE, 12)
+            background = screen.rounded(if (home) HomeStyle.BLACK else Screen.BASE, 12)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }.also {
             badgeView = it
