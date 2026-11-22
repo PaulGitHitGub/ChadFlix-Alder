@@ -208,7 +208,7 @@ object Tmdb {
 
     /** Fetches for [offline] reads that found nothing on disk; their own threads, so rows waiting on [pool] don't queue behind. */
     private val warmer = java.util.concurrent.Executors.newFixedThreadPool(2)
-    private val warming = ConcurrentHashMap.newKeySet<String>()
+    private val warming: MutableSet<String> = java.util.Collections.newSetFromMap(ConcurrentHashMap()) // newKeySet is API 24
 
     /**
      * TMDB's answer from disk when under a month old, else from the network (and kept). [offline] never waits on the
@@ -248,8 +248,11 @@ object Tmdb {
         if (!episodes || json.optString("type") != "series") return
         val videos = json.optJSONArray("videos").objects()
         val seasons = videos.map { it.optInt("season") }.filter { it > 0 }.distinct()
-        pool.invokeAll(seasons.map { s -> java.util.concurrent.Callable { s to answer("$BASE/tv/$id/season/$s?api_key=$KEY&language=$language", offline) } })
-            .forEach { f -> runCatching { f.get() }.getOrNull()?.let { (s, a) -> a?.let { applyEpisodes(videos, s, it) } } }
+        fun season(s: Int) = answer("$BASE/tv/$id/season/$s?api_key=$KEY&language=$language", offline)
+        // Disk reads stay on this thread: queued behind TMDB requests on [pool], a saved title would wait on the network.
+        val answers = if (offline) seasons.map { it to season(it) }
+            else pool.invokeAll(seasons.map { s -> java.util.concurrent.Callable { s to season(s) } }).mapNotNull { runCatching { it.get() }.getOrNull() }
+        answers.forEach { (s, a) -> a?.let { applyEpisodes(videos, s, it) } }
     }
 
     /**
@@ -258,6 +261,8 @@ object Tmdb {
      */
     fun translateAll(titles: List<JSONObject>, offline: Boolean = false, budgetMs: Long = 3_000) {
         if (titles.isEmpty()) return
+        // Disk only: on this thread, so saved rows never wait behind TMDB requests on [pool].
+        if (offline) return titles.forEach { json -> runCatching { details(json, true) }.getOrNull()?.let { applyTranslation(json, it.second, language) } }
         // The workers only read; the titles change here, on the caller's thread, once each answer is in.
         val answers = pool.invokeAll(titles.map { java.util.concurrent.Callable { runCatching { details(it, offline) }.getOrNull() } },
             budgetMs, java.util.concurrent.TimeUnit.MILLISECONDS)

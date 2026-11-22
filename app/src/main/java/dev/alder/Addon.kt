@@ -123,16 +123,17 @@ class Addon(val descriptor: JSONObject) {
                     c.optJSONArray("extra").objects().none { it.optBoolean("isRequired") && it.optString("name") != "search" }
             }
             .distinctBy { it.optString("type") to it.optString("id") }
+        val deadline = System.currentTimeMillis() + 5_000
         fun fetch(c: JSONObject): List<Meta> {
             val path = url(arrayOf("catalog", c.getString("type"), c.getString("id"))).removeSuffix(".json")
             val searchUrl = "$path/search=${Uri.encode(query)}.json"
             val answer = JSONObject(Http.get(searchUrl, timeoutMs = 5_000, strict = true))
-            // Inside the search's own 5 s: what TMDB hasn't answered in 1.5 s stays English.
-            return answer.getJSONArray("metas").objects().inLanguage(budgetMs = 1_500).metas()
+            // Translation waits at most 1.5 s, and never past the search's own deadline: English results beat none.
+            val budget = minOf(1_500L, deadline - System.currentTimeMillis() - 300).coerceAtLeast(0)
+            return answer.getJSONArray("metas").objects().inLanguage(budgetMs = budget).metas()
         }
         val completion = ExecutorCompletionService<Pair<Int, Result<List<Meta>>>>(catalogSearchPool)
         val pending = catalogs.mapIndexed { index, catalog -> completion.submit { index to runCatching { fetch(catalog) } } }
-        val deadline = System.currentTimeMillis() + 5_000
         val answers = mutableListOf<Pair<Int, List<Meta>>>()
         var failure: Throwable? = null
         try {
