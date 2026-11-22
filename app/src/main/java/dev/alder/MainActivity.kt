@@ -480,7 +480,7 @@ class MainActivity : Screen() {
 
             // Coming down from the top bar, the remote returns to where it was.
             override fun addFocusables(views: ArrayList<View>, direction: Int, focusableMode: Int) {
-                val back = last?.takeIf { it.isAttachedToWindow && !hasFocus() && direction == View.FOCUS_DOWN }
+                val back = lastOrTitle()?.takeIf { it.isAttachedToWindow && !hasFocus() && direction == View.FOCUS_DOWN }
                 if (back != null) views.add(back) else super.addFocusables(views, direction, focusableMode)
             }
         }.apply {
@@ -699,6 +699,14 @@ class MainActivity : Screen() {
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
 
+    /** ChadFlix: where the remote goes back to in the rows: the last card, but a genre row's title rather than its tile. */
+    private fun lastOrTitle(): View? {
+        val card = last as? MediaCardView ?: return last
+        if (!HomeStyle.isTile((card.payload as? Item)?.id.orEmpty())) return card
+        val row = rows.firstOrNull { isInside(card, it.view) } ?: return card
+        return row.cards.getOrNull(row.selected) ?: card
+    }
+
     override fun onResume() {
         super.onResume()
         if (!::profile.isInitialized) return
@@ -786,7 +794,7 @@ class MainActivity : Screen() {
                 if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && genreStrip.hasFocus()) {
-                (last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull()
+                (lastOrTitle()?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull()
                     ?: librarySlot?.findViewWithTag<View>("clear_filters"))
                     ?.requestFocus()?.let { if (it) return true }
             }
@@ -827,7 +835,7 @@ class MainActivity : Screen() {
         // Down from the top bar goes to the titles, past Resume (one Up from the cards), to where the remote last was.
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && event.action == KeyEvent.ACTION_DOWN && header.hasFocus()) {
             if (warning()?.requestFocus() == true) return true
-            val to = last?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.let { it.cards[it.selected] }
+            val to = lastOrTitle()?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.let { it.cards[it.selected] }
             if (to != null) { to.requestFocus(); return true }
         }
         return super.dispatchKeyEvent(event)
@@ -1826,7 +1834,8 @@ class MainActivity : Screen() {
                         if (batchPending == 0) main.post { loadMoreSections?.invoke() }
                     }
                     if (completed == rowCatalogs.size && title in genreNames) {
-                        genreResults[title] = items.isNotEmpty()
+                        // ChadFlix: a failed Showing pick that kept the old row still has titles
+                        genreResults[title] = items.isNotEmpty() || rows.any { it.title == title && it.view.parent === slot }
                         // Resolve empty rows before showing chips; off-screen row views arrive later.
                         val readyGenres = if (p.hasGenreShortcuts) genreNames.filter { genreResults[it] == true }
                             else settledGenres(genreNames, genreResults)
@@ -2828,8 +2837,10 @@ class MainActivity : Screen() {
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         // ChadFlix: a genre row's title names its list, "Action · Trending".
         private val list = if (homeRow && page.hasGenreShortcuts) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
+        private val quietTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = false) }
+        private val litTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = true) }
         private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
-            list?.let { text = HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = false) }
+            quietTitle?.let { text = it }
             setPadding(inset, 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
@@ -2880,7 +2891,7 @@ class MainActivity : Screen() {
                 setNewEpisodes(item.newEpisodeCount)
                 logoUrl = item.logo
                 refresh(item.poster, item.art, item.settled)
-                if (active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
+                if (homeRow && active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
             }
             // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
             if (continueRow && item.progress == 0f && item.resumeAt > 0) {
@@ -2917,7 +2928,7 @@ class MainActivity : Screen() {
             }
             styleTile()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
-            list?.let { heading.text = HomeStyle.rowTitle(HomeStyle.titleCase(title), it, on) }
+            (if (on) litTitle else quietTitle)?.let { heading.text = it }
             cards.forEachIndexed { i, c -> c.dim(!on || (grid && i != selected)) } // ChadFlix: the whole row lights up
         }
 
@@ -2926,7 +2937,9 @@ class MainActivity : Screen() {
         /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
         fun pin(index: Int): Int {
             val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
-            browseInfo.translationX = if (homeRow) (index * cardStep - target).toFloat() else 0f
+            // Kept on screen: near a row's end the card sits far right, and the info box is wider than what's left.
+            val room = artW - browseInfo.width - (browseInfo.layoutParams as FrameLayout.LayoutParams).leftMargin - dp(HomeStyle.INSET)
+            browseInfo.translationX = if (homeRow) (index * cardStep - target).coerceAtMost(room).toFloat() else 0f
             return target
         }
 
