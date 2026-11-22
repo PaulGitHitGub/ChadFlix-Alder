@@ -572,4 +572,5 @@
     <string name="audio_fallback_hint">पहले मेरी भाषा में Alder पहले आपकी चुनी हुई भाषा, फिर यह वैकल्पिक भाषा और फिर अंग्रेज़ी आज़माता है। केवल अपनी चुनी हुई भाषा के लिए बंद चुनें।</string>
     <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
     <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
+    <string name="list_added_on">%1$s को जोड़ा गया</string>
 </resources>

@@ -574,4 +574,5 @@
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. Alder will try to sync it again.</string>
     <string name="library_load_failed">Couldn\'t load your Stremio library</string>
+    <string name="list_added_on">Added %1$s</string>
 </resources>

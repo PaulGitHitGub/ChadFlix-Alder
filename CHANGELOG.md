@@ -36,6 +36,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **Send a crash report.** If Alder stops, it offers to send a report the next time you open it. Reports never include your account.
 
 ### Easier to use
+- **See more in My Alder.** See a title's year, genre, seasons and ratings. If you add it on this device, see the date too.
 - **See Alder in action.** New pictures in the README show Home, Search, My Alder, and the player on a TV.
 - **A fresh look.** Smooth motion, one poster style on every screen, and cleaner **Home**, **Search** and player screens.
 - **My List is now My Alder.** A full poster grid with **Genre** and **Year** filters, and a check before you remove a title.

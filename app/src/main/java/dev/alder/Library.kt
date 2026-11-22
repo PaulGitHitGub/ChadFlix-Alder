@@ -1,6 +1,8 @@
 package dev.alder
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.SharedPreferences
 import android.util.Base64
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -48,6 +50,15 @@ object Library {
     /** Adds the title to the library or takes it out; its watch history stays either way. */
     fun setInList(item: JSONObject, on: Boolean) {
         item.put("removed", !on).put("temp", false).put("_mtime", now())
+    }
+
+    internal fun listDates(context: Context, profileId: String): SharedPreferences =
+        context.getSharedPreferences("list_dates:$profileId", Context.MODE_PRIVATE)
+
+    // shortcut: dates live on this device, sync them if Stremio provides a list-add timestamp.
+    internal fun recordListDate(dates: SharedPreferences, item: JSONObject) {
+        val id = item.getString("_id")
+        dates.edit().putString(id, item.text("_mtime").takeIf { inList(item) }).apply()
     }
 
     /** Marks the current title complete without discarding its watch history. */
