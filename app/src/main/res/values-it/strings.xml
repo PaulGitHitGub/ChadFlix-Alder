@@ -70,7 +70,6 @@
     <string name="menu_settings">Impostazioni</string>
     <string name="action_play">Riproduci</string>
     <string name="action_resume">Riprendi</string>
-    <string name="stopped_at">Interrotto a %1$s</string>
     <string name="time_left_hours">Mancano %1$d h %2$d min</string>
     <string name="time_left_minutes">Mancano %1$d min</string>
     <plurals name="seasons">

@@ -70,7 +70,6 @@
     <string name="menu_settings">Configuración</string>
     <string name="action_play">Reproducir</string>
     <string name="action_resume">Reanudar</string>
-    <string name="stopped_at">Detenido en %1$s</string>
     <string name="time_left_hours">Quedan %1$d h %2$d min</string>
     <string name="time_left_minutes">Quedan %1$d min</string>
     <plurals name="seasons">

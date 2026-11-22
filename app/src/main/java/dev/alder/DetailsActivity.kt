@@ -595,8 +595,8 @@ class DetailsActivity : Screen() {
         val duration = item?.optJSONObject("state")?.optLong("duration") ?: 0L
         val remaining = timeLeft(duration, resumeAt)
         if (resumeAt > 0) {
-            val stopped = getString(R.string.stopped_at, android.text.format.DateUtils.formatElapsedTime(resumeAt / 1000))
-            val where = listOfNotNull(episode?.let { "S${it.season} E${it.episode}" }, episode?.title?.takeIf { it.isNotBlank() }, remaining, stopped)
+            // ChadFlix: no "Stopped at 46:15"; the time left and the bar say where you are.
+            val where = listOfNotNull(episode?.let { "S${it.season} E${it.episode}" }, episode?.title?.takeIf { it.isNotBlank() }, remaining)
             stack.addView(text(where.joinToString(DOT), SMALL, bold = true).onArt().apply {
                 maxLines = 2; ellipsize = TextUtils.TruncateAt.END
             }.marginTop(16))

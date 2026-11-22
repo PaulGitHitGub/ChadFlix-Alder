@@ -70,7 +70,6 @@
     <string name="menu_settings">Paramètres</string>
     <string name="action_play">Lecture</string>
     <string name="action_resume">Reprendre</string>
-    <string name="stopped_at">Arrêté à %1$s</string>
     <string name="time_left_hours">%1$d h %2$d min restantes</string>
     <string name="time_left_minutes">%1$d min restantes</string>
     <plurals name="seasons">
