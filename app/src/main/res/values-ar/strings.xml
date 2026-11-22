@@ -275,10 +275,6 @@
     <string name="subtitle_color_hint">لون نص الترجمة.</string>
     <string name="subtitle_background">خلفية الترجمة</string>
     <string name="subtitle_background_hint">تحافظ الخلفية الداكنة على وضوح الترجمة في المشاهد الساطعة.</string>
-    <string name="picture_fit">الصورة</string>
-    <string name="picture_fit_fit">ملاءمة</string>
-    <string name="picture_fit_zoom">تكبير</string>
-    <string name="picture_fit_stretch">تمديد</string>
     <string name="settings_profile_name">الملف الشخصي %1$s</string>
     <string name="addons_installed">عدد الإضافات المثبّتة: %1$d</string>
     <string name="addons_unavailable">غير متاح</string>

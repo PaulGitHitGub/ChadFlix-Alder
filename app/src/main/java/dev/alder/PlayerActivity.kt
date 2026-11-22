@@ -1754,6 +1754,7 @@ class PlayerActivity : Screen() {
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var infoButton: TextView
+    private lateinit var sleepButton: TextView // ChadFlix: Sleep Timer has its own button; its label shows the choice
     private val dimmed = mutableListOf<View>() // the other buttons, dimmed while the menu is open
     private lateinit var endsAt: TextView
     private lateinit var playerLogo: ImageView // the Info pop-up's logo, or its name when there is none
@@ -1932,6 +1933,7 @@ class PlayerActivity : Screen() {
             val face = onFocusChangeListener
             setOnFocusChangeListener { v, has -> face?.onFocusChange(v, has); infoFocusChanged(has) }
         }
+        sleepButton = button(getString(R.string.sleep_timer), R.drawable.ic_sleep) { cycleSleep(); showSleepChoice() }
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
@@ -1956,10 +1958,11 @@ class PlayerActivity : Screen() {
                         LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
                     addView(nextCell.also { dimmed += it })
                     addView(buttonCell(infoButton).also { dimmed += it })
+                    addView(buttonCell(sleepButton, labelDp = 240).also { dimmed += it }) // room for "Sleep Timer  ·  After This Episode"
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
-        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton))
+        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton, sleepButton))
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
@@ -2149,12 +2152,12 @@ class PlayerActivity : Screen() {
         return control
     }
 
-    private fun buttonCell(control: TextView, primary: Boolean = false) = FrameLayout(this).apply {
+    private fun buttonCell(control: TextView, primary: Boolean = false, labelDp: Int = 160) = FrameLayout(this).apply {
         clipChildren = false
         clipToPadding = false
         addView(control, FrameLayout.LayoutParams(dp(if (primary) 50 else 40), dp(if (primary) 50 else 40),
             Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-        addView(buttonLabels.getValue(control), FrameLayout.LayoutParams(dp(160), dp(18),
+        addView(buttonLabels.getValue(control), FrameLayout.LayoutParams(dp(labelDp), dp(18),
             Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(if (primary) 53 else 48) })
         layoutParams = LinearLayout.LayoutParams(dp(if (primary) 70 else 62), dp(76))
     }
@@ -2197,6 +2200,7 @@ class PlayerActivity : Screen() {
         val duration = player.duration.takeIf { it != C.TIME_UNSET } ?: 0L
         val position = if (scrubTo >= 0) scrubTo else player.currentPosition
         if (shown) {
+            showSleepChoice()
             if (!bar.isIndeterminate) {
                 bar.set(position, player.bufferedPosition, if (live) 0L else duration)
                 elapsed.text = if (live) getString(R.string.player_live) else clock(position)
@@ -2307,6 +2311,7 @@ class PlayerActivity : Screen() {
     private var menuMoving = false // focus is moving into the menu on purpose, not leaving the button
     private var menuBusy = false // the rows are being replaced: focus callbacks mean nothing
     private var suppressOpen = false // focus returns to the button without opening the menu again
+    private val FRAME_COPY_W = 480 // px wide: the frame copied for the glass is blurred anyway (Images.frost shrinks it to 360)
     private var menuArt: ImageView? = null // the title's art, unseen: what the glass frosts (the player has no backdrop of its own)
     private var appearanceArt: ImageView? = null
     private var infoShade: View? = null
@@ -2325,10 +2330,45 @@ class PlayerActivity : Screen() {
     private fun panelUp() = menuOpen || infoOpen
     private fun isRtl() = controls.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
+    /**
+     * What the glass frosts: the video frame on screen when the panel opens, copied once (small) from the video surface
+     * and laid over the surface's own bounds, so the glass blurs what is really behind it. Until the copy lands (a frame
+     * or two) the glass is dark; if it can't be copied (no frame yet, Android 6), the title's art stands in. One copy and
+     * one frost per opening: nothing runs while the panel stays open or closed.
+     */
     private fun frostArt() = ImageView(this).apply {
         scaleType = ImageView.ScaleType.CENTER_CROP
         visibility = View.INVISIBLE
-        (backdropArt.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap?.let { setImageBitmap(it) } // the same picture: one frost, no download
+        val art = (backdropArt.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+        val surface = view.videoSurfaceView as? android.view.SurfaceView
+        if (android.os.Build.VERSION.SDK_INT < 24 || surface == null || player.videoFormat == null ||
+            surface.width <= 0 || surface.height <= 0 || !surface.holder.surface.isValid) {
+            art?.let { setImageBitmap(it) }
+            return@apply
+        }
+        setImageBitmap(android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(BASE) })
+        val w = FRAME_COPY_W
+        val h = maxOf(1, w * surface.height / surface.width)
+        val frame = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val target = this
+        try {
+            android.view.PixelCopy.request(surface, frame, { result ->
+                if (target !== menuArt && target !== appearanceArt) return@request // closed meanwhile
+                if (result == android.view.PixelCopy.SUCCESS) {
+                    val at = IntArray(2).also { surface.getLocationOnScreen(it) }
+                    target.scaleType = ImageView.ScaleType.MATRIX
+                    target.imageMatrix = android.graphics.Matrix().apply {
+                        setRectToRect(android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()),
+                            android.graphics.RectF(at[0].toFloat(), at[1].toFloat(), (at[0] + surface.width).toFloat(), (at[1] + surface.height).toFloat()),
+                            android.graphics.Matrix.ScaleToFit.FILL)
+                    }
+                    target.setImageBitmap(frame)
+                } else art?.let { target.setImageBitmap(it) }
+                refrost()
+            }, main)
+        } catch (e: IllegalArgumentException) { // the surface went away between the check and the copy
+            art?.let { setImageBitmap(it) }
+        }
     }
 
     private fun audioFocusChanged(has: Boolean) {
@@ -2702,7 +2742,7 @@ class PlayerActivity : Screen() {
 
     // ----- Appearance -----
 
-    private enum class Look { SIZE, BACKGROUND, FIT, COLOR, SLEEP }
+    private enum class Look { SIZE, BACKGROUND, COLOR }
     private class Tile(val view: TextView, val look: Look, val value: Any, val row: Int, val face: TileFace, val name: String)
 
     /** A tile: its fill, a ring when it is the one in use, a brighter one with focus, and a tick on the one in use. */
@@ -2758,18 +2798,14 @@ class PlayerActivity : Screen() {
     private fun current(look: Look): Any = when (look) {
         Look.SIZE -> Settings.subtitleSize(this)
         Look.BACKGROUND -> Settings.subtitleBackground(this)
-        Look.FIT -> Settings.pictureFit(this)
         Look.COLOR -> Settings.subtitleColorName(this)
-        Look.SLEEP -> 0
     }
 
     private fun applyLook(tile: Tile) {
         when (tile.look) {
             Look.SIZE -> { Settings.setSubtitleSize(this, tile.value as Int); applySubtitleSize() }
             Look.BACKGROUND -> { Settings.setSubtitleBackground(this, tile.value as Boolean); applySubtitleStyle() }
-            Look.FIT -> { Settings.setPictureFit(this, tile.value as String); applyPictureFit() }
             Look.COLOR -> { Settings.setSubtitleColor(this, tile.value as String); applySubtitleStyle() }
-            Look.SLEEP -> { cycleSleep(); tile.view.text = sleep() }
         }
         paintTiles()
     }
@@ -2777,10 +2813,10 @@ class PlayerActivity : Screen() {
     /** Each tile's ring and tick, and each group's label: the focused tile's name, else the one in use. */
     private fun paintTiles() {
         val focused = tiles.firstOrNull { it.view.isFocused }
-        tiles.forEach { it.face.selected = it.look != Look.SLEEP && current(it.look) == it.value; it.face.invalidateSelf() }
+        tiles.forEach { it.face.selected = current(it.look) == it.value; it.face.invalidateSelf() }
         looks.forEach { (look, label) ->
-            val tile = focused?.takeIf { it.look == look } ?: tiles.firstOrNull { it.look == look && (look == Look.SLEEP || current(look) == it.value) }
-            label.text = if (look == Look.SLEEP) sleep() else tile?.name.orEmpty()
+            val tile = focused?.takeIf { it.look == look } ?: tiles.firstOrNull { it.look == look && current(look) == it.value }
+            label.text = tile?.name.orEmpty()
         }
     }
 
@@ -2821,7 +2857,6 @@ class PlayerActivity : Screen() {
         val sizes = listOf(80 to R.string.size_small, 100 to R.string.size_medium, 130 to R.string.size_large, 160 to R.string.size_extra_large)
         val colors = listOf("white" to R.string.color_white, "gray" to R.string.color_gray, "yellow" to R.string.color_yellow,
             "cyan" to R.string.color_cyan, "cream" to R.string.color_cream, "warm_white" to R.string.color_warm_white)
-        val fits = listOf("fit" to R.string.picture_fit_fit, "zoom" to R.string.picture_fit_zoom, "stretch" to R.string.picture_fit_stretch)
 
         fun group(look: Look, title: Int, row: Int, count: Int, tileOf: (Int) -> Triple<Any, String, TextView>, wide: Int = 66): LinearLayout {
             val label = LinearLayout(this)
@@ -2852,11 +2887,16 @@ class PlayerActivity : Screen() {
             }
         }
         fun aa(sp: Float, color: Int = 0xFFFFFFFF.toInt()) = text(SAMPLE_LETTERS, sp, color = color)
+        // Kodi's layout, as the owner placed it: Size centred on top; Color where Kodi has Size, Background where it has Style.
         val row1 = LinearLayout(this).apply { clipChildren = false }
         row1.addView(group(Look.SIZE, R.string.subtitle_size, 0, sizes.size, { i ->
             Triple(sizes[i].first, getString(sizes[i].second), aa(19f * sizes[i].first / 100))
         }))
-        row1.addView(group(Look.BACKGROUND, R.string.appearance_background, 0, 2, { i ->
+        val row2 = LinearLayout(this).apply { clipChildren = false }
+        row2.addView(group(Look.COLOR, R.string.color, 1, colors.size, { i ->
+            Triple(colors[i].first, getString(colors[i].second), aa(19f, subtitleColorValue(colors[i].first)))
+        }))
+        row2.addView(group(Look.BACKGROUND, R.string.appearance_background, 1, 2, { i ->
             val on = i == 0
             Triple(on, getString(if (on) R.string.state_on else R.string.state_off), aa(19f).apply {
                 if (on) text = android.text.SpannableString(SAMPLE_LETTERS).apply {
@@ -2864,18 +2904,8 @@ class PlayerActivity : Screen() {
                 }
             })
         }), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(44) })
-        row1.addView(group(Look.FIT, R.string.picture_fit, 0, fits.size, { i ->
-            Triple(fits[i].first, getString(fits[i].second), text(getString(fits[i].second), SMALL, bold = true))
-        }), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(44) })
-        val row2 = LinearLayout(this).apply { clipChildren = false }
-        row2.addView(group(Look.COLOR, R.string.color, 1, colors.size, { i ->
-            Triple(colors[i].first, getString(colors[i].second), aa(19f, subtitleColorValue(colors[i].first)))
-        }))
-        row2.addView(group(Look.SLEEP, R.string.sleep_timer, 1, 1, { _ ->
-            Triple(0, sleep(), text(sleep(), SMALL, bold = true))
-        }, wide = 142), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(44) })
 
-        val panel = column(Gravity.START).apply { setPaddingRelative(dp(24), dp(16), dp(24), dp(16)) }
+        val panel = column(Gravity.CENTER_HORIZONTAL).apply { setPaddingRelative(dp(24), dp(16), dp(24), dp(16)) }
         panel.background = glassOver(panel, 16, shade = FROST_READING)
         panel.addView(row1, wrap())
         panel.addView(row2, wrap().apply { topMargin = dp(14) })
@@ -3074,7 +3104,7 @@ class PlayerActivity : Screen() {
      * so under Zoom they move onto the screen itself and stay readable; Fit and Stretch put them back.
      */
     private fun applyPictureFit() {
-        val fit = Settings.pictureFit(this)
+        val fit = "fit" // ChadFlix: Picture is gone from the player (owner), so a Zoom or Stretch saved before can't stick
         view.resizeMode = resizeModeFor(fit)
         val subs = view.subtitleView ?: return
         val frame = view.findViewById<ViewGroup>(androidx.media3.ui.R.id.exo_content_frame) ?: return
@@ -3084,6 +3114,12 @@ class PlayerActivity : Screen() {
         val at = if (home === view) view.indexOfChild(frame) + 1
             else frame.indexOfChild(frame.findViewById(androidx.media3.ui.R.id.exo_buffering)).takeIf { it >= 0 } ?: frame.childCount
         home.addView(subs, at, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    private fun showSleepChoice() {
+        if (!::sleepButton.isInitialized) return
+        val words = getString(R.string.sleep_timer) + DOT + sleep()
+        buttonLabels[sleepButton]?.takeIf { it.text.toString() != words }?.text = words
     }
 
     private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(R.string.sleep_after_episode),
