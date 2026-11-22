@@ -545,6 +545,7 @@ class PlayerActivity : Screen() {
             val episode = if (isTrailer) null else m.videos.firstOrNull { it.id == videoId }
             pauseTitle.text = episode?.title?.takeIf { it.isNotBlank() } ?: m.name
             subtitle.text = if (isTrailer) getString(R.string.action_trailer) else episode?.let { "S${it.season} E${it.episode}" } ?: m.year.orEmpty()
+            if (infoOpen) showInfo()
             nextCell.visibility = if (isTrailer || nextVideo() == null) View.GONE else View.VISIBLE
         }
 
@@ -1754,8 +1755,11 @@ class PlayerActivity : Screen() {
     private lateinit var audioButton: TextView
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
+    private lateinit var infoButton: TextView
     private val dimmed = mutableListOf<View>() // the other buttons, dimmed while the menu is open
     private lateinit var endsAt: TextView
+    private lateinit var playerLogo: ImageView // the Info pop-up's logo, or its name when there is none
+    private lateinit var topName: TextView
     private lateinit var pauseTitle: TextView
     private lateinit var pauseInfo: LinearLayout
     private lateinit var pauseFacts: TextView
@@ -1795,6 +1799,12 @@ class PlayerActivity : Screen() {
     private fun buildControls(): FrameLayout {
         val name = intent.getStringExtra("name").orEmpty()
         menuLayer = FrameLayout(this).apply { visibility = View.GONE; clipChildren = false }
+        infoLayer = FrameLayout(this).apply { visibility = View.GONE; clipChildren = false }
+        // ChadFlix: the title's logo (or its name) is the Info pop-up's, no longer at the top left; it is loaded when the pop-up first shows.
+        playerLogo = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(225); maxHeight = dp(75); visibility = View.GONE }
+        topName = text(name, SERIF_HERO, serif = true).onArt().apply {
+            maxLines = 2; ellipsize = TextUtils.TruncateAt.END
+        }
         endsAt = text("", BODY, bold = true, color = 0xB3FFFFFF.toInt()).onArt().apply { maxLines = 1; visibility = View.GONE }
         pauseTitle = text(intent.getStringExtra("episode")?.substringAfter("  ·  ", "")?.takeIf { it.isNotBlank() }
             ?: name, SERIF_HERO, serif = true).onArt().apply {
@@ -1910,22 +1920,19 @@ class PlayerActivity : Screen() {
             if (player.playWhenReady) player.pause() else player.play()
         }
         val nextButton = button(getString(R.string.player_next_episode), R.drawable.ic_next_episode) { playNext() }
-        val infoButton = button(getString(R.string.player_info), R.drawable.ic_info) {
-            startActivity(Intent(this, DetailsActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("type", type).putExtra("id", metaId)
-                .putExtra("name", intent.getStringExtra("name"))
-                .putExtra("poster", intent.getStringExtra("poster"))
-                .putExtra("background", intent.getStringExtra("background")))
-            finish()
-        }
-        // Landing on Audio & Subtitles opens its menu after a short dwell.
+        // ChadFlix: OK does nothing here (it used to open the title page): the Info pop-up shows while this button has focus.
+        infoButton = button(getString(R.string.player_info), R.drawable.ic_info) {}
+        // Landing on Audio & Subtitles opens its menu and landing on Info shows the pop-up, after a short dwell.
         audioButton.apply {
             val face = onFocusChangeListener
             setOnFocusChangeListener { v, has -> face?.onFocusChange(v, has); audioFocusChanged(has) }
             setOnKeyListener { _, code, event ->
                 (code == KeyEvent.KEYCODE_DPAD_UP).also { if (it && event.action == KeyEvent.ACTION_DOWN) enterMenu() }
             }
+        }
+        infoButton.apply {
+            val face = onFocusChangeListener
+            setOnFocusChangeListener { v, has -> face?.onFocusChange(v, has); infoFocusChanged(has) }
         }
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
         val buttons = LinearLayout(this).apply {
@@ -1988,8 +1995,9 @@ class PlayerActivity : Screen() {
             addView(length, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(PAD); bottomMargin = dp(91)
             })
-            // ChadFlix: the menu, empty until it opens, under the buttons so the focused one stays lit.
+            // ChadFlix: the menu and the pop-up, empty until they open, under the buttons so the focused one stays lit.
             addView(menuLayer, FrameLayout.LayoutParams(-1, -1))
+            addView(infoLayer, FrameLayout.LayoutParams(-1, -1))
             addView(buttons, FrameLayout.LayoutParams(-1, dp(76), Gravity.BOTTOM).apply {
                 bottomMargin = dp(11)
             })
@@ -2017,6 +2025,7 @@ class PlayerActivity : Screen() {
         )
         if (badges == shownBadges && pauseBadges.childCount > 0) return
         shownBadges = badges
+        if (infoOpen) showInfo() // the pop-up's chips are these badges
         pauseBadges.removeAllViews()
         pauseBadges.visibility = if (badges.isEmpty()) View.GONE else View.VISIBLE
         badges.forEachIndexed { index, badge ->
@@ -2169,6 +2178,7 @@ class PlayerActivity : Screen() {
     private fun hideControls(force: Boolean = false) {
         if (!force && (!player.playWhenReady || panelUp())) return // ChadFlix: an open menu or pop-up keeps the controls up
         closeMenu(focusButton = false, restartHide = false)
+        hideInfo(restartHide = false)
         setChapterSnapMode(false)
         chapterPill.visibility = View.INVISIBLE
         shown = false
@@ -2286,29 +2296,35 @@ class PlayerActivity : Screen() {
         load(if (player.isCurrentMediaItemLive) 0L else position())
     }
 
-    // ---------- ChadFlix: the Audio & Subtitles menu and Appearance (after the player-menu draft) ----------
+    // ---------- ChadFlix: the Audio & Subtitles menu, Appearance and the Info pop-up (after the player-menu and info-popup drafts) ----------
     // Landing on Audio & Subtitles opens a menu of frosted glass above the buttons, after a short dwell so passing over
-    // does not flash it. OK or Up goes into it, Left or Right leaves it, Back closes it. It is built when it opens and
-    // taken away when it closes: nothing exists or runs while it is shut. While it is open the controls stay up.
+    // does not flash it. OK or Up goes into it, Left or Right leaves it, Back closes it. Landing on Info shows its pop-up
+    // over the playing picture. Each is built when it opens and taken away when it closes: nothing exists or runs while
+    // they are shut. An open one keeps the controls up.
     private lateinit var menuLayer: FrameLayout
+    private lateinit var infoLayer: FrameLayout
     private lateinit var options: FrameLayout // Appearance
     private var menuOpen = false
+    private var infoOpen = false
     private var menuMoving = false // focus is moving into the menu on purpose, not leaving the button
     private var menuBusy = false // the rows are being replaced: focus callbacks mean nothing
     private var suppressOpen = false // focus returns to the button without opening the menu again
     private var menuArt: ImageView? = null // the title's art, unseen: what the glass frosts (the player has no backdrop of its own)
     private var appearanceArt: ImageView? = null
+    private var infoShade: View? = null
+    private var infoLogoUrl: String? = null
     private var originalLanguage: String? = null
     private var askedOriginal = false
     private var menuRows = 7
     private var menuPill: TextView? = null
     private var sample: SubtitleView? = null
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
+    private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
 
     /** The glass frosts the art the title page shows, as the Showing menu's does; with none, the same plain fallback. */
     override val backdrop: ImageView? get() = (menuArt ?: appearanceArt)?.takeIf { it.drawable != null }
 
-    private fun panelUp() = menuOpen
+    private fun panelUp() = menuOpen || infoOpen
     private fun isRtl() = controls.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
     private fun frostArt() = ImageView(this).apply {
@@ -2321,6 +2337,11 @@ class PlayerActivity : Screen() {
         main.removeCallbacks(dwellMenu)
         if (has) { if (!menuOpen && !suppressOpen) main.postDelayed(dwellMenu, DWELL) }
         else if (menuOpen && !menuMoving && !menuBusy) closeMenu() // Left or Right: on to a neighbour
+    }
+
+    private fun infoFocusChanged(has: Boolean) {
+        main.removeCallbacks(dwellInfo)
+        if (has) main.postDelayed(dwellInfo, DWELL) else hideInfo()
     }
 
     // ----- the menu -----
@@ -2545,6 +2566,7 @@ class PlayerActivity : Screen() {
         if (menuOpen || isTrailer || !shown) return
         menuOpen = true
         main.removeCallbacks(hideTask)
+        hideInfo(restartHide = false)
         menuLayer.animate().cancel()
         menuLayer.removeAllViews()
         menuLayer.alpha = 0f
@@ -2672,7 +2694,7 @@ class PlayerActivity : Screen() {
         main.removeCallbacks(dwellMenu)
         if (focusButton) focusAudioButton()
         dimmed.forEach { it.animate().alpha(1f).setDuration(FOCUS_MS) }
-        pauseInfo.visibility = View.VISIBLE
+        if (!infoOpen) pauseInfo.visibility = View.VISIBLE
         menuLayer.exit().alpha(0f).withEndAction {
             if (!menuOpen) { menuLayer.removeAllViews(); menuLayer.visibility = View.GONE; menuArt = null }
         }
@@ -2900,7 +2922,98 @@ class PlayerActivity : Screen() {
     /** Whatever panel is open goes away (an error, up next or still watching takes the screen). */
     private fun closePanels() {
         closeMenu(restartHide = false)
+        hideInfo(restartHide = false)
         dropAppearance()
+    }
+
+    // ----- Info -----
+
+    private fun loadInfoLogo(url: String?) = Images.load(url, playerLogo, Images.TITLE_LOGO_PX, urgent = true,
+        look = Images.trimmedLogo, failed = {
+            playerLogo.visibility = View.GONE; topName.visibility = View.VISIBLE
+        }) {
+        playerLogo.visibility = View.VISIBLE; topName.visibility = View.GONE
+    }
+
+    /** The pop-up: logo, facts, plot, ratings and the technical chips, from what the player already has. Nothing is asked for. */
+    private fun showInfo() {
+        if (isTrailer || !shown) return
+        val refresh = infoOpen
+        infoOpen = true
+        main.removeCallbacks(hideTask)
+        pauseInfo.visibility = View.INVISIBLE
+        val m = meta
+        val logo = m?.logo ?: intent.getStringExtra("logo") ?: Images.logoFor(metaId)
+        if (logo != infoLogoUrl) { infoLogoUrl = logo; loadInfoLogo(logo) }
+        topName.text = m?.name?.takeIf { it.isNotBlank() } ?: intent.getStringExtra("name").orEmpty()
+
+        if (!refresh) infoLayer.animate().cancel()
+        infoLayer.removeAllViews()
+        val stack = column(Gravity.START)
+        val box = FrameLayout(this).apply { clipChildren = false }
+        (playerLogo.parent as? ViewGroup)?.removeView(playerLogo)
+        (topName.parent as? ViewGroup)?.removeView(topName)
+        box.addView(playerLogo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+        box.addView(topName, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+        stack.addView(box, LinearLayout.LayoutParams(dp(560), dp(75)))
+        val soft = 0xB3FFFFFF.toInt()
+        val certificate = m?.certification ?: knownCertificate(metaId)
+        val length = HomeStyle.runtimeMs(m?.runtime ?: intent.getStringExtra("runtime")).takeIf { it > 0 }
+            ?: player.duration.takeIf { it > 0 && !isLive() } ?: 0L
+        val facts = infoFacts(m?.year, certificate, runtimeWords(length, getString(R.string.info_runtime_hours_minutes),
+            getString(R.string.info_runtime_hours), getString(R.string.info_runtime_minutes)))
+        if (facts.isNotEmpty()) stack.addView(text(facts, BODY, color = soft).apply { maxLines = 1 }, wrap().apply { topMargin = dp(13) })
+        m?.description?.takeIf { it.isNotBlank() }?.let { plot ->
+            stack.addView(text(plot, BODY, color = soft).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END },
+                LinearLayout.LayoutParams(dp(560), -2).apply { topMargin = dp(10) })
+        }
+        val scores = knownRatings(metaId).orEmpty()
+        val ratings = shownRatings("both", m?.rating, scores["letterboxd"], scores["tomatoes"])
+        if (ratings.isNotEmpty()) {
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            addRatingLogos(row, ratings)
+            stack.addView(row, wrap().apply { topMargin = dp(10) })
+        }
+        if (shownBadges.isNotEmpty()) {
+            val chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            shownBadges.forEachIndexed { i, b ->
+                chips.addView(text(badgeChip(b), 11f, bold = true, color = 0xFF0B0B0B.toInt()).apply {
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    maxLines = 1
+                    setPaddingRelative(dp(6), 0, dp(6), 0)
+                    background = rounded(0xB3FFFFFF.toInt(), 3)
+                }, LinearLayout.LayoutParams(-2, dp(15)).apply { if (i > 0) marginStart = dp(5) })
+            }
+            stack.addView(chips, wrap().apply { topMargin = dp(6) })
+        }
+        infoLayer.addView(stack, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
+            marginStart = dp(PAD); bottomMargin = dp(185)
+        })
+        if (refresh) return
+        infoLayer.alpha = 0f
+        infoLayer.visibility = View.VISIBLE
+        infoLayer.enter().alpha(1f)
+        // Only the picture dims, 0.72 black, under the controls.
+        val shade = infoShade ?: View(this).apply { setBackgroundColor(0xB8000000.toInt()); alpha = 0f }.also {
+            infoShade = it
+            screen.addView(it, screen.indexOfChild(controls), FrameLayout.LayoutParams(-1, -1))
+        }
+        shade.animate().cancel()
+        shade.visibility = View.VISIBLE
+        shade.enter().alpha(1f)
+    }
+
+    private fun hideInfo(restartHide: Boolean = true) {
+        if (!infoOpen) return
+        infoOpen = false
+        main.removeCallbacks(dwellInfo)
+        if (!menuOpen) pauseInfo.visibility = View.VISIBLE
+        infoLayer.exit().alpha(0f).withEndAction {
+            if (!infoOpen) { infoLayer.removeAllViews(); infoLayer.visibility = View.GONE }
+        }
+        infoShade?.let { shade -> shade.exit().alpha(0f).withEndAction { if (!infoOpen) shade.visibility = View.GONE } }
+        if (restartHide && shown) showControls(null)
     }
 
     /** What's playing, in a few words: "English  ·  Spanish subtitles", or "English  ·  Subtitles off". */
@@ -2987,6 +3100,7 @@ class PlayerActivity : Screen() {
             main.removeCallbacks(startTimeout)
             main.removeCallbacks(seekTask)
             main.removeCallbacks(dwellMenu)
+            main.removeCallbacks(dwellInfo)
             checkpoint.captureResumeOnPause(player.playWhenReady, isFinishing)
             player.pause()
             val durationMs = player.duration.takeIf { it > 0 } ?: item?.optJSONObject("state")?.optLong("duration") ?: 0L

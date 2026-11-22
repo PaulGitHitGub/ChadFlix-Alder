@@ -168,6 +168,9 @@
     <string name="menu_appearance">Aspetto</string>
     <string name="appearance_background">Sfondo</string>
     <string name="appearance_sample">I tuoi sottotitoli appariranno così.</string>
+    <string name="info_runtime_hours_minutes">%1$d h %2$d min</string>
+    <string name="info_runtime_hours">%1$d h</string>
+    <string name="info_runtime_minutes">%1$d min</string>
     <string name="player_live">Diretta</string>
     <string name="player_chapters">%1$s  ·  ▲ Capitoli</string>
     <string name="player_cannot_seek">Questa fonte non permette di avanzare · Cambia fonte per provarne un’altra</string>

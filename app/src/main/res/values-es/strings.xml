@@ -168,6 +168,9 @@
     <string name="menu_appearance">Apariencia</string>
     <string name="appearance_background">Fondo</string>
     <string name="appearance_sample">Así se verán tus subtítulos.</string>
+    <string name="info_runtime_hours_minutes">%1$d h %2$d min</string>
+    <string name="info_runtime_hours">%1$d h</string>
+    <string name="info_runtime_minutes">%1$d min</string>
     <string name="player_live">En vivo</string>
     <string name="player_chapters">%1$s  ·  ▲ Capítulos</string>
     <string name="player_cannot_seek">Esta fuente no permite avanzar · Cambia de fuente para probar otra</string>

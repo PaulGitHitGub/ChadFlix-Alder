@@ -165,6 +165,9 @@
     <string name="menu_appearance">Darstellung</string>
     <string name="appearance_background">Hintergrund</string>
     <string name="appearance_sample">So sehen deine Untertitel aus.</string>
+    <string name="info_runtime_hours_minutes">%1$d Std. %2$d Min.</string>
+    <string name="info_runtime_hours">%1$d Std.</string>
+    <string name="info_runtime_minutes">%1$d Min.</string>
     <string name="player_live">Live</string>
     <string name="player_chapters">%1$s  ·  ▲ Kapitel</string>
     <string name="player_cannot_seek">Diese Quelle kann nicht vorspulen · Wechsle die Quelle, um eine andere zu versuchen</string>

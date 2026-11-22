@@ -165,6 +165,9 @@
     <string name="menu_appearance">रूप</string>
     <string name="appearance_background">पृष्ठभूमि</string>
     <string name="appearance_sample">आपके सबटाइटल ऐसे दिखेंगे।</string>
+    <string name="info_runtime_hours_minutes">%1$d घंटे %2$d मिनट</string>
+    <string name="info_runtime_hours">%1$d घंटे</string>
+    <string name="info_runtime_minutes">%1$d मिनट</string>
     <string name="player_live">लाइव</string>
     <string name="player_chapters">%1$s  ·  ▲ चैप्टर</string>
     <string name="player_cannot_seek">यह स्रोत आगे नहीं बढ़ सकता · दूसरा आज़माने के लिए स्रोत बदलें</string>

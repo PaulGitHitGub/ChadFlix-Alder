@@ -168,6 +168,9 @@
     <string name="menu_appearance">Apparence</string>
     <string name="appearance_background">Arrière-plan</string>
     <string name="appearance_sample">Vos sous-titres ressembleront à ceci.</string>
+    <string name="info_runtime_hours_minutes">%1$d h %2$d min</string>
+    <string name="info_runtime_hours">%1$d h</string>
+    <string name="info_runtime_minutes">%1$d min</string>
     <string name="player_live">Direct</string>
     <string name="player_chapters">%1$s  ·  ▲ Chapitres</string>
     <string name="player_cannot_seek">Cette source ne permet pas d’avancer · Changez de source pour en essayer une autre</string>

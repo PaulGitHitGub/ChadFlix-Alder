@@ -2,7 +2,7 @@ package dev.alder
 
 import androidx.media3.common.C
 
-// ChadFlix: what the player's Audio & Subtitles menu and top line decide, kept apart from the views so it can be tested.
+// ChadFlix: what the player's Audio & Subtitles menu and Info pop-up decide, kept apart from the views so it can be tested.
 
 /** One audio or subtitle track as the menu sees it. [plain]: not forced, SDH or commentary. [off]: the Subtitles' Off row. */
 internal data class MenuTrack(
@@ -44,3 +44,26 @@ internal fun plainTrack(selectionFlags: Int, roleFlags: Int, label: String?): Bo
 /** When the title ends in wall-clock ms, or null for a trailer, live TV or a length not known. */
 internal fun endsAtTime(now: Long, duration: Long, position: Long, speed: Float, trailer: Boolean, live: Boolean): Long? =
     if (trailer || live || duration <= 0) null else now + ((duration - position).coerceAtLeast(0) / speed).toLong()
+
+/** "2 hr 52 mins"; null for no length. The screen passes its words. */
+internal fun runtimeWords(ms: Long, hoursMinutes: String = "%1\$d hr %2\$d mins", hours: String = "%1\$d hr",
+                          minutes: String = "%1\$d mins"): String? {
+    val total = (ms / 60_000).toInt()
+    return when {
+        total <= 0 -> null
+        total < 60 -> minutes.format(total)
+        total % 60 == 0 -> hours.format(total / 60)
+        else -> hoursMinutes.format(total / 60, total % 60)
+    }
+}
+
+/** The Info pop-up's facts line, "2026 • R • 2 hr 52 mins": the year, the content rating and the length, whichever are known. */
+internal fun infoFacts(year: String?, certificate: String?, runtime: String?): String =
+    listOfNotNull(year, certificate, runtime).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" • ")
+
+/** A badge as the Info pop-up writes it in a chip: "Dolby Atmos", "DTS:X", "Blu-Ray", "1080p". */
+internal fun badgeChip(b: PlayerBadge): String = when (b.brand) {
+    BadgeBrand.DOLBY -> when (b.label) { "TRUEHD" -> "Dolby TrueHD"; else -> "Dolby " + b.label.lowercase().replaceFirstChar { it.titlecase() } }
+    BadgeBrand.DTS -> when (b.label) { "HD" -> "DTS-HD"; "X" -> "DTS:X"; else -> "DTS" }
+    BadgeBrand.NONE -> if (b.label == "BLU-RAY") "Blu-Ray" else b.label
+}

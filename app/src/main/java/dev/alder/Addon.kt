@@ -739,6 +739,9 @@ internal fun parseImdbCertificate(json: JSONObject): String? =
 
 private val imdbCertificateCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+/** ChadFlix: the content rating the title page already found this session (in memory only; the player asks for nothing). */
+internal fun knownCertificate(imdbId: String): String? = imdbCertificateCache[imdbId]
+
 internal fun imdbCertificate(imdbId: String): String? {
     if (!imdbId.startsWith("tt")) return null
     imdbCertificateCache[imdbId]?.let { return it }

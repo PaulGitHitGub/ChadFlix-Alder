@@ -178,6 +178,9 @@
     <string name="menu_appearance">المظهر</string>
     <string name="appearance_background">الخلفية</string>
     <string name="appearance_sample">ستظهر الترجمة بهذا الشكل.</string>
+    <string name="info_runtime_hours_minutes">%1$d س %2$d د</string>
+    <string name="info_runtime_hours">%1$d س</string>
+    <string name="info_runtime_minutes">%1$d د</string>
     <string name="player_live">مباشر</string>
     <string name="player_chapters">%1$s  ·  ▲ الفصول</string>
     <string name="player_cannot_seek">هذا المصدر لا يدعم التقديم · اختر تغيير المصدر لتجربة مصدر آخر</string>

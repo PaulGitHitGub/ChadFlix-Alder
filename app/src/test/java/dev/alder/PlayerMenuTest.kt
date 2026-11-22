@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The player's Audio & Subtitles menu rows and the "Ends at" time. */
+/** The player's Audio & Subtitles menu rows, the Info pop-up's lines, and the "Ends at" time. */
 class PlayerMenuTest {
     private fun t(id: String, language: String?, selected: Boolean = false, plain: Boolean = true, addon: Boolean = false) =
         MenuTrack(id, language, selected, plain, addon)
@@ -103,6 +103,36 @@ class PlayerMenuTest {
         assertNull(endsAtTime(1_000L, 120_000L, 60_000L, 1f, trailer = false, live = true))
         assertNull(endsAtTime(1_000L, 0L, 0L, 1f, trailer = false, live = false))
         assertEquals(1_000L, endsAtTime(1_000L, 120_000L, 130_000L, 1f, trailer = false, live = false)) // past the end: now
+    }
+
+    @Test fun infoFactsLeaveOutWhatIsMissing() {
+        assertEquals("2026 • R • 2 hr 52 mins", infoFacts("2026", "R", runtimeWords(172 * 60_000L)))
+        assertEquals("2026 • 2 hr 52 mins", infoFacts("2026", null, "2 hr 52 mins"))
+        assertEquals("2026 • R", infoFacts("2026", " R ", null))
+        assertEquals("R", infoFacts(null, "R", null))
+        assertEquals("", infoFacts(null, "", null))
+    }
+
+    @Test fun runtimeWordsReadHoursAndMinutes() {
+        assertEquals("2 hr 52 mins", runtimeWords(172 * 60_000L))
+        assertEquals("2 hr", runtimeWords(120 * 60_000L))
+        assertEquals("47 mins", runtimeWords(47 * 60_000L))
+        assertNull(runtimeWords(0L))
+        assertNull(runtimeWords(30_000L))
+        assertEquals("2 h 5 min", runtimeWords(125 * 60_000L, "%1\$d h %2\$d min", "%1\$d h", "%1\$d min"))
+    }
+
+    @Test fun chipsReadInTitleCase() {
+        assertEquals("Dolby Vision", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "VISION")))
+        assertEquals("Dolby Atmos", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "ATMOS")))
+        assertEquals("Dolby TrueHD", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "TRUEHD")))
+        assertEquals("Dolby Audio", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "AUDIO")))
+        assertEquals("DTS", badgeChip(PlayerBadge(BadgeBrand.DTS, "")))
+        assertEquals("DTS-HD", badgeChip(PlayerBadge(BadgeBrand.DTS, "HD")))
+        assertEquals("DTS:X", badgeChip(PlayerBadge(BadgeBrand.DTS, "X")))
+        assertEquals("Blu-Ray", badgeChip(PlayerBadge(BadgeBrand.NONE, "BLU-RAY")))
+        assertEquals("1080p", badgeChip(PlayerBadge(BadgeBrand.NONE, "1080p")))
+        assertEquals("7.1", badgeChip(PlayerBadge(BadgeBrand.NONE, "7.1")))
     }
 
     @Test fun originalLanguageComesFromTheFindAnswer() {

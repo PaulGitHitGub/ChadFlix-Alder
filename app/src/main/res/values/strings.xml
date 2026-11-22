@@ -192,6 +192,9 @@
     <string name="menu_appearance">Appearance</string>
     <string name="appearance_background">Background</string>
     <string name="appearance_sample">Your subtitles will look like this.</string>
+    <string name="info_runtime_hours_minutes">%1$d hr %2$d mins</string>
+    <string name="info_runtime_hours">%1$d hr</string>
+    <string name="info_runtime_minutes">%1$d mins</string>
     <string name="player_live">Live</string>
     <string name="player_chapters">%1$s  ·  ▲ Chapters</string>
     <string name="player_cannot_seek">This source can\'t skip ahead. Change stream to try another.</string>
