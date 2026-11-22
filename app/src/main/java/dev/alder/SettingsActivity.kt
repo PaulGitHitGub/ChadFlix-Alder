@@ -138,6 +138,8 @@ object Settings {
     fun clearDialogue(c: Context) = prefs(c).getBoolean("clearDialogue", false)
     /** ChadFlix: Settings › Picture & Sound › Show FPS, for this TV: a frame counter in Home's top-left corner. */
     fun showFps(c: Context) = prefs(c).getBoolean("showFps", false)
+    /** ChadFlix: Settings › Picture & Sound › Background wash, for this TV: Home's soft wash behind the rows, or black. */
+    fun wash(c: Context) = prefs(c).getBoolean("wash", true)
     fun setClearDialogue(c: Context, on: Boolean) = prefs(c).edit().putBoolean("clearDialogue", on).apply()
     /** "on", "foreign" (only when audio differs or forced), "off". Migrates old Boolean "subtitles". */
     fun subPref(c: Context): String {
@@ -558,6 +560,7 @@ class SettingsActivity : Screen() {
             }
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)
+                choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
                 choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
                 languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 dubbed.forEach(::choiceRow)

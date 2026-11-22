@@ -811,6 +811,8 @@ class MainActivity : Screen() {
         super.onResume()
         if (!::profile.isInitialized) return
         startFps()
+        washOn = Settings.wash(this) // back from Settings: the choice there applies
+        if (!washOn && page.isBrowse) { main.removeCallbacks(artTask); resetArt() }
         val key = profile.authKey
         background({ syncWatchProgress(key) }) {}
         // ponytail: idle dim and the cinema screensaver are off (2026-10-26, not wanted yet); post `idle` here to bring the cinema back.
@@ -1208,7 +1210,10 @@ class MainActivity : Screen() {
      * crossfade per stop. A title with no backdrop (the Showing tile) keeps the wash there is. In steady state only one of
      * the two views holds a picture, so the screen gets one extra layer.
      */
+    private var washOn = true
+
     private fun showWash(item: Item) {
+        if (!washOn) return // Settings › Background wash off: black, and nothing runs
         val url = item.art ?: return
         if (url == art.tag) return
         artTask = Runnable {

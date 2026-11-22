@@ -104,6 +104,8 @@
     <string name="showing" translatable="false">Showing</string>
     <string name="fps" translatable="false">%1$d fps</string>
     <string name="show_fps" translatable="false">Show FPS</string>
+    <string name="background_wash" translatable="false">Background wash</string>
+    <string name="background_wash_hint" translatable="false">A soft, dimmed blur of the focused title behind the home rows. Off: plain black.</string>
     <string name="show_fps_hint" translatable="false">A frames-per-second counter in the top-left corner of the home pages.</string>
     <string name="customize_home" translatable="false">Customize Home</string>
     <string name="customize_home_hint" translatable="false">Choose the rows on Movies and Shows, and their order.</string>
