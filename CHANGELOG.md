@@ -29,7 +29,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
-- **Sleep Timer button.** In the player, select the moon button next to **Info**. Each press changes the timer: **Off**, **After This Episode** or **In 60 min**.
+- **Sleep Timer button.** In the player, select **Sleep Timer** next to **Info**. Each time you select it, the timer changes: **Off**, **After This Episode** (series only) or **In 60 min**.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No subtitle timing.** The player no longer has controls to move subtitles earlier or later. If subtitles are out of time, select **More** and select a different subtitle.
 - **Simpler badges.** The badges in the player no longer show the audio language, the subtitle language or the debrid service. **REMUX** now shows as **Blu-Ray**. The channels, for example **5.1**, always show when ChadFlix knows them.

@@ -1517,7 +1517,7 @@ class PlayerActivity : Screen() {
         intent.putExtra("sleepAt", at) // so another source of this video keeps the timer
     }
 
-    /** OK on the Sleep row: Off → After this episode (series) → In 60 min → Off. */
+    /** OK on the Sleep Timer button: Off → After This Episode (series) → In 60 min → Off. */
     private fun cycleSleep() {
         when {
             stopAfter -> { stopAfter = false; setSleepAt(System.currentTimeMillis() + SLEEP_TIMER) }
@@ -1958,7 +1958,7 @@ class PlayerActivity : Screen() {
                         LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
                     addView(nextCell.also { dimmed += it })
                     addView(buttonCell(infoButton).also { dimmed += it })
-                    addView(buttonCell(sleepButton, labelDp = 240).also { dimmed += it }) // room for "Sleep Timer  ·  After This Episode"
+                    addView(buttonCell(sleepButton, labelDp = 320).also { dimmed += it }) // room for "Sleep Timer  ·  After This Episode"
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
@@ -2333,7 +2333,7 @@ class PlayerActivity : Screen() {
     /**
      * What the glass frosts: the video frame on screen when the panel opens, copied once (small) from the video surface
      * and laid over the surface's own bounds, so the glass blurs what is really behind it. Until the copy lands (a frame
-     * or two) the glass is dark; if it can't be copied (no frame yet, Android 6), the title's art stands in. One copy and
+     * or two) the glass shows the last frost or dark; if it can't be copied (no frame yet, Android 6), the title's art stands in. One copy and
      * one frost per opening: nothing runs while the panel stays open or closed.
      */
     private fun frostArt() = ImageView(this).apply {
@@ -2346,7 +2346,7 @@ class PlayerActivity : Screen() {
             art?.let { setImageBitmap(it) }
             return@apply
         }
-        setImageBitmap(android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(BASE) })
+        setImageBitmap(android.graphics.Bitmap.createBitmap(16, 9, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(BASE) })
         val w = FRAME_COPY_W
         val h = maxOf(1, w * surface.height / surface.width)
         val frame = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
@@ -2355,14 +2355,24 @@ class PlayerActivity : Screen() {
             android.view.PixelCopy.request(surface, frame, { result ->
                 if (target !== menuArt && target !== appearanceArt) return@request // closed meanwhile
                 if (result == android.view.PixelCopy.SUCCESS) {
+                    // The frame on a black screen-sized picture, where the video sits in it: the blur fades into the
+                    // letterbox bars as real frosted glass would, and it lines up wherever the glass's window is.
                     val at = IntArray(2).also { surface.getLocationOnScreen(it) }
-                    target.scaleType = ImageView.ScaleType.MATRIX
-                    target.imageMatrix = android.graphics.Matrix().apply {
-                        setRectToRect(android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()),
-                            android.graphics.RectF(at[0].toFloat(), at[1].toFloat(), (at[0] + surface.width).toFloat(), (at[1] + surface.height).toFloat()),
-                            android.graphics.Matrix.ScaleToFit.FILL)
+                    val me = IntArray(2).also { target.getLocationOnScreen(it) }
+                    val tw = target.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+                    val th = target.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+                    val scale = w.toFloat() / tw
+                    val full = android.graphics.Bitmap.createBitmap(w, maxOf(1, (th * scale).toInt()), android.graphics.Bitmap.Config.ARGB_8888)
+                    android.graphics.Canvas(full).apply {
+                        drawColor(Color.BLACK)
+                        drawBitmap(frame, null, android.graphics.RectF((at[0] - me[0]) * scale, (at[1] - me[1]) * scale,
+                            (at[0] - me[0] + surface.width) * scale, (at[1] - me[1] + surface.height) * scale),
+                            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
                     }
-                    target.setImageBitmap(frame)
+                    frame.recycle()
+                    target.scaleType = ImageView.ScaleType.MATRIX
+                    target.imageMatrix = android.graphics.Matrix().apply { setScale(1f / scale, 1f / scale) }
+                    target.setImageBitmap(full)
                 } else art?.let { target.setImageBitmap(it) }
                 refrost()
             }, main)
@@ -3100,8 +3110,8 @@ class PlayerActivity : Screen() {
         getString(R.string.timing_earlier), getString(R.string.timing_later))
 
     /**
-     * Fit, Zoom or Stretch. Media3 keeps the subtitles inside the video's frame, which Zoom makes larger than the screen,
-     * so under Zoom they move onto the screen itself and stay readable; Fit and Stretch put them back.
+     * ChadFlix: always Fit now (the owner removed Picture). Kept as Alder wrote it, for easy merges: under Zoom the
+     * subtitles would move onto the screen itself; Fit keeps them inside the video's frame.
      */
     private fun applyPictureFit() {
         val fit = "fit" // ChadFlix: Picture is gone from the player (owner), so a Zoom or Stretch saved before can't stick
