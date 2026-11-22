@@ -371,7 +371,7 @@
     <string name="version">Version %1$s</string>
     <string name="about_hint">ChadFlix is a TV interface for your Stremio account.</string>
     <string name="about_desc">A TV interface for your Stremio account.</string>
-    <string name="details_ends_at" translatable="false">Ends at %1$s</string>
+    <string name="details_ends_at">Ends at %1$s</string>
     <string name="about_credit" translatable="false">Based on Alder by aradhyas8</string>
     <string name="about_credit_desc" translatable="false">ChadFlix is a fork of Alder by aradhyas8 (github.com/aradhyas8/Alder), licensed under GPL-3.0.</string>
     <string name="whats_new_hint">The changes in the version on this TV.</string>

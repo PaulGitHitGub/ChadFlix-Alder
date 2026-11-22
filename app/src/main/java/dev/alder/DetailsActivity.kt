@@ -183,7 +183,7 @@ class DetailsActivity : Screen() {
     private val endsTick = object : Runnable {
         override fun run() {
             showEnds()
-            root.postDelayed(this, 60_000 - System.currentTimeMillis() % 60_000) // on the minute
+            root.postDelayed(this, 60_000 - (System.currentTimeMillis() + endsLeftMs) % 60_000) // when the end time's minute turns
         }
     }
     private lateinit var hero: FrameLayout

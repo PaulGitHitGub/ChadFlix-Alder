@@ -591,4 +591,5 @@
     <string name="library_load_failed">تعذّر تحميل مكتبتك في Stremio</string>
     <string name="filmography_loading">جارٍ البحث عن العناوين…</string>
     <string name="filmography_empty">لم يتم العثور على عناوين أخرى في قوائمك.</string>
+    <string name="details_ends_at">ينتهي في %1$s</string>
 </resources>

@@ -571,4 +571,5 @@
     <string name="library_load_failed">Deine Stremio-Bibliothek konnte nicht geladen werden</string>
     <string name="filmography_loading">Suche Titel…</string>
     <string name="filmography_empty">Keine weiteren Titel in deinen Katalogen gefunden.</string>
+    <string name="details_ends_at">Endet um %1$s</string>
 </resources>

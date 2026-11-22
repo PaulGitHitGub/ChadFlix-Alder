@@ -576,4 +576,5 @@
     <string name="library_load_failed">Impossibile caricare la tua libreria Stremio</string>
     <string name="filmography_loading">Ricerca titoli…</string>
     <string name="filmography_empty">Nessun altro titolo trovato nei tuoi cataloghi.</string>
+    <string name="details_ends_at">Finisce alle %1$s</string>
 </resources>

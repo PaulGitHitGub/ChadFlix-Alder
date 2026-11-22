@@ -571,4 +571,5 @@
     <string name="library_load_failed">आपकी Stremio लाइब्रेरी लोड नहीं हो सकी</string>
     <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
     <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
+    <string name="details_ends_at">%1$s बजे समाप्त</string>
 </resources>

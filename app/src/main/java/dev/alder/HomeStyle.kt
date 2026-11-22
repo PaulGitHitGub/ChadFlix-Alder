@@ -124,10 +124,14 @@ internal object HomeStyle {
     }
 
     /** What's left to watch for the title page's "Ends at": the saved duration minus the progress when resuming,
-     *  else the runtime ("2h 07m"), less any progress; 0 when unknown. */
+     *  else the runtime ("2h 07m"), less any progress; 0 when unknown or the progress is past it. */
     fun endsLeftMs(runtime: String?, duration: Long, resumeAt: Long): Long {
         val total = if (resumeAt > 0 && duration > resumeAt) duration else runtimeMs(runtime)
-        return if (resumeAt in 1 until total) total - resumeAt else total
+        return when {
+            resumeAt <= 0 -> total
+            resumeAt < total -> total - resumeAt
+            else -> 0 // progress past the runtime, no duration saved: unknown, hidden
+        }
     }
 
     /** The IMDb and Letterboxd tags in white and grey instead of Alder's warm tungsten. */

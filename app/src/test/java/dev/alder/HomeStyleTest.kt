@@ -38,6 +38,7 @@ class HomeStyleTest {
         assertEquals(30 * 60_000L, HomeStyle.endsLeftMs("2h 07m", 100 * 60_000L, 70 * 60_000L)) // saved duration - progress
         assertEquals(97 * 60_000L, HomeStyle.endsLeftMs("2h 07m", 0, 30 * 60_000L)) // no duration: runtime - progress
         assertEquals(0L, HomeStyle.endsLeftMs(null, 0, 0)) // unknown: hidden
+        assertEquals(0L, HomeStyle.endsLeftMs("47 min", 0, 50 * 60_000L)) // past the runtime, no duration: hidden
     }
 
     @Test fun genreListsBecomeTmdbFilters() {
