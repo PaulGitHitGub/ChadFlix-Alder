@@ -773,13 +773,13 @@ class MainActivity : Screen() {
         if (android.os.Build.VERSION.SDK_INT < 24 || fpsListener != null || !Settings.showFps(this)) return
         val view = fpsView ?: text("", 10f, color = HomeStyle.WHITE).also { v ->
             fpsView = v
-            findViewById<FrameLayout>(android.R.id.content).addView(v, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START)
+            findViewById<FrameLayout>(android.R.id.content).addView(v, FrameLayout.LayoutParams(dp(48), -2, Gravity.TOP or Gravity.START) // fixed width: a new number never re-lays out the screen
                 .apply { leftMargin = dp(8); topMargin = dp(4) }) // the corner, left of and above the avatar
         }
         view.alpha = 0.35f
         view.visibility = View.VISIBLE
         val thread = android.os.HandlerThread("fps").also { it.start() }
-        val listener = android.view.Window.OnFrameMetricsAvailableListener { _, _, _ -> fpsFrames.incrementAndGet() }
+        val listener = android.view.Window.OnFrameMetricsAvailableListener { _, _, dropped -> fpsFrames.addAndGet(1 + dropped) } // count frames dropped before delivery too
         window.addOnFrameMetricsAvailableListener(listener, android.os.Handler(thread.looper))
         fpsThread = thread
         fpsListener = listener
@@ -1218,6 +1218,7 @@ class MainActivity : Screen() {
             if (art.drawable != null && art.alpha > 0.5f) artBack.setImageDrawable(art.drawable)
             art.alpha = 0f
             Images.load(url, art, HomeStyle.WASH_W, look = HomeStyle.wash) {
+                if (heroItem !== item || held) { art.tag = null; return@load } // moved on while it loaded: no stale wash
                 art.enter(HOME_ART_MS).alpha(1f).withEndAction { artBack.setImageDrawable(null) }.start()
             }
         }
