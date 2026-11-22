@@ -34,4 +34,22 @@ class RatingsTest {
         assertEquals(listOf("IMDb" to "7.9"), shownRatings("both", "7.9", null))
         assertEquals(emptyList<Pair<String, String>>(), shownRatings("both", null, null))
     }
+
+    @Test fun parsesTomatoesAndLetterboxdFromOneAnswer() {
+        val json = answer(rating("imdb", 8.1, 81), rating("tomatoes", 92, 92), rating("letterboxd", 3.9, 78))
+        assertEquals("92%", parseTomatoes(json))
+        assertEquals(mapOf("tomatoes" to "92%", "letterboxd" to "3.9"), parseRatings(json))
+    }
+
+    @Test fun showHasTomatoesOnly() {
+        assertEquals(mapOf("tomatoes" to "88%"), parseRatings(answer(rating("tomatoes", 88, 88))))
+        assertEquals(emptyMap<String, String>(), parseRatings(answer(rating("tomatoes", null, null))))
+        assertEquals(emptyMap<String, String>(), parseRatings(JSONObject()))
+    }
+
+    @Test fun bothShowsImdbTomatoesLetterboxdInOrder() {
+        assertEquals(listOf("IMDb" to "7.9", ROTTEN to "92%", LETTERBOXD to "3.9"), shownRatings("both", "7.9", "3.9", "92%"))
+        assertEquals(listOf("IMDb" to "7.9", ROTTEN to "92%"), shownRatings("both", "7.9", null, "92%"))
+        assertEquals(listOf("IMDb" to "7.9"), shownRatings("imdb", "7.9", "3.9", "92%"))
+    }
 }
