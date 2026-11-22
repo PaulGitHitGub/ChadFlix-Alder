@@ -3,6 +3,7 @@ package dev.alder
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Rect
+import android.graphics.Paint
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -13,6 +14,8 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewOutlineProvider
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -97,9 +100,18 @@ class SearchActivity : Screen() {
             typeface = text("", HomeStyle.ROW_TITLE, bold = true).typeface
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
-            isFocusable = false // the remote lives on the keys; the field only shows what they typed
+            id = View.generateViewId()
+            imeOptions = EditorInfo.IME_ACTION_SEARCH
+            showSoftInputOnFocus = false // phone remotes and TalkBack type into it without our own keyboard's help
             background = null
             setPadding(dp(12), 0, 0, 0)
+            setSelectAllOnFocus(false)
+            // No box: the header's words are underlined while the field has the remote.
+            setOnFocusChangeListener { _, has ->
+                paintFlags = if (has) paintFlags or Paint.UNDERLINE_TEXT_FLAG else paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+                invalidate()
+                if (!has) (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(windowToken, 0)
+            }
         }
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -153,6 +165,11 @@ class SearchActivity : Screen() {
                 main.postDelayed(typed, TYPING_PAUSE)
             }
         })
+        input.setOnEditorActionListener { _, _, _ ->
+            main.removeCallbacks(typed)
+            search(true)
+            true
+        }
         // Our keyboard only: the Android one never opens.
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         (voice ?: firstKey)?.let { it.post { it.requestFocus() } }
@@ -339,13 +356,15 @@ class SearchActivity : Screen() {
 
         rows.forEachIndexed { r, keys ->
             keys.forEachIndexed { c, v ->
-                v.nextFocusUpId = if (r > 0) rows[r - 1][c].id else voice?.id ?: View.NO_ID
+                v.nextFocusUpId = if (r > 0) rows[r - 1][c].id else voice?.id ?: input.id
                 v.nextFocusDownId = if (r < rows.lastIndex) rows[r + 1][c].id else (if (c < 3) space else delete).id
             }
         }
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
+        voice?.nextFocusUpId = input.id
+        input.nextFocusDownId = (voice ?: rows[0][0]).id
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -410,11 +429,13 @@ class SearchActivity : Screen() {
         if (event.action == KeyEvent.ACTION_DOWN) {
             val focus = currentFocus
             if (event.keyCode == KeyEvent.KEYCODE_BACK &&
-                (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus())) {
+                (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus() || input.hasFocus())) {
                 if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys) {
-                if ((firstResult ?: resultsAction)?.requestFocus() == true) return true
+                // Still loading (nothing to land on): stay put rather than let Android's search jump to the gear.
+                (firstResult ?: resultsAction)?.requestFocus()
+                return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && cards.any { it === focus }) {
                 if (firstResult === focus || cards.indexOfFirst { it === focus } == 0) {
