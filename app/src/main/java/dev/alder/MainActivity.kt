@@ -1723,6 +1723,10 @@ class MainActivity : Screen() {
             height = if (grid) resources.displayMetrics.heightPixels - dp(GRID_TOP) else browseRowH
         }
         content.setPadding(0, 0, 0, if (grid) 0 else browseEndPad)
+        // ChadFlix: the last page's info line goes at once. Fading out (~240 ms) it was already moved to the new page's
+        // spot below (translationX 0, or My Lists' top), so the old words jumped left and lingered there.
+        browseInfo.animate().cancel()
+        browseInfo.alpha = 0f
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             leftMargin = dp((if (grid) PAD else HomeStyle.INSET) - FOCUS_ROOM)
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
@@ -1782,7 +1786,6 @@ class MainActivity : Screen() {
         focusedSomething = false
         // The last page's title goes with it; an empty page (no library yet, no catalogs) shows none.
         heroItem = null
-        browseInfo.exit(FOCUS_MS).alpha(0f).start()
         slideAnim.also { slideAnim = null }?.cancel()
         scroller.scrollTo(0, 0)
         mode = Mode.BROWSE
@@ -3031,7 +3034,9 @@ class MainActivity : Screen() {
 
     private val heroTop = Runnable {
         val first = firstRow()?.takeIf { header.hasFocus() && mode == Mode.BROWSE } ?: return@Runnable
-        first.items[first.selected].takeIf { it !== heroItem }?.let { fill(it); showHero(it) }
+        // ChadFlix: placed under its card before it shows, as Down will place it (a Showing tile row starts at card 1);
+        // it used to show at translationX 0, under the tile, then jump one card right on Down.
+        first.items[first.selected].takeIf { it !== heroItem }?.let { first.pin(first.selected, snap = true); fill(it); showHero(it) }
     }
 
     /** The row nearest the top of the page: where Up goes back to the cinema from. */
