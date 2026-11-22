@@ -182,7 +182,7 @@ internal class MediaCardView(
                 outline.setRoundRect(0, 0, view.width, view.height, screen.dp(Screen.CARD_RADIUS).toFloat())
         }
         clipToOutline = true
-        if (home) HomeStyle.posterCard(this, face)
+        if (home) HomeStyle.posterCard(this, face, shade)
 
         face.addView(image, LayoutParams(-1, -1))
         if (wide && !live) titleShade.visibility = View.VISIBLE

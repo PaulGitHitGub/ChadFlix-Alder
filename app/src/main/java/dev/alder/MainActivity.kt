@@ -1563,9 +1563,12 @@ class MainActivity : Screen() {
         // ChadFlix: "Drama • 2014 • 1h 41m • PG-13", with Continue Watching's time left (its card only has the bar).
         val left = item.timeLeft ?: HomeStyle.runtimeMs(meta?.runtime).takeIf { item.resumeAt in 1L until it }?.let { timeLeft(it, item.resumeAt) }
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() }, left)
-        // No "Movie"/"Series" (the tab says it); the time left goes in brackets after the runtime: "1h 59m (1h 56m left)".
-        else factsList += listOfNotNull(genre, year, length?.let { l -> left?.let { "$l ($it)" } ?: l } ?: left?.let { "($it)" },
-            meta?.certification)
+        // No "Movie"/"Series" (the tab says it). A film's time left goes in brackets after its runtime, "1h 59m (1h 56m
+        // left)"; otherwise (a show's seasons, no runtime) it's its own item, "3 Seasons • 40m left".
+        else {
+            val bracket = item.type == "movie" && length != null && left != null
+            factsList += listOfNotNull(genre, year, if (bracket) "$length ($left)" else length, meta?.certification, left.takeIf { !bracket })
+        }
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
         // ChadFlix: the ratings (views, and any MDBList request) only for the card the remote stops on: racing past films
         // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
@@ -3125,9 +3128,12 @@ class MainActivity : Screen() {
             val b = badge ?: HomeStyle.badge(this@MainActivity).also { badge = it }
             if (b.parent !== card) {
                 (b.parent as? android.view.ViewGroup)?.removeView(b)
-                card.addView(b, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply {
-                    rightMargin = dp(8); bottomMargin = dp(if (card.hasBar) 12 else 8) // above Continue Watching's bar
-                })
+                card.addView(b, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { rightMargin = dp(8) })
+            }
+            // Above Continue Watching's bar (6-10 dp up) whenever it's there, even if it came after the badge.
+            (b.layoutParams as FrameLayout.LayoutParams).let { lp ->
+                val bottom = dp(if (card.hasBar) 16 else 8)
+                if (lp.bottomMargin != bottom) { lp.bottomMargin = bottom; b.layoutParams = lp }
             }
             (b.getChildAt(0) as ImageView).setImageResource(mark)
             (b.getChildAt(1) as TextView).text = score

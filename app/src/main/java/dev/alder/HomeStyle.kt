@@ -63,9 +63,10 @@ internal object HomeStyle {
      * A home card: a rounded placeholder until the picture comes, and the picture rounded on its own, so the card can
      * widen ([MediaCardView.expand]) without a clip of its own.
      */
-    fun posterCard(card: FrameLayout, face: View) {
+    fun posterCard(card: FrameLayout, face: View, shade: View) {
         val c = card.context
         val r = px(c, CARD_RADIUS)
+        shade.background = GradientDrawable().apply { setColor(BLACK); cornerRadius = r } // the dimming keeps the corners round
         card.background = GradientDrawable().apply { setColor(PLACEHOLDER); cornerRadius = r }
         card.clipToOutline = false
         face.outlineProvider = object : ViewOutlineProvider() {
