@@ -695,12 +695,17 @@ class SearchActivity : Screen() {
         }
         recentBox.addView(caps(R.string.search_recent, TEXT_3), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(7) })
         var firstChip: View? = null
-        values.chunked(2).forEach { pair ->
-            val line = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
-            pair.forEach { query ->
+        // Each chip as wide as its words, as many to a line as fit the keyboard's width, at most two lines; only a chip
+        // wider than the whole column is cut short.
+        val columnW = dp(KEYS_W)
+        val gap = dp(5)
+        var line: LinearLayout? = null
+        var used = 0
+        var lines = 0
+        values.forEach { query ->
                 val chipView = chip(query).apply {
                     textSize = SMALL
-                    maxWidth = dp(95)
+                    maxWidth = columnW
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     contentDescription = getString(R.string.search_recent_hint, query)
@@ -722,10 +727,17 @@ class SearchActivity : Screen() {
                         true
                     }
                 }
+                val w = minOf(columnW, chipView.paint.measureText(query).toInt() + chipView.paddingLeft + chipView.paddingRight + 1)
+                val row = line?.takeIf { used + gap + w <= columnW } ?: run {
+                    if (lines == 2) return@forEach
+                    lines++
+                    used = -gap
+                    LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
+                        .also { line = it; recentBox.addView(it, LinearLayout.LayoutParams(-1, dp(27))) }
+                }
                 if (firstChip == null) firstChip = chipView
-                line.addView(chipView, LinearLayout.LayoutParams(-2, dp(24)).apply { if (line.childCount > 0) marginStart = dp(5) })
-            }
-            recentBox.addView(line, LinearLayout.LayoutParams(-1, dp(27)))
+                row.addView(chipView, LinearLayout.LayoutParams(-2, dp(24)).apply { if (row.childCount > 0) marginStart = gap })
+                used += gap + w
         }
         recentBox.addView(text(R.string.search_hold_to_remove, HomeStyle.INFO, color = HomeStyle.PLOT),
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
@@ -938,7 +950,7 @@ class SearchActivity : Screen() {
             list.forEachIndexed { index, meta ->
                 rail.appendCard(card(meta, caption, rail, index, index == 0, posters))
             }
-            group.addView(rail.scroller, LinearLayout.LayoutParams(-1, dp(HomeStyle.CARD_H + 10)))
+            group.addView(rail.scroller, LinearLayout.LayoutParams(-1, posterH + dp(10)))
             group.addView(caption, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(2) })
             results.addView(group, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
         }
@@ -952,7 +964,7 @@ class SearchActivity : Screen() {
 
     private fun card(meta: Meta, caption: TextView, rail: HorizontalCardRail, index: Int, firstInRow: Boolean, posters: MutableList<() -> Unit>): MediaCardView {
         // Home's poster card: its size and small radius, a white border while focused, no growth and no dimming.
-        val card = MediaCardView(this, meta.name, meta.poster, meta.background, widthPx = dp(HomeStyle.CARD_W), heightPx = dp(HomeStyle.CARD_H),
+        val card = MediaCardView(this, meta.name, meta.poster, meta.background, widthPx = posterH * 2 / 3, heightPx = posterH,
             dimAlpha = 0f, fadeIn = false, retryOnFailure = true, home = true).apply {
             tag = "${meta.type}:${meta.id}"
             setOnFocusChanged { has ->
@@ -983,6 +995,17 @@ class SearchActivity : Screen() {
         if (firstResult == null) firstResult = card
         posters += { card.load() }
         return card
+    }
+
+    /**
+     * ChadFlix: search's posters (2:3, home's corners and border), as tall as lets Movies' title, row and caption, then
+     * Shows' title and its whole row fit under the search line; never taller than Home's.
+     */
+    private val posterH by lazy {
+        val title = HomeStyle.height(text("", HomeStyle.ROW_TITLE, bold = true)) + dp(2)
+        val caption = HomeStyle.height(text("", HomeStyle.INFO, bold = true)) + dp(2)
+        val room = (resources.displayMetrics.heightPixels - dp(104)) - 2 * title - 2 * dp(10) - caption - dp(16)
+        (room / 2).coerceIn(dp(100), dp(HomeStyle.CARD_H))
     }
 
     private companion object {
