@@ -135,7 +135,6 @@
     <string name="timing_on_time">सही समय पर</string>
     <string name="timing_earlier">%1$+.2f s  पहले</string>
     <string name="timing_later">%1$+.2f s  बाद में</string>
-    <string name="player_ends_at">%1$s पर खत्म</string>
     <string name="player_loading">लोड हो रहा है</string>
     <string name="player_loading_percent">लोड हो रहा है · %1$d%%</string>
     <string name="player_starting">शुरू हो रहा है · %1$s</string>

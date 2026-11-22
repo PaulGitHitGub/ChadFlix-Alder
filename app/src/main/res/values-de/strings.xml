@@ -135,7 +135,6 @@
     <string name="timing_on_time">Synchron</string>
     <string name="timing_earlier">%1$+.2f s  früher</string>
     <string name="timing_later">%1$+.2f s  später</string>
-    <string name="player_ends_at">Endet um %1$s</string>
     <string name="player_loading">Wird geladen</string>
     <string name="player_loading_percent">Wird geladen · %1$d %%</string>
     <string name="player_starting">Startet · %1$s</string>

@@ -535,12 +535,7 @@ class ScreenDesignTest {
         assertEquals(null, Meta(org.json.JSONObject("""{"id":"tt1"}""")).certification)
     }
 
-    @Test fun playerPauseFactsAndBrandBadges() {
-        assertEquals("2025  ·  Ends 7:18 PM", playerPauseFacts("2025", "7:18 PM", isTrailer = false, isLive = false))
-        assertEquals("S5 E2  ·  Ends 8:56 PM", playerPauseFacts("S5 E2", "8:56 PM", isTrailer = false, isLive = false))
-        assertEquals("Trailer", playerPauseFacts("Trailer", "7:18 PM", isTrailer = true, isLive = false))
-        assertEquals("2025", playerPauseFacts("2025", "7:18 PM", isTrailer = false, isLive = true))
-
+    @Test fun playerBadgesHaveNoLanguageAndNoDebrid() {
         val dvAtmosRd = Stream(
             "[RD+] Torrentio (2160p)",
             "Dune.Part.Two.2024.2160p.WEB-DL.DV.HDR.DDP5.1.Atmos.H265.mkv",
@@ -555,11 +550,9 @@ class ScreenDesignTest {
                 PlayerBadge(BadgeBrand.NONE, "4K", accent = true),
                 PlayerBadge(BadgeBrand.DOLBY, "VISION", accent = true),
                 PlayerBadge(BadgeBrand.DOLBY, "ATMOS", accent = true),
-                PlayerBadge(BadgeBrand.NONE, "ENGLISH 5.1"),
-                PlayerBadge(BadgeBrand.SUBTITLES, "ENGLISH"),
-                PlayerBadge(BadgeBrand.DEBRID, "RD", code = "RD ⚡", accent = true),
+                PlayerBadge(BadgeBrand.NONE, "5.1"),
             ),
-            playerBadges(dvAtmosRd, audioLanguage = "en", subtitleLanguage = "en"),
+            playerBadges(dvAtmosRd),
         )
 
         val dtsRemuxTb = Stream(
@@ -575,12 +568,10 @@ class ScreenDesignTest {
             listOf(
                 PlayerBadge(BadgeBrand.NONE, "1080p"),
                 PlayerBadge(BadgeBrand.DTS, "HD"),
-                PlayerBadge(BadgeBrand.NONE, "INDONESIAN 5.1"),
-                PlayerBadge(BadgeBrand.SUBTITLES, "ENGLISH"),
-                PlayerBadge(BadgeBrand.NONE, "REMUX"),
-                PlayerBadge(BadgeBrand.DEBRID, "TB", code = "TB ⚡", accent = true),
+                PlayerBadge(BadgeBrand.NONE, "5.1"),
+                PlayerBadge(BadgeBrand.NONE, "BLU-RAY"),
             ),
-            playerBadges(dtsRemuxTb, audioLanguage = "id", audioChannels = 6, subtitleLanguage = "eng"),
+            playerBadges(dtsRemuxTb, audioChannels = 6),
         )
     }
 
@@ -604,14 +595,20 @@ class ScreenDesignTest {
         assertTrue(BadgeBrand.DTS to "X" in audio(dtsX, MimeTypes.AUDIO_DTS_HD))
     }
 
-    @Test fun playerBadgesEmptyWhenNoStreamOrTracks() {
-        assertEquals(emptyList<PlayerBadge>(), playerBadges(null))
+    /** Channels show whenever they are known, Atmos and DTS:X included. */
+    @Test fun playerBadgesShowChannelsWithAtmosAndDtsX() {
+        val atmos = Stream("Torrentio 2160p", "Film.2160p.WEB-DL.DDP5.1.Atmos.mkv", "https://example.invalid/a.mkv",
+            emptyMap(), 0L, "Film.2160p.WEB-DL.DDP5.1.Atmos.mkv", null)
+        val seven = playerBadges(atmos, audioMime = MimeTypes.AUDIO_E_AC3_JOC, audioChannels = 8)
+        assertTrue(PlayerBadge(BadgeBrand.DOLBY, "ATMOS", accent = true) in seven)
+        assertEquals("7.1", seven.last().label)
+        val dtsX = Stream("Comet 2160p", "Film.2160p.BluRay.REMUX.DTS:X.7.1.mkv", "https://example.invalid/x.mkv",
+            emptyMap(), 0L, "Film.2160p.BluRay.REMUX.DTS:X.7.1.mkv", null)
+        assertEquals(listOf("4K", "X", "7.1", "BLU-RAY"), playerBadges(dtsX, audioMime = MimeTypes.AUDIO_DTS_HD, audioChannels = 8).map { it.label })
     }
 
-    @Test fun playerPauseFactsHandlesLoadingStates() {
-        assertEquals("", playerPauseFacts("", null, isTrailer = false, isLive = false))
-        assertEquals("S1 E1", playerPauseFacts("S1 E1", null, isTrailer = false, isLive = false))
-        assertEquals("S1 E1  ·  Ends 10:00 PM", playerPauseFacts("S1 E1", "10:00 PM", isTrailer = false, isLive = false))
+    @Test fun playerBadgesEmptyWhenNoStreamOrTracks() {
+        assertEquals(emptyList<PlayerBadge>(), playerBadges(null))
     }
 
     @Test fun subtitleColorResolvesCorrectly() {

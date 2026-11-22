@@ -19,7 +19,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.TextClock
 import android.widget.TextView
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -55,8 +54,6 @@ import androidx.media3.ui.SubtitleView
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
-import java.text.SimpleDateFormat
-import java.util.Date
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -154,28 +151,20 @@ internal fun <T> chunkGrid(tracks: List<T>, columns: Int = 3): List<List<T>> {
     return tracks.chunked(columns)
 }
 
-internal fun playerPauseFacts(subtitle: String, endClock: String?, isTrailer: Boolean, isLive: Boolean,
-                              endsAt: String = "Ends %1\$s"): String =
-    listOfNotNull(
-        subtitle.takeIf { it.isNotBlank() },
-        endClock?.takeIf { it.isNotBlank() && !isTrailer && !isLive }?.let { endsAt.format(it) },
-    ).joinToString(Screen.DOT)
+// ChadFlix: no audio or subtitle language and no debrid badge; "Ends at" is its own line at the top left.
+internal enum class BadgeBrand { NONE, DOLBY, DTS }
 
-internal enum class BadgeBrand { NONE, DOLBY, DTS, SUBTITLES, DEBRID }
-
-internal data class PlayerBadge(val brand: BadgeBrand, val label: String, val code: String? = null, val accent: Boolean = false)
+internal data class PlayerBadge(val brand: BadgeBrand, val label: String, val accent: Boolean = false)
 
 internal fun playerBadges(
     stream: Stream?,
     videoHeight: Int = 0,
     videoWidth: Int = 0,
-    audioLanguage: String? = null,
     audioMime: String? = null,
     audioLabel: String? = null,
     audioChannels: Int = 0,
-    subtitleLanguage: String? = null,
 ): List<PlayerBadge> {
-    if (stream == null && videoHeight <= 0 && audioMime == null && audioLanguage == null && subtitleLanguage == null) return emptyList()
+    if (stream == null && videoHeight <= 0 && audioMime == null && audioChannels <= 0) return emptyList()
     val out = mutableListOf<PlayerBadge>()
     // Widescreen films are stored without black bars (4K scope is 3840 x 1608), so the width's 16:9 height counts too.
     val height = maxOf(videoHeight.takeIf { it > 0 } ?: stream?.height ?: 0, videoWidth * 9 / 16)
@@ -214,8 +203,6 @@ internal fun playerBadges(
         dolbyDigital -> out += PlayerBadge(BadgeBrand.DOLBY, "AUDIO")
     }
 
-    val langName = audioLanguage?.let { Languages.code(it)?.let(Languages::name) ?: it }
-        ?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(Locale.ROOT)
     val channels = when {
         audioChannels == 8 -> "7.1"
         audioChannels == 6 -> "5.1"
@@ -226,18 +213,9 @@ internal fun playerBadges(
         Regex("(?<!\\d)5[ ._-]?1\\b").containsMatchIn(words) -> "5.1"
         else -> null
     }
-    val audioTag = listOfNotNull(langName, channels.takeIf { langName != null || (!atmos && !dtsX) })
-        .joinToString(" ").ifEmpty { null }
-    if (audioTag != null) out += PlayerBadge(BadgeBrand.NONE, audioTag)
+    if (channels != null) out += PlayerBadge(BadgeBrand.NONE, channels)
 
-    val subName = subtitleLanguage?.let { Languages.code(it)?.let(Languages::name) ?: it }
-        ?.trim()?.takeIf { it.isNotEmpty() }?.uppercase(Locale.ROOT)
-    if (subName != null) out += PlayerBadge(BadgeBrand.SUBTITLES, subName)
-
-    if (stream?.remux == true) out += PlayerBadge(BadgeBrand.NONE, "REMUX")
-    stream?.debrid?.let { d ->
-        out += PlayerBadge(BadgeBrand.DEBRID, d.short, code = d.tag, accent = true)
-    }
+    if (stream?.remux == true) out += PlayerBadge(BadgeBrand.NONE, "BLU-RAY")
     return out
 }
 
@@ -568,11 +546,6 @@ class PlayerActivity : Screen() {
             val episode = if (isTrailer) null else m.videos.firstOrNull { it.id == videoId }
             pauseTitle.text = episode?.title?.takeIf { it.isNotBlank() } ?: m.name
             subtitle.text = if (isTrailer) getString(R.string.action_trailer) else episode?.let { "S${it.season} E${it.episode}" } ?: m.year.orEmpty()
-            Images.load(m.logo ?: Images.logoFor(m.id), playerLogo, dp(300), urgent = true, failed = {
-                playerLogo.visibility = View.GONE; topName.visibility = View.VISIBLE
-            }) {
-                playerLogo.visibility = View.VISIBLE; topName.visibility = View.GONE
-            }
             nextCell.visibility = if (isTrailer || nextVideo() == null) View.GONE else View.VISIBLE
         }
 
@@ -1778,8 +1751,7 @@ class PlayerActivity : Screen() {
     private lateinit var audioButton: TextView
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
-    private lateinit var playerLogo: ImageView
-    private lateinit var topName: TextView
+    private lateinit var endsAt: TextView
     private lateinit var pauseTitle: TextView
     private lateinit var pauseInfo: LinearLayout
     private lateinit var pauseFacts: TextView
@@ -1818,18 +1790,7 @@ class PlayerActivity : Screen() {
 
     private fun buildControls(): FrameLayout {
         val name = intent.getStringExtra("name").orEmpty()
-        playerLogo = ImageView(this).apply { scaleType = ImageView.ScaleType.FIT_START; visibility = View.GONE }
-        topName = text(name, SERIF_TITLE, serif = true).onArt().apply {
-            maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-        }
-        val logoUrl = intent.getStringExtra("logo") ?: Images.logoFor(metaId)
-        Images.load(logoUrl, playerLogo, dp(300), urgent = true, failed = {
-            playerLogo.visibility = View.GONE
-            topName.visibility = View.VISIBLE
-        }) {
-            playerLogo.visibility = View.VISIBLE
-            topName.visibility = View.GONE
-        }
+        endsAt = text("", BODY, bold = true, color = 0xB3FFFFFF.toInt()).onArt().apply { maxLines = 1; visibility = View.GONE }
         pauseTitle = text(intent.getStringExtra("episode")?.substringAfter("  ·  ", "")?.takeIf { it.isNotBlank() }
             ?: name, SERIF_HERO, serif = true).onArt().apply {
             maxLines = 1; ellipsize = TextUtils.TruncateAt.END
@@ -1995,17 +1956,9 @@ class PlayerActivity : Screen() {
                 background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
                     intArrayOf(0xBF0E0C0A.toInt(), 0x590E0C0A, 0x000E0C0A))
             }, FrameLayout.LayoutParams(-1, dp(220), Gravity.BOTTOM))
-            addView(playerLogo, FrameLayout.LayoutParams(dp(150), dp(50)).apply {
-                leftMargin = dp(PAD); topMargin = dp(26)
-            })
-            addView(topName, FrameLayout.LayoutParams(dp(250), -2).apply {
-                leftMargin = dp(PAD); topMargin = dp(31)
-            })
-            addView(TextClock(this@PlayerActivity).apply {
-                format12Hour = "h:mm a"; format24Hour = "HH:mm"
-                textSize = SMALL; setTextColor(TEXT_2); typeface = text("", SMALL).typeface
-            }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(34); rightMargin = dp(PAD)
+            // ChadFlix: "Ends at 2:40 PM" at the top left, once; it replaces the logo, the name and the clock up here.
+            addView(endsAt, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply {
+                marginStart = dp(PAD); topMargin = dp(31)
             })
             addView(pauseInfo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
                 leftMargin = dp(PAD); bottomMargin = dp(168)
@@ -2035,10 +1988,6 @@ class PlayerActivity : Screen() {
             return
         }
         val audio = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }?.getTrackFormat(0)
-        val textGroup = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_TEXT && it.isSelected }
-        val subLang = if (textGroup == null || C.TRACK_TYPE_TEXT in player.trackSelectionParameters.disabledTrackTypes) null
-        else (if (isAddonSub(textGroup)) chosenSub?.lang else textGroup.getTrackFormat(0).language)
-            ?.let(Languages::code)?.let(Languages::name) ?: getString(R.string.state_on)
         val videoHeight = player.videoFormat?.height?.takeIf { it > 0 }
             ?: tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }?.getTrackFormat(0)?.height ?: 0
         val videoWidth = player.videoFormat?.width?.takeIf { it > 0 }
@@ -2047,11 +1996,9 @@ class PlayerActivity : Screen() {
             stream = sources.getOrNull(at),
             videoHeight = videoHeight,
             videoWidth = videoWidth,
-            audioLanguage = audio?.language,
             audioMime = audio?.sampleMimeType,
             audioLabel = audio?.label,
             audioChannels = audio?.channelCount?.takeIf { it > 0 } ?: 0,
-            subtitleLanguage = subLang,
         )
         if (badges == shownBadges && pauseBadges.childCount > 0) return
         shownBadges = badges
@@ -2064,7 +2011,7 @@ class PlayerActivity : Screen() {
         }
     }
 
-    /** Monochrome House Lights brand badge: custom vector marks for Dolby / DTS / Subtitles / Debrid, or crisp typographic lockups. */
+    /** Monochrome House Lights brand badge: custom vector marks for Dolby / DTS, or crisp typographic lockups. */
     private fun badgeView(b: PlayerBadge): View {
         val rim = if (b.accent) 0x80F3D9B1.toInt() else 0x66FFF0DC
         val frame = GradientDrawable().apply {
@@ -2094,33 +2041,6 @@ class PlayerActivity : Screen() {
                     letterSpacing = 0.06f
                 }, wrap())
             }
-            BadgeBrand.SUBTITLES -> LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                background = frame
-                setPadding(dp(5), 0, dp(6), 0)
-                addView(ImageView(context).apply {
-                    setImageDrawable(getDrawable(R.drawable.ic_subtitles)?.mutate()?.apply { setTint(TEXT_2) })
-                }, LinearLayout.LayoutParams(dp(12), dp(12)).apply { marginEnd = dp(4) })
-                addView(text(b.label, 9.5f, bold = true, color = TEXT_2).apply {
-                    includeFontPadding = false
-                    letterSpacing = 0.05f
-                }, wrap())
-            }
-            BadgeBrand.DEBRID -> if (b.label == "TB") {
-                FrameLayout(this).apply {
-                    background = frame
-                    setPadding(dp(5), 0, dp(5), 0)
-                    addView(torboxIcon(TUNGSTEN), FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
-                }
-            } else {
-                text(b.code ?: b.label, 9.5f, bold = true, color = TUNGSTEN).apply {
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    letterSpacing = 0.04f
-                    background = frame
-                    setPadding(dp(6), 0, dp(6), 0)
-                }
-            }
             BadgeBrand.NONE -> text(b.label, 9.5f, bold = true, color = if (b.accent) TUNGSTEN else TEXT_2).apply {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
@@ -2128,45 +2048,6 @@ class PlayerActivity : Screen() {
                 background = frame
                 setPadding(dp(6), 0, dp(6), 0)
             }
-        }
-    }
-
-    /** TorBox isometric 3D cube mark, drawn in [color]. */
-    private fun torboxIcon(color: Int) = object : View(this) {
-        private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            style = Paint.Style.STROKE
-            strokeWidth = resources.displayMetrics.density * 1.25f
-            strokeJoin = Paint.Join.ROUND
-            strokeCap = Paint.Cap.ROUND
-        }
-        private val path = android.graphics.Path()
-        override fun onDraw(canvas: Canvas) {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            val cx = w / 2f
-            val topY = h * 0.08f
-            val midY = h * 0.32f
-            val botMidY = h * 0.68f
-            val botY = h * 0.92f
-            val leftX = w * 0.10f
-            val rightX = w * 0.90f
-            path.reset()
-            // Outer hexagon of the cube
-            path.moveTo(cx, topY)
-            path.lineTo(rightX, midY)
-            path.lineTo(rightX, botMidY)
-            path.lineTo(cx, botY)
-            path.lineTo(leftX, botMidY)
-            path.lineTo(leftX, midY)
-            path.close()
-            // Inner Y edges of the cube
-            path.moveTo(leftX, midY)
-            path.lineTo(cx, h * 0.52f)
-            path.lineTo(rightX, midY)
-            path.moveTo(cx, h * 0.52f)
-            path.lineTo(cx, botY)
-            canvas.drawPath(path, stroke)
         }
     }
 
@@ -2322,10 +2203,13 @@ class PlayerActivity : Screen() {
             optionsElapsed.text = if (live) getString(R.string.player_live) else clock(position)
             optionsLeft.text = if (live || duration <= 0) "" else "−${clock((duration - position).coerceAtLeast(0))}"
         }
-        val remaining = (duration - position).coerceAtLeast(0)
-        val end = if (duration > 0) SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(System.currentTimeMillis() + (remaining / player.playbackParameters.speed).toLong())) else null
+        // ChadFlix: "Ends at 2:40 PM" is its own line at the top left (none for a trailer, live TV or a length not known).
+        val end = endsAtTime(System.currentTimeMillis(), duration, position, player.playbackParameters.speed, isTrailer, live)
         if (started) {
-            pauseFacts.text = playerPauseFacts(subtitle.text.toString(), end, isTrailer, live, getString(R.string.player_ends_at))
+            endsAt.visibility = if (end == null) View.GONE else View.VISIBLE
+            if (end != null) endsAt.text = getString(R.string.details_ends_at, android.text.format.DateFormat.format(
+                if (android.text.format.DateFormat.is24HourFormat(this)) "HH:mm" else "h:mm a", end).toString())
+            pauseFacts.text = subtitle.text.toString()
             pauseFacts.visibility = if (pauseFacts.text.isEmpty()) View.GONE else View.VISIBLE
         }
         main.postDelayed(progressTask, 500)

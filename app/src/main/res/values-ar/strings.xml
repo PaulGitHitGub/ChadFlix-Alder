@@ -148,7 +148,6 @@
     <string name="timing_on_time">في موعدها</string>
     <string name="timing_earlier">قبل الموعد بـ %1$+.2f ث</string>
     <string name="timing_later">بعد الموعد بـ %1$+.2f ث</string>
-    <string name="player_ends_at">ينتهي عند %1$s</string>
     <string name="player_loading">جارٍ التحميل</string>
     <string name="player_loading_percent">جارٍ التحميل · %1$d%%</string>
     <string name="player_starting">جارٍ البدء · %1$s</string>

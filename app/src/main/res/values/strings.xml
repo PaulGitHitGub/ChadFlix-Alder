@@ -161,7 +161,6 @@
     <string name="timing_on_time">On time</string>
     <string name="timing_earlier">%1$+.2f s  earlier</string>
     <string name="timing_later">%1$+.2f s  later</string>
-    <string name="player_ends_at">Ends %1$s</string>
     <string name="player_loading">Loading</string>
     <string name="player_loading_percent">Loading · %1$d%%</string>
     <string name="player_starting">Starting · %1$s</string>
