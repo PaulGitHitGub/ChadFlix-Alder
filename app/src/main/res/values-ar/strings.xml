@@ -399,6 +399,7 @@
     <string name="search_recent_hint">%1$s. اضغط مطولًا على موافق لإزالته من عمليات البحث الأخيرة</string>
     <string name="search_remove_recent">هل تريد إزالة عملية البحث الأخيرة؟</string>
     <string name="search_remove_query">إزالة %1$s</string>
+    <string name="search_hold_to_remove">اضغط مطولًا على موافق للإزالة</string>
     <string name="search_popular_unavailable">العناوين الرائجة غير متاحة.</string>
     <string name="search_popular_titles">العناوين الرائجة</string>
     <string name="search_voice">بحث صوتي</string>

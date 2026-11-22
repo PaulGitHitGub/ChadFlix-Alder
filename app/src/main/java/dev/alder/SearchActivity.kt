@@ -484,6 +484,8 @@ class SearchActivity : Screen() {
             }
             recentBox.addView(line, LinearLayout.LayoutParams(-1, dp(27)))
         }
+        recentBox.addView(text(R.string.search_hold_to_remove, HomeStyle.INFO, color = HomeStyle.PLOT),
+            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
         if (restoreFocus) (firstChip ?: lastKeyboardFocus ?: firstKey)?.requestFocus()
     }
 

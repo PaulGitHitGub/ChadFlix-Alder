@@ -386,6 +386,7 @@
     <string name="search_recent_hint">%1$s. OK gedrückt halten, um es aus den letzten Suchen zu entfernen</string>
     <string name="search_remove_recent">Letzte Suche entfernen?</string>
     <string name="search_remove_query">%1$s entfernen</string>
+    <string name="search_hold_to_remove">OK gedrückt halten zum Entfernen</string>
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
     <string name="search_popular_titles">Beliebte Titel</string>
     <string name="search_voice">Sprachsuche</string>

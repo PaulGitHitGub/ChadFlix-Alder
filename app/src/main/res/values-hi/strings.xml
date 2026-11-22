@@ -386,6 +386,7 @@
     <string name="search_recent_hint">%1$s. हाल की खोजों से हटाने के लिए OK दबाकर रखें</string>
     <string name="search_remove_recent">हाल की खोज हटाएँ?</string>
     <string name="search_remove_query">%1$s हटाएँ</string>
+    <string name="search_hold_to_remove">हटाने के लिए OK दबाकर रखें</string>
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
     <string name="search_popular_titles">लोकप्रिय शीर्षक</string>
     <string name="search_voice">वॉइस खोज</string>

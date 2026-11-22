@@ -406,6 +406,7 @@
     <string name="search_recent_hint">%1$s. Hold OK to remove from recent searches</string>
     <string name="search_remove_recent">Remove recent search?</string>
     <string name="search_remove_query">Remove %1$s</string>
+    <string name="search_hold_to_remove">Hold OK to remove</string>
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
     <string name="search_popular_titles">Popular Titles</string>
     <string name="search_voice">Voice Search</string>

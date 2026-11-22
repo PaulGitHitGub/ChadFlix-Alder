@@ -389,6 +389,7 @@
     <string name="search_recent_hint">%1$s. Mantén OK para quitarla de las búsquedas recientes</string>
     <string name="search_remove_recent">¿Quitar búsqueda reciente?</string>
     <string name="search_remove_query">Quitar %1$s</string>
+    <string name="search_hold_to_remove">Mantén OK para quitar</string>
     <string name="search_popular_unavailable">Los títulos populares no están disponibles.</string>
     <string name="search_popular_titles">Títulos populares</string>
     <string name="search_voice">Búsqueda por voz</string>
