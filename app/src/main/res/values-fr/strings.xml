@@ -368,8 +368,8 @@
     <string name="unhide_row_hint">Sélectionnez une rangée pour la remettre.</string>
     <string name="custom">Personnalisé</string>
     <string name="source_choice">Choix de la source</string>
-    <string name="source_choice_hint">Meilleure image : Blu-ray complet et Dolby Vision d’abord. Équilibré : fichiers plus légers. Démarrage rapide : versions web. Ordre de l’extension : suit l’extension.</string>
-    <string name="preset_addon_order">Ordre de l’extension</string>
+    <string name="source_choice_hint">Meilleure image : Blu-ray complet et Dolby Vision d’abord. Équilibré : fichiers plus légers. Démarrage rapide : versions web. N’importe quelle version : la copie la plus nette, quelle que soit la version.</string>
+    <string name="preset_addon_order">N’importe quelle version</string>
     <string name="preset_best_picture">Meilleure image</string>
     <string name="preset_balanced">Équilibré</string>
     <string name="preset_fast_start">Démarrage rapide</string>

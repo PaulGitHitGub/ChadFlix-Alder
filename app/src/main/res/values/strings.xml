@@ -372,8 +372,8 @@
     <string name="unhide_row_hint">Select a row to put it back.</string>
     <string name="custom">Custom</string>
     <string name="source_choice">Source choice</string>
-    <string name="source_choice_hint">Best picture: full Blu-ray and Dolby Vision first. Balanced: smaller files. Fast start: web releases. Add-on\'s order: follow the add-on.</string>
-    <string name="preset_addon_order">Add-on\'s order</string>
+    <string name="source_choice_hint">Best picture: full Blu-ray and Dolby Vision first. Balanced: smaller files. Fast start: web releases. Any release: the sharpest copy, whatever the release.</string>
+    <string name="preset_addon_order">Any release</string>
     <string name="preset_best_picture">Best picture</string>
     <string name="preset_balanced">Balanced</string>
     <string name="preset_fast_start">Fast start</string>

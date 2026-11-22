@@ -367,8 +367,8 @@
     <string name="unhide_row_hint">वापस लाने के लिए पंक्ति चुनें।</string>
     <string name="custom">कस्टम</string>
     <string name="source_choice">स्रोत का चुनाव</string>
-    <string name="source_choice_hint">सबसे अच्छी तस्वीर: पहले पूरा Blu-ray और Dolby Vision। संतुलित: छोटी फ़ाइलें। तेज़ शुरुआत: वेब रिलीज़। ऐड-ऑन का क्रम: ऐड-ऑन के हिसाब से।</string>
-    <string name="preset_addon_order">ऐड-ऑन का क्रम</string>
+    <string name="source_choice_hint">सबसे अच्छी तस्वीर: पहले पूरा Blu-ray और Dolby Vision। संतुलित: छोटी फ़ाइलें। तेज़ शुरुआत: वेब रिलीज़। कोई भी रिलीज़: सबसे साफ़ कॉपी, रिलीज़ कोई भी हो।</string>
+    <string name="preset_addon_order">कोई भी रिलीज़</string>
     <string name="preset_best_picture">सबसे अच्छी तस्वीर</string>
     <string name="preset_balanced">संतुलित</string>
     <string name="preset_fast_start">तेज़ शुरुआत</string>

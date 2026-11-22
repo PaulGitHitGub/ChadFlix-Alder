@@ -367,8 +367,8 @@
     <string name="unhide_row_hint">Wähle eine Reihe, um sie zurückzuholen.</string>
     <string name="custom">Eigene</string>
     <string name="source_choice">Quellenwahl</string>
-    <string name="source_choice_hint">Bestes Bild: vollständige Blu-ray und Dolby Vision zuerst. Ausgewogen: kleinere Dateien. Schneller Start: Web-Versionen. Add-on-Reihenfolge: folgt dem Add-on.</string>
-    <string name="preset_addon_order">Add-on-Reihenfolge</string>
+    <string name="source_choice_hint">Bestes Bild: vollständige Blu-ray und Dolby Vision zuerst. Ausgewogen: kleinere Dateien. Schneller Start: Web-Versionen. Beliebige Version: die schärfste Kopie, egal welche Version.</string>
+    <string name="preset_addon_order">Beliebige Version</string>
     <string name="preset_best_picture">Bestes Bild</string>
     <string name="preset_balanced">Ausgewogen</string>
     <string name="preset_fast_start">Schneller Start</string>

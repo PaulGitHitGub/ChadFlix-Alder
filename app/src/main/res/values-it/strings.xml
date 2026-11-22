@@ -368,8 +368,8 @@
     <string name="unhide_row_hint">Seleziona una riga per ripristinarla.</string>
     <string name="custom">Personalizzato</string>
     <string name="source_choice">Scelta della fonte</string>
-    <string name="source_choice_hint">Immagine migliore: prima Blu-ray completo e Dolby Vision. Bilanciato: file più leggeri. Avvio rapido: versioni web. Ordine dell’add-on: segue l’add-on.</string>
-    <string name="preset_addon_order">Ordine dell’add-on</string>
+    <string name="source_choice_hint">Immagine migliore: prima Blu-ray completo e Dolby Vision. Bilanciato: file più leggeri. Avvio rapido: versioni web. Qualsiasi versione: la copia più nitida, qualunque sia la versione.</string>
+    <string name="preset_addon_order">Qualsiasi versione</string>
     <string name="preset_best_picture">Immagine migliore</string>
     <string name="preset_balanced">Bilanciato</string>
     <string name="preset_fast_start">Avvio rapido</string>

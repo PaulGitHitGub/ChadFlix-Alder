@@ -372,8 +372,8 @@
     <string name="unhide_row_hint">اختر صفًا لإعادته.</string>
     <string name="custom">مخصّص</string>
     <string name="source_choice">اختيار المصدر</string>
-    <string name="source_choice_hint">أفضل صورة: Blu-ray الكامل وDolby Vision أولًا. متوازن: ملفات أصغر. بدء سريع: إصدارات الويب. ترتيب الإضافة: اتّبع ترتيب الإضافة.</string>
-    <string name="preset_addon_order">ترتيب الإضافة</string>
+    <string name="source_choice_hint">أفضل صورة: Blu-ray الكامل وDolby Vision أولًا. متوازن: ملفات أصغر. بدء سريع: إصدارات الويب. أي إصدار: أوضح نسخة، أيًّا كان الإصدار.</string>
+    <string name="preset_addon_order">أي إصدار</string>
     <string name="preset_best_picture">أفضل صورة</string>
     <string name="preset_balanced">متوازن</string>
     <string name="preset_fast_start">بدء سريع</string>
