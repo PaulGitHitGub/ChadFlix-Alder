@@ -1,6 +1,7 @@
 package dev.alder
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.TextUtils
@@ -643,8 +644,10 @@ class DetailsActivity : Screen() {
     }
 
     private fun toggleList() {
+        val profile = Profiles.active(this)?.takeIf { it.authKey == key } ?: return
+        val dates = Library.listDates(this, profile.id)
         val add = !Library.inList(item)
-        editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed) {
+        editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed, listDates = dates) {
             listButton.text = if (add) "✓" else "+"
             val desc = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
             listButton.contentDescription = desc
@@ -866,12 +869,12 @@ class DetailsActivity : Screen() {
     }
 
     private fun editLibrary(change: (JSONObject) -> Unit, title: Int = R.string.library_edit_failed,
-                            previous: Failure? = null, done: () -> Unit) {
+                            previous: Failure? = null, listDates: SharedPreferences? = null, done: () -> Unit) {
         if (savingEdit) return
         savingEdit = true
         val entry = Library.newItem(metaId, type, meta?.name ?: name, meta?.poster ?: poster)
         background({
-            Stremio.editLibrary(key, metaId, entry, change)
+            Stremio.editLibrary(key, metaId, entry, listDates, change)
         }) { result ->
             savingEdit = false
             if (isFinishing) return@background
@@ -884,7 +887,7 @@ class DetailsActivity : Screen() {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.LIBRARY_EDIT, failure)
                 choose(getString(title), listOf(getString(R.string.action_try_again), getString(R.string.action_cancel)),
-                    getString(failure.message)) { choice -> if (choice == 0) editLibrary(change, title, failure, done) }
+                    getString(failure.message)) { choice -> if (choice == 0) editLibrary(change, title, failure, listDates, done) }
             }
         }
     }

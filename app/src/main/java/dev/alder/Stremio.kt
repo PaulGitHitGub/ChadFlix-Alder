@@ -144,10 +144,15 @@ object Stremio {
     }
 
     @Synchronized
-    internal fun editLibrary(authKey: String, id: String, fallback: JSONObject, change: (JSONObject) -> Unit): JSONObject {
+    internal fun editLibrary(
+        authKey: String, id: String, fallback: JSONObject, listDates: android.content.SharedPreferences? = null,
+        change: (JSONObject) -> Unit,
+    ): JSONObject {
         val entry = library(authKey, listOf(id)).firstOrNull()?.let { JSONObject(it.toString()) } ?: fallback
+        val wasInList = Library.inList(entry)
         change(entry)
         saveLibrary(authKey, listOf(entry))
+        if (listDates != null && (!wasInList || !Library.inList(entry))) Library.recordListDate(listDates, entry)
         return entry
     }
 

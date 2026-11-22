@@ -588,4 +588,5 @@
     <string name="audio_fallback_hint">مع خيار لغتي أولًا، يحاول Alder تشغيل لغتك المفضلة ثم اللغة الاحتياطية ثم الإنجليزية. اختر إيقاف لاستخدام لغتك المفضلة فقط.</string>
     <string name="failure_preferred_audio">لا يوجد مسار صوتي مدعوم بلغتك المفضلة</string>
     <string name="failure_advice_preferred_audio">اختر مصدرًا يوفر لغة الصوت التي تفضلها.</string>
+    <string name="list_added_on">تاريخ الإضافة %1$s</string>
 </resources>

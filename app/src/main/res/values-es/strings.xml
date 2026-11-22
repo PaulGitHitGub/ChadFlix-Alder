@@ -576,4 +576,5 @@
     <string name="audio_fallback_hint">Con Mi idioma primero, Alder prueba tu idioma, este idioma alternativo y luego inglés. Selecciona Desactivado para usar solo tu idioma.</string>
     <string name="failure_preferred_audio">no hay ninguna pista de audio compatible en tu idioma preferido</string>
     <string name="failure_advice_preferred_audio">Elige una fuente con tu idioma de audio.</string>
+    <string name="list_added_on">Añadido el %1$s</string>
 </resources>

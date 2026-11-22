@@ -12,6 +12,29 @@ import org.junit.Test
 
 class ProfilesSyncTest {
     @Test
+    fun listDateIsPerProfileAndChangesOnlyWithListMembership() {
+        val dates = InMemoryPrefs()
+        val otherProfile = InMemoryPrefs()
+        val title = Library.newItem("tt1", "movie", "Film", null).put("_ctime", "2020-01-01T00:00:00.000Z")
+        assertNull(dates.getString("tt1", null))
+
+        Library.setInList(title, true)
+        Library.recordListDate(dates, title)
+        val added = title.getString("_mtime")
+        assertEquals(added, dates.getString("tt1", null))
+        assertNull(otherProfile.getString("tt1", null))
+        Library.markTitleWatched(title)
+        assertEquals(added, dates.getString("tt1", null))
+
+        Library.setInList(title, false)
+        Library.recordListDate(dates, title)
+        assertNull(dates.getString("tt1", null))
+        Library.setInList(title, true)
+        Library.recordListDate(dates, title)
+        assertEquals(title.getString("_mtime"), dates.getString("tt1", null))
+    }
+
+    @Test
     fun newestSeedsBrandNewSavingTitleWhenMissingFromRemoteAndPending() {
         ProgressSaves.init(InMemoryPrefs())
         Stremio.clearSavingForTest()

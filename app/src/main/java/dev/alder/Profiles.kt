@@ -45,13 +45,16 @@ object Profiles {
         return profile
     }
 
-    fun remove(context: Context, id: String) = removeFromPrefs(
-        accountPrefs = prefs(context),
-        settingsPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE),
-        searchPrefs = context.getSharedPreferences("search", Context.MODE_PRIVATE),
-        homePrefs = context.getSharedPreferences("home", Context.MODE_PRIVATE),
-        id = id,
-    )
+    fun remove(context: Context, id: String) {
+        Library.listDates(context, id).edit().clear().apply()
+        removeFromPrefs(
+            accountPrefs = prefs(context),
+            settingsPrefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE),
+            searchPrefs = context.getSharedPreferences("search", Context.MODE_PRIVATE),
+            homePrefs = context.getSharedPreferences("home", Context.MODE_PRIVATE),
+            id = id,
+        )
+    }
 
     internal fun removeFromPrefs(
         accountPrefs: SharedPreferences,

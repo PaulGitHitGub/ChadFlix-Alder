@@ -408,6 +408,7 @@ class MainActivity : Screen() {
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
         var newEpisodeCount: Int = 0,
+        val addedAt: String? = null,
     ) {
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
@@ -1278,7 +1279,8 @@ class MainActivity : Screen() {
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
-            val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
+            val year = if (page == Page.LIBRARY) null
+                else metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
             val title = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
                 if (year != null) {
                     val start = item.name.length
@@ -1287,6 +1289,7 @@ class MainActivity : Screen() {
                 }
             }
             showHeroTitle(item, title, year?.let { "$DOT$it" })
+            if (page == Page.LIBRARY) renderLibraryMetadata(item, requestLetterboxd = !changed && heroTask == null)
             browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
             main.post(::placeCaption)
             if (changed) {
@@ -1295,6 +1298,7 @@ class MainActivity : Screen() {
                 heroTask = Runnable {
                     heroTask = null
                     if (page.isGrid && heroItem === item && !isDestroyed) {
+                        if (page == Page.LIBRARY && item.settled) renderLibraryMetadata(item, requestLetterboxd = true)
                         fill(item)
                         if (item.settled) showLibraryArt(item)
                     }
@@ -1317,6 +1321,23 @@ class MainActivity : Screen() {
         if (backdropOf(item) != null) showArt(item)
         else if (item.settled) clearArt()
     }
+
+    private fun renderLibraryMetadata(item: Item, requestLetterboxd: Boolean) {
+        val meta = metas[item.id]
+        heroFacts.text = listOfNotNull(meta?.year, meta?.genres?.firstOrNull(), seasonCount(item, meta)).joinToString(DOT)
+        renderHeroRatings(item, meta?.rating, requestLetterboxd)
+        episodeDate(item.addedAt)?.let { date ->
+            val gap = if (heroFacts.text.isNotEmpty() || heroRatings.childCount > 0) DOT else ""
+            heroRatings.addView(text(gap + getString(R.string.list_added_on, date), SMALL, color = TEXT_2).onArt().apply {
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    private fun seasonCount(item: Item, meta: Meta?): String? =
+        meta?.videos?.takeIf { hasEpisodes(item.type, it) }?.map { it.season }
+            ?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }?.let { plural(R.plurals.seasons, it) }
 
     private fun cancelBrowseHero() {
         heroTask?.let(main::removeCallbacks)
@@ -1371,9 +1392,7 @@ class MainActivity : Screen() {
         val meta = metas[item.id]
         val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
         val genre = meta?.genres?.firstOrNull() ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
-        val length = if (hasEpisodes(item.type, meta?.videos)) meta?.videos?.map { it.season }?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }
-            ?.let { plural(R.plurals.seasons, it) }
-            else meta?.runtime
+        val length = if (hasEpisodes(item.type, meta?.videos)) seasonCount(item, meta) else meta?.runtime
         // A show in progress describes its next episode, so the line names that episode rather than the show.
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
@@ -1382,18 +1401,7 @@ class MainActivity : Screen() {
         else factsList += listOfNotNull(year, genre, length)
         heroFacts.text = factsList.joinToString(DOT)
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
-        // Letterboxd comes from this session or the disk at once; a film never asked yet fills in when MDBList answers.
-        val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
-        val letterboxdScore = if (wantsLetterboxd) knownLetterboxd(item.id) else null
-        if (wantsLetterboxd && letterboxdScore == null) {
-            val key = Settings.mdblistKey(this)
-            background({ letterboxd(item.id, key) }) { r ->
-                if (r.getOrNull() != null && heroItem === item && mode == Mode.BROWSE) showHero(item)
-            }
-        }
-        val ratings = shownRatings(Settings.ratings(this), rating, letterboxdScore)
-        heroRatings.removeAllViews()
-        addRatings(heroRatings, ratings)
+        renderHeroRatings(item, rating)
         val showResume = page != Page.HOME && !page.isGrid && item.resume
         val synopsisLines = if (page.hasGenreShortcuts && !showResume) 3 else 2
         heroAbout.maxLines = synopsisLines
@@ -1411,6 +1419,25 @@ class MainActivity : Screen() {
         heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
         if (mode == Mode.BROWSE) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS)
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
+    }
+
+    private fun renderHeroRatings(item: Item, imdb: String?, requestLetterboxd: Boolean = true) {
+        val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
+        val score = if (wantsLetterboxd) knownLetterboxd(item.id) else null
+        if (requestLetterboxd && wantsLetterboxd && score == null) {
+            val key = Settings.mdblistKey(this)
+            background({ letterboxd(item.id, key) }) { r ->
+                if (r.getOrNull() != null && heroItem === item && mode == Mode.BROWSE) showHero(item)
+            }
+        }
+        val libraryPage = page == Page.LIBRARY
+        val ratings = shownRatings(if (libraryPage) "both" else Settings.ratings(this), imdb, score)
+        heroRatings.removeAllViews()
+        addRatings(
+            heroRatings, ratings,
+            tagSp = if (libraryPage) 9.5f else SMALL,
+            firstGap = if (libraryPage && heroFacts.text.isEmpty()) 0 else 10,
+        )
     }
 
     private fun showCaption(item: Item) {
@@ -1506,14 +1533,16 @@ class MainActivity : Screen() {
         }
         page = p
         val grid = p.isGrid
+        val libraryPage = p == Page.LIBRARY
+        val gridTop = GRID_TOP + if (libraryPage) 40 else 0
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
-            topMargin = if (grid) dp(GRID_TOP) else browseRowTop
-            height = if (grid) resources.displayMetrics.heightPixels - dp(GRID_TOP) else browseRowH
+            topMargin = if (grid) dp(gridTop) else browseRowTop
+            height = if (grid) resources.displayMetrics.heightPixels - dp(gridTop) else browseRowH
         }
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
-            topMargin = if (grid) dp(GRID_HERO_TOP) else 0
+            topMargin = if (grid) dp(GRID_HERO_TOP + if (libraryPage) 12 else 0) else 0
             bottomMargin = if (grid) 0 else heroBottom
             width = if (grid) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
@@ -1526,7 +1555,10 @@ class MainActivity : Screen() {
         heroLogo.maxHeight = dp(if (grid) 46 else 55)
         heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
-        for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
+        browseInfo.getChildAt(1).marginTop(if (libraryPage) 12 else 8)
+        for (i in 1 until browseInfo.childCount) {
+            browseInfo.getChildAt(i).visibility = if (!grid || (libraryPage && i == 1)) View.VISIBLE else View.GONE
+        }
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
         librarySlot = null
@@ -2145,6 +2177,7 @@ class MainActivity : Screen() {
             val now = System.currentTimeMillis()
             r.getOrNull()?.forEach { (id, resolved) ->
                 cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                heroItem?.takeIf { page == Page.LIBRARY && mode == Mode.BROWSE && it.id == id }?.let(::showHero)
                 val count = newEpisodeCount(id, resolved.meta)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
@@ -2441,6 +2474,8 @@ class MainActivity : Screen() {
 
     private fun showLibrary(slot: FrameLayout, focusTag: Any? = null, removedIndex: Int? = null) {
         fillListDetails()
+        val dates = Library.listDates(this, profile.id)
+        fun sortDate(title: JSONObject): String = dates.getString(title.optString("_id"), null) ?: title.optString("_ctime")
         val all = listTitles()
             .filter { listFilter == ListFilter.ALL || (it.optString("type") == "movie") == (listFilter == ListFilter.MOVIES) }
             .filter { t -> listGenre == null || metas[t.optString("_id")]?.genres?.contains(listGenre) == true }
@@ -2449,11 +2484,11 @@ class MainActivity : Screen() {
                 (listYear == null || inYear(y, listYear!!)) && (listDecade == null || inDecade(y, listDecade!!))
             }
         val ordered = when (listSort) {
-            ListSort.RECENT -> all.sortedByDescending { it.optString("_ctime") }
+            ListSort.RECENT -> all.sortedByDescending(::sortDate)
             ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
-            ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending { it.optString("_ctime") })
+            ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending(::sortDate))
         }
-        val items = ordered.map(::libraryItem)
+        val items = ordered.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
         val build = ++listBuild
         if (items.isEmpty()) {
             cancelBrowseHero()
@@ -2532,7 +2567,8 @@ class MainActivity : Screen() {
                 val videos = if (remove) emptyList() else (known ?: runCatching {
                         Stremio.addons(key).let { it.savedMeta(item.type, item.id) ?: it.meta(item.type, item.id) }
                     }.getOrElse { if (item.type == "movie") null else throw it })?.videos.orEmpty()
-                Stremio.editLibrary(key, item.id, JSONObject(original.toString())) { updated ->
+                val dates = if (remove) Library.listDates(this, profile.id) else null
+                Stremio.editLibrary(key, item.id, JSONObject(original.toString()), dates) { updated ->
                     if (remove) Library.setInList(updated, false) else Library.markTitleWatched(updated, videos)
                 }
             }) { result ->
@@ -2956,7 +2992,7 @@ class MainActivity : Screen() {
         return HomeLibrary(list, continuing, found)
     }
 
-    private fun libraryItem(item: JSONObject): Item {
+    private fun libraryItem(item: JSONObject, addedAt: String? = null): Item {
         val s = item.optJSONObject("state") ?: JSONObject()
         val videoId = Library.savedVideoId(item)
         val duration = s.optLong("duration")
@@ -2972,6 +3008,7 @@ class MainActivity : Screen() {
             timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
             newEpisodeCount = newEpisodeCount(id, metas[id], item),
+            addedAt = addedAt,
         )
     }
 
