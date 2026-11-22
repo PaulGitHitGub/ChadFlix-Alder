@@ -1517,12 +1517,12 @@ class PlayerActivity : Screen() {
         intent.putExtra("sleepAt", at) // so another source of this video keeps the timer
     }
 
-    /** OK on the Sleep Timer button: Off → After This Episode (series) → In 60 min → Off. */
+    /** OK on the Sleep Timer button: Off → After This Episode (series) or After This Movie → In 60 min → Off. Live: no "after". */
     private fun cycleSleep() {
         when {
             stopAfter -> { stopAfter = false; setSleepAt(System.currentTimeMillis() + SLEEP_TIMER) }
             sleepAt > 0 -> setSleepAt(0)
-            episodic -> stopAfter = true
+            episodic || !isLive() -> stopAfter = true // ChadFlix: films too, "After This Movie" (owner)
             else -> setSleepAt(System.currentTimeMillis() + SLEEP_TIMER)
         }
         intent.putExtra("stopAfter", stopAfter)
@@ -3061,7 +3061,7 @@ class PlayerActivity : Screen() {
         buttonLabels[sleepButton]?.takeIf { it.text.toString() != words }?.text = words
     }
 
-    private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(R.string.sleep_after_episode),
+    private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(if (episodic) R.string.sleep_after_episode else R.string.sleep_after_movie),
         getString(R.string.sleep_in_minutes), getString(R.string.state_off))
 
     override fun onPause() {

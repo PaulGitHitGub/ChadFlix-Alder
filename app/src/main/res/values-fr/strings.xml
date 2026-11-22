@@ -132,6 +132,7 @@
 
     <!-- Player -->
     <string name="sleep_after_episode">Après cet épisode</string>
+    <string name="sleep_after_movie">Après ce film</string>
     <string name="sleep_in_minutes">Dans %1$d min</string>
     <string name="state_off">Désactivé</string>
     <string name="state_on">Activé</string>

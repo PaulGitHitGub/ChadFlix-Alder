@@ -129,6 +129,7 @@
 
     <!-- Player -->
     <string name="sleep_after_episode">इस एपिसोड के बाद</string>
+    <string name="sleep_after_movie">इस फ़िल्म के बाद</string>
     <string name="sleep_in_minutes">%1$d मि में</string>
     <string name="state_off">बंद</string>
     <string name="state_on">चालू</string>

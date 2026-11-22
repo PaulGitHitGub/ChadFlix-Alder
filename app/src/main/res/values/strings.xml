@@ -155,6 +155,7 @@
 
     <!-- Player -->
     <string name="sleep_after_episode">After This Episode</string>
+    <string name="sleep_after_movie">After This Movie</string>
     <string name="sleep_in_minutes">In %1$d min</string>
     <string name="state_off">Off</string>
     <string name="state_on">On</string>

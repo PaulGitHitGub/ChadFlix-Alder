@@ -142,6 +142,7 @@
 
     <!-- Player -->
     <string name="sleep_after_episode">بعد هذه الحلقة</string>
+    <string name="sleep_after_movie">بعد هذا الفيلم</string>
     <string name="sleep_in_minutes">بعد %1$d دقيقة</string>
     <string name="state_off">إيقاف</string>
     <string name="state_on">تشغيل</string>
