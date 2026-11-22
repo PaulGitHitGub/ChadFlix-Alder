@@ -715,6 +715,32 @@ class MainActivity : Screen() {
 
     @Volatile private var landingTargets = 0 // ChadFlix: which round of landing prefetches is current
 
+    // ChadFlix: the title page's full-screen art and logo, fetched once the remote has rested on a home card a moment,
+    // at the title page's own sizes, so OK opens on pictures already in memory. One title at a time: moving on drops
+    // what was fetched for the last one.
+    @Volatile private var titleWanted: Item? = null
+    private var titleFetched: Item? = null
+    private val titleTask = Runnable { fetchTitle() }
+
+    private fun fetchTitleSoon(item: Item?) {
+        main.removeCallbacks(titleTask)
+        titleWanted = item?.takeIf { !it.live && !HomeStyle.isTile(it.id) }
+        if (titleWanted != null) main.postDelayed(titleTask, TITLE_AHEAD_MS)
+    }
+
+    private fun fetchTitle() {
+        val item = titleWanted ?: return
+        if (isFinishing || !hasWindowFocus()) return
+        titleFetched?.takeIf { it !== item }?.let { old ->
+            old.art?.takeIf { it != item.art }?.let { Images.forget(it, artW) }
+            old.logo?.takeIf { it != item.logo }?.let { Images.forget(it, Images.TITLE_LOGO_PX, Images.trimmedLogo) }
+        }
+        titleFetched = item
+        val still = { titleWanted === item }
+        item.art?.let { Images.prefetch(it, artW, still = still) }
+        item.logo?.let { Images.prefetch(it, Images.TITLE_LOGO_PX, look = Images.trimmedLogo, still = still) }
+    }
+
     /** ChadFlix: the landing cards of the rows above and below [row]. */
     private fun prefetchNeighbours(row: Row) {
         val round = ++landingTargets
@@ -2958,7 +2984,9 @@ class MainActivity : Screen() {
                 if (has) {
                     focus(index)
                     showHero(item)
-                } else main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
+                    if (homeRow && !held) fetchTitleSoon(item)
+                } else if (titleWanted === item) fetchTitleSoon(null)
+                if (!has) main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
                 styleTile()
             }
             // A channel has no title page to show: OK plays it, and holding OK lists its sources.
@@ -3004,6 +3032,7 @@ class MainActivity : Screen() {
             if (!homeRow) return
             cards.getOrNull(selected)?.expand(true, animate) ?: return
             pin(selected, snap = !animate)
+            if (cards[selected].isFocused) fetchTitleSoon(items.getOrNull(selected))
             prefetchNeighbours(this)
         }
 
@@ -3230,9 +3259,11 @@ class MainActivity : Screen() {
     }
 
     private fun openDetails(item: Item) {
+        main.removeCallbacks(titleTask) // ChadFlix: the title page asks for its pictures itself now
         startActivity(Intent(this, DetailsActivity::class.java)
             .putExtra("type", item.type).putExtra("id", item.id).putExtra("name", item.name)
-            .putExtra("poster", item.poster).putExtra("background", item.art).putExtra("videoId", item.videoId))
+            .putExtra("poster", item.poster).putExtra("background", item.art).putExtra("videoId", item.videoId)
+            .putExtra("logo", item.logo))
     }
 
     // ---------- vertical movement ----------
@@ -3401,6 +3432,7 @@ class MainActivity : Screen() {
         const val INFO_STEP_MS = 120L // ChadFlix: the info line, along a row
         const val HOME_ART_EXIT_MS = 100L
         const val HOME_ART_MS = 220L
+        const val TITLE_AHEAD_MS = 400L // ChadFlix: resting on a home card this long fetches its title page's pictures
         const val QUIET = 0.75f // the next row remains visible without competing with the active one
         const val HERO_GAP = SECTION_GAP // dp between the focused title's block and the row heading below it
         const val RISE = 200 // dp the rows travel when they come up from the cinema

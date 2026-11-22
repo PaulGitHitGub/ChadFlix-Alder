@@ -35,6 +35,9 @@ object Images {
     private val urgentPool = newestFirst(2)
     // Art fetched ahead for where the remote may go next never holds up the cards on screen.
     private val aheadPool = newestFirst(2)
+    // ChadFlix: a request for a picture already being fetched only waits for it: it must not hold one of the two urgent
+    // threads (the title page asks for its logo again each time its details refresh, which starved the art).
+    private val joiners = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); r.run() } }
     private val tmdb = Regex("""(image\.tmdb\.org/t/p/)(original|w1280)/""")
     private val metahub = Regex("""(images\.metahub\.space/(?:poster|background)/)(small|medium)/""")
 
@@ -69,7 +72,7 @@ object Images {
         val key = key(url, widthPx, look)
         cache(widthPx, wide).get(key)?.let { into.setImageBitmap(it); done?.invoke(); return }
         into.setImageDrawable(null)
-        (if (urgent) urgentPool else pool).execute {
+        (if (inFlight.containsKey(key)) joiners else if (urgent) urgentPool else pool).execute {
             if (into.tag != url) return@execute // the view moved on (scrolled away, another title) while this waited
             val bitmap = bitmap(url, widthPx, look, wide)
             if (bitmap == null) {
@@ -86,7 +89,8 @@ object Images {
      */
     fun prefetch(url: String?, widthPx: Int, urgent: Boolean = false, look: Look? = null, wide: Boolean = false,
                  still: (() -> Boolean)? = null) { // still: ChadFlix, asked again just before the work; false drops it
-        if (cache(widthPx, wide).get(key(url ?: return, widthPx, look)) != null) return
+        val key = key(url ?: return, widthPx, look)
+        if (cache(widthPx, wide).get(key) != null || inFlight.containsKey(key)) return
         (if (urgent) urgentPool else aheadPool).execute { if (still?.invoke() != false) bitmap(url, widthPx, look, wide) }
     }
 
@@ -96,6 +100,8 @@ object Images {
      */
     class Look(val name: String, val paint: (Bitmap) -> Bitmap)
     val blurred = Look("blurred") { src -> frost(src).also { if (it !== src) src.recycle() } }
+    /** ChadFlix: the width the title page decodes its logo at ([trimmedLogo]); Home fetches it ahead at the same size. */
+    const val TITLE_LOGO_PX = 1000
     /** ChadFlix: a title logo cropped to its ink (MetaHub logos are 800 x 310 canvases with wide transparent margins). Title page only. */
     val trimmedLogo = Look("trimmed") { src ->
         val w = src.width; val h = src.height
@@ -128,6 +134,12 @@ object Images {
     }
 
     fun cached(url: String, widthPx: Int, look: Look? = null, wide: Boolean = false) = cache(widthPx, wide).get(key(url, widthPx, look)) != null
+
+    /** ChadFlix: the picture at this size if it's in memory now, else null (nothing is fetched). */
+    fun cachedBitmap(url: String, widthPx: Int, look: Look? = null, wide: Boolean = false): Bitmap? = cache(widthPx, wide).get(key(url, widthPx, look))
+
+    /** ChadFlix: lets go of a picture fetched ahead that's no longer wanted (views showing it keep it). */
+    fun forget(url: String, widthPx: Int, look: Look? = null, wide: Boolean = false) { cache(widthPx, wide).remove(key(url, widthPx, look)) }
 
     /**
      * [src] frosted for glass, as Plume does it: shrunk to [w] px wide and box-blurred twice. Works on every Android

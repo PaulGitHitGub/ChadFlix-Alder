@@ -170,6 +170,7 @@ class DetailsActivity : Screen() {
     private val name by lazy { intent.getStringExtra("name") ?: "" }
     private val poster by lazy { intent.getStringExtra("poster") }
     private val initialArt by lazy { intent.getStringExtra("background") }
+    private val cardLogo by lazy { intent.getStringExtra("logo") } // ChadFlix: the logo the home card showed, known before the details
 
     private lateinit var key: String
     override val backdrop get() = heroArt
@@ -252,19 +253,38 @@ class DetailsActivity : Screen() {
         setWindowed(root, heroArt, vignette = false)
 
         // The art arrives: a touch close, settling back as the page opens (a transform only, no redraw of the art).
-        (initialArt ?: poster)?.let { Images.load(it, heroArt, artWidth, urgent = true) {
+        var arrived = false
+        fun arrive() {
+            if (arrived) return refrost()
+            arrived = true
             heroArt.alpha = 1f; heroArt.scaleX = ARRIVE; heroArt.scaleY = ARRIVE
             heroArt.enter(ART_MS).scaleX(1f).scaleY(1f).start()
             refrost()
-        } }
-
-        fun show(m: Meta) {
-            meta = m
-            val art = m.background ?: initialArt ?: poster
+        }
+        fun showArt(art: String?) {
             if (heroArt.tag != art) Images.load(art, heroArt, artWidth, urgent = true) {
                 heroArt.enter().alpha(1f).start()
                 refrost()
             }
+        }
+        // ChadFlix: the card's art is the page's art, so it never waits on the details; only if it won't load do they choose.
+        var cardArtFailed = false
+        (initialArt ?: poster)?.let { first ->
+            Images.load(first, heroArt, artWidth, urgent = true, failed = {
+                if (first == initialArt) { cardArtFailed = true; meta?.background?.let(::showArt) }
+            }) { arrive() }
+            // ChadFlix: still on its way: the home card's backdrop (the same picture, smaller, already in memory) opens
+            // the page at once and is swapped for the sharp copy in place when it lands.
+            if (!arrived && first == initialArt) Images.cachedBitmap(first, dp(HomeStyle.WIDE_W), wide = true)?.let {
+                heroArt.setImageBitmap(it); arrive()
+            }
+        }
+        // ChadFlix: the logo is fetched alongside the art, not after the details arrive.
+        cardLogo?.let { Images.prefetch(it, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo) }
+
+        fun show(m: Meta) {
+            meta = m
+            showArt(initialArt?.takeIf { !cardArtFailed } ?: m.background ?: poster)
             richCast = m.castMembers
             certificate = m.certification ?: certificate
             val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
@@ -438,7 +458,9 @@ class DetailsActivity : Screen() {
                 title.postDelayed({ if (logo.visibility != View.VISIBLE) title.visibility = View.VISIBLE }, 1500)
                 // ChadFlix: cropped to its ink, decoded at full source width (1000 px > the 800 px logos: no scale-down first),
                 // then sized by constant area and never above its own pixels.
-                Images.load(m.logo ?: Images.logoFor(m.id), logo, 1000, urgent = true, look = Images.trimmedLogo, failed = {
+                val detailsLogo = m.logo ?: Images.logoFor(m.id)
+                Images.load(cardLogo ?: detailsLogo, logo, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo,
+                    orElse = detailsLogo?.takeIf { cardLogo != null && it != cardLogo }, failed = {
                     title.visibility = View.VISIBLE; logo.visibility = View.GONE
                 }) {
                     val bitmap = (logo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
