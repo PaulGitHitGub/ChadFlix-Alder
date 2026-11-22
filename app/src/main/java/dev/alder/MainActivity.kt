@@ -2872,17 +2872,26 @@ class MainActivity : Screen() {
      * genres that go with Animation; a pick comes back here on the line, Left or Back without one), then the sorts, where
      * OK applies genre and sort together.
      */
-    private fun animeMenu(row: Row, focus: Int = -1, pending: Int? = null) {
+    private fun animeMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
         val genres = listOf(0 to getString(R.string.filter_all)) + HomeStyle.animeGenres(movie)
         val now = HomeStyle.animeGenre(this, page.label)
-        val genre = pending ?: now // a genre picked below, not applied until a sort is
+        val genre = now
+        val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
         val genreName = genres.firstOrNull { it.first == genre }?.second ?: genres[0].second
         val lists = HomeStyle.listsFor(movie, "a")
         val current = HomeStyle.showing(this, page.label, "a")
         fun genreMenu() = choose("${HomeStyle.ANIME} · ${getString(R.string.discover_genre)}", genres.map { it.second }, header = true,
             checked = genres.indexOfFirst { it.first == genre }.coerceAtLeast(0),
-            left = { animeMenu(row, 0, pending) }, back = { animeMenu(row, 0, pending) }) { g -> animeMenu(row, 0, genres[g].first) }
+            left = { animeMenu(row, 0) }, back = { animeMenu(row, 0) }) { g ->
+            // A genre applies at once with the row's sort (an empty answer puts the old one back); the menu stays, on its line.
+            if (genres[g].first != now) {
+                showingChanged[changing] = "a" to (showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, "a", movie))
+                HomeStyle.setAnimeGenre(this, page.label, genres[g].first)
+                rebuildRows?.invoke() ?: showPage(page)
+            }
+            animeMenu(row, 0)
+        }
         val names = listOf("${getString(R.string.discover_genre)}   $genreName  ›") +
             lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         val checked = 1 + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
@@ -2890,17 +2899,15 @@ class MainActivity : Screen() {
             right = { i -> if (i == 0) ({ genreMenu() }) else null }) { i ->
             if (i == 0) return@choose genreMenu() // the Genre line: its own list, then back here on it
             val list = lists[i - 1].first
-            if (genre == now && list == current) return@choose
-            val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
+            if (list == current) return@choose
             showingChanged[changing] = "a" to (showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, "a", movie))
-            HomeStyle.setAnimeGenre(this, page.label, genre)
             HomeStyle.setShowing(this, page.label, "a", list)
             rebuildRows?.invoke() ?: showPage(page)
         }
     }
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
-    private fun showingMenu(row: Row, focus: Int = -1, pending: Int? = null) {
+    private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
         val key = HomeStyle.rowKey(movie, row.title, page.label) ?: return
         if (key == "a") return animeMenu(row)
@@ -2911,37 +2918,41 @@ class MainActivity : Screen() {
         val excl = platform?.let { HomeStyle.exclusive(this, page.label, it, movie) }
         val switch = excl?.let { listOf("${getString(R.string.showing_exclusives_only)}  ·  ${getString(if (it) R.string.state_on else R.string.state_off)}") }.orEmpty()
         // Services rows: a "Genre  All  ›" line after the switch, as on the Anime row: OK or Right opens All, then TMDb's TV
-        // genres; a pick comes back here on the line (applied with the sort picked next), Left or Back without one.
+        // genres; a pick applies at once with the row's sort and comes back here on the line, Left or Back without one.
         val service = key.takeIf { it.startsWith("p") && page == Page.SERVICES }?.drop(1)?.toInt()
         val genreNow = service?.let { HomeStyle.serviceGenre(this, page.label, it) } ?: 0
-        val genre = pending ?: genreNow
+        val genre = genreNow
+        val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
         val genres = listOf(0 to getString(R.string.filter_all)) + HomeStyle.genres(false)
         val genreName = genres.firstOrNull { it.first == genre }?.second ?: genres[0].second
         val genreLine = service?.let { listOf("${getString(R.string.discover_genre)}   $genreName  ›") }.orEmpty()
         val head = switch + genreLine
         fun genreMenu() = choose("${row.title} · ${getString(R.string.discover_genre)}", genres.map { it.second }, header = true,
             checked = genres.indexOfFirst { it.first == genre }.coerceAtLeast(0),
-            left = { showingMenu(row, switch.size, pending) }, back = { showingMenu(row, switch.size, pending) }) { g ->
-            showingMenu(row, switch.size, genres[g].first)
+            left = { showingMenu(row, switch.size) }, back = { showingMenu(row, switch.size) }) { g ->
+            if (service != null && genres[g].first != genreNow) { // applies at once; an empty answer puts the old one back
+                showingChanged[changing] = key to (showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, key, movie))
+                HomeStyle.setServiceGenre(this, page.label, service, genres[g].first)
+                rebuildRows?.invoke() ?: showPage(page)
+            }
+            showingMenu(row, switch.size)
         }
         val names = head + lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         val checked = head.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
         choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked, header = true,
             right = { i -> if (service != null && i == switch.size) ({ genreMenu() }) else null }) { picked ->
-            val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
             val shown = showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, key, movie)
             if (platform != null && picked == 0) {
                 showingChanged[changing] = key to shown
                 HomeStyle.setExclusive(this, page.label, platform, excl != true)
                 rebuildRows?.invoke() ?: showPage(page)
-                main.post { showingMenu(row, 0, pending) } // the switch stays in reach to flip back or pick a sort
+                main.post { showingMenu(row, 0) } // the switch stays in reach to flip back or pick a sort
                 return@choose
             }
             if (service != null && picked == switch.size) return@choose genreMenu()
             val list = lists[picked - head.size].first
-            if (list == current && genre == genreNow) return@choose
+            if (list == current) return@choose
             showingChanged[changing] = key to shown
-            if (service != null) HomeStyle.setServiceGenre(this, page.label, service, genre)
             HomeStyle.setShowing(this, page.label, key, list)
             rebuildRows?.invoke() ?: showPage(page)
         }
