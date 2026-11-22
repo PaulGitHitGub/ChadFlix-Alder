@@ -179,12 +179,34 @@ internal object HomeStyle {
 
     fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, id)}"
 
-    /** A genre row's titles, one TMDb page. Blocks: run it off the main thread. */
-    fun genreTitles(movie: Boolean, source: String): List<Meta> {
+    fun setShowing(c: Context, page: String, id: Int, list: String) =
+        prefs(c).edit().putString(Settings.profileKey(c, "showing:$page:$id"), list).apply()
+
+    /** The lists a genre row can show, the default first: key to its name. */
+    fun lists(movie: Boolean): List<Pair<String, Int>> = if (movie) listOf("trending" to R.string.showing_trending,
+        "new" to R.string.showing_new_releases, "blockbusters" to R.string.showing_blockbusters,
+        "most_watched" to R.string.showing_most_watched, "top_rated" to R.string.showing_top_rated)
+    else listOf("trending" to R.string.showing_trending, "new" to R.string.showing_new_series,
+        "most_watched" to R.string.showing_most_watched, "top_rated" to R.string.showing_top_rated,
+        "complete" to R.string.showing_complete)
+
+    private const val TILE = "chadflix:showing:"
+
+    /** A genre row's first card, the Showing tile: it opens the list picker instead of a title. */
+    fun isTile(id: String) = id.startsWith(TILE)
+
+    /**
+     * A genre row's titles, one TMDb page, after its Showing tile (a card with no picture: "Showing" over the list's
+     * name). Blocks: run it off the main thread.
+     */
+    fun genreTitles(c: Context, movie: Boolean, source: String): List<Meta> {
         val parts = source.removePrefix(TMDB).split(":")
+        val list = lists(movie).firstOrNull { it.first == parts.getOrElse(1) { "" } } ?: lists(movie)[0]
+        val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series")
+            .put("name", c.getString(R.string.showing) + "\n" + c.getString(list.second)))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
-        return Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
+        return listOf(tile) + Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
             day.format(java.util.Date()), day.format(since)), genres(movie).toMap())
     }
 }

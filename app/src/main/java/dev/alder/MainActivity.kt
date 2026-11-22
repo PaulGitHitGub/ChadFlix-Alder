@@ -1901,9 +1901,9 @@ class MainActivity : Screen() {
                 }
                 if (picked?.startsWith(HomeStyle.TMDB) == true) { // ChadFlix: a TMDb genre row, kept for the session
                     if (kept != null) return onAnswer(Result.success(kept))
-                    background({ listOf(HomeStyle.genreTitles(p == Page.MOVIES, picked) to false) }) { r ->
+                    background({ listOf(HomeStyle.genreTitles(applicationContext, p == Page.MOVIES, picked) to false) }) { r ->
                         if (g != generation || build != catalogBuild) return@background
-                        r.getOrNull()?.takeIf { it.first().first.isNotEmpty() }?.let { answers[key] = it }
+                        r.getOrNull()?.takeIf { it.first().first.size > 1 }?.let { answers[key] = it }
                         onAnswer(r)
                     }
                     return
@@ -2622,13 +2622,27 @@ class MainActivity : Screen() {
     private fun rowMenu(row: Row, item: Item) {
         val at = pageRows.indexOf(row.title)
         val actions = listOfNotNull<Pair<String, () -> Unit>>(
-            getString(R.string.action_choose_source) to { play(item, pick = true) },
+            (getString(R.string.action_choose_source) to { play(item, pick = true) }).takeIf { !HomeStyle.isTile(item.id) },
             (getString(R.string.row_move_up) to { moveRow(row.title, -1) }).takeIf { at > 0 },
             (getString(R.string.row_move_down) to { moveRow(row.title, 1) }).takeIf { at >= 0 && at < pageRows.lastIndex },
             (getString(R.string.action_hide_row, row.title) to { Settings.hideRow(this, row.title); showPage(page) })
                 .takeIf { row.title.isNotEmpty() },
         )
         choose(item.name, actions.map { it.first }) { actions[it].second() }
+    }
+
+    /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
+    private fun showingMenu(row: Row) {
+        val movie = page == Page.MOVIES
+        val id = HomeStyle.genres(movie).firstOrNull { it.second == row.title }?.first ?: return
+        val lists = HomeStyle.lists(movie)
+        val current = HomeStyle.showing(this, page.label, id)
+        val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
+        choose("${row.title} · ${getString(R.string.showing)}", names, checked = lists.indexOfFirst { it.first == current }.coerceAtLeast(0)) { i ->
+            if (lists[i].first == current) return@choose
+            HomeStyle.setShowing(this, page.label, id, lists[i].first)
+            rebuildRows?.invoke() ?: showPage(page)
+        }
     }
 
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
@@ -2826,7 +2840,7 @@ class MainActivity : Screen() {
                 } else main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
             }
             // A channel has no title page to show: OK plays it, and holding OK lists its sources.
-            setOnClickListener { if (item.live) play(item) else openDetails(item) }
+            setOnClickListener { if (HomeStyle.isTile(item.id)) showingMenu(this@Row) else if (item.live) play(item) else openDetails(item) }
             if (grid && page == Page.LIBRARY) setOnLongClickListener { listMenu(item); true }
             else if (continueRow) setOnLongClickListener { continueMenu(item); true }
             else setOnLongClickListener { rowMenu(this@Row, item); true }
@@ -2916,7 +2930,7 @@ class MainActivity : Screen() {
 
     /** Art, logo and facts the catalog didn't send, fetched once per title from the meta addon. */
     private fun fill(item: Item) {
-        if (item.filled) return
+        if (item.filled || HomeStyle.isTile(item.id)) return // ChadFlix: the Showing tile has no details to fetch
         item.filled = true
         if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
             metas[item.id]?.let { applyMeta(item, it); return }

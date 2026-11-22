@@ -101,6 +101,15 @@
     <string name="action_remove_from_continue">Remove from Continue Watching</string>
     <string name="remove_failed">Couldn\'t remove it</string>
     <string name="row_move_up" translatable="false">Move Up</string>
+    <string name="showing" translatable="false">Showing</string>
+    <string name="showing_default" translatable="false">(Default)</string>
+    <string name="showing_trending" translatable="false">Trending</string>
+    <string name="showing_new_releases" translatable="false">New Releases</string>
+    <string name="showing_new_series" translatable="false">New Series</string>
+    <string name="showing_blockbusters" translatable="false">Blockbusters</string>
+    <string name="showing_most_watched" translatable="false">Most Watched</string>
+    <string name="showing_top_rated" translatable="false">Top Rated</string>
+    <string name="showing_complete" translatable="false">Complete Series</string>
     <string name="row_move_down" translatable="false">Move Down</string>
     <string name="action_hide_row">Hide row \"%1$s\"</string>
 
