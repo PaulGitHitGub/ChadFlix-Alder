@@ -308,6 +308,7 @@ class MainActivity : Screen() {
     private val captionAnchor = Rect()
     private var browseRowTop = 0
     private var browseRowH = 0
+    private var browseEndPad = 0 // ChadFlix: room under the last row, so it can rise to the top like the others
 
     private var artTask = Runnable {}
     private var heroTask: Runnable? = null
@@ -443,11 +444,13 @@ class MainActivity : Screen() {
 
         val screenH = resources.displayMetrics.heightPixels
         // A row heading's real height: the TV's font size setting can make it taller than any fixed guess.
-        val headingH = text("", BODY, bold = true).lineHeight
+        val headingH = text("", HomeStyle.ROW_TITLE, bold = true).lineHeight
         val rowH = headingH + dp(ROW_TOP_ROOM + CARD_H + ROW_BOTTOM_ROOM)
-        val rowTop = screenH - rowH - dp(SAFE_BOTTOM) // one row on screen; the track in the left margin says where you are
+        // ChadFlix: the row the remote is in sits under the top bar with its info line below it; the next row peeks in.
+        val rowTop = dp(HomeStyle.ROWS_TOP)
         browseRowTop = rowTop
-        browseRowH = rowH
+        browseRowH = screenH - rowTop
+        browseEndPad = browseRowH - rowH
         content = column(Gravity.START)
         scroller = object : ScrollView(this) {
             override fun requestChildFocus(child: View, focused: View) {
@@ -485,7 +488,7 @@ class MainActivity : Screen() {
         topShade = View(this).apply { background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xCC000000.toInt(), 0x66000000, 0x1A000000, 0)); alpha = 0f }
 
         // Black from the window alone: a black layout too would be one more full screen painted under the art.
-        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(BASE))
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(FrameLayout(this).apply {
             addView(artBack, FrameLayout.LayoutParams(-1, -1))
             addView(art, FrameLayout.LayoutParams(-1, -1))
@@ -496,7 +499,7 @@ class MainActivity : Screen() {
                 visibility = View.GONE
             }
             addView(listShade, FrameLayout.LayoutParams(-1, -1))
-            addView(scroller, FrameLayout.LayoutParams(-1, rowH).apply { topMargin = rowTop })
+            addView(scroller, FrameLayout.LayoutParams(-1, browseRowH).apply { topMargin = rowTop })
             moreHint = ImageView(context).apply { setImageResource(R.drawable.ic_back); scaleX = -1f; alpha = 0f }
             addView(moreHint, FrameLayout.LayoutParams(dp(32), dp(32), Gravity.END).apply {
                 rightMargin = (dp(PAD) - dp(32)) / 2; topMargin = rowTop + headingH + dp(ROW_TOP_ROOM + CARD_H / 2 - 16)
@@ -526,12 +529,15 @@ class MainActivity : Screen() {
             })
             // Sits on the row band, so a larger font size grows it upwards into the art, never down into the rows.
             addView(browseInfo(), FrameLayout.LayoutParams(dp(HERO_W + 2 * FOCUS_ROOM), -2, Gravity.BOTTOM).apply {
-                heroBottom = screenH - rowTop + dp(HERO_GAP)
+                heroBottom = screenH - rowTop - rowH + dp(HomeStyle.INFO_GAP) // ChadFlix: under the row
                 // Room inside the block for the focused Resume to grow into (it was cut flat on the left).
                 leftMargin = dp(PAD - FOCUS_ROOM); bottomMargin = heroBottom
             })
             addView(stage(), FrameLayout.LayoutParams(-1, -1))
-            genreStrip = HorizontalScrollView(context).apply {
+            // ChadFlix: no genre chips on Movies and Shows, whose rows sit right under the top bar; My Lists keeps its chips.
+            genreStrip = object : HorizontalScrollView(context) {
+                override fun setVisibility(v: Int) = super.setVisibility(if (v == View.VISIBLE && page.isCatalog) View.GONE else v)
+            }.apply {
                 isHorizontalScrollBarEnabled = false
                 visibility = View.GONE
             }
@@ -844,15 +850,15 @@ class MainActivity : Screen() {
         val avatar = text(profile.name.take(1).uppercase(), SMALL, bold = true, color = TUNGSTEN).apply {
             gravity = Gravity.CENTER
             contentDescription = getString(R.string.nav_profile)
-            val rest = glassOver(this, 20)
+            val rest = rounded(HomeStyle.AVATAR, 20) // ChadFlix: a grey circle, white while focused
             fun style(focused: Boolean) {
-                background = if (focused) glass(20, true) else rest
-                setTextColor(TUNGSTEN)
+                background = if (focused) rounded(HomeStyle.WHITE, 20) else rest
+                setTextColor(if (focused) HomeStyle.BLACK else HomeStyle.WHITE)
                 grow(focused).start()
             }
             style(false)
             isFocusable = true
-            setOnFocusChangeListener { _, has -> style(has) }
+            setOnFocusChangeListener { _, has -> style(has); styleNav() }
             setOnClickListener { profileMenu() }
         }
         val dot = View(this).apply {
@@ -893,16 +899,22 @@ class MainActivity : Screen() {
         // once the profile's add-ons have a live catalog; order and hidden tabs come from Settings › Tabs ([arrangeTabs]).
         Page.fixed.forEach { p -> navItem(p).inNav() }
         arrangeTabs()
-        nav.background = glassOver(nav, NAV_R + 4, shade = 0.22f, keepPrevious = false)
         header.addView(avatarBox, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.START or Gravity.CENTER_VERTICAL))
         header.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
-        header.addView(TextClock(this).apply {
-            format12Hour = "h:mm a"
-            format24Hour = "HH:mm"
-            typeface = text("", SMALL).typeface
-            textSize = SMALL
-            setTextColor(TEXT_2)
-        }, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL))
+        // ChadFlix: a gear for Settings where the clock was.
+        header.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_settings)
+            contentDescription = getString(R.string.menu_settings)
+            setPadding(dp(12), dp(7), dp(12), dp(7))
+            isFocusable = true
+            fun style(on: Boolean) {
+                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else null
+                setColorFilter(if (on) HomeStyle.BLACK else HomeStyle.WHITE)
+            }
+            style(false)
+            setOnFocusChangeListener { _, has -> style(has); styleNav() }
+            setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+        }, FrameLayout.LayoutParams(dp(44), dp(32), Gravity.END or Gravity.CENTER_VERTICAL))
         styleNav()
         return header
     }
@@ -916,7 +928,7 @@ class MainActivity : Screen() {
         navItems[p] = this
         gravity = Gravity.CENTER
         compoundDrawablePadding = dp(2)
-        setPadding(dp(12), dp(4), dp(12), dp(2))
+        setPadding(dp(16), dp(5), dp(16), dp(5))
         setOnFocusChangeListener { _, has ->
             styleNav()
             main.removeCallbacks(switchPage)
@@ -1000,24 +1012,20 @@ class MainActivity : Screen() {
     }
 
     /**
-     * A lit pill follows the remote (as on Search); a tungsten dot marks the open page.
+     * ChadFlix: a white pill with black words follows the remote; the open page keeps its pill, white while the remote is
+     * down in the rows and faint while it's on another item up here.
      */
     private fun styleNav() {
+        val inBar = header.findFocus() != null
         navItems.forEach { (p, item) ->
-            val focused = item.isFocused
-            item.background = if (focused) glass(NAV_R, true) else null
-            item.setTextColor(if (p == page || focused) TEXT else TEXT_2)
+            val lit = item.isFocused || (p == page && !inBar)
+            item.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
+            item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
-            // The open page's dot hangs under its name; the others keep an empty one, so every name sits on one line.
-            item.setCompoundDrawablesRelative(null, null, null, GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(if (p == page) TUNGSTEN else Color.TRANSPARENT)
-                setBounds(0, 0, dp(4), dp(4))
-            })
         }
         search?.let {
-            it.background = if (it.isFocused) glass(NAV_R, true) else null
-            it.setColorFilter(if (it.isFocused) TEXT else TEXT_2)
+            it.background = if (it.isFocused) HomeStyle.pill(HomeStyle.WHITE) else null
+            it.setColorFilter(if (it.isFocused) HomeStyle.BLACK else HomeStyle.WHITE)
         }
     }
 
@@ -1030,6 +1038,7 @@ class MainActivity : Screen() {
      */
     private fun showArt(item: Item, ready: (() -> Unit)? = null) {
         main.removeCallbacks(artTask)
+        if (page.isBrowse && mode == Mode.BROWSE) return run { ready?.invoke() } // ChadFlix: the home pages stay black
         val settledBrowse = page.polishedRail && mode == Mode.BROWSE
         val libraryGrid = page.isGrid
         if (item.live && item.art == null && item.poster == null) return run { if (item.settled) clearArt(); ready?.invoke() }
@@ -1089,6 +1098,7 @@ class MainActivity : Screen() {
 
     /** Gets [item]'s full-screen art ready ahead (fetching its details first if need be), so moving to it is instant. */
     private fun warm(item: Item) {
+        if (page.isBrowse && mode == Mode.BROWSE) return fill(item) // ChadFlix: no art to fetch ahead, only the info line
         if (item.warming) return
         item.warming = true
         item.logo?.let { Images.prefetch(it, dp(LOGO_W)) }
@@ -1224,10 +1234,10 @@ class MainActivity : Screen() {
         // adjustViewBounds resets the scale type to FIT_CENTER, so FIT_START comes after it (logo on the margin).
         heroLogo = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_START; maxHeight = dp(55) }
         heroYear = text("", SERIF_TITLE * 0.65f, serif = true, color = TEXT_2).onArt().apply { visibility = View.GONE }
-        heroFacts = text("", SMALL, color = TEXT_2).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        heroFacts = text("", HomeStyle.INFO, bold = true, color = HomeStyle.WHITE).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         // Small tags, as tall as the letters: SMALL's leading and font padding made them blocks twice the mock's.
         heroRatings = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        heroAbout = text("", BODY, color = TEXT).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+        heroAbout = text("", BODY, color = HomeStyle.PLOT).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         heroResume = pill(R.string.action_resume, R.drawable.ic_play).apply {
             setOnClickListener { heroItem?.let(::play) }
             setOnLongClickListener { heroItem?.let { play(it, pick = true) }; true }
@@ -1296,7 +1306,6 @@ class MainActivity : Screen() {
             } else if (heroTask == null) showLibraryArt(item)
             return
         }
-        if (page.isBrowse) showCaption(item)
         if (page.polishedRail && changed) {
             main.removeCallbacks(artTask)
             // Keep the last complete hero visible until the new focus settles.
@@ -1323,7 +1332,7 @@ class MainActivity : Screen() {
         heroTask = Runnable {
             if (heroItem === item && page.polishedRail && mode == Mode.BROWSE && !isDestroyed) {
                 val cachedArt = backdropOf(item)?.let { (url, look) -> Images.cached(url, artW, look) } == true
-                if (browseInfo.alpha == 0f || cachedArt || (art.drawable != null && backdropOf(item)?.first == art.tag)) {
+                if (page.isBrowse || browseInfo.alpha == 0f || cachedArt || (art.drawable != null && backdropOf(item)?.first == art.tag)) {
                     heroTask = null
                     if (cachedArt && backdropOf(item)?.first != art.tag) browseInfo.alpha = 0f
                     renderHero(item)
@@ -1360,8 +1369,7 @@ class MainActivity : Screen() {
     }
 
     private fun renderHero(item: Item) {
-        showArt(item)
-        showHeroTitle(item, item.name)
+        showArt(item) // ChadFlix: no art, title or logo on the home pages, only the info line under the row
         val meta = metas[item.id]
         val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
         val genre = meta?.genres?.firstOrNull() ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
@@ -1372,9 +1380,8 @@ class MainActivity : Screen() {
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() })
-        else if (page.hasGenreShortcuts) factsList += listOfNotNull(year, genre)
-        else factsList += listOfNotNull(year, genre, length)
-        heroFacts.text = factsList.joinToString(DOT)
+        else factsList += listOfNotNull(genre, year, length, meta?.certification) // ChadFlix: Genre • Year • Runtime • Rating
+        heroFacts.text = factsList.joinToString(HomeStyle.SEP)
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
         // Letterboxd comes from this session or the disk at once; a film never asked yet fills in when MDBList answers.
         val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
@@ -1388,8 +1395,9 @@ class MainActivity : Screen() {
         val ratings = shownRatings(Settings.ratings(this), rating, letterboxdScore)
         heroRatings.removeAllViews()
         addRatings(heroRatings, ratings)
-        val showResume = page != Page.HOME && !page.isGrid && item.resume
-        val synopsisLines = if (page.hasGenreShortcuts && !showResume) 3 else 2
+        HomeStyle.plainRatings(heroRatings)
+        val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
+        val synopsisLines = 1 // ChadFlix: the plot is one line
         heroAbout.maxLines = synopsisLines
         val description = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
         heroAbout.text = description
@@ -1505,6 +1513,7 @@ class MainActivity : Screen() {
             topMargin = if (grid) dp(GRID_TOP) else browseRowTop
             height = if (grid) resources.displayMetrics.heightPixels - dp(GRID_TOP) else browseRowH
         }
+        content.setPadding(0, 0, 0, if (grid) 0 else browseEndPad)
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
             topMargin = if (grid) dp(GRID_HERO_TOP) else 0
@@ -1520,6 +1529,7 @@ class MainActivity : Screen() {
         heroLogo.maxHeight = dp(if (grid) 46 else 55)
         heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
+        browseInfo.getChildAt(0).visibility = if (grid) View.VISIBLE else View.GONE // ChadFlix: no title on the home pages
         for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
@@ -2624,11 +2634,11 @@ class MainActivity : Screen() {
             ?: visible.indexOfFirst { offsetIn(it.view) >= scroller.scrollY - dp(2) }.coerceAtLeast(0)
         // Rows below the active one keep their names hidden: one peeking in at the bottom sat under the caption.
         // The hint on the right names the next row instead.
-        visible.forEachIndexed { i, row -> row.peek(i <= active) }
+        visible.forEachIndexed { i, row -> row.peek(i <= active + 1) } // ChadFlix: the next row's title peeks in, dimmed
         val next = visible.getOrNull(active + 1)
         nextRowHint.text = next?.let { "⌄  ${it.title}" } ?: ""
         if (page.polishedRail) next?.let { it.items.getOrNull(it.selected)?.let(::warm) }
-        nextRowHint.visibility = if (nextRowHint.text.isEmpty()) View.GONE else View.VISIBLE
+        nextRowHint.visibility = View.GONE // ChadFlix: the next row shows itself
         nextRowHint.post(::clearHint)
     }
 
@@ -2689,9 +2699,9 @@ class MainActivity : Screen() {
     private inner class Row(val title: String, first: List<Item>, private var more: ((Int) -> List<Item>)?, val wide: Boolean = false,
                             val grid: Boolean = false, val continueRow: Boolean = false) {
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
-        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
+        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H + if (continueRow) HomeStyle.CONTINUE_UNDER else 0)
         private val polishedRail = page.polishedRail
-        private val gap = if (grid) LIST_GAP else if (polishedRail) CARD_GAP_RAIL else CARD_GAP
+        private val gap = if (grid) LIST_GAP else HomeStyle.CARD_GAP
         val cardStep = cardWidth + dp(gap)
         val items = first.toMutableList()
         private var fetching = false
@@ -2706,7 +2716,7 @@ class MainActivity : Screen() {
             paddingStartPx = inset,
             paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
             paddingEndPx = inset,
-            paddingBottomPx = dp(if (grid) GRID_ROW_BOTTOM else ROW_BOTTOM_ROOM),
+            paddingBottomPx = dp(if (grid) GRID_ROW_BOTTOM else ROW_BOTTOM_ROOM - if (continueRow) HomeStyle.CONTINUE_UNDER else 0),
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
         ).apply {
@@ -2724,7 +2734,7 @@ class MainActivity : Screen() {
 
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
-        private val heading = text(title, BODY, bold = true).onArt().apply {
+        private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true).onArt().apply {
             setPadding(dp(PAD), 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
@@ -2747,15 +2757,18 @@ class MainActivity : Screen() {
             heightPx = cardHeight,
             wide = wide,
             grid = grid,
-            dimAlpha = if (grid) GRID_DIM else if (continueRow || page.hasGenreShortcuts) CARD_CONTINUE_DIM else CARD_DIM,
+            dimAlpha = if (grid) GRID_DIM else HomeStyle.ROW_DIM,
             progress = item.progress,
             finished = item.finished,
             newEpisodes = item.newEpisodeCount,
             live = item.live,
             settled = item.settled,
             liftShadow = !page.hasGenreShortcuts,
+            home = !wide && !grid,
+            note = if (continueRow) item.timeLeft ?: episodeLabel(item)
+                ?: getString(R.string.player_next_episode).takeIf { item.nextEpisodePending } else null,
         ).apply {
-            dim(true, animate = false)
+            dim(grid || !active, animate = false)
             payload = item
             tag = "card:${item.id}"
             onRequestMeta = { fill(item) }
@@ -2784,7 +2797,7 @@ class MainActivity : Screen() {
             active = on
             if (on) peek(true) else rail.clearHeld()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
-            cards.forEachIndexed { i, c -> c.dim(!on || i != selected) }
+            cards.forEachIndexed { i, c -> c.dim(!on || (grid && i != selected)) } // ChadFlix: the whole row lights up
         }
 
         fun focusFirst() = rail.focusSelected()
@@ -2800,7 +2813,7 @@ class MainActivity : Screen() {
             rail.selectIndex(index)
             main.post { loadMoreSections?.invoke() }
             if (active) {
-                if (previous != index) { cards[previous].dim(true); cards[index].dim(false) }
+                if (previous != index && grid) { cards[previous].dim(true); cards[index].dim(false) }
             } else light(true)
             if (page.isBrowse) updateNextRow()
             if (page.isCatalog) markChip(title)
@@ -2823,7 +2836,7 @@ class MainActivity : Screen() {
             if (!grid && wideRow != wide) {
                 wideRow = wide
                 browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
-                    bottomMargin = heroBottom - if (wide) dp(CARD_H - WIDE_H) else 0
+                    bottomMargin = heroBottom // ChadFlix: wide cards end on the posters' foot line, so the info line stays put
                 }
             }
         }
@@ -3107,8 +3120,8 @@ class MainActivity : Screen() {
         const val WHATS_NEW_WAIT = 1_500L // ms after Home opens: its first row draws before the pop-up covers it
         // 2:3 posters, six and a bit across (56 + 7 × 120 + 6 × 16 = 992 of 960 dp): the seventh runs off the edge to
         // say there's more, like the TV apps the layout follows.
-        const val CARD_W = POSTER_W
-        const val CARD_H = POSTER_H
+        const val CARD_W = HomeStyle.CARD_W
+        const val CARD_H = HomeStyle.CARD_H
         // Continue Watching: 16:9, four across (4 × 200 + 3 × 16 = 848 dp, the row between the margins).
         const val WIDE_W = 200
         const val WIDE_H = WIDE_W * 9 / 16
@@ -3120,20 +3133,20 @@ class MainActivity : Screen() {
         const val GRID_ROW_BOTTOM = 20
         const val INFO_W = 360 // the cinema's line
         const val NAV_R = 18 // dp: the top bar's pills
-        const val NAV_GAP = 4 // dp between them
+        const val NAV_GAP = 10 // dp between them
         const val WARM_AFTER = 3000L // ms after launch before other pages' posters are fetched ahead
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
-        const val ROW_TOP_ROOM = HEADING_GAP + 8 // dp between the row title and its cards, plus the focused card's growth
-        const val ROW_BOTTOM_ROOM = 40 // room for the focused caption below the poster
+        const val ROW_TOP_ROOM = 12 // dp between the row title and its cards (ChadFlix cards don't grow)
+        const val ROW_BOTTOM_ROOM = 96 // ChadFlix: Continue Watching's bar and time left, the info line, and a gap
         const val SAFE_BOTTOM = 28
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
-        const val HOME_SYNOPSIS_W = 445
+        const val HOME_SYNOPSIS_W = HERO_W
         const val HOME_HERO_WAIT = 150L
         const val HOME_ART_EXIT_MS = 100L
         const val HOME_ART_MS = 220L
-        const val QUIET = 0.65f // the next row remains visible without competing with the active one
+        const val QUIET = 0.5f // the next row remains visible without competing with the active one
         const val HERO_GAP = SECTION_GAP // dp between the focused title's block and the row heading below it
         const val RISE = 200 // dp the rows travel when they come up from the cinema
         // Cards a row starts with (a screenful and a bit), then how many come at a time as the remote nears its end.

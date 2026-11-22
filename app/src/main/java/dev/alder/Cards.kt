@@ -97,6 +97,8 @@ internal class MediaCardView(
     val fadeIn: Boolean = true,
     val retryOnFailure: Boolean = false,
     val liftShadow: Boolean = true,
+    private val home: Boolean = false, // ChadFlix home rows: HomeStyle's poster, white focus border, no growth
+    note: String? = null, // ChadFlix: the words under a Continue Watching poster ("1h 10m left")
 ) : FrameLayout(screen) {
 
     var payload: Any? = null
@@ -113,6 +115,9 @@ internal class MediaCardView(
     // Darkens the cards beside the focused one. A shade, not transparency: a see-through card would let the
     // art behind it show through and look like it was floating on the poster.
     private val shade = View(screen).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
+    // ChadFlix: a home card's 2:3 poster sits on top; anything taller holds Continue Watching's bar and time left.
+    private val posterH = if (home) minOf(heightPx, widthPx * 3 / 2) else heightPx
+    private val ring = if (home) HomeStyle.ring(screen) else null
 
     private val hasProgress = !grid && progress > 0f
 
@@ -122,7 +127,7 @@ internal class MediaCardView(
                 GradientDrawable.Orientation.BOTTOM_TOP,
                 intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000),
             )
-        }.also { face.addView(it, 1, LayoutParams(-1, heightPx * 6 / 10, Gravity.BOTTOM)) }
+        }.also { face.addView(it, 1, LayoutParams(-1, posterH * 6 / 10, Gravity.BOTTOM)) }
     }
     private val titleShade by titleShadeMade
 
@@ -159,19 +164,22 @@ internal class MediaCardView(
                 outline.setRoundRect(0, 0, view.width, view.height, screen.dp(Screen.CARD_RADIUS).toFloat())
         }
         clipToOutline = true
+        if (home) HomeStyle.posterCard(this, face, heightPx - posterH)
 
         face.addView(image, LayoutParams(-1, -1))
         if (wide && !live) titleShade.visibility = View.VISIBLE
         if (wide && !live) nameView.visibility = View.VISIBLE
 
-        addView(face, LayoutParams(-1, -1))
-        if (hasProgress) {
+        addView(face, LayoutParams(-1, posterH))
+        if (hasProgress && !home) {
             addView(screen.progressBar(progress), LayoutParams(-1, screen.dp(3), Gravity.BOTTOM).apply {
                 setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(10))
             })
         }
+        if (home && heightPx > posterH) HomeStyle.under(screen, this, posterH, progress, note)
         renderBadge()
         addView(shade, LayoutParams(-1, -1))
+        ring?.let { addView(it, LayoutParams(-1, posterH)) }
 
         isFocusable = true
         contentDescription = listOfNotNull(
@@ -183,7 +191,8 @@ internal class MediaCardView(
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         face.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         setOnFocusChangeListener { _, has ->
-            screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
+            if (ring != null) ring.visibility = if (has) View.VISIBLE else View.GONE
+            else screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
             onFocusHandler?.invoke(has)
         }
     }
@@ -295,7 +304,7 @@ internal class MediaCardView(
                 image.alpha = 0f
                 screen.run { image.enter(Screen.QUICK_MS) }.alpha(1f).start()
             }
-            if (isFocused) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
+            if (isFocused && ring == null) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
         }
         now = false
     }
