@@ -25,4 +25,11 @@ class HomeStyleTest {
         assertEquals(listOf("A", "B", "C"), movedRow(listOf("A", "B", "C"), "A", -1))
         assertEquals(listOf("A", "B", "C"), movedRow(listOf("A", "B", "C"), "X", 1))
     }
+
+    @Test fun runtimesBecomeMilliseconds() {
+        assertEquals(127 * 60_000L, HomeStyle.runtimeMs("2h 07m"))
+        assertEquals(47 * 60_000L, HomeStyle.runtimeMs("47 min"))
+        assertEquals(0L, HomeStyle.runtimeMs(null))
+        assertEquals(0L, HomeStyle.runtimeMs("N/A"))
+    }
 }

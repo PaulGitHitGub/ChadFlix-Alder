@@ -2791,6 +2791,14 @@ class MainActivity : Screen() {
                 setNewEpisodes(item.newEpisodeCount)
                 refresh(item.poster, item.art, item.settled)
             }
+            // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar and time left.
+            if (continueRow && item.progress == 0f && item.resumeAt > 0) {
+                item.onFill += {
+                    val ms = HomeStyle.runtimeMs(metas[item.id]?.runtime)
+                    if (ms > item.resumeAt) setUnder(item.resumeAt.toFloat() / ms, timeLeft(ms, item.resumeAt))
+                }
+                fill(item)
+            }
             setOnFocusChanged { has ->
                 if (has) {
                     focus(index)
@@ -2981,11 +2989,12 @@ class MainActivity : Screen() {
     private fun libraryItem(item: JSONObject): Item {
         val s = item.optJSONObject("state") ?: JSONObject()
         val videoId = Library.savedVideoId(item)
-        val duration = s.optLong("duration")
+        val id = item.getString("_id")
+        // ChadFlix: a player that saved no length (duration 0) leaves no bar or time left; the title's runtime stands in.
+        val duration = s.optLong("duration").takeIf { it > 0 } ?: HomeStyle.runtimeMs(metas[id]?.runtime)
         val offset = Library.resumeAt(item, videoId)
         val pending = Library.nextEpisodePending(item)
         val progress = if (duration > 0) offset.toFloat() / duration else 0f
-        val id = item.getString("_id")
         val type = item.optString("type")
         return Item(
             id, type, item.text("name")?.takeIf { it.isNotBlank() } ?: getString(R.string.addons_unavailable), item.text("poster"),
@@ -3193,9 +3202,9 @@ internal fun typeTabName(c: Context, type: String) =
  * The tabs after Home, in Alder's own order, for add-ons that list catalogs of these [types]: Discover, Shows and Movies always,
  * Live for channels, sport or events, one "type:<type>" per other type ([extraPageTypes]), then My List ("library").
  */
-internal fun tabsFor(types: List<String>): List<String> =
-    listOf("discover", "shows", "movies") + listOfNotNull("live".takeIf { types.any(::isLiveType) }) +
-        extraPageTypes(types).map { "type:$it" } + "library"
+internal fun tabsFor(types: List<String>): List<String> = // ChadFlix: Movies, Shows, My Lists first; the rest start hidden
+    listOf("movies", "shows", "library", "discover") + listOfNotNull("live".takeIf { types.any(::isLiveType) }) +
+        extraPageTypes(types).map { "type:$it" }
 
 /**
  * [available] tabs in the order the viewer [saved] in Settings › Tabs. One they never placed (a new add-on's) goes next

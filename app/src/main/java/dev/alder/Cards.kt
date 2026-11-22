@@ -118,6 +118,7 @@ internal class MediaCardView(
     // ChadFlix: a home card's 2:3 poster sits on top; anything taller holds Continue Watching's bar and time left.
     private val posterH = if (home) minOf(heightPx, widthPx * 3 / 2) else heightPx
     private val ring = if (home) HomeStyle.ring(screen) else null
+    private var underViews: List<View> = emptyList()
 
     private val hasProgress = !grid && progress > 0f
 
@@ -176,7 +177,7 @@ internal class MediaCardView(
                 setMargins(screen.dp(insetDp), 0, screen.dp(insetDp), screen.dp(10))
             })
         }
-        if (home && heightPx > posterH) HomeStyle.under(screen, this, posterH, progress, note)
+        setUnder(progress, note)
         renderBadge()
         addView(shade, LayoutParams(-1, -1))
         ring?.let { addView(it, LayoutParams(-1, posterH)) }
@@ -195,6 +196,14 @@ internal class MediaCardView(
             else screen.run { lift(has, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
             onFocusHandler?.invoke(has)
         }
+    }
+
+    /** ChadFlix: Continue Watching's bar and words under a home poster, replaced when the progress becomes known. */
+    fun setUnder(progress: Float, note: String?) {
+        if (!home || heightPx <= posterH) return
+        underViews.forEach(::removeView)
+        underViews = HomeStyle.under(screen, this, posterH, progress, note)
+        underViews.forEach { addView(it, indexOfChild(shade).takeIf { i -> i >= 0 } ?: childCount) }
     }
 
     fun setOnFocusChanged(handler: (Boolean) -> Unit) {

@@ -78,23 +78,40 @@ internal object HomeStyle {
         visibility = View.GONE
     }
 
-    /** Under a Continue Watching poster: a red watched-so-far bar on a grey track, then "1h 10m left" or "S2 E4". */
-    fun under(screen: Screen, card: FrameLayout, posterH: Int, progress: Float, note: String?) {
+    /**
+     * Under a Continue Watching poster: a red watched-so-far bar on a grey track, then "1h 10m left" or "S2 E4". The views
+     * come back with their layout set; the card adds them.
+     */
+    fun under(screen: Screen, card: FrameLayout, posterH: Int, progress: Float, note: String?): List<View> {
         val c = card.context
-        if (progress > 0f) card.addView(LinearLayout(c).apply {
+        val out = mutableListOf<View>()
+        if (progress > 0f) out += LinearLayout(c).apply {
             val p = progress.coerceIn(0f, 1f)
             setBackgroundColor(TRACK)
             addView(View(c).apply { setBackgroundColor(RED) }, LinearLayout.LayoutParams(0, -1, p))
             addView(View(c), LinearLayout.LayoutParams(0, -1, 1f - p))
-        }, FrameLayout.LayoutParams(-1, px(c, RING).toInt().coerceAtLeast(2), Gravity.TOP).apply { topMargin = posterH + px(c, 5f).toInt() })
-        if (!note.isNullOrEmpty()) card.addView(screen.text(note, NOTE_SP, bold = true, color = NOTE).apply {
+            layoutParams = FrameLayout.LayoutParams(-1, px(c, RING).toInt().coerceAtLeast(2), Gravity.TOP).apply { topMargin = posterH + px(c, 5f).toInt() }
+        }
+        if (!note.isNullOrEmpty()) out += screen.text(note, NOTE_SP, bold = true, color = NOTE).apply {
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
-        }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
-            topMargin = posterH + px(c, 11f).toInt()
-            leftMargin = px(c, 2f).toInt()
-        })
+            layoutParams = FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
+                topMargin = posterH + px(c, 11f).toInt()
+                leftMargin = px(c, 2f).toInt()
+            }
+        }
+        return out
+    }
+
+    /** A title's runtime as Alder writes it ("2h 07m", "47 min") in milliseconds; 0 when it has none. */
+    fun runtimeMs(text: String?): Long {
+        val t = text?.trim() ?: return 0
+        val minutes = Regex("""^(\d+)\s*h\s*(\d+)\s*m""").find(t)?.let { it.groupValues[1].toLong() * 60 + it.groupValues[2].toLong() }
+            ?: Regex("""^(\d+)\s*min""").find(t)?.let { it.groupValues[1].toLong() }
+            ?: Regex("""^(\d+)\s*h""").find(t)?.let { it.groupValues[1].toLong() * 60 }
+            ?: return 0
+        return minutes * 60_000
     }
 
     /** The IMDb and Letterboxd tags in white and grey instead of Alder's warm tungsten. */

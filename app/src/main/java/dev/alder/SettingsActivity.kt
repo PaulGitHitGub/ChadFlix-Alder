@@ -68,7 +68,7 @@ object Settings {
     }
     fun startTab(c: Context) = prefs(c).getString(profileKey(c, "startTab"), "movies").orEmpty() // ChadFlix: opens on Movies
     /** Whether a tab after Home shows in the top bar, by its id in [tabsFor]; hiding an add-on's tab keeps the add-on. */
-    fun tabShown(c: Context, id: String) = prefs(c).getBoolean(profileKey(c, tabKey(id)), id != "discover" && id != "live") // ChadFlix: Movies, Shows, My Lists
+    fun tabShown(c: Context, id: String) = prefs(c).getBoolean(profileKey(c, tabKey(id)), id != "discover" && id != "live" && !id.startsWith("type:")) // ChadFlix: Movies, Shows, My Lists
     fun setTabShown(c: Context, id: String, shown: Boolean) = prefs(c).edit().putBoolean(profileKey(c, tabKey(id)), shown).apply()
     // Movies, Shows and Live keep the keys of the switches they had before Settings › Tabs, so those choices carry over.
     private fun tabKey(id: String) = when (id) {
@@ -80,7 +80,7 @@ object Settings {
     }
     /** The tabs after Home in this profile's order ([orderTabs] fills in the ones it never placed). */
     fun tabOrder(c: Context): List<String> =
-        runCatching { org.json.JSONArray(prefs(c).getString(profileKey(c, "tabOrder"), "[\"movies\",\"shows\"]")).strings() }.getOrDefault(emptyList())
+        runCatching { org.json.JSONArray(prefs(c).getString(profileKey(c, "tabOrder"), "[]")).strings() }.getOrDefault(emptyList())
     fun setTabOrder(c: Context, ids: List<String>) = prefs(c).edit().putString(profileKey(c, "tabOrder"), org.json.JSONArray(ids).toString()).apply()
     fun featuredHome(c: Context) = prefs(c).getBoolean(profileKey(c, "featuredHome"), false)
     /** "imdb", "letterboxd" or "both"; Letterboxd needs [mdblistKey] and covers films only. */
