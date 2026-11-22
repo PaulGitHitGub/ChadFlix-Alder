@@ -342,11 +342,9 @@ class SearchActivity : Screen() {
                     style(has)
                 }
                 setOnClickListener {
-                    runCatching {
-                        startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                        }, VOICE_REQUEST)
-                    }
+                    // ChadFlix: ask for the microphone once; Google's speech service checks the asking app holds it.
+                    if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
+                    else requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
                 }
                 addView(icon, LinearLayout.LayoutParams(dp(16), dp(16)))
                 addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
@@ -365,6 +363,20 @@ class SearchActivity : Screen() {
         voice?.nextFocusDownId = rows[0][0].id
         voice?.nextFocusUpId = input.id
         input.nextFocusDownId = (voice ?: rows[0][0]).id
+    }
+
+    private fun startVoice() {
+        runCatching {
+            startActivityForResult(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            }, VOICE_REQUEST)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Granted: straight into listening. Refused: voice search simply doesn't start; typing still works.
+        if (requestCode == MIC_REQUEST && grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -770,6 +782,7 @@ class SearchActivity : Screen() {
         const val TYPING_PAUSE = 500L
         const val SEARCH_WAIT = 6000L
         const val VOICE_REQUEST = 101
+        const val MIC_REQUEST = 102
         val searchPool = Images.newestFirst(8)
     }
 }

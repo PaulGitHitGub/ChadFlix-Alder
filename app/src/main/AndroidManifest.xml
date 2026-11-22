@@ -6,6 +6,8 @@
     <uses-sdk tools:overrideLibrary="com.nuvio.engine" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ChadFlix: Google's speech service on the Shield (Android 11) refuses voice search for an app without the microphone permission -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Updates itself from the GitHub releases (Updates.kt) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Continue Watching on the Google TV home (WatchNext.kt) -->
