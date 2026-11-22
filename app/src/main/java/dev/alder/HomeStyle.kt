@@ -107,4 +107,27 @@ internal object HomeStyle {
             }
         }
     }
+
+    // ---------- row order (Move Up / Move Down in a row's hold-OK menu), per profile and page ----------
+
+    private fun key(c: Context, page: String) = Settings.profileKey(c, "rowOrder:$page")
+    private fun prefs(c: Context) = c.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    fun rowOrder(c: Context, page: String): List<String> =
+        runCatching { org.json.JSONArray(prefs(c).getString(key(c, page), "[]")).strings() }.getOrDefault(emptyList())
+
+    /** Moves [title] [by] places among the page's [shown] rows and keeps that order. */
+    fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) =
+        prefs(c).edit().putString(key(c, page), org.json.JSONArray(movedRow(shown, title, by)).toString()).apply()
+}
+
+/** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
+internal fun <T> orderedRows(saved: List<String>, items: List<T>, title: (T) -> String): List<T> =
+    if (saved.isEmpty()) items else items.sortedBy { saved.indexOf(title(it)).let { i -> if (i < 0) Int.MAX_VALUE else i } }
+
+internal fun movedRow(titles: List<String>, title: String, by: Int): List<String> {
+    val from = titles.indexOf(title)
+    val to = from + by
+    if (from < 0 || to !in titles.indices) return titles
+    return titles.toMutableList().apply { add(to, removeAt(from)) }
 }

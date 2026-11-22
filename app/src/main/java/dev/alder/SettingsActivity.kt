@@ -66,9 +66,9 @@ object Settings {
         current.remove(rowTitle)
         prefs(c).edit().putStringSet(profileKey(c, "hiddenRows"), current).apply()
     }
-    fun startTab(c: Context) = prefs(c).getString(profileKey(c, "startTab"), "home").orEmpty()
+    fun startTab(c: Context) = prefs(c).getString(profileKey(c, "startTab"), "movies").orEmpty() // ChadFlix: opens on Movies
     /** Whether a tab after Home shows in the top bar, by its id in [tabsFor]; hiding an add-on's tab keeps the add-on. */
-    fun tabShown(c: Context, id: String) = prefs(c).getBoolean(profileKey(c, tabKey(id)), true)
+    fun tabShown(c: Context, id: String) = prefs(c).getBoolean(profileKey(c, tabKey(id)), id != "discover" && id != "live") // ChadFlix: Movies, Shows, My Lists
     fun setTabShown(c: Context, id: String, shown: Boolean) = prefs(c).edit().putBoolean(profileKey(c, tabKey(id)), shown).apply()
     // Movies, Shows and Live keep the keys of the switches they had before Settings › Tabs, so those choices carry over.
     private fun tabKey(id: String) = when (id) {
@@ -80,7 +80,7 @@ object Settings {
     }
     /** The tabs after Home in this profile's order ([orderTabs] fills in the ones it never placed). */
     fun tabOrder(c: Context): List<String> =
-        runCatching { org.json.JSONArray(prefs(c).getString(profileKey(c, "tabOrder"), "[]")).strings() }.getOrDefault(emptyList())
+        runCatching { org.json.JSONArray(prefs(c).getString(profileKey(c, "tabOrder"), "[\"movies\",\"shows\"]")).strings() }.getOrDefault(emptyList())
     fun setTabOrder(c: Context, ids: List<String>) = prefs(c).edit().putString(profileKey(c, "tabOrder"), org.json.JSONArray(ids).toString()).apply()
     fun featuredHome(c: Context) = prefs(c).getBoolean(profileKey(c, "featuredHome"), false)
     /** "imdb", "letterboxd" or "both"; Letterboxd needs [mdblistKey] and covers films only. */
@@ -99,7 +99,7 @@ object Settings {
             "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary",
             "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
         ).forEach { remove("$it@$profileId") }
-        prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:")) && it.endsWith("@$profileId") }.forEach(::remove)
+        prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 
     /**
@@ -601,7 +601,7 @@ class SettingsActivity : Screen() {
                 }
                 countRows()
                 choiceRow(Choice("startTab", getString(R.string.default_tab), getString(R.string.default_tab_hint),
-                    listOf("home" to getString(R.string.tab_home), "movies" to getString(R.string.tab_movies),
+                    listOf("movies" to getString(R.string.tab_movies), "home" to getString(R.string.tab_home), // ChadFlix: Movies first, the default
                         "shows" to getString(R.string.tab_shows), "library" to getString(R.string.tab_my_list)), perProfile = true))
                 lateinit var tabsValue: TextView
                 tabsValue = actionRow(getString(R.string.tabs), "…", getString(R.string.tabs_hint), perProfile = true) {

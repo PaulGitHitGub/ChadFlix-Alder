@@ -100,6 +100,8 @@
     <string name="action_choose_source">Choose a source</string>
     <string name="action_remove_from_continue">Remove from Continue Watching</string>
     <string name="remove_failed">Couldn\'t remove it</string>
+    <string name="row_move_up" translatable="false">Move Up</string>
+    <string name="row_move_down" translatable="false">Move Down</string>
     <string name="action_hide_row">Hide row \"%1$s\"</string>
 
     <!-- Title page -->

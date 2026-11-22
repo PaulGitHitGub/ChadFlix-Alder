@@ -681,6 +681,8 @@ class MainActivity : Screen() {
     }
 
     private var refreshAddons: (() -> Unit)? = null // the open page's add-on check, run again on coming back to Alder
+    private var rebuildRows: (() -> Unit)? = null // ChadFlix: the open page's rows again, after Move Up / Move Down
+    private var pageRows: List<String> = emptyList() // ChadFlix: the open page's row titles, in order
 
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
@@ -983,6 +985,8 @@ class MainActivity : Screen() {
         navItems.forEach { (p, item) ->
             if (p != Page.HOME) item.visibility = if ((p.tabId in order && Settings.tabShown(this, p.tabId)) || p == page) View.VISIBLE else View.GONE
         }
+        // ChadFlix: Home shows only when it's the start page (Settings › Default tab) or open.
+        navItems[Page.HOME]?.visibility = if (page == Page.HOME || Settings.startTab(this) == "home") View.VISIBLE else View.GONE
     }
 
     private fun showLiveTab(addons: List<Addon>) {
@@ -1541,6 +1545,7 @@ class MainActivity : Screen() {
         loadMoreSections = null
         restoreCatalogFocus = null
         refreshAddons = null
+        rebuildRows = null
         main.removeCallbacks(focusTop)
         main.removeCallbacks(heroTop)
         refreshLibrary = null
@@ -1596,7 +1601,7 @@ class MainActivity : Screen() {
             failure = null
         }
 
-        if (p == Page.HOME || p == Page.LIBRARY) {
+        if (p == Page.HOME || p == Page.LIBRARY || p.hasGenreShortcuts) { // ChadFlix: Continue Watching tops Movies and Shows too
             val slot = slot()
             if (grid) librarySlot = slot
             var shown: String? = null // what's on screen, to tell whether the fresh library changed anything
@@ -1607,7 +1612,7 @@ class MainActivity : Screen() {
                 metadata.forEach { (id, resolved) ->
                     cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
                 }
-                val what = (if (p == Page.HOME) cw else list).joinToString {
+                val what = (if (!grid) cw else list).joinToString {
                     val state = it.state
                     "${it.optString("_id")}:${it.optString("_mtime")}:${it.optBoolean("removed")}:${state.optLong("timeOffset")}:${state.optLong("duration")}:${state.text("video_id")}"
                 }
@@ -1620,14 +1625,14 @@ class MainActivity : Screen() {
                 val inSlot = currentFocus?.let { isInside(it, slot) } == true
                 val was = if (inSlot) currentFocus?.tag else null
                 library = list
-                if (p == Page.HOME) Profiles.active(this)?.let { me ->
+                if (!grid) Profiles.active(this)?.let { me ->
                     val syncGeneration = WatchNext.currentGeneration()
                     background({ WatchNext.sync(applicationContext, me.authKey, cw, me.pin != null, syncGeneration) }) {}
                 }
                 rows.filter { isInside(it.view, slot) }.forEach { r -> r.cards.forEach { it.unload() }; rows.remove(r) }
                 slot.removeAllViews()
-                if (p == Page.HOME) {
-                    val items = cw.map(::libraryItem)
+                if (!grid) {
+                    val items = cw.filter { p == Page.HOME || (it.optString("type") == "movie") == (p == Page.MOVIES) }.map(::libraryItem)
                     if (items.isNotEmpty()) {
                         slot.addView(row(getString(R.string.row_continue), items.take(initialRowCards(false)), later(items), continueRow = true).view)
                         android.util.Log.d("Alder", "page ${p.label}: Continue in ${android.os.SystemClock.uptimeMillis() - opened} ms")
@@ -1641,12 +1646,12 @@ class MainActivity : Screen() {
                 } else {
                     showLibrary(slot, was)
                 }
-                if (inSlot && p == Page.HOME) {
+                if (inSlot && !grid) {
                     val target = was?.let { slot.findViewWithTag<View>(it) } ?: rows.firstOrNull { isInside(it.view, slot) }?.cards?.firstOrNull()
                     if (target?.requestFocus() != true && firstRow()?.focusFirst() != true) navItems[page]?.requestFocus()
                 }
                 // Continue came in after a quicker row below took the first focus: the remote starts on Continue.
-                else if (p == Page.HOME && firstShow && !touched && focusedSomething && scroller.hasFocus())
+                else if (!grid && firstShow && !touched && focusedSomething && scroller.hasFocus())
                     rows.firstOrNull { isInside(it.view, slot) }?.focusFirst()
             }
             val remembered = library.takeIf { it.isNotEmpty() }
@@ -1752,7 +1757,9 @@ class MainActivity : Screen() {
             }
             val genres = catalogGenres(catalogs.flatMap { it.genres }.map { if (p.hasGenreShortcuts) genreLabel(it) else it })
             val hiddenRows = Settings.hiddenRows(this@MainActivity)
-            val sections = sections(p, shelves, featuredHome).filterNot { it.first in hiddenRows }
+            val sections = orderedRows(HomeStyle.rowOrder(this@MainActivity, p.label),
+                sections(p, shelves, featuredHome).filterNot { it.first in hiddenRows }) { it.first } // ChadFlix: Move Up / Move Down
+            pageRows = sections.map { it.first }
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
             val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
                 else emptyList()).toMutableList()
@@ -2010,6 +2017,7 @@ class MainActivity : Screen() {
         }
         checkAddons()
         refreshAddons = ::checkAddons
+        rebuildRows = { builtFrom = null; build(lastAddons) } // the same rows in a new order: built rows are kept and moved
     }
 
     private class Shelf(val page: Page, val title: String, val rank: Int)
@@ -2590,17 +2598,24 @@ class MainActivity : Screen() {
         }
     }
 
-    /** Hold OK on a catalog card: choose a source yourself, or take the whole row off the page. */
+    /** Hold OK on a catalog card: choose a source yourself, move the row (ChadFlix), or take the whole row off the page. */
     private fun rowMenu(row: Row, item: Item) {
-        val options = listOf(getString(R.string.action_choose_source)) +
-            (if (row.title.isNotEmpty()) listOf(getString(R.string.action_hide_row, row.title)) else emptyList())
-        choose(item.name, options) { selected ->
-            if (selected == 0) play(item, pick = true)
-            else {
-                Settings.hideRow(this, row.title)
-                showPage(page)
-            }
-        }
+        val at = pageRows.indexOf(row.title)
+        val actions = listOfNotNull<Pair<String, () -> Unit>>(
+            getString(R.string.action_choose_source) to { play(item, pick = true) },
+            (getString(R.string.row_move_up) to { moveRow(row.title, -1) }).takeIf { at > 0 },
+            (getString(R.string.row_move_down) to { moveRow(row.title, 1) }).takeIf { at >= 0 && at < pageRows.lastIndex },
+            (getString(R.string.action_hide_row, row.title) to { Settings.hideRow(this, row.title); showPage(page) })
+                .takeIf { row.title.isNotEmpty() },
+        )
+        choose(item.name, actions.map { it.first }) { actions[it].second() }
+    }
+
+    /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
+    private fun moveRow(title: String, by: Int) {
+        HomeStyle.moveRow(this, page.label, pageRows, title, by)
+        rebuildRows?.invoke() ?: showPage(page)
+        main.post { currentFocus?.let(::snapTo) }
     }
 
     // ---------- rows ----------
