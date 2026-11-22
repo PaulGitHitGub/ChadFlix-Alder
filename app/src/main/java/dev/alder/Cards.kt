@@ -119,6 +119,7 @@ internal class MediaCardView(
     private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
     /** ChadFlix: the title's logo, shown at the foot of the widened card ([expand]). */
     var logoUrl: String? = null
+    private var shownWide = false // ChadFlix: the picture showing was decoded at the widened size
     private var wantWide = false // focused: widen as soon as there's a backdrop to show
     private val expanded get() = wantWide && artUrl != null
     /** How much wider than a poster this card is about to be (its row scrolls for that). */
@@ -316,8 +317,10 @@ internal class MediaCardView(
             face.alpha = 1f
             return
         }
-        if (url == shownUrl) return
+        val backdrop = expanded && url == artUrl
+        if (url == shownUrl && backdrop == shownWide) return // the same picture at the same size (a widened card's is bigger)
         shownUrl = url
+        shownWide = backdrop
         face.animate().cancel()
         face.alpha = 0f
         loadUrl(url, retry = retryOnFailure)

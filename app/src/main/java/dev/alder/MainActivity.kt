@@ -256,7 +256,8 @@ class MainActivity : Screen() {
     private val Page.isCatalog get() = this == Page.SHOWS || this == Page.MOVIES || type != null
     private val Page.hasGenreShortcuts get() = this == Page.SHOWS || this == Page.MOVIES
     private val Page.polishedRail get() = this == Page.HOME || hasGenreShortcuts
-    private val held get() = rows.any { it.rail.held }
+    private val held get() = verticalHeld || rows.any { it.rail.held }
+    private var verticalHeld = false // ChadFlix: Up or Down held: the rows passed don't widen a card or fetch backdrops
     /** One row of cards under the focused title's art: every page but My Alder's and Discover's grids. */
     private val Page.isBrowse get() = this == Page.HOME || isCatalog || this == Page.LIVE
     /** A grid of large posters under the focused title's art: My Alder and Discover. */
@@ -693,7 +694,7 @@ class MainActivity : Screen() {
     private var refreshAddons: (() -> Unit)? = null // the open page's add-on check, run again on coming back to Alder
     private var rebuildRows: (() -> Unit)? = null // ChadFlix: the open page's rows again, after Move Up / Move Down
     private var pageRows: List<String> = emptyList() // ChadFlix: the open page's row titles, in order
-    private val showingChanged = mutableMapOf<String, Pair<Int, String>>() // ChadFlix: row title to (genre, the list before)
+    private val showingChanged = mutableMapOf<String, Pair<Int, String>>() // ChadFlix: "page:row" to (genre, the list last shown)
 
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
@@ -735,6 +736,10 @@ class MainActivity : Screen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
+            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle() } // where the hold ends
+        }
         if (event.action == KeyEvent.ACTION_DOWN) {
             restoreCatalogFocus = null
             if (event.keyCode == KeyEvent.KEYCODE_BACK && resolvingStreams != null) {
@@ -1553,6 +1558,7 @@ class MainActivity : Screen() {
         restoreCatalogFocus = null
         refreshAddons = null
         rebuildRows = null
+        showingChanged.clear()
         main.removeCallbacks(focusTop)
         main.removeCallbacks(heroTop)
         refreshLibrary = null
@@ -1869,7 +1875,7 @@ class MainActivity : Screen() {
                         if (g != generation || build != catalogBuild || version != rowVersion) return
                         if (items.isEmpty()) { if (completed == rowCatalogs.size) main.post { loadMoreSections?.invoke() }; return }
                         val old = rows.firstOrNull { it.view.parent === slot }
-                        if (old != null && showingChanged.remove(title) != null) { // ChadFlix: the new list replaces the row, focus and all
+                        if (old != null && showingChanged.remove("${p.label}:$title") != null) { // ChadFlix: the new list replaces the row, focus and all
                             val made = row(title, items.take(initialRowCards(false)), more)
                             slot.addView(made.view)
                             if (old.view.hasFocus()) made.cards.firstOrNull()?.requestFocus() // back on its tile
@@ -1923,8 +1929,9 @@ class MainActivity : Screen() {
                         // Kept even if the page moved on; a row whose titles mostly lacked IMDb ids is asked again next time.
                         r.getOrNull()?.takeIf { it.second }?.let { answers[key] = listOf(it.first to false) }
                         if (g != generation || build != catalogBuild) return@background
-                        if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove(title)?.let { (id, was) ->
-                            HomeStyle.setShowing(this@MainActivity, p.label, id, was) // the new list failed: the old row stays
+                        if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove("${p.label}:$title")?.let { (id, was) ->
+                            HomeStyle.setShowing(this@MainActivity, p.label, id, was) // the new list failed: the old row stays,
+                            return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
                         onAnswer(r.map { listOf(it.first to false) })
                     }
@@ -2666,7 +2673,8 @@ class MainActivity : Screen() {
         val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         choose("${row.title} · ${getString(R.string.showing)}", names, checked = lists.indexOfFirst { it.first == current }.coerceAtLeast(0)) { i ->
             if (lists[i].first == current) return@choose
-            showingChanged[row.title] = id to current
+            val changing = "${page.label}:${row.title}" // picking again before it answered: back to the list last shown
+            showingChanged[changing] = id to (showingChanged[changing]?.second ?: current)
             HomeStyle.setShowing(this, page.label, id, lists[i].first)
             rebuildRows?.invoke() ?: showPage(page)
         }
@@ -2809,7 +2817,7 @@ class MainActivity : Screen() {
             onHoldEnd = { sel ->
                 if (!grid && !polishedRail) items.getOrNull(sel)?.let(::showArt)
                 // ChadFlix: racing along a row passes the cards as posters; the one the remote stops on widens.
-                if (homeRow) cards.getOrNull(sel)?.let { it.expand(true); scrollToCard(sel, it.widensBy, pinOf(sel)) }
+                if (homeRow) settle()
             }
         }
         val cards: MutableList<MediaCardView> get() = rail.cards
@@ -2872,6 +2880,7 @@ class MainActivity : Screen() {
                 setNewEpisodes(item.newEpisodeCount)
                 logoUrl = item.logo
                 refresh(item.poster, item.art, item.settled)
+                if (active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
             }
             // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
             if (continueRow && item.progress == 0f && item.resumeAt > 0) {
@@ -2914,6 +2923,20 @@ class MainActivity : Screen() {
 
         fun focusFirst() = rail.focusSelected()
 
+        /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
+        fun pin(index: Int): Int {
+            val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
+            browseInfo.translationX = if (homeRow) (index * cardStep - target).toFloat() else 0f
+            return target
+        }
+
+        /** ChadFlix: a hold ended here: the card the remote stopped on widens. */
+        fun settle() {
+            if (!homeRow) return
+            cards.getOrNull(selected)?.expand(true) ?: return
+            pin(selected)
+        }
+
         /**
          * The remote reached card [index]: slide it to the row's start, where the eye already is. Near the end the row
          * stops, so the last card rests at the right margin instead of leaving a hole. Cards that slid into the left
@@ -2945,9 +2968,7 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            val targetScroll = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
-            // ChadFlix: the info line starts under the focused card (after the Showing tile, its first title sits further right).
-            browseInfo.translationX = if (homeRow) (index * cardStep - targetScroll).toFloat() else 0f
+            val targetScroll = pin(index)
             loadRest(this@Row)
             val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
