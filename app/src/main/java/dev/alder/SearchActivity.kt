@@ -221,6 +221,8 @@ class SearchActivity : Screen() {
 
     override fun onPause() {
         cancelVoice()
+        pendingTab?.let(main::removeCallbacks) // ChadFlix: a tab rested on, then the page left: nothing opens behind
+        pendingTab = null
         super.onPause()
     }
 
@@ -356,7 +358,7 @@ class SearchActivity : Screen() {
                     setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                     // ChadFlix: as on Home, resting on a page's name opens it.
                     pendingTab?.let(main::removeCallbacks)
-                    pendingTab = if (has) open.also { main.postDelayed(it, HomeStyle.NAV_WAIT) } else null
+                    pendingTab = if (has) Runnable { if (hasWindowFocus()) open.run() }.also { main.postDelayed(it, HomeStyle.NAV_WAIT) } else null
                 }
                 setOnClickListener { pendingTab?.let(main::removeCallbacks); open.run() }
             }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })

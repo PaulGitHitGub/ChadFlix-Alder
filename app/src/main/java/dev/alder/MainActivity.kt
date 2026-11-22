@@ -847,6 +847,7 @@ class MainActivity : Screen() {
     }
 
     override fun onPause() {
+        main.removeCallbacks(openSearch) // ChadFlix: resting on Search, then gone (Back, a dialog): it doesn't open behind
         cancelStreamResolution()
         stopFps()
         super.onPause()
@@ -1137,7 +1138,7 @@ class MainActivity : Screen() {
 
     private var pending = Page.HOME
     private var jump = false // OK on a page's name: go down into its rows once they're in
-    private val openSearch = Runnable { if (search?.isFocused == true) startActivity(Intent(this, SearchActivity::class.java)) }
+    private val openSearch = Runnable { if (search?.isFocused == true && hasWindowFocus()) startActivity(Intent(this, SearchActivity::class.java)) }
     private val switchPage = Runnable { if (pending != page && navItems[pending]?.isFocused == true) { jump = false; showPage(pending) } }
 
     private fun profileMenu() {

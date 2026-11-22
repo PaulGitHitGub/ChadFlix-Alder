@@ -491,7 +491,7 @@ class SettingsActivity : Screen() {
                 groupViews.values.any { it.hasFocus() }) {
                 if (firstDetail?.requestFocus() == true) return true
             }
-            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customMoving &&
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customMoving && currentFocus !== customLeftStop &&
                 currentFocus?.let { isInside(it, detailRows) && it !in choiceRows } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
             }
@@ -805,6 +805,7 @@ class SettingsActivity : Screen() {
     // ---------- ChadFlix: Customize Home, as ChadFlix on Kodi has it ----------
 
     private var customMoving = false // a row is picked up
+    private var customLeftStop: View? = null // Customize Home's Shows pill
 
     /**
      * Movies | Shows pills (focusing one shows its rows), a fixed "Continue Watching · Always First" line, then the page's
@@ -820,7 +821,7 @@ class SettingsActivity : Screen() {
         customMoving = false
         val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val tabViews = listOf(R.string.tab_movies, R.string.tab_shows).map { words ->
-            text(words, BODY, bold = true).apply { gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
+            text(words, BODY, bold = true).apply { id = View.generateViewId(); gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
         }
         fun styleTabs() = tabViews.forEachIndexed { i, t ->
             val open = (i == 0) == movie
@@ -835,7 +836,7 @@ class SettingsActivity : Screen() {
                 addView(ImageView(context).apply { setImageResource(R.drawable.ic_lock); imageTintList = ColorStateList.valueOf(0x80FFFFFF.toInt()) },
                     LinearLayout.LayoutParams(dp(14), dp(14)))
                 addView(text(R.string.row_continue, BODY, color = 0x99FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
-                addView(text(R.string.always_first, SMALL, color = 0x80FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
+                addView(text("·  ${getString(R.string.always_first)}", SMALL, color = 0x80FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
             }, LinearLayout.LayoutParams(-1, dp(36)))
             val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
             val order = orderedRows(HomeStyle.rowOrder(this, page), HomeStyle.knownRows(this, page, movie)) { it }.toMutableList()
@@ -905,6 +906,8 @@ class SettingsActivity : Screen() {
                 list.addView(row, LinearLayout.LayoutParams(-1, dp(36)))
                 bind()
             }
+            // Up from the first row goes to the open list's pill, not to the nearest one (which would switch the list).
+            list.getChildAt(1)?.nextFocusUpId = tabViews[if (movie) 0 else 1].id
         }
         tabViews.forEachIndexed { i, t ->
             t.setOnFocusChangeListener { _, has ->
@@ -918,6 +921,7 @@ class SettingsActivity : Screen() {
         detailRows.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12); bottomMargin = dp(8) })
         detailRows.addView(list, LinearLayout.LayoutParams(-1, -2))
         firstDetail = tabViews[0]
+        customLeftStop = tabViews[1] // Left on Shows goes to Movies, not to the menu
         fill()
         styleTabs()
     }
