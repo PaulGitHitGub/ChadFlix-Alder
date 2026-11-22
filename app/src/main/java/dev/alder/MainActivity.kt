@@ -1974,7 +1974,10 @@ class MainActivity : Screen() {
                 } else if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
                 HomeStyle.genres(movie).map { (id, name) ->
                     Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
-                } + sections(p, shelves, featuredHome).filterNot { s -> HomeStyle.genres(movie).any { it.second.equals(s.first, true) } }
+                } + Triple(HomeStyle.ANIME, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.animeSource(this@MainActivity, p.label, movie) as String?) +
+                    sections(p, shelves, featuredHome).filterNot { s ->
+                        HomeStyle.genres(movie).any { it.second.equals(s.first, true) } || s.first.equals(HomeStyle.ANIME, true)
+                    }
             if (p.hasGenreShortcuts || services) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
             val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
             val sections = HomeStyle.ordered(this@MainActivity, p.label, movie, candidates.filter {
@@ -2865,9 +2868,38 @@ class MainActivity : Screen() {
     }
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
+    /**
+     * ChadFlix: the Anime row's Showing card, in two levels: its genre (All, then genres that go with Animation); OK or
+     * Right on one opens that genre's sorts, where Left goes back and OK applies genre and sort together.
+     */
+    private fun animeMenu(row: Row) {
+        val movie = page == Page.MOVIES
+        val genres = listOf(0 to getString(R.string.filter_all)) + HomeStyle.animeGenres(movie)
+        val now = HomeStyle.animeGenre(this, page.label)
+        fun sorts(g: Int) {
+            val lists = HomeStyle.listsFor(movie, "a")
+            val current = HomeStyle.showing(this, page.label, "a")
+            val names = lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
+            val genreName = genres.first { it.first == g }.second
+            choose("${HomeStyle.ANIME} · $genreName", names,
+                checked = if (g == now) lists.indexOfFirst { it.first == current } else -1, left = { animeMenu(row) }) { i ->
+                if (g == now && lists[i].first == current) return@choose
+                val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
+                showingChanged[changing] = "a" to (showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, "a", movie))
+                HomeStyle.setAnimeGenre(this, page.label, g)
+                HomeStyle.setShowing(this, page.label, "a", lists[i].first)
+                rebuildRows?.invoke() ?: showPage(page)
+            }
+        }
+        val names = genres.mapIndexed { i, (_, name) -> name + if (i == 0) " " + getString(R.string.showing_default) else "" }
+        choose("${HomeStyle.ANIME} · ${getString(R.string.showing)}", names, checked = genres.indexOfFirst { it.first == now }.coerceAtLeast(0),
+            right = { i -> sorts(genres[i].first) }) { i -> sorts(genres[i].first) }
+    }
+
     private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
         val key = HomeStyle.rowKey(movie, row.title) ?: return
+        if (key == "a") return animeMenu(row)
         val lists = HomeStyle.listsFor(movie, key)
         val current = HomeStyle.showing(this, page.label, key)
         // ChadFlix: a platform row's picker starts with its Exclusives Only switch (where the tab has a filter for it).

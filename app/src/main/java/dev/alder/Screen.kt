@@ -919,6 +919,7 @@ abstract class Screen : Activity() {
      */
     protected fun choose(title: String, items: List<String>, message: String? = null, checked: Int = -1,
                          focus: Int = maxOf(checked, 0), widthDp: Int = if (items.size > 8) 300 else 340,
+                         right: ((Int) -> Unit)? = null, left: (() -> Unit)? = null, // ChadFlix: Right / Left on a row, for a two-level list
                          pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
@@ -937,6 +938,13 @@ abstract class Screen : Activity() {
                 }
                 rowFocus()
                 setOnClickListener { dialog.dismiss(); pick(i) }
+                if (right != null || left != null) setOnKeyListener { _, code, e ->
+                    val act = if (e.action != android.view.KeyEvent.ACTION_DOWN) null
+                        else if (code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT && right != null) ({ right(i) })
+                        else if (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT && left != null) left
+                        else null
+                    act?.let { dialog.dismiss(); it(); true } ?: false
+                }
                 list.addView(this, LinearLayout.LayoutParams(-1, -2))
             }
         }

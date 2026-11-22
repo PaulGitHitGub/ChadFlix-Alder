@@ -88,4 +88,14 @@ class HomeStyleTest {
         assertEquals("35", platformParams(false, "8", "213", null, "trending", true, "US", "", 35)["with_genres"])
         assertEquals(null, platformParams(false, "8", "213", null, "trending", true, "US", "", 0)["with_genres"])
     }
+
+    @Test fun animeRowIsJapaneseAnimationWithItsGenreAndSort() {
+        val all = animeParams(false, "trending", 0, "2026-11-22", "2025-11-22", "2026-10-23")
+        assertEquals("16", all["with_genres"]); assertEquals("ja", all["with_original_language"])
+        val action = animeParams(true, "blockbusters", 28, "2026-11-22", "2026-05-22", "2026-10-23")
+        assertEquals("16,28", action["with_genres"]); assertEquals("revenue.desc", action["sort_by"])
+        val airing = animeParams(false, "airing", 0, "2026-11-22", "2025-11-22", "2026-10-23")
+        assertEquals("2026-10-23", airing["air_date.gte"]); assertEquals("2026-11-22", airing["air_date.lte"])
+        assertEquals("3", animeParams(false, "complete", 0, "", "", "")["with_status"])
+    }
 }

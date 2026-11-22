@@ -273,6 +273,7 @@ internal object HomeStyle {
      */
     fun choiceOf(c: Context, page: String, key: String, movie: Boolean): String {
         val list = showing(c, page, key)
+        if (key == "a") return list + animeGenre(c, page).let { if (it > 0) "~$it" else "" }
         if (!key.startsWith("p")) return list
         val i = key.drop(1).toInt()
         val genre = serviceGenre(c, page, i)
@@ -282,6 +283,7 @@ internal object HomeStyle {
     fun restoreChoice(c: Context, page: String, key: String, movie: Boolean, choice: String) {
         val head = choice.substringBefore('~')
         setShowing(c, page, key, head.removeSuffix("!"))
+        if (key == "a") return setAnimeGenre(c, page, choice.substringAfter('~', "0").toIntOrNull() ?: 0)
         if (!key.startsWith("p")) return
         val i = key.drop(1).toInt()
         if (canExclusive(i, movie)) setExclusive(c, page, i, head.endsWith("!"))
@@ -308,9 +310,34 @@ internal object HomeStyle {
     fun rowKey(movie: Boolean, title: String): String? =
         genres(movie).firstOrNull { it.second == title }?.first?.toString()
             ?: platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" }
+            ?: "a".takeIf { title == ANIME }
+
+    // ---------- the Anime row (Movies and Shows): TMDb Animation in Japanese, a genre and a sort in one query ----------
+
+    const val ANIME = "Anime"
+
+    /** The genres an Anime row can narrow to (ANDed with Animation), by tab. */
+    fun animeGenres(movie: Boolean): List<Pair<Int, String>> = if (movie) listOf(28 to "Action", 12 to "Adventure",
+        35 to "Comedy", 18 to "Drama", 14 to "Fantasy", 878 to "Science Fiction", 10749 to "Romance", 27 to "Horror",
+        9648 to "Mystery", 10751 to "Family")
+    else listOf(10759 to "Action & Adventure", 35 to "Comedy", 18 to "Drama", 10765 to "Sci-Fi & Fantasy",
+        9648 to "Mystery", 80 to "Crime", 10751 to "Family", 10762 to "Kids")
+
+    /** The Anime row's genre on [page] (0 is All). */
+    fun animeGenre(c: Context, page: String) = prefs(c).getInt(Settings.profileKey(c, "agenre:$page"), 0)
+
+    fun setAnimeGenre(c: Context, page: String, genre: Int) =
+        prefs(c).edit().putInt(Settings.profileKey(c, "agenre:$page"), genre).apply()
+
+    fun animeSource(c: Context, page: String, movie: Boolean) = "${TMDB}a:${choiceOf(c, page, "a", movie)}"
 
     /** The lists a row can show, the default first: genre rows [lists]; platform rows Trending, New Releases, Top Rated (and Most Watched for films). */
-    fun listsFor(movie: Boolean, key: String): List<Pair<String, Int>> = if (!key.startsWith("p")) lists(movie)
+    fun listsFor(movie: Boolean, key: String): List<Pair<String, Int>> = if (key == "a") listOfNotNull( // the Anime row
+            "trending" to R.string.showing_trending, "new" to if (movie) R.string.showing_new_releases else R.string.showing_new_series,
+            "top_rated" to R.string.showing_top_rated, "most_watched" to R.string.showing_most_watched,
+            ("airing" to R.string.showing_airing).takeIf { !movie }, ("complete" to R.string.showing_complete).takeIf { !movie },
+            ("blockbusters" to R.string.showing_blockbusters).takeIf { movie })
+        else if (!key.startsWith("p")) lists(movie)
         else listOfNotNull("trending" to R.string.showing_trending,
             "new" to if (movie) R.string.showing_new_releases else R.string.showing_new_series,
             "top_rated" to R.string.showing_top_rated, ("most_watched" to R.string.showing_most_watched).takeIf { movie })
@@ -341,6 +368,7 @@ internal object HomeStyle {
         val key = rowKey(movie, title) ?: return null
         val lists = listsFor(movie, key)
         val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
+        if (key == "a") return listOfNotNull(animeGenres(movie).firstOrNull { it.first == animeGenre(c, page) }?.second, list).joinToString(" · ")
         if (!key.startsWith("p")) return list
         // A service row: its genre first ("Comedy · Trending"), and "· All" when it isn't kept to the service's own shows.
         val i = key.drop(1).toInt()
@@ -410,6 +438,10 @@ internal object HomeStyle {
             val head = list.substringBefore('~')
             platformParams(movie, p.providers, p.networks, p.companies, head.removeSuffix("!"), head.endsWith("!"), Tmdb.region,
                 day.format(java.util.Date()), list.substringAfter('~', "").toIntOrNull())
+        } else if (parts[0] == "a") { // the Anime row
+            val month = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_MONTH, -30) }.time
+            animeParams(movie, list.substringBefore('~'), list.substringAfter('~', "").toIntOrNull() ?: 0,
+                day.format(java.util.Date()), day.format(since), day.format(month))
         } else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
         val (titles, complete) = Tmdb.discoverRow(movie, params, genres(movie).toMap())
         return listOf(tile) + titles to complete
@@ -486,5 +518,19 @@ internal fun platformParams(movie: Boolean, providers: String, networks: String,
         "most_watched" -> p["sort_by"] = "vote_count.desc"
         else -> p["sort_by"] = "popularity.desc"
     }
+    return p
+}
+
+/**
+ * TMDb discover filters for the Anime row: Animation (16, ANDed with [genre] when it isn't 0) in Japanese, sorted like a
+ * genre row's [list]; "airing" (shows) is what aired in the last month ([monthAgo]), most popular first. Checked against
+ * TMDb on 2026-11-22: Animation + Japanese gives the anime lists (Pokémon, One Piece, Frieren; Spirited Away, Your
+ * Name.), as the "anime" keyword does, so one query is enough.
+ */
+internal fun animeParams(movie: Boolean, list: String, genre: Int, today: String, since: String, monthAgo: String): Map<String, String> {
+    val p = genreParams(movie, 16, if (list == "airing") "trending" else list, today, since).toMutableMap()
+    p["with_genres"] = if (genre > 0) "16,$genre" else "16"
+    p["with_original_language"] = "ja"
+    if (list == "airing") { p.remove("air_date.gte"); p["air_date.gte"] = monthAgo; p["air_date.lte"] = today; p["sort_by"] = "popularity.desc" }
     return p
 }
