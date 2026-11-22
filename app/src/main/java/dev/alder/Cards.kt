@@ -506,13 +506,13 @@ internal class HorizontalCardRail(
     }
 
     /** [widenBy]: ChadFlix, how much wider the card is about to be (the row's end stops later by that much). */
-    fun scrollToCard(index: Int, widenBy: Int = 0): Int {
+    fun scrollToCard(index: Int, widenBy: Int = 0, pinAt: Int = index): Int { // pinAt: ChadFlix, the card the row scrolls to
         selected = index
         anim?.cancel()
         val startScroll = scroller.scrollX
         val stripW = if (widenBy <= 0) strip.width else
             strip.paddingLeft + strip.paddingRight + cards.sumOf { it.widthPx } + cardGapPx * (cards.size - 1) + widenBy
-        val targetScroll = railTargetScroll(index, stepPx, stripW, scroller.width)
+        val targetScroll = railTargetScroll(pinAt, stepPx, stripW, scroller.width)
         if (cullLeft) showVisibleCards()
         val glideTime = rowGlideDuration(held, wideMotion, ViewConfiguration.getKeyRepeatDelay().toLong())
         anim = ValueAnimator.ofInt(startScroll, targetScroll).setDuration(glideTime).apply {

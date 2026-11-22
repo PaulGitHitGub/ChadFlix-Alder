@@ -1540,6 +1540,7 @@ class MainActivity : Screen() {
         heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
         browseInfo.getChildAt(0).visibility = if (grid) View.VISIBLE else View.GONE // ChadFlix: no title on the home pages
+        browseInfo.translationX = 0f
         for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
@@ -1871,7 +1872,7 @@ class MainActivity : Screen() {
                         if (old != null && showingChanged.remove(title) != null) { // ChadFlix: the new list replaces the row, focus and all
                             val made = row(title, items.take(initialRowCards(false)), more)
                             slot.addView(made.view)
-                            if (old.view.hasFocus()) made.focusFirst()
+                            if (old.view.hasFocus()) made.cards.firstOrNull()?.requestFocus() // back on its tile
                             old.cards.forEach { card -> card.unload() }
                             rows.remove(old)
                             slot.removeView(old.view)
@@ -2653,7 +2654,7 @@ class MainActivity : Screen() {
             })
                 .takeIf { row.title.isNotEmpty() },
         )
-        choose(item.name, actions.map { it.first }) { actions[it].second() }
+        choose(item.name.ifEmpty { row.title }, actions.map { it.first }) { actions[it].second() }
     }
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
@@ -2808,7 +2809,7 @@ class MainActivity : Screen() {
             onHoldEnd = { sel ->
                 if (!grid && !polishedRail) items.getOrNull(sel)?.let(::showArt)
                 // ChadFlix: racing along a row passes the cards as posters; the one the remote stops on widens.
-                if (homeRow) cards.getOrNull(sel)?.let { it.expand(true); scrollToCard(sel, it.widensBy) }
+                if (homeRow) cards.getOrNull(sel)?.let { it.expand(true); scrollToCard(sel, it.widensBy, pinOf(sel)) }
             }
         }
         val cards: MutableList<MediaCardView> get() = rail.cards
@@ -2817,7 +2818,10 @@ class MainActivity : Screen() {
 
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
+        // ChadFlix: a genre row's title names its list, "Action · Trending".
+        private val list = if (homeRow && page.hasGenreShortcuts) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
         private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
+            list?.let { text = HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = false) }
             setPadding(inset, 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
@@ -2827,8 +2831,16 @@ class MainActivity : Screen() {
         }
         val view: View = column(Gravity.START, heading, scroller).apply { if (wide) setPadding(0, dp(CARD_H - WIDE_H), 0, 0) }
 
+        // ChadFlix: a genre row starts with its Showing tile: Up and Down land on the first title after it, and while the
+        // remote is on the tile or that first title the row doesn't scroll, so the tile stays in view.
+        private val tileRow = homeRow && first.firstOrNull()?.id?.let(HomeStyle::isTile) == true
+        private var tileLook: ((Int) -> Unit)? = null
+        private fun pinOf(i: Int) = if (tileRow && i <= 1) 0 else i
+        private fun styleTile() = tileLook?.invoke(when { cards.firstOrNull()?.isFocused == true -> 2; active -> 1; else -> 0 })
+
         init {
             items.forEachIndexed { i, item -> rail.appendCard(makeCard(item, i)) }
+            if (tileRow && cards.size > 1) rail.selectIndex(1)
         }
 
         private fun makeCard(item: Item, index: Int) = MediaCardView(
@@ -2851,6 +2863,7 @@ class MainActivity : Screen() {
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
+            if (HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
             dim(grid || !active, animate = false)
             payload = item
             tag = "card:${item.id}"
@@ -2873,6 +2886,7 @@ class MainActivity : Screen() {
                     focus(index)
                     showHero(item)
                 } else main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
+                styleTile()
             }
             // A channel has no title page to show: OK plays it, and holding OK lists its sources.
             setOnClickListener { if (HomeStyle.isTile(item.id)) showingMenu(this@Row) else if (item.live) play(item) else openDetails(item) }
@@ -2887,8 +2901,14 @@ class MainActivity : Screen() {
         fun light(on: Boolean) {
             if (active == on) return
             active = on
-            if (on) peek(true) else { rail.clearHeld(); cards.getOrNull(selected)?.expand(false) }
+            if (on) peek(true) else {
+                rail.clearHeld()
+                cards.getOrNull(selected)?.expand(false)
+                if (tileRow && selected == 0 && cards.size > 1) rail.selectIndex(1) // back in, the remote lands on a title
+            }
+            styleTile()
             heading.animate().alpha(if (on) 1f else QUIET).setDuration(FOCUS_MS).start()
+            list?.let { heading.text = HomeStyle.rowTitle(HomeStyle.titleCase(title), it, on) }
             cards.forEachIndexed { i, c -> c.dim(!on || (grid && i != selected)) } // ChadFlix: the whole row lights up
         }
 
@@ -2925,7 +2945,9 @@ class MainActivity : Screen() {
                 moreHint.alpha = 0f
                 return
             }
-            val targetScroll = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0)
+            val targetScroll = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
+            // ChadFlix: the info line starts under the focused card (after the Showing tile, its first title sits further right).
+            browseInfo.translationX = if (homeRow) (index * cardStep - targetScroll).toFloat() else 0f
             loadRest(this@Row)
             val beyond = rail.hasCardsBeyond(targetScroll, dp(PAD) / 2)
             moreHint.animate().alpha(if (beyond && mode == Mode.BROWSE && !page.isBrowse) 0.9f else 0f).setDuration(FOCUS_MS).start()
