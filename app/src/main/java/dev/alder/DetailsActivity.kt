@@ -412,7 +412,7 @@ class DetailsActivity : Screen() {
         startOverButton = null
         hero.removeAllViews()
         val title = text(m?.name ?: name, SERIF_HERO, serif = true).onArt().apply {
-            maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.TOP or Gravity.START
+            maxLines = 2; ellipsize = TextUtils.TruncateAt.END; gravity = Gravity.BOTTOM or Gravity.START
             // The box is a fixed height: at large font sizes a two-line name shrinks to fit instead of clipping.
             // Android 8+ only; older TVs ellipsize the second line instead.
             if (android.os.Build.VERSION.SDK_INT >= 26)
@@ -428,7 +428,7 @@ class DetailsActivity : Screen() {
                     maxHeight = dp(68)
                     visibility = View.GONE
                 }
-                addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
+                addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
                 Images.load(m.logo ?: Images.logoFor(m.id), logo, dp(520), urgent = true, failed = {
                     title.visibility = View.VISIBLE; logo.visibility = View.GONE
                 }) {
