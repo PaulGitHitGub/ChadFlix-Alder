@@ -193,8 +193,8 @@ internal object HomeStyle {
     fun rowsOn(c: Context, page: String): org.json.JSONObject =
         runCatching { org.json.JSONObject(prefs(c).getString(Settings.profileKey(c, "rowsOn:$page"), null)!!) }.getOrDefault(org.json.JSONObject())
 
-    fun isOn(state: org.json.JSONObject, title: String, movie: Boolean) =
-        if (state.has(title)) state.optBoolean(title) else onByDefault(title, movie)
+    fun isOn(state: org.json.JSONObject, title: String, movie: Boolean, services: Boolean = false) =
+        if (state.has(title)) state.optBoolean(title) else services || onByDefault(title, movie) // every service row starts on
 
     /** What the page's rows depend on in Customize Home, to tell when coming back that they changed. */
     fun signature(c: Context, page: String) = rowsOn(c, page).toString() + rowOrder(c, page)
@@ -203,14 +203,25 @@ internal object HomeStyle {
      * [items] in this page's saved order ([orderedRows]); platform rows that order has never seen (an order saved before
      * they existed) go after the genres, where the page puts them, not at the end.
      */
-    fun <T> ordered(c: Context, page: String, movie: Boolean, items: List<T>, title: (T) -> String): List<T> {
-        val saved = rowOrder(c, page)
-        val out = orderedRows(saved, items, title)
-        val fresh = out.filter { t -> title(t) !in saved && platforms.any { it.name == title(t) } }
-        if (saved.isEmpty() || fresh.isEmpty()) return out
-        val rest = out - fresh.toSet()
-        val at = rest.indexOfLast { t -> genres(movie).any { it.second == title(t) } } + 1
-        return rest.take(at) + fresh + rest.drop(at)
+    @Suppress("UNUSED_PARAMETER") // movie: kept so callers don't change if a page's own placement rule comes back
+    fun <T> ordered(c: Context, page: String, movie: Boolean, items: List<T>, title: (T) -> String): List<T> =
+        orderedRows(rowOrder(c, page), items, title)
+
+    const val SERVICES = "Services" // the Services tab's page label: one row per streaming service, all on by default
+
+    /**
+     * Platform rows used to be on Movies and Shows (they're on Services now): once per profile, their on/off there is
+     * forgotten, so an add-on row with the same name ("Netflix" from a catalog add-on) starts off as add-on rows do.
+     */
+    fun forgetPlatformsOnMoviesAndShows(c: Context) {
+        val done = Settings.profileKey(c, "platformsMoved")
+        if (prefs(c).getBoolean(done, false)) return
+        for (page in listOf("Movies", "Shows")) {
+            val state = rowsOn(c, page)
+            platforms.forEach { state.remove(it.name) }
+            prefs(c).edit().putString(Settings.profileKey(c, "rowsOn:$page"), state.toString()).apply()
+        }
+        prefs(c).edit().putBoolean(done, true).apply()
     }
 
     fun setRowOn(c: Context, page: String, title: String, on: Boolean) =
@@ -222,12 +233,9 @@ internal object HomeStyle {
 
     fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
         val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
-            .getOrNull() ?: genres(movie).map { it.second }
-        // Platform rows the page hasn't been built with yet (before this version) go after the genres, as the page puts them.
-        val missing = platforms.map { it.name }.filter { it !in known }
-        if (missing.isEmpty()) return known
-        val at = known.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
-        return known.take(at) + missing + known.drop(at)
+            .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second }
+        // Movies and Shows built before the Services tab listed the platform rows too: not any more.
+        return if (page == SERVICES) known else known.filterNot { t -> platforms.any { it.name == t } }
     }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
@@ -307,8 +315,9 @@ internal object HomeStyle {
         val key = rowKey(movie, title) ?: return null
         val lists = listsFor(movie, key)
         val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
-        val excl = key.startsWith("p") && exclusive(c, page, key.drop(1).toInt(), movie)
-        return if (excl) "$list · ${c.getString(R.string.showing_exclusives)}" else list
+        // A service row says "· All" when it isn't kept to the service's own shows.
+        val all = key.startsWith("p") && !exclusive(c, page, key.drop(1).toInt(), movie)
+        return if (all) "$list · ${c.getString(R.string.filter_all)}" else list
     }
 
     /** "Action · Trending": the list in red on the row the remote is in, all of it quiet on the others. */

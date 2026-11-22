@@ -101,6 +101,7 @@
     <string name="remove_failed">Couldn\'t remove it</string>
     <string name="row_move_up" translatable="false">Move Up</string>
     <string name="showing" translatable="false">Showing</string>
+    <string name="tab_services" translatable="false">Services</string>
     <string name="fps" translatable="false">%1$d fps</string>
     <string name="show_fps" translatable="false">Show FPS</string>
     <string name="background_wash" translatable="false">Background wash</string>

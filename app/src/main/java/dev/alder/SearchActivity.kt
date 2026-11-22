@@ -333,6 +333,7 @@ class SearchActivity : Screen() {
             "movies" to ("Movies" to getString(R.string.tab_movies)),
             "live" to ("Live" to getString(R.string.tab_live)),
             "library" to ("My Alder" to getString(R.string.tab_my_list)),
+            "services" to (HomeStyle.SERVICES to getString(R.string.tab_services)),
         )
         val visible = orderTabs(Settings.tabOrder(this), tabsFor(catalogTypes)).filter { Settings.tabShown(this, it) }
         val ids = listOfNotNull("home".takeIf { Settings.startTab(this) == "home" }) + visible // as Home: only when it is the start page
