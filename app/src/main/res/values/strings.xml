@@ -107,7 +107,9 @@
     <string name="background_wash_hint" translatable="false">A soft, dimmed blur of the focused title behind the home rows. Off: plain black.</string>
     <string name="show_fps_hint" translatable="false">A frames-per-second counter in the top-left corner of the home pages.</string>
     <string name="customize_home" translatable="false">Customize Home</string>
-    <string name="customize_home_hint" translatable="false">Choose the rows on Movies and Shows, and their order.</string>
+    <string name="customize_home_sub" translatable="false">Show, Hide and Reorder Your Rows</string>
+    <string name="always_first" translatable="false">Always First</string>
+    <string name="hint_customize" translatable="false">The rows Movies and Shows show, and their order, for this profile.</string>
     <string name="showing_default" translatable="false">(Default)</string>
     <string name="showing_trending" translatable="false">Trending</string>
     <string name="showing_new_releases" translatable="false">New Releases</string>

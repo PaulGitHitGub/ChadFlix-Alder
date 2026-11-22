@@ -270,6 +270,7 @@ class SettingsActivity : Screen() {
         PICTURE(R.string.group_picture, R.drawable.ic_tv),
         SUBTITLES(R.string.group_subtitles, R.drawable.ic_subtitles),
         ADDONS(R.string.group_addons, R.drawable.ic_layers),
+        CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix
         PROFILE(R.string.group_profile, R.drawable.ic_person),
         LANGUAGE(R.string.group_language, R.drawable.ic_language),
         STORAGE(R.string.group_storage, R.drawable.ic_storage),
@@ -486,13 +487,14 @@ class SettingsActivity : Screen() {
                 groupViews.values.any { it.hasFocus() }) {
                 if (firstDetail?.requestFocus() == true) return true
             }
-            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT &&
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customMoving &&
                 currentFocus?.let { isInside(it, detailRows) && it !in choiceRows } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
             }
             // The rows end where they end: Down past the last one stays put instead of falling into the group list.
             if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN && detailRows.childCount > 0 &&
                 currentFocus === detailRows.getChildAt(detailRows.childCount - 1)) return true
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK) customMoving = false // ChadFlix: Back drops a picked-up row
             if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK &&
                 currentFocus?.let { isInside(it, detailRows) } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
@@ -551,6 +553,7 @@ class SettingsActivity : Screen() {
             Group.PICTURE -> R.string.hint_picture
             Group.SUBTITLES -> R.string.hint_subtitles
             Group.ADDONS -> R.string.hint_addons
+            Group.CUSTOMIZE -> R.string.hint_customize
             Group.PROFILE -> R.string.hint_profile
             Group.LANGUAGE -> R.string.hint_language
             Group.STORAGE -> R.string.hint_storage
@@ -609,6 +612,7 @@ class SettingsActivity : Screen() {
                     addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
                 }
             }
+            Group.CUSTOMIZE -> customizeHome()
             Group.PROFILE -> {
                 actionRow(getString(R.string.menu_switch_profile), "", getString(R.string.switch_profile_hint)) {
                     startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
@@ -638,7 +642,6 @@ class SettingsActivity : Screen() {
                     tabsMenu { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
                 }
                 withTabs { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
-                actionRow(getString(R.string.customize_home), "›", getString(R.string.customize_home_hint), perProfile = true) { customizeHome() }
                 choiceRow(Choice("featuredHome", getString(R.string.featured_home), getString(R.string.featured_home_hint),
                     listOf(false to off, true to on), perProfile = true))
                 choiceRow(Choice("blurThumbnails", getString(R.string.blur_thumbnails), getString(R.string.blur_thumbnails_hint),
@@ -795,31 +798,124 @@ class SettingsActivity : Screen() {
         }
     }
 
-    /** ChadFlix: Customize Home: Movies or Shows, then that page's rows (genres, then add-on rows), on or off and in order. */
-    private fun customizeHome() = choose(getString(R.string.customize_home),
-        listOf(getString(R.string.tab_movies), getString(R.string.tab_shows))) { i -> homeRowsMenu(i == 0) }
+    // ---------- ChadFlix: Customize Home, as ChadFlix on Kodi has it ----------
 
-    /** Like Settings › Tabs: OK on a row turns it on or off or moves it a place, and the list opens again on it. */
-    private fun homeRowsMenu(movie: Boolean, focus: Int = 0) {
-        val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
-        val rows = orderedRows(HomeStyle.rowOrder(this, page), HomeStyle.knownRows(this, page, movie)) { it }
-        val state = HomeStyle.rowsOn(this, page)
-        val hidden = Settings.hiddenRows(this)
-        fun shown(title: String) = HomeStyle.isOn(state, title, movie) && title !in hidden
-        choose(getString(if (movie) R.string.tab_movies else R.string.tab_shows), rows.map { "$it  ·  ${if (shown(it)) on else off}" },
-            focus = focus.coerceIn(0, rows.lastIndex)) { i ->
-            val title = rows[i]
-            val actions = listOfNotNull<Pair<String, () -> Int>>(
-                getString(if (shown(title)) R.string.tab_hide else R.string.tab_show) to {
-                    HomeStyle.setRowOn(this, page, title, !shown(title))
-                    if (!shown(title)) Settings.unhideRow(this, title)
-                    i
-                },
-                if (i > 0) getString(R.string.row_move_up) to { HomeStyle.moveRow(this, page, rows, title, -1); i - 1 } else null,
-                if (i < rows.lastIndex) getString(R.string.row_move_down) to { HomeStyle.moveRow(this, page, rows, title, 1); i + 1 } else null,
-            )
-            choose(title, actions.map { it.first }) { a -> homeRowsMenu(movie, actions[a].second()) }
+    private var customMoving = false // a row is picked up
+
+    /**
+     * Movies | Shows pills (focusing one shows its rows), a fixed "Continue Watching · Always First" line, then the page's
+     * rows (genres, then add-on rows): check when on, name, grip, On / Off. On a row: OK turns it on or off, Right picks it
+     * up; picked up, Up / Down move it a place and OK or Left drop it. Back drops it and leaves. Every change is saved at
+     * once, in the order and on/off the home rows' hold-OK menu uses too.
+     */
+    private fun customizeHome() {
+        detailRows.addView(text(R.string.customize_home_sub, SMALL, color = TEXT_2),
+            LinearLayout.LayoutParams(-1, -2).apply { marginStart = dp(12); bottomMargin = dp(12) })
+        val list = column(Gravity.START)
+        var movie = true
+        customMoving = false
+        val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        val tabViews = listOf(R.string.tab_movies, R.string.tab_shows).map { words ->
+            text(words, BODY, bold = true).apply { gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
         }
+        fun styleTabs() = tabViews.forEachIndexed { i, t ->
+            val open = (i == 0) == movie
+            t.background = if (t.isFocused) HomeStyle.pill(HomeStyle.WHITE) else if (open) HomeStyle.pill(0x40FFFFFF) else null
+            t.setTextColor(if (t.isFocused) HomeStyle.BLACK else if (open) HomeStyle.WHITE else 0xB0FFFFFF.toInt())
+        }
+        fun fill() {
+            list.removeAllViews()
+            list.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(12), 0, dp(14), 0)
+                addView(ImageView(context).apply { setImageResource(R.drawable.ic_lock); imageTintList = ColorStateList.valueOf(0x80FFFFFF.toInt()) },
+                    LinearLayout.LayoutParams(dp(14), dp(14)))
+                addView(text(R.string.row_continue, BODY, color = 0x99FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
+                addView(text(R.string.always_first, SMALL, color = 0x80FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
+            }, LinearLayout.LayoutParams(-1, dp(36)))
+            val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
+            val order = orderedRows(HomeStyle.rowOrder(this, page), HomeStyle.knownRows(this, page, movie)) { it }.toMutableList()
+            val binds = mutableListOf<() -> Unit>()
+            order.indices.forEach { i ->
+                val check = ImageView(this).apply { setImageResource(R.drawable.ic_check) }
+                val name = text("", BODY)
+                val grip = ImageView(this).apply { setImageResource(R.drawable.ic_grip) }
+                val state = text("", SMALL).apply { gravity = Gravity.END }
+                val row = LinearLayout(this).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    isFocusable = true
+                    setPadding(dp(12), 0, dp(14), 0)
+                    addView(check, LinearLayout.LayoutParams(dp(16), dp(16)))
+                    addView(name, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
+                    addView(grip, LinearLayout.LayoutParams(dp(14), dp(14)))
+                    addView(state, LinearLayout.LayoutParams(dp(36), -2).apply { marginStart = dp(12) })
+                }
+                fun on() = HomeStyle.isOn(HomeStyle.rowsOn(this, page), order[i], movie) && order[i] !in Settings.hiddenRows(this)
+                fun bind() {
+                    val lit = row.isFocused
+                    val on = on()
+                    name.text = order[i]
+                    state.text = if (on) this.on else off
+                    check.visibility = if (on) View.VISIBLE else View.INVISIBLE
+                    row.background = if (!lit) null else android.graphics.drawable.GradientDrawable().apply {
+                        setColor(HomeStyle.WHITE); cornerRadius = 999f
+                        if (customMoving) setStroke(dp(2), HomeStyle.LIST_RED) // picked up
+                    }
+                    name.setTextColor(if (lit) HomeStyle.BLACK else if (on) HomeStyle.WHITE else 0x99FFFFFF.toInt())
+                    name.paint.isFakeBoldText = lit
+                    check.imageTintList = ColorStateList.valueOf(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
+                    grip.imageTintList = ColorStateList.valueOf(if (lit) 0xFF3A3A3A.toInt() else 0x80FFFFFF.toInt())
+                    state.setTextColor(if (lit) 0xFF3A3A3A.toInt() else if (on) 0xB0FFFFFF.toInt() else 0x80FFFFFF.toInt())
+                }
+                binds += ::bind
+                row.setOnFocusChangeListener { _, has -> bind(); if (has) hint.text = getString(R.string.hint_customize) }
+                row.setOnClickListener {
+                    if (customMoving) customMoving = false // drop it here
+                    else {
+                        val turnOn = !on()
+                        HomeStyle.setRowOn(this, page, order[i], turnOn)
+                        if (turnOn) Settings.unhideRow(this, order[i])
+                    }
+                    bind()
+                }
+                row.setOnKeyListener { _, code, event ->
+                    if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                    val up = code == android.view.KeyEvent.KEYCODE_DPAD_UP
+                    when {
+                        code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> { customMoving = true; bind(); true } // pick it up
+                        customMoving && code == android.view.KeyEvent.KEYCODE_DPAD_LEFT -> { customMoving = false; bind(); true } // drop
+                        customMoving && (up || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) -> {
+                            val j = i + if (up) -1 else 1
+                            if (j in order.indices) {
+                                order[i] = order[j].also { order[j] = order[i] }
+                                HomeStyle.saveRowOrder(this, page, order)
+                                list.getChildAt(j + 1).requestFocus()
+                                binds[i](); binds[j]()
+                            }
+                            true // the fixed first line and the list's end stop it
+                        }
+                        code == android.view.KeyEvent.KEYCODE_DPAD_DOWN && i == order.lastIndex -> true
+                        else -> false
+                    }
+                }
+                list.addView(row, LinearLayout.LayoutParams(-1, dp(36)))
+                bind()
+            }
+        }
+        tabViews.forEachIndexed { i, t ->
+            t.setOnFocusChangeListener { _, has ->
+                if (has && movie != (i == 0)) { movie = i == 0; customMoving = false; fill() }
+                if (has) hint.text = getString(R.string.hint_customize)
+                styleTabs()
+            }
+            t.setOnClickListener { list.getChildAt(1)?.requestFocus() }
+            tabs.addView(t, LinearLayout.LayoutParams(-2, dp(30)).apply { marginEnd = dp(8) })
+        }
+        detailRows.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12); bottomMargin = dp(8) })
+        detailRows.addView(list, LinearLayout.LayoutParams(-1, -2))
+        firstDetail = tabViews[0]
+        fill()
+        styleTabs()
     }
 
     /** The catalog rows hidden from home, movies or shows; OK on one puts it back. */
