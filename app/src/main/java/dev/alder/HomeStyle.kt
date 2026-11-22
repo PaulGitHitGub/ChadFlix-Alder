@@ -232,7 +232,7 @@ internal object HomeStyle {
         "complete" to R.string.showing_complete)
 
     private const val TILE = "chadflix:showing:"
-    const val LIST_RED = 0xFFE50914.toInt() // Netflix red
+    const val LIST_RED = 0xFFFF3B47.toInt() // #EF4B55 at full saturation
     const val LABEL_GREY = 0xFF9A9A9A.toInt()
 
     /** The name of the list genre row [title] shows on [page] ("Trending"), or null when it isn't a genre row. */
