@@ -1560,10 +1560,12 @@ class MainActivity : Screen() {
         // A show in progress describes its next episode, so the line names that episode rather than the show.
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
-        // ChadFlix: "Drama • 2014 • 1h 41m • PG-13", and Continue Watching's time left (its card only has the bar).
+        // ChadFlix: "Drama • 2014 • 1h 41m • PG-13", with Continue Watching's time left (its card only has the bar).
         val left = item.timeLeft ?: HomeStyle.runtimeMs(meta?.runtime).takeIf { item.resumeAt in 1L until it }?.let { timeLeft(it, item.resumeAt) }
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() }, left)
-        else factsList += listOfNotNull(genre, year, length, meta?.certification, left) // no "Movie"/"Series": the tab says it
+        // No "Movie"/"Series" (the tab says it); the time left goes in brackets after the runtime: "1h 59m (1h 56m left)".
+        else factsList += listOfNotNull(genre, year, length?.let { l -> left?.let { "$l ($it)" } ?: l } ?: left?.let { "($it)" },
+            meta?.certification)
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
         // ChadFlix: the ratings (views, and any MDBList request) only for the card the remote stops on: racing past films
         // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
