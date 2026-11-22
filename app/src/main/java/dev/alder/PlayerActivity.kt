@@ -458,7 +458,7 @@ class PlayerActivity : Screen() {
         }
         if (sources.isEmpty() && isTrailer) return finish()
         decodeAudio = Settings.decodeAudio(this)
-        speed = if (isTrailer || isLiveType(type)) 1f else Settings.titleChoice(this, metaId)?.speed?.takeIf { it in SPEEDS } ?: 1f // kept per title, like audio and subtitles
+        // ChadFlix: no speed control; always 1x (a speed saved for the title earlier is ignored).
         dialogueProcessor.enabled = Settings.clearDialogue(this)
         val renderers = object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
@@ -663,7 +663,6 @@ class PlayerActivity : Screen() {
                 if (state == Player.STATE_BUFFERING) showLoading(if (started) getString(R.string.player_loading) else startMessage
                     ?: getString(R.string.player_starting, sources.getOrNull(at)?.label.orEmpty()))
                 if (state == Player.STATE_READY) {
-                    updateSpeedAvailability()
                     if (started) {
                         retries = 0 // the source recovered: the next network drop gets its own two retries
                         hideLoading()
@@ -693,7 +692,6 @@ class PlayerActivity : Screen() {
             }
 
             override fun onTracksChanged(tracks: Tracks) {
-                updateSpeedAvailability()
                 trackStatus.text = trackStatus(tracks)
                 refreshBadges(tracks)
                 if (selectAddonSub) tracks.groups.firstOrNull(::isAddonSub)?.let { g ->
@@ -1280,86 +1278,6 @@ class PlayerActivity : Screen() {
 
     private fun isLive() = isLiveType(type) || player.isCurrentMediaItemLive
 
-    private fun updateSpeedAvailability() {
-        val live = isLive()
-        val available = isSpeedAvailable(isTrailer = isTrailer, isLive = live)
-        if (::speedCell.isInitialized) {
-            if (!available && speedButton.isFocused) playPause.requestFocus()
-            speedCell.visibility = if (available) View.VISIBLE else View.GONE
-            speedButton.isEnabled = available
-            speedButton.isFocusable = available
-        }
-        if (!available && (speed != 1f || player.playbackParameters.speed != 1f)) {
-            val reopen = speed != 1f && selectedTrackPassesAudio() && player.isCurrentMediaItemSeekable && !live
-            speed = 1f
-            player.setPlaybackSpeed(1f)
-            if (::speedButton.isInitialized) {
-                speedButton.text = speedLabel(1f)
-                speedButton.setTextColor(TEXT)
-            }
-            if (reopen) {
-                player.stop()
-                retryAudio(null, "Audio reopened for 1× playback")
-            }
-        }
-    }
-
-    /** The speeds in the shared glass list, the one in use ticked and focused; picking one plays at it. */
-    private fun openSpeedMenu() {
-        if (!isSpeedAvailable(isTrailer = isTrailer, isLive = isLive())) return
-        val note = if (passthroughOut || (speed != 1f && selectedTrackPassesAudio()))
-            getString(R.string.player_speed_passthrough_note) else null
-        choose(getString(R.string.player_speed), SPEEDS.map(::speedLabel), message = note,
-            checked = SPEEDS.indexOf(speed), widthDp = 260) { i ->
-            applySpeed(SPEEDS[i])
-            showControls(speedButton) // focus back on the button, and the controls' hide timer starts again
-        }
-    }
-
-    /**
-     * Plays at [to]. Away from 1x a passthrough stream is reopened as PCM, since the sink can only time-stretch PCM;
-     * back at 1x a stream the route can pass is reopened as it is again.
-     */
-    private fun applySpeed(to: Float) {
-        when (resolveSpeedChange(
-            isTrailer = isTrailer,
-            isLive = isLive(),
-            seekable = player.isCurrentMediaItemSeekable,
-            currentSpeed = speed,
-            targetSpeed = to,
-            passthroughOut = passthroughOut,
-            trackPassesAudio = selectedTrackPassesAudio(),
-        )) {
-            SpeedChangeAction.UNAVAILABLE -> {
-                updateSpeedAvailability()
-                return
-            }
-            SpeedChangeAction.BLOCKED_UNSEEKABLE_PASSTHROUGH -> {
-                canSeek()
-                speedButton.text = speedLabel(speed)
-                speedButton.setTextColor(if (speed != 1f) TUNGSTEN else TEXT)
-                return
-            }
-            SpeedChangeAction.APPLY_IN_PLACE -> {
-                speedButton.text = speedLabel(to)
-                speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
-                if (to == speed) return
-                speed = to
-                Settings.pickedInPlayer(this, metaId, speed = to)
-                player.setPlaybackSpeed(speed)
-            }
-            SpeedChangeAction.REOPEN_AUDIO_AND_APPLY -> {
-                speedButton.text = speedLabel(to)
-                speedButton.setTextColor(if (to != 1f) TUNGSTEN else TEXT)
-                speed = to
-                Settings.pickedInPlayer(this, metaId, speed = to)
-                player.stop()
-                retryAudio(null, "Audio reopened for ${speedLabel(speed)} playback")
-                player.setPlaybackSpeed(speed)
-            }
-        }
-    }
-
     private val tickTask = Runnable { tick() }
 
     // Progress every 10 s, pushed to Stremio every minute (Stremio's own apps push every 3 minutes).
@@ -1858,8 +1776,6 @@ class PlayerActivity : Screen() {
     private lateinit var length: TextView
     private lateinit var playPause: TextView
     private lateinit var audioButton: TextView
-    private lateinit var speedButton: TextView
-    private lateinit var speedCell: FrameLayout
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var playerLogo: ImageView
@@ -2024,19 +1940,6 @@ class PlayerActivity : Screen() {
 
         audioButton = button(getString(R.string.player_audio_subtitles), R.drawable.ic_subtitles) { openOptions() }
         val streamButton = button(getString(R.string.player_change_stream), R.drawable.ic_layers) { changeStream() }
-        // Shows the speed itself rather than an icon; OK opens the list of speeds above it.
-        speedButton = button(getString(R.string.player_speed), 0) { openSpeedMenu() }.apply {
-            text = speedLabel(speed)
-            textSize = SMALL
-            typeface = text("", SMALL, bold = true).typeface // Screen.fonts is private
-            setTextColor(if (speed != 1f) TUNGSTEN else TEXT)
-            maxLines = 1
-            includeFontPadding = false
-            setPadding(dp(2), 0, dp(2), 0)
-            if (android.os.Build.VERSION.SDK_INT >= 26) {
-                setAutoSizeTextTypeUniformWithConfiguration(9, 13, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
-            }
-        }
         playPause = button(getString(R.string.player_pause), R.drawable.ic_pause, primary = true) {
             if (player.playWhenReady) player.pause() else player.play()
         }
@@ -2051,7 +1954,6 @@ class PlayerActivity : Screen() {
             finish()
         }
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
-        speedCell = buttonCell(speedButton)
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
             clipToPadding = false
@@ -2073,17 +1975,15 @@ class PlayerActivity : Screen() {
                     gravity = Gravity.START or Gravity.TOP
                     addView(View(context).apply { setBackgroundColor(GLASS_EDGE) },
                         LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
-                    addView(speedCell)
                     addView(nextCell)
                     addView(buttonCell(infoButton))
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
-        for (button in listOf(streamButton, audioButton, speedButton, playPause, nextButton, infoButton))
+        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton))
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
-        updateSpeedAvailability()
         return FrameLayout(this).apply {
             visibility = View.GONE
             alpha = 0f
@@ -2129,7 +2029,6 @@ class PlayerActivity : Screen() {
     }
 
     private fun refreshBadges(tracks: Tracks = player.currentTracks) {
-        updateSpeedAvailability()
         if (!::pauseBadges.isInitialized) return
         if (isTrailer) {
             pauseBadges.visibility = View.GONE

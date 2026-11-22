@@ -159,8 +159,6 @@
     <string name="skip_recap">Rückblick überspringen</string>
     <string name="player_seek">Spulen</string>
     <string name="player_audio_subtitles">Audio und Untertitel</string>
-    <string name="player_speed">Wiedergabegeschwindigkeit</string>
-    <string name="player_speed_passthrough_note">Der Ton pausiert kurz beim Wechsel zu oder von 1×.</string>
     <string name="player_change_stream">Quelle wechseln</string>
     <string name="player_pause">Pause</string>
     <string name="player_info">Info</string>

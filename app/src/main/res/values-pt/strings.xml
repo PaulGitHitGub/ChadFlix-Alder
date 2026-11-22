@@ -162,8 +162,6 @@
     <string name="skip_recap">Pular resumo</string>
     <string name="player_seek">Avançar ou voltar</string>
     <string name="player_audio_subtitles">Áudio e legendas</string>
-    <string name="player_speed">Velocidade de reprodução</string>
-    <string name="player_speed_passthrough_note">O áudio pausa brevemente ao mudar para ou de 1×.</string>
     <string name="player_change_stream">Trocar fonte</string>
     <string name="player_pause">Pausar</string>
     <string name="player_info">Info</string>
