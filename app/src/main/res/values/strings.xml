@@ -408,13 +408,11 @@
     <string name="search_remove_query">Remove %1$s</string>
     <string name="search_hold_to_remove">Hold OK to remove</string>
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
-    <string name="search_popular">Popular</string>
+    <string name="search_popular_titles">Popular Titles</string>
+    <string name="search_voice">Voice Search</string>
+    <string name="search_delete">Delete</string>
     <string name="search_unavailable">Search is unavailable right now.</string>
     <string name="search_no_matches">No matches · Try a shorter title</string>
-    <plurals name="search_titles">
-        <item quantity="one">%1$d title</item>
-        <item quantity="other">%1$d titles</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">Quality</string>

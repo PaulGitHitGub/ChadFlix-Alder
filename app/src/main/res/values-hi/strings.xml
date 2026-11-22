@@ -388,13 +388,11 @@
     <string name="search_remove_query">%1$s हटाएँ</string>
     <string name="search_hold_to_remove">हटाने के लिए OK दबाकर रखें</string>
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
-    <string name="search_popular">लोकप्रिय</string>
+    <string name="search_popular_titles">लोकप्रिय शीर्षक</string>
+    <string name="search_voice">वॉइस खोज</string>
+    <string name="search_delete">मिटाएं</string>
     <string name="search_unavailable">अभी खोज उपलब्ध नहीं है।</string>
     <string name="search_no_matches">कोई नतीजा नहीं · छोटा टाइटल आज़माएँ</string>
-    <plurals name="search_titles">
-        <item quantity="one">%1$d टाइटल</item>
-        <item quantity="other">%1$d टाइटल</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">क्वालिटी</string>
