@@ -173,27 +173,49 @@ object Tmdb {
     fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>,
                     only: ((List<Pair<Int, String>>) -> Boolean)? = null): Pair<List<Meta>, Boolean> {
         val media = if (movie) "movie" else "tv"
-        val query = (mapOf("api_key" to KEY, "language" to language, "include_adult" to "false", "page" to "1") + params)
-            .entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
-        fun kept(url: String, maxAgeMs: Long?) = Http.savedAnswer(url, maxAgeMs = maxAgeMs) ?: Http.get(url, keep = true, timeoutMs = ROW_WAIT, strict = true)
-        val found = JSONObject(kept("$BASE/discover/$media?$query", 12 * 3600_000L)).optJSONArray("results").objects()
+        // Fresh within [maxAgeMs], else asked again; a failed or slow refresh falls back to the last answer of any age.
+        fun kept(url: String, maxAgeMs: Long?) = Http.savedAnswer(url, maxAgeMs = maxAgeMs)
+            ?: runCatching { Http.get(url, keep = true, timeoutMs = ROW_WAIT, strict = true) }.getOrElse { Http.savedAnswer(url) ?: throw it }
         val region = params["watch_region"] ?: this.region
+        // Exclusives: a title's IMDb id and its subscription services here, kept cut down to just those (the full details
+        // run to tens of kB); a day old, asked again, with the same fallback.
+        fun services(id: Int): JSONObject {
+            val url = "$BASE/$media/$id?api_key=$KEY&append_to_response=external_ids,watch/providers&watch_region=$region"
+            Http.savedAnswer(url, maxAgeMs = 24 * 3600_000L)?.let { return JSONObject(it) }
+            return runCatching {
+                val d = JSONObject(Http.get(url, timeoutMs = ROW_WAIT, strict = true))
+                val flatrate = d.optJSONObject("watch/providers")?.optJSONObject("results")?.optJSONObject(region)?.optJSONArray("flatrate")
+                    .objects().map { JSONObject().put("provider_id", it.optInt("provider_id")).put("provider_name", it.optString("provider_name")) }
+                JSONObject().put("imdb_id", d.optJSONObject("external_ids")?.text("imdb_id")).put("flatrate", org.json.JSONArray(flatrate))
+                    .also { Http.keep(url, null, it.toString()) }
+            }.getOrElse { Http.savedAnswer(url)?.let(::JSONObject) ?: throw it }
+        }
         val elsewhere = "elsewhere" // a title that streams on another service too: dropped, not missing its IMDb id
-        val ids = pool.invokeAll(found.map { t ->
-            java.util.concurrent.Callable {
-                runCatching {
-                    if (only == null) JSONObject(kept("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", null)).text("imdb_id")
-                    else {
-                        val d = JSONObject(kept("$BASE/$media/${t.optInt("id")}?api_key=$KEY&append_to_response=external_ids,watch/providers", 24 * 3600_000L))
-                        val flatrate = d.optJSONObject("watch/providers")?.optJSONObject("results")?.optJSONObject(region)
-                            ?.optJSONArray("flatrate").objects().map { it.optInt("provider_id") to it.optString("provider_name") }
-                        if (only(flatrate)) d.optJSONObject("external_ids")?.text("imdb_id") else elsewhere
-                    }
-                }.getOrNull()?.takeIf { it.startsWith("tt") || it == elsewhere }
-            }
-        }).map { runCatching { it.get() }.getOrNull() }
-        val titles = found.zip(ids).mapNotNull { (t, imdb) -> imdb?.takeIf { it != elsewhere }?.let { discoverMeta(t, it, movie, genreNames) } }
-        val counted = ids.count { it != elsewhere }
+        val titles = mutableListOf<Meta>()
+        var counted = 0
+        // An Exclusives row that kept fewer than 10 asks for a second page; the first page's failure is the row's.
+        for (page in 1..(if (only == null) 1 else 2)) {
+            val query = (mapOf("api_key" to KEY, "language" to language, "include_adult" to "false", "page" to "$page") + params)
+                .entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
+            val answer = if (page == 1) JSONObject(kept("$BASE/discover/$media?$query", 12 * 3600_000L))
+                else runCatching { JSONObject(kept("$BASE/discover/$media?$query", 12 * 3600_000L)) }.getOrNull() ?: break
+            val found = answer.optJSONArray("results").objects()
+            val ids = pool.invokeAll(found.map { t ->
+                java.util.concurrent.Callable {
+                    runCatching {
+                        if (only == null) JSONObject(kept("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", null)).text("imdb_id")
+                        else services(t.optInt("id")).let { d ->
+                            val flatrate = d.optJSONArray("flatrate").objects().map { it.optInt("provider_id") to it.optString("provider_name") }
+                            if (only(flatrate)) d.text("imdb_id") else elsewhere
+                        }
+                    }.getOrNull()?.takeIf { it.startsWith("tt") || it == elsewhere }
+                }
+            }).map { runCatching { it.get() }.getOrNull() }
+            titles += found.zip(ids).mapNotNull { (t, imdb) -> imdb?.takeIf { it != elsewhere }?.let { discoverMeta(t, it, movie, genreNames) } }
+                .filter { m -> titles.none { it.id == m.id } }
+            counted += ids.count { it != elsewhere }
+            if (only == null || titles.size >= 10 || answer.optInt("total_pages") < 2) break
+        }
         return titles to (titles.size * 2 >= counted && counted > 0)
     }
 

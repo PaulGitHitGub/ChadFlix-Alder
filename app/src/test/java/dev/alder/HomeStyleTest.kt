@@ -118,6 +118,11 @@ class HomeStyleTest {
         val max = HomeStyle.platforms.first { it.name == "Max" }
         assertEquals(true, onlyOn(listOf(1899 to "HBO Max", 1825 to "HBO Max Amazon Channel"), max))
         assertEquals(false, onlyOn(listOf(1899 to "HBO Max", 289 to "Cinemax Amazon Channel"), max))
+        // Pay-TV bundles carrying the channel don't count (House of the Dragon on Spectrum On Demand); Hulu and Disney+ share.
+        assertEquals(true, onlyOn(listOf(1899 to "HBO Max", 486 to "Spectrum On Demand", 1 to "fuboTV"), max))
+        val hulu = HomeStyle.platforms.first { it.name == "Hulu" }
+        assertEquals(true, onlyOn(listOf(15 to "Hulu", 337 to "Disney Plus"), hulu))
+        assertEquals(false, onlyOn(listOf(15 to "Hulu", 8 to "Netflix"), hulu))
         val apple = HomeStyle.platforms.first { it.name == "Apple TV+" }
         assertEquals(false, onlyOn(listOf(350 to "Apple TV", 1855 to "Starz Apple TV channel"), apple))
     }

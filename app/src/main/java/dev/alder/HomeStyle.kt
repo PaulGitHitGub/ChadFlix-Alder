@@ -270,17 +270,18 @@ internal object HomeStyle {
      * film filter for Disney+, Hulu, Paramount+ or Peacock (TMDb has no such company, or only a foreign one), so their
      * film rows have no Exclusives switch.
      */
-    /** [brand]: how TMDb's names for the service (and its channels elsewhere) begin, letters and digits only ([onlyOn]). */
+    /** [brand]: how TMDb's names for the service (and its channels elsewhere) begin, letters and digits only ([onlyOn]);
+     *  [siblings]: services of the same owner whose shows it shares (Hulu's are on Disney+ too), not counted as elsewhere. */
     class Platform(val name: String, val providers: String, val networks: String, val companies: String?,
-                   val brand: String = name.lowercase().filter(Char::isLetterOrDigit))
+                   val brand: String = name.lowercase().filter(Char::isLetterOrDigit), val siblings: List<String> = emptyList())
 
     val platforms = listOf(
         Platform("Netflix", "8", "213", "178464|145174|171251"), // Netflix, Netflix International Pictures, Netflix Animation Studios
         Platform("Apple TV+", "350", "2552", "194232"), // Apple Studios (TMDb's "Apple Original Films")
-        Platform("Disney+", "337", "2739", null),
+        Platform("Disney+", "337", "2739", null, siblings = listOf("hulu")),
         Platform("Prime Video", "9", "1024", "210099|20580", "amazonprime"), // Amazon MGM Studios, Amazon Studios
         Platform("Max", "1899", "3186|49", "7429|158691|138252", "hbomax"), // HBO Max and HBO networks; HBO Films, HBO Max, Warner Max
-        Platform("Hulu", "15", "453", null),
+        Platform("Hulu", "15", "453", null, siblings = listOf("disney")),
         Platform("Paramount+", "2303|2616", "4330", null), // Premium and Essential
         Platform("Peacock", "386|387", "3353", null), // Premium and Premium Plus
     )
@@ -513,11 +514,16 @@ internal fun genreParams(movie: Boolean, genre: Int, list: String, today: String
     return p
 }
 
-/** Whether a title's subscription services in the region ([flatrate]: TMDb id and name) are all [p] (its plans and
- *  its channels on other stores, as "Paramount+ Amazon Channel"); none listed counts as yes, the discover query said so. */
+/** Pay-TV bundles that carry a network's channel live (HBO, NBC, FX): not another streaming home for its shows. */
+private val payTv = listOf("fubotv", "youtubetv", "philo", "spectrum", "sling", "directv", "xfinity", "frndly", "vidgo", "cox", "optimum", "verizon")
+
+/** Whether a title's subscription services in the region ([flatrate]: TMDb id and name) are all [p] (its plans, its
+ *  channels on other stores as "Paramount+ Amazon Channel", its [HomeStyle.Platform.siblings]) or pay-TV bundles; none
+ *  listed counts as yes, the discover query said so. Checked against TMDb (US, 2026-11-22): 13 to 19 of a page's 20 stay. */
 internal fun onlyOn(flatrate: List<Pair<Int, String>>, p: HomeStyle.Platform): Boolean {
     val ids = p.providers.split('|').toSet()
-    return flatrate.all { (id, name) -> "$id" in ids || name.lowercase().filter(Char::isLetterOrDigit).startsWith(p.brand) }
+    val ok = listOf(p.brand) + p.siblings + payTv
+    return flatrate.all { (id, name) -> "$id" in ids || name.lowercase().filter(Char::isLetterOrDigit).let { n -> ok.any(n::startsWith) } }
 }
 
 /** ChadFlix's wash: full strength in the top 40%, then shading down to 15% at the bottom. */

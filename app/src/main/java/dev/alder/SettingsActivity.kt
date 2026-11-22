@@ -805,7 +805,7 @@ class SettingsActivity : Screen() {
         override fun dispatchDraw(canvas: android.graphics.Canvas) {
             if (clipRows) {
                 val saved = canvas.save()
-                canvas.clipRect(scrollX - dp(24), scrollY, scrollX + width + dp(24), scrollY + height)
+                canvas.clipRect(scrollX - dp(24), scrollY - dp(2), scrollX + width + dp(24), scrollY + height + dp(2)) // a picked-up row's outline
                 super.dispatchDraw(canvas)
                 canvas.restoreToCount(saved)
             } else super.dispatchDraw(canvas)
