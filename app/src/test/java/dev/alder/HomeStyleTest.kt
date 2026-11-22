@@ -50,4 +50,12 @@ class HomeStyleTest {
         assertEquals(listOf("Comedy", "Western", "Action", "Drama"), movedAmong(all, shown, "Comedy", -1))
         assertEquals(all, movedAmong(all, shown, "Action", -1))
     }
+
+    @Test fun washDimsTowardsTheBottomAndLiftsColour() {
+        assertEquals(1f, washShade(0.2f), 0.001f)
+        assertEquals(0.15f, washShade(1f), 0.001f)
+        assertEquals(0xFF000000.toInt(), washPixel(0xFF808080.toInt(), 0f))
+        val lifted = washPixel(0xFF804040.toInt(), 1f)
+        assertEquals(true, (lifted shr 16 and 255) > 0x80 && (lifted and 255) < 0x40)
+    }
 }

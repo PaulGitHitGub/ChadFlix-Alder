@@ -98,7 +98,9 @@ object Images {
      * Something painted into a picture once, as it's decoded, instead of drawn over it every frame: [paint] gets the
      * picture as decoded (software, [widthPx] wide) and returns what to show. [name] keeps its copies apart from plain ones.
      */
-    class Look(val name: String, val paint: (Bitmap) -> Bitmap)
+    // fetchPx: ChadFlix, the copy to download when it isn't the decode width (Home's wash downloads the copy the widened
+    // card already did, so it comes from the disk cache, then decodes it tiny).
+    class Look(val name: String, val fetchPx: Int = 0, val paint: (Bitmap) -> Bitmap)
     val blurred = Look("blurred") { src -> frost(src).also { if (it !== src) src.recycle() } }
     /** ChadFlix: the width the title page decodes its logo at ([trimmedLogo]); Home fetches it ahead at the same size. */
     const val TITLE_LOGO_PX = 1000
@@ -124,7 +126,7 @@ object Images {
         cache(widthPx, wide).get(key)?.let { return it }
         val mine = FutureTask {
             runCatching {
-                val bytes = Http.bytes(sized(url, widthPx))
+                val bytes = Http.bytes(sized(url, look?.fetchPx?.takeIf { it > 0 } ?: widthPx))
                 if (look == null) decode(bytes, widthPx) else decode(bytes, widthPx, Bitmap.Config.ARGB_8888)?.let(look.paint)
             }.getOrNull()?.also { cache(widthPx, wide).put(key, it) }
         }

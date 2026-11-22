@@ -1118,7 +1118,7 @@ class MainActivity : Screen() {
      */
     private fun showArt(item: Item, ready: (() -> Unit)? = null) {
         main.removeCallbacks(artTask)
-        if (page.isBrowse && mode == Mode.BROWSE) return run { ready?.invoke() } // ChadFlix: the home pages stay black
+        if (page.isBrowse && mode == Mode.BROWSE) return run { showWash(item); ready?.invoke() } // ChadFlix: a soft wash, not the art
         val settledBrowse = page.polishedRail && mode == Mode.BROWSE
         val libraryGrid = page.isGrid
         if (item.live && item.art == null && item.poster == null) return run { if (item.settled) clearArt(); ready?.invoke() }
@@ -1149,6 +1149,28 @@ class MainActivity : Screen() {
         }
         val delay = if (settledBrowse || libraryGrid) 0L else artDelay(held, cached, ready != null)
         if (delay == 0L) artTask.run() else main.postDelayed(artTask, delay)
+    }
+
+    /**
+     * ChadFlix: Home's Soft Wash ([HomeStyle.wash]) in the art views Alder already has, crossfading as its art did. Only
+     * once the remote rests on a title (WASH_WAIT), never while a D-pad is held or the rows slide: one tiny decode and one
+     * crossfade per stop. A title with no backdrop (the Showing tile) keeps the wash there is. In steady state only one of
+     * the two views holds a picture, so the screen gets one extra layer.
+     */
+    private fun showWash(item: Item) {
+        val url = item.art ?: return
+        if (url == art.tag) return
+        artTask = Runnable {
+            if (held || slideAnim != null) return@Runnable run { main.postDelayed(artTask, HomeStyle.WASH_WAIT) }
+            if (heroItem !== item || !page.isBrowse) return@Runnable
+            art.animate().cancel()
+            if (art.drawable != null && art.alpha > 0.5f) artBack.setImageDrawable(art.drawable)
+            art.alpha = 0f
+            Images.load(url, art, HomeStyle.WASH_W, look = HomeStyle.wash) {
+                art.enter(HOME_ART_MS).alpha(1f).withEndAction { artBack.setImageDrawable(null) }.start()
+            }
+        }
+        main.postDelayed(artTask, HomeStyle.WASH_WAIT)
     }
 
     /**

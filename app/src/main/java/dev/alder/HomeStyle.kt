@@ -112,6 +112,29 @@ internal object HomeStyle {
         }
     }
 
+    // ---------- Soft Wash: the focused title's backdrop as a dim blur behind the rows ----------
+
+    const val WASH_W = 120 // px: the wash's width; the GPU scales it up to the screen
+    const val WASH_WAIT = 300L // ms the remote rests on a title before its wash comes
+
+    /**
+     * The focused title's backdrop as Home's background: decoded tiny from the copy the widened card already downloaded
+     * (1280 px, from the disk cache), frosted, dimmed to about 70%, its colour lifted a little, and shaded to black
+     * towards the bottom so the plot and the next row stay readable. About 120 x 68 px; off the main thread.
+     */
+    val wash = Images.Look("wash", fetchPx = 1000) { src ->
+        val f = Images.frost(src, WASH_W).also { if (it !== src) src.recycle() }
+        val w = f.width; val h = f.height
+        val px = IntArray(w * h).also { f.getPixels(it, 0, w, 0, 0, w, h) }
+        for (y in 0 until h) {
+            val shade = 0.7f * washShade(y / (h - 1f).coerceAtLeast(1f))
+            for (x in 0 until w) px[y * w + x] = washPixel(px[y * w + x], shade)
+        }
+        val out = if (f.isMutable) f else f.copy(android.graphics.Bitmap.Config.ARGB_8888, true).also { f.recycle() }
+        out.setPixels(px, 0, w, 0, 0, w, h)
+        out.toGpu()
+    }
+
     // ---------- row order (Move Up / Move Down in a row's hold-OK menu), per profile and page ----------
 
     private fun key(c: Context, page: String) = Settings.profileKey(c, "rowOrder:$page")
@@ -301,4 +324,15 @@ internal fun genreParams(movie: Boolean, genre: Int, list: String, today: String
         }
     }
     return p
+}
+
+/** ChadFlix's wash: full strength in the top 40%, then shading down to 15% at the bottom. */
+internal fun washShade(y: Float): Float = if (y <= 0.4f) 1f else 1f - 0.85f * ((y - 0.4f) / 0.6f)
+
+/** One wash pixel: its colour lifted 20% away from its grey, then scaled by [shade]. */
+internal fun washPixel(p: Int, shade: Float): Int {
+    val r = p shr 16 and 255; val g = p shr 8 and 255; val b = p and 255
+    val l = 0.299f * r + 0.587f * g + 0.114f * b
+    fun c(v: Int) = ((l + (v - l) * 1.2f) * shade).toInt().coerceIn(0, 255)
+    return (255 shl 24) or (c(r) shl 16) or (c(g) shl 8) or c(b)
 }
