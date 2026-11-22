@@ -345,7 +345,7 @@
     <string name="clear_storage_desc">Cela supprime les profils, paramètres et données en cache de ce téléviseur. Votre compte Stremio n’est pas supprimé.</string>
     <string name="action_clear">Effacer</string>
     <string name="version">Version %1$s</string>
-    <string name="about_hint">Alder est une interface TV pour votre compte Stremio.</string>
+    <string name="about_hint">ChadFlix est une interface TV pour votre compte Stremio.</string>
     <string name="about_desc">Une interface TV pour votre compte Stremio.</string>
     <string name="whats_new_hint">Les modifications de la version installée sur ce téléviseur.</string>
     <string name="updates">Mises à jour</string>

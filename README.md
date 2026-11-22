@@ -54,7 +54,7 @@ A progress bar on each card and the time left under the row.
 
 Claude installs ChadFlix on your TV over your home network. After that, ChadFlix updates itself.
 
-You need a Mac, Windows or Linux computer on the same network as the TV, and the
+You need a Mac, Windows or Linux (Ubuntu 22.04+ or Debian 12+) computer on the same network as the TV, and the
 [Claude desktop app](https://code.claude.com/docs/en/desktop-quickstart) with a paid plan, which the Code tab needs.
 
 ### 1. Turn On Network Debugging
@@ -68,7 +68,7 @@ On an Nvidia Shield (Android 11):
 On other TVs with Android 13 or newer (untested, menu names vary):
 
 1. Go to **Settings › System › About** and press **Android TV OS build** seven times.
-2. Go to **Settings › System › Developer options › Wireless debugging** and turn it on.
+2. Go to **Settings › System › Developer options › Wireless debugging**, turn it on and allow it on this network.
 3. Note the address it shows. When Claude asks for a pairing code, choose **Pair device with pairing code**: that
    screen has its own port and a code.
 
@@ -82,14 +82,16 @@ My TV's network debugging address is: <IP:PORT>
 
 Install ChadFlix on that TV.
 
-1. Find adb on this computer. If it's missing, ask me before downloading Google's Android
-   SDK Platform-Tools from https://developer.android.com/tools/releases/platform-tools
+1. Find adb on this computer. If it's missing or has no pair command, show me Google's license
+   and ask me before downloading Android SDK Platform-Tools from
+   https://developer.android.com/tools/releases/platform-tools
 2. Download ChadFlix.apk into this folder, from this address only:
    https://github.com/PaulGitHitGub/ChadFlix-Alder/releases/latest/download/ChadFlix.apk
    Check its SHA-256 against the asset's "digest" in:
    https://api.github.com/repos/PaulGitHitGub/ChadFlix-Alder/releases/latest
-   Stop if they differ.
-3. If the TV uses Wireless debugging, ask me for the pairing address and code, then run:
+   Stop if they differ or you can't read the digest.
+3. Ask me whether the TV says "Network debugging" (like an Nvidia Shield) or "Wireless debugging".
+   Only for Wireless debugging, ask me for the pairing address and code, then run:
    adb pair <PAIRING IP:PORT> <CODE>
 4. Run: adb connect <IP:PORT>
    Then check with: adb devices
@@ -103,7 +105,7 @@ Install ChadFlix on that TV.
 
 ### 3. Allow the Computer
 
-When the TV asks to allow debugging, choose **Allow**.
+When the TV asks to allow debugging, choose **Allow**. On a Mac, also allow local network access if macOS asks.
 
 ### 4. Finish on the TV
 
@@ -112,8 +114,9 @@ When the TV asks to allow debugging, choose **Allow**.
 
 ## Updates
 
-ChadFlix offers new versions itself: choose **Install** when it asks, or use **Settings › About › Updates**. The first
-time, Android asks you to allow ChadFlix to install apps. Your profiles and settings stay.
+ChadFlix offers new versions itself: choose **Install** when it asks, then again when Android asks. The first time,
+allow ChadFlix to install apps. Android 11 closes ChadFlix when you do: open it again and choose
+**Settings › About › Updates** to finish. Your profiles and settings stay.
 
 ---
 

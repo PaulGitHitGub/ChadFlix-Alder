@@ -342,7 +342,7 @@
     <string name="clear_storage_desc">इससे इस टीवी से सहेजी गई प्रोफ़ाइलें, सेटिंग और कैश डेटा हट जाते हैं। आपका Stremio खाता रद्द नहीं होता।</string>
     <string name="action_clear">साफ़ करें</string>
     <string name="version">वर्शन %1$s</string>
-    <string name="about_hint">Alder आपके Stremio खाते के लिए एक टीवी इंटरफ़ेस है।</string>
+    <string name="about_hint">ChadFlix आपके Stremio खाते के लिए एक टीवी इंटरफ़ेस है।</string>
     <string name="about_desc">आपके Stremio खाते के लिए एक टीवी इंटरफ़ेस।</string>
     <string name="whats_new_hint">इस टीवी पर मौजूद वर्शन के बदलाव।</string>
     <string name="updates">अपडेट</string>

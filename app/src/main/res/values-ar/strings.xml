@@ -355,7 +355,7 @@
     <string name="clear_storage_desc">يزيل هذا الملفات الشخصية المحفوظة والإعدادات والبيانات المؤقتة من هذا التلفزيون. يبقى حساب Stremio قائمًا.</string>
     <string name="action_clear">مسح</string>
     <string name="version">الإصدار %1$s</string>
-    <string name="about_hint">Alder واجهة تلفزيون لحسابك في Stremio.</string>
+    <string name="about_hint">ChadFlix واجهة تلفزيون لحسابك في Stremio.</string>
     <string name="about_desc">واجهة تلفزيون لحسابك في Stremio.</string>
     <string name="whats_new_hint">التغييرات في الإصدار المثبّت على هذا التلفزيون.</string>
     <string name="updates">التحديثات</string>

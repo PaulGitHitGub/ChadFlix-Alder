@@ -342,7 +342,7 @@
     <string name="clear_storage_desc">Dadurch werden gespeicherte Profile, Einstellungen und zwischengespeicherte Daten von diesem Fernseher entfernt. Dein Stremio-Konto wird nicht gekündigt.</string>
     <string name="action_clear">Löschen</string>
     <string name="version">Version %1$s</string>
-    <string name="about_hint">Alder ist eine TV-Oberfläche für dein Stremio-Konto.</string>
+    <string name="about_hint">ChadFlix ist eine TV-Oberfläche für dein Stremio-Konto.</string>
     <string name="about_desc">Eine TV-Oberfläche für dein Stremio-Konto.</string>
     <string name="whats_new_hint">Die Änderungen der Version auf diesem Fernseher.</string>
     <string name="updates">Updates</string>

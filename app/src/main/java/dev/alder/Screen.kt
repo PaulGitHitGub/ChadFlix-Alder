@@ -1095,7 +1095,7 @@ abstract class Screen : Activity() {
             layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12) }
         }
         keyHints.addView(backHint)
-        right.addView(keyHints, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        // ChadFlix: no remote-button hint row, so keyHints is never shown.
 
         fun updateHero(change: Change, index: Int, total: Int) {
             val group = (change.group ?: getString(R.string.whats_new_group)).uppercase()

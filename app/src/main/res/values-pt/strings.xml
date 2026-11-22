@@ -345,7 +345,7 @@
     <string name="clear_storage_desc">Isso remove perfis salvos, configurações e dados em cache desta TV. Não cancela sua conta do Stremio.</string>
     <string name="action_clear">Limpar</string>
     <string name="version">Versão %1$s</string>
-    <string name="about_hint">O Alder é uma interface de TV para sua conta do Stremio.</string>
+    <string name="about_hint">O ChadFlix é uma interface de TV para sua conta do Stremio.</string>
     <string name="about_desc">Uma interface de TV para sua conta do Stremio.</string>
     <string name="whats_new_hint">As mudanças da versão instalada nesta TV.</string>
     <string name="updates">Atualizações</string>

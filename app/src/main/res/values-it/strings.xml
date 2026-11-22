@@ -345,7 +345,7 @@
     <string name="clear_storage_desc">Vengono rimossi i profili salvati, le impostazioni e i dati in cache da questa TV. Il tuo account Stremio non viene chiuso.</string>
     <string name="action_clear">Cancella</string>
     <string name="version">Versione %1$s</string>
-    <string name="about_hint">Alder è un’interfaccia TV per il tuo account Stremio.</string>
+    <string name="about_hint">ChadFlix è un’interfaccia TV per il tuo account Stremio.</string>
     <string name="about_desc">Un’interfaccia TV per il tuo account Stremio.</string>
     <string name="whats_new_hint">Le modifiche della versione su questa TV.</string>
     <string name="updates">Aggiornamenti</string>
