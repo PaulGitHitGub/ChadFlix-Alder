@@ -99,7 +99,8 @@ object Settings {
             "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary",
             "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
         ).forEach { remove("$it@$profileId") }
-        prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:")) && it.endsWith("@$profileId") }.forEach(::remove)
+        prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:") ||
+            it.startsWith("rowsOn:") || it.startsWith("rowsKnown:") || it.startsWith("showing:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 
     /**

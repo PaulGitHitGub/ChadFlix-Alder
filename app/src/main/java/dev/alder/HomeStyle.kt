@@ -136,6 +136,57 @@ internal object HomeStyle {
     /** Moves [title] [by] places among the page's [shown] rows and keeps that order. */
     fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) =
         prefs(c).edit().putString(key(c, page), org.json.JSONArray(movedRow(shown, title, by)).toString()).apply()
+
+    // ---------- genre rows from TMDb (Movies and Shows), and which rows are on, per profile and page ----------
+
+    const val TMDB = "tmdb:" // a genre row's source in its section: "tmdb:<TMDb genre id>:<list>"
+
+    // TMDb's genre ids (stable) with English names; the first 10 (films) and 9 (shows) are on until Customize Home says otherwise.
+    private val movieGenres = listOf(28 to "Action", 35 to "Comedy", 18 to "Drama", 53 to "Thriller", 27 to "Horror",
+        878 to "Science Fiction", 16 to "Animation", 80 to "Crime", 10749 to "Romance", 99 to "Documentary",
+        12 to "Adventure", 10751 to "Family", 14 to "Fantasy", 36 to "History", 10402 to "Music", 9648 to "Mystery",
+        10770 to "TV Movie", 10752 to "War", 37 to "Western")
+    private val showGenres = listOf(18 to "Drama", 35 to "Comedy", 80 to "Crime", 10759 to "Action & Adventure",
+        10765 to "Sci-Fi & Fantasy", 16 to "Animation", 9648 to "Mystery", 99 to "Documentary", 10764 to "Reality",
+        10751 to "Family", 10762 to "Kids", 10763 to "News", 10766 to "Soap", 10767 to "Talk", 10768 to "War & Politics",
+        37 to "Western")
+
+    fun genres(movie: Boolean) = if (movie) movieGenres else showGenres
+
+    private fun onByDefault(title: String, movie: Boolean) = genres(movie).take(if (movie) 10 else 9).any { it.second == title }
+
+    /** This page's on/off choices by row title; a row never chosen is on only if it's a default genre. */
+    fun rowsOn(c: Context, page: String): org.json.JSONObject =
+        runCatching { org.json.JSONObject(prefs(c).getString(Settings.profileKey(c, "rowsOn:$page"), null)!!) }.getOrDefault(org.json.JSONObject())
+
+    fun isOn(state: org.json.JSONObject, title: String, movie: Boolean) =
+        if (state.has(title)) state.optBoolean(title) else onByDefault(title, movie)
+
+    fun setRowOn(c: Context, page: String, title: String, on: Boolean) =
+        prefs(c).edit().putString(Settings.profileKey(c, "rowsOn:$page"), rowsOn(c, page).put(title, on).toString()).apply()
+
+    /** Every row the page could show, on or off, for Customize Home; kept when the page is built. */
+    fun rememberRows(c: Context, page: String, titles: List<String>) =
+        prefs(c).edit().putString(Settings.profileKey(c, "rowsKnown:$page"), org.json.JSONArray(titles).toString()).apply()
+
+    fun knownRows(c: Context, page: String, movie: Boolean): List<String> =
+        runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
+            .getOrNull() ?: genres(movie).map { it.second }
+
+    /** What genre [id]'s row shows on [page] ("trending" until the Showing tile picks another list). */
+    fun showing(c: Context, page: String, id: Int): String =
+        prefs(c).getString(Settings.profileKey(c, "showing:$page:$id"), "trending").orEmpty()
+
+    fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, id)}"
+
+    /** A genre row's titles, one TMDb page. Blocks: run it off the main thread. */
+    fun genreTitles(movie: Boolean, source: String): List<Meta> {
+        val parts = source.removePrefix(TMDB).split(":")
+        val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
+        return Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },
+            day.format(java.util.Date()), day.format(since)), genres(movie).toMap())
+    }
 }
 
 /** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
@@ -147,4 +198,25 @@ internal fun movedRow(titles: List<String>, title: String, by: Int): List<String
     val to = from + by
     if (from < 0 || to !in titles.indices) return titles
     return titles.toMutableList().apply { add(to, removeAt(from)) }
+}
+
+/**
+ * TMDb discover filters for a genre row's list: Trending (popular and recent), New Releases / New Series, Blockbusters,
+ * Most Watched, Top Rated, Complete Series. [today] and [since] are yyyy-MM-dd.
+ */
+internal fun genreParams(movie: Boolean, genre: Int, list: String, today: String, since: String): Map<String, String> {
+    val date = if (movie) "primary_release_date" else "first_air_date"
+    val p = linkedMapOf("with_genres" to "$genre")
+    when (list) {
+        "new" -> { p["sort_by"] = "$date.desc"; p["$date.lte"] = today; p["vote_count.gte"] = "20" }
+        "blockbusters" -> p["sort_by"] = "revenue.desc"
+        "most_watched" -> p["sort_by"] = "vote_count.desc"
+        "top_rated" -> { p["sort_by"] = "vote_average.desc"; p["vote_count.gte"] = if (movie) "500" else "200" }
+        "complete" -> { p["sort_by"] = "popularity.desc"; p["with_status"] = "3" }
+        else -> { // trending: popular among the last months' releases (films) or what aired lately (shows)
+            val aired = if (movie) date else "air_date"
+            p["sort_by"] = "popularity.desc"; p["$aired.gte"] = since; p["$aired.lte"] = today
+        }
+    }
+    return p
 }

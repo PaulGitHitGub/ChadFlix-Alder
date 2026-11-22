@@ -640,7 +640,8 @@ class MainActivity : Screen() {
         val catalogs = Stremio.savedAddons(profile.authKey).orEmpty().flatMap { it.catalogs }
         for (p in listOf(Page.SHOWS, Page.MOVIES)) {
             val shelves = catalogs.mapNotNull { c -> shelf(c)?.takeIf { it.page == p }?.let { c to it } }.sortedBy { it.second.rank }
-            sections(p, shelves).forEachIndexed { i, (title, sources, picked) ->
+            val rowsOn = HomeStyle.rowsOn(this, p.label) // ChadFlix: add-on rows that are off aren't warmed
+            sections(p, shelves).filter { HomeStyle.isOn(rowsOn, it.first, p == Page.MOVIES) }.forEachIndexed { i, (title, sources, picked) ->
                 if (p.hasGenreShortcuts && picked != null) return@forEachIndexed
                 val key = catalogAnswerKey(p.label, title, picked, sources.map { (c, _) ->
                     "${c.addon.transportUrl}/${c.type}/${c.id}"
@@ -1742,7 +1743,7 @@ class MainActivity : Screen() {
                 shelf(c)?.takeIf { it.page == p || (featuredHome && (it.page == Page.MOVIES || it.page == Page.SHOWS) && it.rank <= 2) }?.let { c to it }
             }.sortedBy { it.second.rank }
             val catalogs = shelves.map { it.first }
-            if (catalogs.isEmpty()) {
+            if (catalogs.isEmpty() && !p.hasGenreShortcuts) { // ChadFlix: Movies and Shows have their genre rows
                 val none = when (p) {
                     Page.HOME -> R.string.home_no_picks
                     Page.MOVIES -> R.string.page_no_movie_catalogs
@@ -1757,8 +1758,18 @@ class MainActivity : Screen() {
             }
             val genres = catalogGenres(catalogs.flatMap { it.genres }.map { if (p.hasGenreShortcuts) genreLabel(it) else it })
             val hiddenRows = Settings.hiddenRows(this@MainActivity)
-            val sections = orderedRows(HomeStyle.rowOrder(this@MainActivity, p.label),
-                sections(p, shelves, featuredHome).filterNot { it.first in hiddenRows }) { it.first } // ChadFlix: Move Up / Move Down
+            // ChadFlix: Movies and Shows are TMDb genre rows, then the add-on rows, which stay off until Customize Home
+            // turns them on; rows that are off are never built or fetched. Move Up / Move Down set the order.
+            val movie = p == Page.MOVIES
+            val candidates = if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
+                HomeStyle.genres(movie).map { (id, name) ->
+                    Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
+                } + sections(p, shelves, featuredHome).filterNot { s -> HomeStyle.genres(movie).any { it.second.equals(s.first, true) } }
+            if (p.hasGenreShortcuts) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
+            val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
+            val sections = orderedRows(HomeStyle.rowOrder(this@MainActivity, p.label), candidates.filter {
+                it.first !in hiddenRows && (!p.hasGenreShortcuts || HomeStyle.isOn(rowsOn, it.first, movie))
+            }) { it.first }
             pageRows = sections.map { it.first }
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
             val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
@@ -1887,6 +1898,15 @@ class MainActivity : Screen() {
                         fresh.getOrNull()?.let { sourceAnswers[index] = it to false }
                         update()
                     }
+                }
+                if (picked?.startsWith(HomeStyle.TMDB) == true) { // ChadFlix: a TMDb genre row, kept for the session
+                    if (kept != null) return onAnswer(Result.success(kept))
+                    background({ listOf(HomeStyle.genreTitles(p == Page.MOVIES, picked) to false) }) { r ->
+                        if (g != generation || build != catalogBuild) return@background
+                        r.getOrNull()?.takeIf { it.first().first.isNotEmpty() }?.let { answers[key] = it }
+                        onAnswer(r)
+                    }
+                    return
                 }
                 if (kept != null && kept.size == rowCatalogs.size) {
                     kept.forEachIndexed { index, answer -> sourceAnswers[index] = answer }

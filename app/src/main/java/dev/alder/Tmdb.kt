@@ -164,6 +164,22 @@ object Tmdb {
 
     private const val SERVICES = 14
 
+    /** ChadFlix: one page of a home genre row, TMDb's discover with [params], as playable metas (IMDb ids only). */
+    fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>): List<Meta> {
+        val media = if (movie) "movie" else "tv"
+        val query = (mapOf("api_key" to KEY, "language" to language, "include_adult" to "false", "page" to "1") + params)
+            .entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
+        val found = JSONObject(Http.get("$BASE/discover/$media?$query")).optJSONArray("results").objects()
+        val ids = pool.invokeAll(found.map { t ->
+            java.util.concurrent.Callable {
+                runCatching {
+                    JSONObject(Http.get("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", keep = true)).text("imdb_id")
+                }.getOrNull()?.takeIf { it.startsWith("tt") }
+            }
+        }).map { runCatching { it.get() }.getOrNull() }
+        return found.zip(ids).mapNotNull { (t, imdb) -> imdb?.let { discoverMeta(t, it, movie, genreNames) } }
+    }
+
     /**
      * Fallback recommendations from TMDB when installed Stremio add-ons do not advertise a `similar` catalog.
      */

@@ -32,4 +32,15 @@ class HomeStyleTest {
         assertEquals(0L, HomeStyle.runtimeMs(null))
         assertEquals(0L, HomeStyle.runtimeMs("N/A"))
     }
+
+    @Test fun genreListsBecomeTmdbFilters() {
+        val trending = genreParams(true, 28, "trending", "2026-11-21", "2026-05-21")
+        assertEquals("28", trending["with_genres"])
+        assertEquals("popularity.desc", trending["sort_by"])
+        assertEquals("2026-05-21", trending["primary_release_date.gte"])
+        assertEquals("2026-11-21", genreParams(false, 18, "trending", "2026-11-21", "2025-11-21")["air_date.lte"])
+        assertEquals("200", genreParams(false, 18, "top_rated", "", "")["vote_count.gte"])
+        assertEquals("3", genreParams(false, 18, "complete", "", "")["with_status"])
+        assertEquals("revenue.desc", genreParams(true, 28, "blockbusters", "", "")["sort_by"])
+    }
 }
