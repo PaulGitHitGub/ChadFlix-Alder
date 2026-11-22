@@ -37,6 +37,7 @@ internal object HomeStyle {
     const val CARD_RADIUS = 6.5f
     const val RING = 1.5f // the focus border's width, outside the card
     const val RING_COLOR = 0xFFF2F2F2.toInt()
+    const val NAV_WAIT = 300L // ms resting on a top bar item before it opens (Home's SWITCH_WAIT)
     const val ROWS_TOP = 76 // the first row's title, under the top bar
     const val INFO_ABOVE = 14 // between the cards and the info line
     const val INFO_GAP = 20 // between the info line and the next row's title

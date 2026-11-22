@@ -1028,8 +1028,13 @@ class MainActivity : Screen() {
             setImageResource(R.drawable.ic_search)
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
-            setOnFocusChangeListener { _, _ -> styleNav() }
-            setOnClickListener { startActivity(Intent(this@MainActivity, SearchActivity::class.java)) }
+            // ChadFlix: like the tabs, resting on Search opens it (no OK needed).
+            setOnFocusChangeListener { _, has ->
+                styleNav()
+                main.removeCallbacks(openSearch)
+                if (has) main.postDelayed(openSearch, SWITCH_WAIT)
+            }
+            setOnClickListener { main.removeCallbacks(openSearch); startActivity(Intent(this@MainActivity, SearchActivity::class.java)) }
         }.inNav(width = dp(44), height = -1)
         // A page opens as soon as the remote rests on its name. OK on Shows or Movies goes to its genres. Live shows only
         // once the profile's add-ons have a live catalog; order and hidden tabs come from Settings › Tabs ([arrangeTabs]).
@@ -1130,6 +1135,7 @@ class MainActivity : Screen() {
 
     private var pending = Page.HOME
     private var jump = false // OK on a page's name: go down into its rows once they're in
+    private val openSearch = Runnable { if (search?.isFocused == true) startActivity(Intent(this, SearchActivity::class.java)) }
     private val switchPage = Runnable { if (pending != page && navItems[pending]?.isFocused == true) { jump = false; showPage(pending) } }
 
     private fun profileMenu() {

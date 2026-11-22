@@ -345,16 +345,20 @@ class SearchActivity : Screen() {
                 gravity = Gravity.CENTER
                 setPadding(dp(16), dp(5), dp(16), dp(5))
                 isFocusable = true
-                setOnFocusChangeListener { _, has ->
-                    background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null
-                    setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
-                }
-                setOnClickListener {
+                val open = Runnable {
                     startActivity(Intent(this@SearchActivity, MainActivity::class.java)
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                         .putExtra("page", page))
                     finish()
                 }
+                setOnFocusChangeListener { _, has ->
+                    background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null
+                    setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+                    // ChadFlix: as on Home, resting on a page's name opens it.
+                    pendingTab?.let(main::removeCallbacks)
+                    pendingTab = if (has) open.also { main.postDelayed(it, HomeStyle.NAV_WAIT) } else null
+                }
+                setOnClickListener { pendingTab?.let(main::removeCallbacks); open.run() }
             }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
         }
         if (focusedId != null) nav.getChildAt(ids.indexOf(focusedId) + 1).requestFocus()
@@ -1009,6 +1013,8 @@ class SearchActivity : Screen() {
         val room = (resources.displayMetrics.heightPixels - dp(104)) - 2 * title - 2 * dp(10) - caption - dp(16)
         (room / 2).coerceIn(dp(100), dp(HomeStyle.CARD_H))
     }
+
+    private var pendingTab: Runnable? = null // ChadFlix: the page whose name the remote rests on in the top bar
 
     private companion object {
         const val RECENT = 4
