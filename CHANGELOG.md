@@ -38,6 +38,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 ### Easier to use
 - **See the updated My Alder.** The README shows how title details appear above the posters.
 - **More space in My Alder.** The title and its details have more room below the filters.
+- **See more in Discover.** Above the posters, see a title's year or run, genre, seasons and ratings, like in **My Alder**.
 - **See more in My Alder.** See a title's year, genre, seasons and ratings. If you add it on this device, see the date too.
 - **See Alder in action.** New pictures in the README show Home, Search, My Alder, and the player on a TV.
 - **A fresh look.** Smooth motion, one poster style on every screen, and cleaner **Home**, **Search** and player screens.
