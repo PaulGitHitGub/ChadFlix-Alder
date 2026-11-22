@@ -52,14 +52,68 @@ A progress bar on each card and the time left under the row.
 
 ## Install
 
-Build it yourself (JDK 21 and the Android SDK):
+Claude installs ChadFlix on your TV over your home network. After that, ChadFlix updates itself.
 
-```
-./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+You need a Mac, Windows or Linux computer on the same network as the TV, and the
+[Claude desktop app](https://code.claude.com/docs/en/desktop-quickstart) with a paid plan, which the Code tab needs.
+
+### 1. Turn On Network Debugging
+
+On an Nvidia Shield (Android 11):
+
+1. Go to **Settings › Device Preferences › About** and press **Build** seven times.
+2. Go to **Settings › Device Preferences › Developer options** and turn on **Network debugging**.
+3. Note the address it shows, like `192.168.1.50:5555`.
+
+On other TVs with Android 13 or newer (untested, menu names vary):
+
+1. Go to **Settings › System › About** and press **Android TV OS build** seven times.
+2. Go to **Settings › System › Developer options › Wireless debugging** and turn it on.
+3. Note the address it shows. When Claude asks for a pairing code, choose **Pair device with pairing code**: that
+   screen has its own port and a code.
+
+### 2. Ask Claude
+
+In the Claude desktop app, open **Code**, choose **Local** and an empty folder, then paste this with your TV's address
+in the first line:
+
+```text
+My TV's network debugging address is: <IP:PORT>
+
+Install ChadFlix on that TV.
+
+1. Find adb on this computer. If it's missing, ask me before downloading Google's Android
+   SDK Platform-Tools from https://developer.android.com/tools/releases/platform-tools
+2. Download ChadFlix.apk into this folder, from this address only:
+   https://github.com/PaulGitHitGub/ChadFlix-Alder/releases/latest/download/ChadFlix.apk
+   Check its SHA-256 against the asset's "digest" in:
+   https://api.github.com/repos/PaulGitHitGub/ChadFlix-Alder/releases/latest
+   Stop if they differ.
+3. If the TV uses Wireless debugging, ask me for the pairing address and code, then run:
+   adb pair <PAIRING IP:PORT> <CODE>
+4. Run: adb connect <IP:PORT>
+   Then check with: adb devices
+   If it says unauthorized, wait for me to allow this computer on the TV.
+5. Ask me to confirm nothing is playing on the TV, then run:
+   adb -s <IP:PORT> install -r ChadFlix.apk
+   If that fails, tell me why. Don't uninstall anything or change TV settings without asking.
+6. Check it with: adb -s <IP:PORT> shell pm path team.cyborgs.chadflix
+   Then run adb disconnect <IP:PORT> and remind me to turn network debugging off.
 ```
 
-It installs as **ChadFlix**, next to Alder if you have it. Sign in with your Stremio account.
+### 3. Allow the Computer
+
+When the TV asks to allow debugging, choose **Allow**.
+
+### 4. Finish on the TV
+
+1. Open **ChadFlix** and sign in to Stremio with the code on screen. It installs next to Alder if you have it.
+2. Turn network debugging off again. While it's on, never forward its port on your router.
+
+## Updates
+
+ChadFlix offers new versions itself: choose **Install** when it asks, or use **Settings › About › Updates**. The first
+time, Android asks you to allow ChadFlix to install apps. Your profiles and settings stay.
 
 ---
 
