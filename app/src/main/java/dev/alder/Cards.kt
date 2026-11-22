@@ -225,23 +225,25 @@ internal class MediaCardView(
 
     /**
      * ChadFlix: the focused home card widens from its poster into the title's 16:9 backdrop at the same height, with
-     * its logo (or name) at the foot; unfocused, it's a poster again. Only this card's width animates.
+     * its logo (or name) at the foot; unfocused, it's a poster again. Only this card's width animates, and only when
+     * [animate] (Left/Right along a row); a card the remote lands on from another row is simply wide.
      */
-    fun expand(on: Boolean) {
+    fun expand(on: Boolean, animate: Boolean = true) {
         if (wideW <= 0 || wantWide == on) return
         wantWide = on
-        widen()
+        widen(animate)
         if (logoMade.isInitialized()) logoView.run { visibility = View.GONE; tag = null; setImageDrawable(null) }
         if (wanted) load()
     }
 
     /** A title with no backdrop yet stays a poster until one comes ([refresh]). */
-    private fun widen() {
+    private fun widen(animate: Boolean = true) {
         if (expanded || nameMade.isInitialized()) nameView.textSize = if (expanded) Screen.SERIF_NAME else Screen.SMALL
         val lp = layoutParams ?: return
         val to = if (expanded) wideW else widthPx
-        if (lp.width == to) return
         widthAnim?.cancel()
+        if (lp.width == to) return
+        if (!animate) { lp.width = to; requestLayout(); return }
         widthAnim = ValueAnimator.ofInt(lp.width, to).setDuration(Screen.QUICK_MS).apply {
             interpolator = DecelerateInterpolator()
             addUpdateListener { lp.width = it.animatedValue as Int; requestLayout() }

@@ -699,6 +699,24 @@ class MainActivity : Screen() {
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
     private var last: View? = null // where the remote last was in the rows
 
+    /** ChadFlix: the backdrop of the card [row] would widen when the remote comes into it, fetched at the wide size. */
+    private fun prefetchLanding(row: Row?) {
+        val item = row?.takeIf { page.isBrowse }?.landing ?: return
+        val url = item.art
+        if (url != null) return Images.prefetch(url, dp(HomeStyle.WIDE_W), wide = true)
+        if (item.filled || HomeStyle.isTile(item.id)) return
+        item.onFill += { item.art?.let { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) } }
+        fill(item)
+    }
+
+    /** ChadFlix: the landing cards of the rows above and below [row]. */
+    private fun prefetchNeighbours(row: Row) {
+        val ordered = rows.filter { it.view.isAttachedToWindow && !it.grid }.sortedBy { offsetIn(it.view) }
+        val at = ordered.indexOf(row).takeIf { it >= 0 } ?: return
+        prefetchLanding(ordered.getOrNull(at - 1))
+        prefetchLanding(ordered.getOrNull(at + 1))
+    }
+
     /** ChadFlix: where the remote goes back to in the rows: the last card, but a genre row's title rather than its tile. */
     private fun lastOrTitle(): View? {
         val card = last as? MediaCardView ?: return last
@@ -746,7 +764,7 @@ class MainActivity : Screen() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
-            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle() } // where the hold ends
+            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false) } // where the hold ends
         }
         if (event.action == KeyEvent.ACTION_DOWN) {
             restoreCatalogFocus = null
@@ -1045,6 +1063,7 @@ class MainActivity : Screen() {
      */
     private fun styleNav() {
         val inBar = header.findFocus() != null
+        if (inBar) prefetchLanding(firstRow()) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar)
             item.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
@@ -2923,7 +2942,7 @@ class MainActivity : Screen() {
             active = on
             if (on) peek(true) else {
                 rail.clearHeld()
-                cards.getOrNull(selected)?.expand(false)
+                cards.getOrNull(selected)?.expand(false, animate = false) // leaving the row: a poster again at once
                 if (tileRow && selected == 0 && cards.size > 1) rail.selectIndex(1) // back in, the remote lands on a title
             }
             styleTile()
@@ -2945,12 +2964,16 @@ class MainActivity : Screen() {
             return target
         }
 
-        /** ChadFlix: a hold ended here: the card the remote stopped on widens. */
-        fun settle() {
+        /** ChadFlix: a hold ended here: the card the remote stopped on widens (at once after Up/Down, sliding after Left/Right). */
+        fun settle(animate: Boolean = true) {
             if (!homeRow) return
-            cards.getOrNull(selected)?.expand(true) ?: return
+            cards.getOrNull(selected)?.expand(true, animate) ?: return
             pin(selected)
+            prefetchNeighbours(this)
         }
+
+        /** ChadFlix: the card the remote lands on coming into this row from above or below. */
+        val landing: Item? get() = items.getOrNull(selected)
 
         /**
          * The remote reached card [index]: slide it to the row's start, where the eye already is. Near the end the row
@@ -2960,6 +2983,7 @@ class MainActivity : Screen() {
          */
         fun focus(index: Int) {
             val previous = selected
+            val entering = !active // ChadFlix: from another row or the top bar: the card is wide at once, no slide
             rail.selectIndex(index)
             main.post { loadMoreSections?.invoke() }
             if (active) {
@@ -2967,7 +2991,8 @@ class MainActivity : Screen() {
             } else light(true)
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
-                if (!held) cards[index].expand(true)
+                if (!held) cards[index].expand(true, animate = !entering)
+                if (!held && entering) prefetchNeighbours(this)
                 if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
             if (page.isBrowse) updateNextRow()
