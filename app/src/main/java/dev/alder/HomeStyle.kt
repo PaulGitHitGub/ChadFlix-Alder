@@ -206,9 +206,15 @@ internal object HomeStyle {
     fun rememberRows(c: Context, page: String, titles: List<String>) =
         prefs(c).edit().putString(Settings.profileKey(c, "rowsKnown:$page"), org.json.JSONArray(titles).toString()).apply()
 
-    fun knownRows(c: Context, page: String, movie: Boolean): List<String> =
-        runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
+    fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
+        val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
             .getOrNull() ?: genres(movie).map { it.second }
+        // Platform rows the page hasn't been built with yet (before this version) go after the genres, as the page puts them.
+        val missing = platforms.map { it.name }.filter { it !in known }
+        if (missing.isEmpty()) return known
+        val at = known.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
+        return known.take(at) + missing + known.drop(at)
+    }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
     fun showing(c: Context, page: String, key: String): String =
