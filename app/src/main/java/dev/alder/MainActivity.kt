@@ -2938,8 +2938,10 @@ class MainActivity : Screen() {
         fun pin(index: Int): Int {
             val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index))
             // Kept on screen: near a row's end the card sits far right, and the info box is wider than what's left.
-            val room = artW - browseInfo.width - (browseInfo.layoutParams as FrameLayout.LayoutParams).leftMargin - dp(HomeStyle.INSET)
-            browseInfo.translationX = if (homeRow) (index * cardStep - target).coerceAtMost(room).toFloat() else 0f
+            // The set width, not the measured one: right after a page switch the box may still measure at the old page's width.
+            val info = browseInfo.layoutParams as FrameLayout.LayoutParams
+            val room = artW - (info.width.takeIf { it > 0 } ?: browseInfo.width) - info.leftMargin - dp(HomeStyle.INSET)
+            browseInfo.translationX = if (homeRow) (index * cardStep - target).coerceAtMost(room.coerceAtLeast(0)).toFloat() else 0f
             return target
         }
 
