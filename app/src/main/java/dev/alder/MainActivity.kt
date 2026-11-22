@@ -699,6 +699,8 @@ class MainActivity : Screen() {
     private var refreshAddons: (() -> Unit)? = null // the open page's add-on check, run again on coming back to Alder
     private var rebuildRows: (() -> Unit)? = null // ChadFlix: the open page's rows again, after Move Up / Move Down
     private var pageRows: List<String> = emptyList() // ChadFlix: the open page's row titles, in order
+    private var showingFor = "" // ChadFlix: "page:row" whose Showing menu was opened last
+    private var showingDialog: android.app.Dialog? = null // and that menu
     private val showingChanged = mutableMapOf<String, Pair<String, String>>() // ChadFlix: "page:row" to (row key, the choice last shown; "!" = Exclusives)
 
     private var refreshLibrary: (() -> Unit)? = null // the open page's library rows (Home, Library), asked again
@@ -2133,6 +2135,11 @@ class MainActivity : Screen() {
                         if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove("${p.label}:$title")?.let { (rowKey, was) ->
                             // the new choice failed: the old row stays,
                             HomeStyle.restoreChoice(this@MainActivity, p.label, rowKey, p == Page.MOVIES, was)
+                            // The row's Showing menu, if it's still open, shows the choice put back (on its Genre line).
+                            if (showingFor == "${p.label}:$title" && showingDialog?.isShowing == true) {
+                                showingDialog?.dismiss()
+                                rows.firstOrNull { it.title == title }?.let { showingMenu(it, GENRE_LINE) }
+                            }
                             return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
                         onAnswer(r.map { listOf(it.first to false) })
@@ -2895,7 +2902,9 @@ class MainActivity : Screen() {
         val names = listOf("${getString(R.string.discover_genre)}   $genreName  ›") +
             lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         val checked = 1 + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
-        choose("${HomeStyle.ANIME} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked, header = true,
+        val at = if (focus >= 0) focus else if (focus == GENRE_LINE) 0 else checked
+        showingFor = changing
+        choose("${HomeStyle.ANIME} · ${getString(R.string.showing)}", names, checked = checked, focus = at, header = true,
             right = { i -> if (i == 0) ({ genreMenu() }) else null }) { i ->
             if (i == 0) return@choose genreMenu() // the Genre line: its own list, then back here on it
             val list = lists[i - 1].first
@@ -2904,13 +2913,14 @@ class MainActivity : Screen() {
             HomeStyle.setShowing(this, page.label, "a", list)
             rebuildRows?.invoke() ?: showPage(page)
         }
+        showingDialog = lastChoose // the menu just opened, so a choice put back can show in it
     }
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
     private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
         val key = HomeStyle.rowKey(movie, row.title, page.label) ?: return
-        if (key == "a") return animeMenu(row)
+        if (key == "a") return animeMenu(row, focus)
         val lists = HomeStyle.listsFor(movie, key)
         val current = HomeStyle.showing(this, page.label, key)
         // ChadFlix: a platform row's picker starts with its Exclusives Only switch (where the tab has a filter for it).
@@ -2939,7 +2949,9 @@ class MainActivity : Screen() {
         }
         val names = head + lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
         val checked = head.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
-        choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked, header = true,
+        val at = if (focus >= 0) focus else if (focus == GENRE_LINE) switch.size else checked
+        showingFor = changing
+        choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = at, header = true,
             right = { i -> if (service != null && i == switch.size) ({ genreMenu() }) else null }) { picked ->
             val shown = showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, key, movie)
             if (platform != null && picked == 0) {
@@ -2956,6 +2968,7 @@ class MainActivity : Screen() {
             HomeStyle.setShowing(this, page.label, key, list)
             rebuildRows?.invoke() ?: showPage(page)
         }
+        showingDialog = lastChoose // the menu just opened, so a choice put back can show in it
     }
 
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
@@ -3652,6 +3665,7 @@ class MainActivity : Screen() {
         const val CAPTION_BOTTOM = 16 // dp: low enough to leave the focused card a clear gap
         const val HOME_SYNOPSIS_W = HERO_W
         const val HOME_HERO_WAIT = 150L
+        const val GENRE_LINE = -2 // ChadFlix: open a Showing menu on its Genre line
         const val ROW_SLIDE_MS = 200L // ChadFlix: Up/Down between rows
         const val INFO_IN_MS = 150L // ChadFlix: the info line, once the rows stop
         const val INFO_STEP_MS = 120L // ChadFlix: the info line, along a row

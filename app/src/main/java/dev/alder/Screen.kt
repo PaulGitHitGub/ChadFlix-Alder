@@ -917,6 +917,9 @@ abstract class Screen : Activity() {
      * A short list to pick from (a menu, a genre, a yes or no), on glass with tungsten focus, in
      * place of Android's grey dialog. [checked] gets a tick (the choice in use); the remote starts on [focus].
      */
+    /** ChadFlix: the list [choose] opened last, so a screen can close it (and open it again). */
+    protected var lastChoose: android.app.Dialog? = null
+
     protected fun choose(title: String, items: List<String>, message: String? = null, checked: Int = -1,
                          focus: Int = maxOf(checked, 0), widthDp: Int = if (items.size > 8) 300 else 340,
                          // ChadFlix, for a two-level list: [right] gives what Right does on a row (null: nothing), [left]
@@ -974,6 +977,7 @@ abstract class Screen : Activity() {
         if (back != null) dialog.setOnCancelListener { back() } // Back cancels; a pick dismisses, which isn't a cancel
         dialog.show()
         rows.getOrNull(focus)?.requestFocus()
+        lastChoose = dialog
     }
 
     /** Highlights come from CHANGELOG.md; the full release notes remain one remote action away. */
