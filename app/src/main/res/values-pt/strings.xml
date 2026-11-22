@@ -389,16 +389,12 @@
     <string name="search_recent_hint">%1$s. Segure OK para remover das buscas recentes</string>
     <string name="search_remove_recent">Remover busca recente?</string>
     <string name="search_remove_query">Remover %1$s</string>
-    <string name="search_hold_to_remove">Segure OK para remover</string>
     <string name="search_popular_unavailable">Os títulos populares estão indisponíveis.</string>
-    <string name="search_popular">Populares</string>
+    <string name="search_popular_titles">Títulos populares</string>
+    <string name="search_voice">Pesquisa por voz</string>
+    <string name="search_delete">Apagar</string>
     <string name="search_unavailable">A busca está indisponível no momento.</string>
     <string name="search_no_matches">Nenhum resultado · Tente um título mais curto</string>
-    <plurals name="search_titles">
-        <item quantity="one">%1$d título</item>
-        <item quantity="many">%1$d títulos</item>
-        <item quantity="other">%1$d títulos</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">Qualidade</string>

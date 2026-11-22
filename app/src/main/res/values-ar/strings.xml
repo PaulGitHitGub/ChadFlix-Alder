@@ -399,19 +399,12 @@
     <string name="search_recent_hint">%1$s. اضغط مطولًا على موافق لإزالته من عمليات البحث الأخيرة</string>
     <string name="search_remove_recent">هل تريد إزالة عملية البحث الأخيرة؟</string>
     <string name="search_remove_query">إزالة %1$s</string>
-    <string name="search_hold_to_remove">اضغط مطولًا على موافق للإزالة</string>
     <string name="search_popular_unavailable">العناوين الرائجة غير متاحة.</string>
-    <string name="search_popular">رائج</string>
+    <string name="search_popular_titles">العناوين الرائجة</string>
+    <string name="search_voice">بحث صوتي</string>
+    <string name="search_delete">حذف</string>
     <string name="search_unavailable">البحث غير متاح حاليًا.</string>
     <string name="search_no_matches">لا توجد نتائج مطابقة · جرّب عنوانًا أقصر</string>
-    <plurals name="search_titles">
-        <item quantity="zero">لا عناوين</item>
-        <item quantity="one">عنوان واحد</item>
-        <item quantity="two">عنوانان</item>
-        <item quantity="few">%1$d عناوين</item>
-        <item quantity="many">%1$d عنوانًا</item>
-        <item quantity="other">%1$d عنوان</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">الجودة</string>

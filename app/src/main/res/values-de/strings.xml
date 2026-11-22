@@ -386,15 +386,12 @@
     <string name="search_recent_hint">%1$s. OK gedrückt halten, um es aus den letzten Suchen zu entfernen</string>
     <string name="search_remove_recent">Letzte Suche entfernen?</string>
     <string name="search_remove_query">%1$s entfernen</string>
-    <string name="search_hold_to_remove">OK gedrückt halten zum Entfernen</string>
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
-    <string name="search_popular">Beliebt</string>
+    <string name="search_popular_titles">Beliebte Titel</string>
+    <string name="search_voice">Sprachsuche</string>
+    <string name="search_delete">Löschen</string>
     <string name="search_unavailable">Die Suche ist gerade nicht verfügbar.</string>
     <string name="search_no_matches">Keine Treffer · Versuche einen kürzeren Titel</string>
-    <plurals name="search_titles">
-        <item quantity="one">%1$d Titel</item>
-        <item quantity="other">%1$d Titel</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">Qualität</string>
