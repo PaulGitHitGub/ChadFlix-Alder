@@ -13,12 +13,33 @@ object Tmdb {
     private val creditsCache = ConcurrentHashMap<String, Set<String>>()
     private val similarCache = ConcurrentHashMap<String, List<Meta>>()
 
+    /** TMDb's /find answer for an IMDb id; the cast, the similar titles and the original language all read (and keep) this one. */
+    private fun findUrl(imdbId: String) = "$BASE/find/$imdbId?api_key=$KEY&external_source=imdb_id"
+
+    private val originalLanguages = ConcurrentHashMap<String, String>()
+    private val originalAsked = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * ChadFlix: the language a title was made in ("ko"), for the player's Audio & Subtitles menu. It comes from the /find
+     * answer [cast] keeps on disk; only when there is none, one request is made (kept for [cast]), and only once for a
+     * title. Blocks, so run it off the main thread. null: not known, or the request failed.
+     */
+    fun originalLanguage(imdbId: String, type: String): String? {
+        if (!imdbId.startsWith("tt")) return null
+        originalLanguages[imdbId]?.let { return it }
+        val url = findUrl(imdbId)
+        val raw = Http.savedAnswer(url) ?: run {
+            if (!originalAsked.add(imdbId)) return null
+            runCatching { Http.get(url, keep = true, timeoutMs = 5_000) }.getOrNull()
+        } ?: return null
+        return runCatching { parseOriginalLanguage(JSONObject(raw), type) }.getOrNull()?.also { originalLanguages[imdbId] = it }
+    }
+
     fun cast(imdbId: String, type: String): List<CastMember> {
         if (!imdbId.startsWith("tt")) return emptyList()
         memoryCache[imdbId]?.let { return it }
         return runCatching {
-            val findUrl = "$BASE/find/$imdbId?api_key=$KEY&external_source=imdb_id"
-            val findJson = JSONObject(Http.get(findUrl, keep = true))
+            val findJson = JSONObject(Http.get(findUrl(imdbId), keep = true))
             val isMovie = type != "series"
             val primaryKey = if (isMovie) "movie_results" else "tv_results"
             val fallbackKey = if (isMovie) "tv_results" else "movie_results"
@@ -229,8 +250,7 @@ object Tmdb {
         val cacheKey = "${type}_$imdbId"
         similarCache[cacheKey]?.let { return it }
         return runCatching {
-            val findUrl = "$BASE/find/$imdbId?api_key=$KEY&external_source=imdb_id"
-            val findJson = JSONObject(Http.get(findUrl, keep = true))
+            val findJson = JSONObject(Http.get(findUrl(imdbId), keep = true))
             val isMovie = type != "series"
             val primaryKey = if (isMovie) "movie_results" else "tv_results"
             val fallbackKey = if (isMovie) "tv_results" else "movie_results"
@@ -301,4 +321,16 @@ internal fun discoverMeta(t: JSONObject, imdb: String, movie: Boolean, genreName
         .putOpt("description", t.text("overview"))
         .putOpt("releaseInfo", date?.take(4))
         .put("genres", org.json.JSONArray(t.optJSONArray("genre_ids")?.let { ids -> (0 until ids.length()).mapNotNull { genreNames[ids.optInt(it)] } }.orEmpty())))
+}
+
+/** The title's original language from a TMDb /find answer ("ko"), or null when it has none; a film or a show as [type] says, else the other. */
+internal fun parseOriginalLanguage(find: JSONObject, type: String): String? {
+    val movies = find.optJSONArray("movie_results")?.optJSONObject(0)
+    val shows = find.optJSONArray("tv_results")?.optJSONObject(0)
+    val target = (if (type == "series") shows ?: movies else movies ?: shows) ?: return null
+    return when (val code = target.optString("original_language").trim().lowercase()) {
+        "", "xx", "null" -> null // xx: no spoken language
+        "cn" -> "zh" // TMDb's code for Cantonese
+        else -> code
+    }
 }
