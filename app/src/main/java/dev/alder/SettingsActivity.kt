@@ -926,14 +926,14 @@ class SettingsActivity : Screen() {
                     }
                 }
             }
-            if (isOn) v.setOnLongClickListener { // hold OK: into or out of edit mode
-                edit = !edit
-                picked = -1
-                render(true, index, true)
-                true
-            }
             v.setOnKeyListener { _, code, event ->
                 if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                // Hold OK: OK repeating (the remote held) toggles edit mode once; the lists are rebuilt, so the key's
+                // release lands on a fresh row and clicks nothing.
+                if ((code == android.view.KeyEvent.KEYCODE_DPAD_CENTER || code == android.view.KeyEvent.KEYCODE_ENTER) && event.repeatCount > 0) {
+                    if (isOn && event.repeatCount == 1) { edit = !edit; picked = -1; render(true, index, true) }
+                    return@setOnKeyListener true
+                }
                 val list = if (isOn) onRows else offRows
                 when (code) {
                     android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
