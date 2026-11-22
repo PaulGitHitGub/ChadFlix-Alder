@@ -2024,16 +2024,11 @@ class PlayerActivity : Screen() {
             audioLabel = audio?.label,
             audioChannels = audio?.channelCount?.takeIf { it > 0 } ?: 0,
         )
-        if (badges == shownBadges && pauseBadges.childCount > 0) return
+        // ChadFlix (owner): the badges show only in the Info pop-up, not on the play page.
+        pauseBadges.visibility = View.GONE
+        if (badges == shownBadges) return
         shownBadges = badges
-        if (infoOpen) showInfo() // the pop-up's chips are these badges
-        pauseBadges.removeAllViews()
-        pauseBadges.visibility = if (badges.isEmpty()) View.GONE else View.VISIBLE
-        badges.forEachIndexed { index, badge ->
-            pauseBadges.addView(badgeView(badge), LinearLayout.LayoutParams(-2, dp(20)).apply {
-                if (index > 0) marginStart = dp(6)
-            })
-        }
+        if (infoOpen) showInfo()
     }
 
     /** Monochrome House Lights brand badge: custom vector marks for Dolby / DTS, or crisp typographic lockups. */
@@ -2311,75 +2306,23 @@ class PlayerActivity : Screen() {
     private var menuMoving = false // focus is moving into the menu on purpose, not leaving the button
     private var menuBusy = false // the rows are being replaced: focus callbacks mean nothing
     private var suppressOpen = false // focus returns to the button without opening the menu again
-    private val FRAME_COPY_W = 480 // px wide: the frame copied for the glass is blurred anyway (Images.frost shrinks it to 360)
-    private var menuArt: ImageView? = null // the title's art, unseen: what the glass frosts (the player has no backdrop of its own)
-    private var appearanceArt: ImageView? = null
     private var infoShade: View? = null
     private var infoLogoUrl: String? = null
     private var originalLanguage: String? = null
     private var askedOriginal = false
     private var menuRows = 7
+    // Audio column widths: Kodi's 170 dp column pitch while only languages show; room for codec and channels under More.
+    private val AUDIO_NARROW = 170
+    private val AUDIO_WIDE = 250
     private var menuPill: TextView? = null
     private var sample: SubtitleView? = null
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
     private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
 
-    /** The glass frosts the art the title page shows, as the Showing menu's does; with none, the same plain fallback. */
-    override val backdrop: ImageView? get() = (appearanceArt ?: menuArt)?.takeIf { it.drawable != null }
 
     private fun panelUp() = menuOpen || infoOpen
     private fun isRtl() = controls.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
-    /**
-     * What the glass frosts: the video frame on screen when the panel opens, copied once (small) from the video surface
-     * and laid over the surface's own bounds, so the glass blurs what is really behind it. Until the copy lands (a frame
-     * or two) the glass shows the last frost or dark; if it can't be copied (no frame yet, Android 6), the title's art stands in. One copy and
-     * one frost per opening: nothing runs while the panel stays open or closed.
-     */
-    private fun frostArt() = ImageView(this).apply {
-        scaleType = ImageView.ScaleType.CENTER_CROP
-        visibility = View.INVISIBLE
-        val art = (backdropArt.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-        val surface = view.videoSurfaceView as? android.view.SurfaceView
-        if (android.os.Build.VERSION.SDK_INT < 24 || surface == null || player.videoFormat == null ||
-            surface.width <= 0 || surface.height <= 0 || !surface.holder.surface.isValid) {
-            art?.let { setImageBitmap(it) }
-            return@apply
-        }
-        setImageBitmap(android.graphics.Bitmap.createBitmap(16, 9, android.graphics.Bitmap.Config.ARGB_8888).apply { eraseColor(BASE) })
-        val w = FRAME_COPY_W
-        val h = maxOf(1, w * surface.height / surface.width)
-        val frame = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-        val target = this
-        try {
-            android.view.PixelCopy.request(surface, frame, { result ->
-                if (target !== menuArt && target !== appearanceArt) return@request // closed meanwhile
-                if (result == android.view.PixelCopy.SUCCESS) {
-                    // The frame on a black screen-sized picture, where the video sits in it: the blur fades into the
-                    // letterbox bars as real frosted glass would, and it lines up wherever the glass's window is.
-                    val at = IntArray(2).also { surface.getLocationOnScreen(it) }
-                    val me = IntArray(2).also { target.getLocationOnScreen(it) }
-                    val tw = target.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
-                    val th = target.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
-                    val scale = w.toFloat() / tw
-                    val full = android.graphics.Bitmap.createBitmap(w, maxOf(1, (th * scale).toInt()), android.graphics.Bitmap.Config.ARGB_8888)
-                    android.graphics.Canvas(full).apply {
-                        drawColor(Color.BLACK)
-                        drawBitmap(frame, null, android.graphics.RectF((at[0] - me[0]) * scale, (at[1] - me[1]) * scale,
-                            (at[0] - me[0] + surface.width) * scale, (at[1] - me[1] + surface.height) * scale),
-                            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
-                    }
-                    frame.recycle()
-                    target.scaleType = ImageView.ScaleType.MATRIX
-                    target.imageMatrix = android.graphics.Matrix().apply { setScale(1f / scale, 1f / scale) }
-                    target.setImageBitmap(full)
-                } else art?.let { target.setImageBitmap(it) }
-                refrost()
-            }, main)
-        } catch (e: IllegalArgumentException) { // the surface went away between the check and the copy
-            art?.let { setImageBitmap(it) }
-        }
-    }
 
     private fun audioFocusChanged(has: Boolean) {
         main.removeCallbacks(dwellMenu)
@@ -2505,7 +2448,7 @@ class PlayerActivity : Screen() {
             addView(tag, wrap().apply { marginStart = dp(8) })
         }
         val row = MenuRow(key, item, view, check, name, detail, tag)
-        if (item?.detail.isNullOrEmpty()) detail.visibility = View.GONE
+        if (item?.detail.isNullOrEmpty() || (col.audio && !col.expanded)) detail.visibility = View.GONE // ChadFlix: audio details only under More
         if (item?.tag.isNullOrEmpty()) tag.visibility = View.GONE
         // a row with no detail still needs the weight to push its tag to the end
         if (detail.visibility == View.GONE) name.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
@@ -2569,6 +2512,7 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = if (col.expanded) dp(AUDIO_WIDE) else -2 }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2619,14 +2563,11 @@ class PlayerActivity : Screen() {
         menuLayer.removeAllViews()
         menuLayer.alpha = 0f
         menuLayer.visibility = View.VISIBLE
-        val art = frostArt().also { menuArt = it }
-        menuLayer.addView(art, FrameLayout.LayoutParams(-1, -1))
-        // The dim around the glass: black at 0.6, as the Showing menu's.
+        // ChadFlix (owner): no glass and no blur; what is playing is dimmed, black at 0.6, as Alder's menus dim the page.
         menuLayer.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
-        panel.background = glassOver(panel, 16, shade = FROST_READING)
-        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(250), -2))
+        panel.addView(columnView(audioColumn).apply { minimumWidth = dp(AUDIO_NARROW) }, LinearLayout.LayoutParams(-2, -2))
         panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(240), -2))
         menuLayer.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
             marginStart = dp(PAD); bottomMargin = dp(150)
@@ -2745,7 +2686,7 @@ class PlayerActivity : Screen() {
         dimmed.forEach { it.animate().alpha(1f).setDuration(FOCUS_MS) }
         if (!infoOpen) pauseInfo.visibility = View.VISIBLE
         menuLayer.exit().alpha(0f).withEndAction {
-            if (!menuOpen) { menuLayer.removeAllViews(); menuLayer.visibility = View.GONE; menuArt = null }
+            if (!menuOpen) { menuLayer.removeAllViews(); menuLayer.visibility = View.GONE }
         }
         if (restartHide && shown) showControls(null)
     }
@@ -2854,12 +2795,8 @@ class PlayerActivity : Screen() {
         controls.visibility = View.GONE
         options.removeAllViews()
         tiles.clear(); looks.clear()
-        val art = frostArt().also { appearanceArt = it }
-        options.addView(art, FrameLayout.LayoutParams(-1, -1))
-        // The picture darkens towards the bottom, where the tiles sit; the sample line above them is drawn as Alder draws subtitles.
-        options.addView(View(this).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x00000000, 0x63000000, 0xCF000000.toInt()))
-        }, FrameLayout.LayoutParams(-1, resources.displayMetrics.heightPixels * 3 / 4, Gravity.BOTTOM))
+        // The same dim as the menu's (black at 0.6); the sample line above the tiles is drawn as Alder draws subtitles.
+        options.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
         val sampleView = SubtitleView(this).also { sample = it }
         options.addView(sampleView, FrameLayout.LayoutParams(-1, -1))
 
@@ -2916,7 +2853,6 @@ class PlayerActivity : Screen() {
         }), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(44) })
 
         val panel = column(Gravity.CENTER_HORIZONTAL).apply { setPaddingRelative(dp(24), dp(16), dp(24), dp(16)) }
-        panel.background = glassOver(panel, 16, shade = FROST_READING)
         panel.addView(row1, wrap())
         panel.addView(row2, wrap().apply { topMargin = dp(14) })
         options.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(38) })
@@ -2946,7 +2882,6 @@ class PlayerActivity : Screen() {
         options.visibility = View.GONE
         options.removeAllViews()
         sample = null
-        appearanceArt = null
         tiles.clear(); looks.clear()
     }
 
@@ -3015,14 +2950,8 @@ class PlayerActivity : Screen() {
         }
         if (shownBadges.isNotEmpty()) {
             val chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-            shownBadges.forEachIndexed { i, b ->
-                chips.addView(text(badgeChip(b), 11f, bold = true, color = 0xFF0B0B0B.toInt()).apply {
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    maxLines = 1
-                    setPaddingRelative(dp(6), 0, dp(6), 0)
-                    background = rounded(0xB3FFFFFF.toInt(), 3)
-                }, LinearLayout.LayoutParams(-2, dp(15)).apply { if (i > 0) marginStart = dp(5) })
+            shownBadges.forEachIndexed { i, b -> // Alder's own badges, Dolby and DTS marks included (owner)
+                chips.addView(badgeView(b), LinearLayout.LayoutParams(-2, dp(20)).apply { if (i > 0) marginStart = dp(6) })
             }
             stack.addView(chips, wrap().apply { topMargin = dp(6) })
         }

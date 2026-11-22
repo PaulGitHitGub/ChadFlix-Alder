@@ -61,9 +61,3 @@ internal fun runtimeWords(ms: Long, hoursMinutes: String = "%1\$d hr %2\$d mins"
 internal fun infoFacts(year: String?, certificate: String?, runtime: String?): String =
     listOfNotNull(year, certificate, runtime).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" • ")
 
-/** A badge as the Info pop-up writes it in a chip: "Dolby Atmos", "DTS:X", "Blu-Ray", "1080p". */
-internal fun badgeChip(b: PlayerBadge): String = when (b.brand) {
-    BadgeBrand.DOLBY -> when (b.label) { "TRUEHD" -> "Dolby TrueHD"; else -> "Dolby " + b.label.lowercase().replaceFirstChar { it.titlecase() } }
-    BadgeBrand.DTS -> when (b.label) { "HD" -> "DTS-HD"; "X" -> "DTS:X"; else -> "DTS" }
-    BadgeBrand.NONE -> if (b.label == "BLU-RAY") "Blu-Ray" else b.label
-}

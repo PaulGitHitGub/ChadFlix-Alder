@@ -122,19 +122,6 @@ class PlayerMenuTest {
         assertEquals("2 h 5 min", runtimeWords(125 * 60_000L, "%1\$d h %2\$d min", "%1\$d h", "%1\$d min"))
     }
 
-    @Test fun chipsReadInTitleCase() {
-        assertEquals("Dolby Vision", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "VISION")))
-        assertEquals("Dolby Atmos", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "ATMOS")))
-        assertEquals("Dolby TrueHD", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "TRUEHD")))
-        assertEquals("Dolby Audio", badgeChip(PlayerBadge(BadgeBrand.DOLBY, "AUDIO")))
-        assertEquals("DTS", badgeChip(PlayerBadge(BadgeBrand.DTS, "")))
-        assertEquals("DTS-HD", badgeChip(PlayerBadge(BadgeBrand.DTS, "HD")))
-        assertEquals("DTS:X", badgeChip(PlayerBadge(BadgeBrand.DTS, "X")))
-        assertEquals("Blu-Ray", badgeChip(PlayerBadge(BadgeBrand.NONE, "BLU-RAY")))
-        assertEquals("1080p", badgeChip(PlayerBadge(BadgeBrand.NONE, "1080p")))
-        assertEquals("7.1", badgeChip(PlayerBadge(BadgeBrand.NONE, "7.1")))
-    }
-
     @Test fun originalLanguageComesFromTheFindAnswer() {
         val find = JSONObject("""{"movie_results":[{"id":496243,"title":"Parasite","original_language":"ko"}],"tv_results":[]}""")
         assertEquals("ko", parseOriginalLanguage(find, "movie"))

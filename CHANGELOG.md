@@ -22,10 +22,10 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 <!-- Spotlight -->
 - **Updates in ChadFlix.** ChadFlix finds new versions. It asks you before it installs them. To find a new version yourself, select **Settings → About → Updates**.
 <!-- Spotlight -->
-- **Audio & Subtitles menu.** In the player, move to **Audio & Subtitles** and wait a short time. A menu opens with the columns **Audio** and **Subtitles**. Each column shows the track in use, the best English track and the best track in the original language of the title. Select **More** to see all tracks. Subtitles from add-ons join the list when they arrive.
+- **Audio & Subtitles menu.** In the player, move to **Audio & Subtitles** and wait a short time. A menu opens with the columns **Audio** and **Subtitles**. Each column shows the track in use, the best English track and the best track in the original language of the title. Select **More** to see all tracks, and the format and channels of each audio track. Subtitles from add-ons join the list when they arrive.
 - **Appearance.** In the **Audio & Subtitles** menu, select **Appearance**. Change the size, the color and the background of the subtitles. A sample line shows each change at once.
 <!-- Spotlight -->
-- **Info pop-up.** In the player, move to **Info**. A pop-up shows the logo, the year, the age rating, the length, the story, the ratings and the video and sound badges. The video continues to play. Move to another button to close the pop-up. **OK** on **Info** does nothing.
+- **Info pop-up.** In the player, move to **Info**. A pop-up shows the logo, the year, the age rating, the length, the story, the ratings and the video and sound badges. The badges are only in this pop-up. The video continues to play. Move to another button to close the pop-up. **OK** on **Info** does nothing.
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
