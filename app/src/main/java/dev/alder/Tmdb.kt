@@ -206,10 +206,23 @@ object Tmdb {
     /** Whether Cinemeta's titles need translating: the app speaks something other than English. */
     val translates get() = java.util.Locale.getDefault().language != "en"
 
-    /** TMDB's answer from disk when under a month old, else from the network (and kept); [offline] never asks. */
-    private fun answer(url: String, offline: Boolean): JSONObject? =
-        (Http.savedAnswer(url, maxAgeMs = MONTH_MS) ?: if (offline) null else runCatching { Http.get(url, keep = true, timeoutMs = 5_000, strict = true) }.getOrNull())
-            ?.let { runCatching { JSONObject(it) }.getOrNull() }
+    /** Fetches for [offline] reads that found nothing on disk; their own threads, so rows waiting on [pool] don't queue behind. */
+    private val warmer = java.util.concurrent.Executors.newFixedThreadPool(2)
+    private val warming = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * TMDB's answer from disk when under a month old, else from the network (and kept). [offline] never waits on the
+     * network: it fetches in the background instead, so a title Home drew from disk is translated on its next draw.
+     */
+    private fun answer(url: String, offline: Boolean): JSONObject? {
+        val text = Http.savedAnswer(url, maxAgeMs = MONTH_MS) ?: when {
+            !offline -> fetch(url)
+            else -> { if (warming.add(url)) warmer.execute { try { fetch(url) } finally { warming.remove(url) } }; null }
+        }
+        return text?.let { runCatching { JSONObject(it) }.getOrNull() }
+    }
+
+    private fun fetch(url: String) = runCatching { Http.get(url, keep = true, timeoutMs = 5_000, strict = true) }.getOrNull()
 
     /** TMDB's details for a Cinemeta title in the app's language, with its logos in that language. Reads [json] only. */
     private fun details(json: JSONObject, offline: Boolean): Pair<Int, JSONObject>? {
