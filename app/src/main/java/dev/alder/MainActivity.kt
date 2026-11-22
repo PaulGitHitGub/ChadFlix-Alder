@@ -2129,8 +2129,7 @@ class MainActivity : Screen() {
                         if (g != generation || build != catalogBuild) return@background
                         if (r.getOrNull()?.first.orEmpty().size <= 1) showingChanged.remove("${p.label}:$title")?.let { (rowKey, was) ->
                             // the new choice failed: the old row stays,
-                            HomeStyle.setShowing(this@MainActivity, p.label, rowKey, was.removeSuffix("!"))
-                            if (rowKey.startsWith("p")) HomeStyle.setExclusive(this@MainActivity, p.label, rowKey.drop(1).toInt(), was.endsWith("!"))
+                            HomeStyle.restoreChoice(this@MainActivity, p.label, rowKey, p == Page.MOVIES, was)
                             return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
                         onAnswer(r.map { listOf(it.first to false) })
@@ -2875,11 +2874,17 @@ class MainActivity : Screen() {
         val platform = key.takeIf { it.startsWith("p") }?.drop(1)?.toInt()?.takeIf { HomeStyle.canExclusive(it, movie) }
         val excl = platform?.let { HomeStyle.exclusive(this, page.label, it, movie) }
         val switch = excl?.let { listOf("${getString(R.string.showing_exclusives_only)}  ·  ${getString(if (it) R.string.state_on else R.string.state_off)}") }.orEmpty()
-        val names = switch + lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
-        val checked = switch.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
+        // Services rows: a Genre line after the switch (All, then TMDb's TV genres), in the same one query.
+        val service = key.takeIf { it.startsWith("p") && page == Page.SERVICES }?.drop(1)?.toInt()
+        val genreNow = service?.let { HomeStyle.serviceGenre(this, page.label, it) } ?: 0
+        val genreLine = service?.let { listOf("${getString(R.string.discover_genre)}  ·  " +
+            (HomeStyle.genres(false).firstOrNull { it.first == genreNow }?.second ?: getString(R.string.filter_all))) }.orEmpty()
+        val head = switch + genreLine
+        val names = head + lists.mapIndexed { i, (_, words) -> getString(words) + if (i == 0) " " + getString(R.string.showing_default) else "" }
+        val checked = head.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
         choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus >= 0) focus else checked) { picked ->
             val changing = "${page.label}:${row.title}" // picking again before it answered: back to the choice last shown
-            val shown = showingChanged[changing]?.second ?: (current + if (excl == true) "!" else "")
+            val shown = showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, key, movie)
             if (platform != null && picked == 0) {
                 showingChanged[changing] = key to shown
                 HomeStyle.setExclusive(this, page.label, platform, excl != true)
@@ -2887,7 +2892,19 @@ class MainActivity : Screen() {
                 main.post { showingMenu(row, 0) } // the switch stays in reach to flip back or pick a sort
                 return@choose
             }
-            val list = lists[picked - switch.size].first
+            if (service != null && picked == switch.size) { // the Genre line: All, then the TV genres
+                val genres = listOf(0 to getString(R.string.filter_all)) + HomeStyle.genres(false)
+                choose("${row.title} · ${getString(R.string.discover_genre)}", genres.map { it.second },
+                    checked = genres.indexOfFirst { it.first == genreNow }.coerceAtLeast(0)) { g ->
+                    if (genres[g].first == genreNow) return@choose
+                    showingChanged[changing] = key to shown
+                    HomeStyle.setServiceGenre(this, page.label, service, genres[g].first)
+                    rebuildRows?.invoke() ?: showPage(page)
+                    main.post { showingMenu(row, switch.size) }
+                }
+                return@choose
+            }
+            val list = lists[picked - head.size].first
             if (list == current) return@choose
             showingChanged[changing] = key to shown
             HomeStyle.setShowing(this, page.label, key, list)

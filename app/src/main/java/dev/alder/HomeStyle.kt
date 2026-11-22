@@ -265,8 +265,34 @@ internal object HomeStyle {
         Platform("Peacock", "386|387", "3353", null), // Premium and Premium Plus
     )
 
-    fun platformSource(c: Context, page: String, i: Int, movie: Boolean) =
-        "${TMDB}p$i:${showing(c, page, "p$i")}${if (exclusive(c, page, i, movie)) "!" else ""}"
+    fun platformSource(c: Context, page: String, i: Int, movie: Boolean) = "${TMDB}p$i:${choiceOf(c, page, "p$i", movie)}"
+
+    /**
+     * What a row shows, as its source spells it: the list, then "!" for Exclusives Only and "~<genre id>" for a service
+     * row's genre ("trending!~35"). [restoreChoice] puts a remembered one back.
+     */
+    fun choiceOf(c: Context, page: String, key: String, movie: Boolean): String {
+        val list = showing(c, page, key)
+        if (!key.startsWith("p")) return list
+        val i = key.drop(1).toInt()
+        val genre = serviceGenre(c, page, i)
+        return list + (if (exclusive(c, page, i, movie)) "!" else "") + (if (genre > 0) "~$genre" else "")
+    }
+
+    fun restoreChoice(c: Context, page: String, key: String, movie: Boolean, choice: String) {
+        val head = choice.substringBefore('~')
+        setShowing(c, page, key, head.removeSuffix("!"))
+        if (!key.startsWith("p")) return
+        val i = key.drop(1).toInt()
+        if (canExclusive(i, movie)) setExclusive(c, page, i, head.endsWith("!"))
+        setServiceGenre(c, page, i, choice.substringAfter('~', "0").toIntOrNull() ?: 0)
+    }
+
+    /** A service row's genre (a TMDb TV genre id; 0 is All), ANDed into its one discover query. */
+    fun serviceGenre(c: Context, page: String, i: Int) = prefs(c).getInt(Settings.profileKey(c, "sgenre:$page:p$i"), 0)
+
+    fun setServiceGenre(c: Context, page: String, i: Int, genre: Int) =
+        prefs(c).edit().putInt(Settings.profileKey(c, "sgenre:$page:p$i"), genre).apply()
 
     /** Whether platform row [i] has an Exclusives Only switch on this tab (films need a company to filter by). */
     fun canExclusive(i: Int, movie: Boolean) = !movie || platforms[i].companies != null
@@ -315,9 +341,12 @@ internal object HomeStyle {
         val key = rowKey(movie, title) ?: return null
         val lists = listsFor(movie, key)
         val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
-        // A service row says "· All" when it isn't kept to the service's own shows.
-        val all = key.startsWith("p") && !exclusive(c, page, key.drop(1).toInt(), movie)
-        return if (all) "$list · ${c.getString(R.string.filter_all)}" else list
+        if (!key.startsWith("p")) return list
+        // A service row: its genre first ("Comedy · Trending"), and "· All" when it isn't kept to the service's own shows.
+        val i = key.drop(1).toInt()
+        val genre = genres(movie).firstOrNull { it.first == serviceGenre(c, page, i) }?.second
+        val all = !exclusive(c, page, i, movie)
+        return listOfNotNull(genre, list, c.getString(R.string.filter_all).takeIf { all }).joinToString(" · ")
     }
 
     /** "Action · Trending": the list in red on the row the remote is in, all of it quiet on the others. */
@@ -378,8 +407,9 @@ internal object HomeStyle {
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
         val list = parts.getOrElse(1) { "trending" }
         val params = if (parts[0].startsWith("p")) platforms[parts[0].drop(1).toInt()].let { p -> // a platform row
-            platformParams(movie, p.providers, p.networks, p.companies, list.removeSuffix("!"), list.endsWith("!"), Tmdb.region,
-                day.format(java.util.Date()))
+            val head = list.substringBefore('~')
+            platformParams(movie, p.providers, p.networks, p.companies, head.removeSuffix("!"), head.endsWith("!"), Tmdb.region,
+                day.format(java.util.Date()), list.substringAfter('~', "").toIntOrNull())
         } else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
         val (titles, complete) = Tmdb.discoverRow(movie, params, genres(movie).toMap())
         return listOf(tile) + titles to complete
@@ -445,9 +475,10 @@ internal fun washPixel(p: Int, shade: Float): Int {
  * networks, films by its companies.
  */
 internal fun platformParams(movie: Boolean, providers: String, networks: String, companies: String?, list: String,
-                            exclusive: Boolean, region: String, today: String): Map<String, String> {
+                            exclusive: Boolean, region: String, today: String, genre: Int? = null): Map<String, String> {
     val date = if (movie) "primary_release_date" else "first_air_date"
     val p = linkedMapOf("with_watch_providers" to providers, "watch_region" to region, "with_watch_monetization_types" to "flatrate")
+    if (genre != null && genre > 0) p["with_genres"] = "$genre" // a service row's genre, in the same query
     if (exclusive) { if (!movie) p["with_networks"] = networks else if (companies != null) p["with_companies"] = companies }
     when (list) {
         "new" -> { p["sort_by"] = "$date.desc"; p["$date.lte"] = today; p["vote_count.gte"] = "20" }

@@ -83,4 +83,9 @@ class HomeStyleTest {
         assertEquals(null, platformParams(true, "337", "2739", null, "new", true, "US", "2026-11-22")["with_companies"])
         assertEquals(null, platformParams(false, "8", "213", null, "top_rated", false, "US", "")["with_networks"])
     }
+
+    @Test fun serviceRowsAddTheirGenreToTheSameQuery() {
+        assertEquals("35", platformParams(false, "8", "213", null, "trending", true, "US", "", 35)["with_genres"])
+        assertEquals(null, platformParams(false, "8", "213", null, "trending", true, "US", "", 0)["with_genres"])
+    }
 }

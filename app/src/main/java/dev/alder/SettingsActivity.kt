@@ -101,7 +101,7 @@ object Settings {
         ).forEach { remove("$it@$profileId") }
         prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:") ||
             it.startsWith("rowsOn:") || it.startsWith("rowsKnown:") || it.startsWith("showing:") ||
-            it.startsWith("excl:")) && it.endsWith("@$profileId") }.forEach(::remove)
+            it.startsWith("excl:") || it.startsWith("sgenre:")) && it.endsWith("@$profileId") }.forEach(::remove)
     }.apply()
 
     /**
