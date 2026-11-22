@@ -1975,7 +1975,7 @@ class MainActivity : Screen() {
                 }
             if (p.hasGenreShortcuts) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
             val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
-            val sections = orderedRows(HomeStyle.rowOrder(this@MainActivity, p.label), candidates.filter {
+            val sections = HomeStyle.ordered(this@MainActivity, p.label, movie, candidates.filter {
                 it.first !in hiddenRows && (!p.hasGenreShortcuts || HomeStyle.isOn(rowsOn, it.first, movie))
             }) { it.first }
             pageRows = sections.map { it.first }
@@ -2896,7 +2896,7 @@ class MainActivity : Screen() {
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
     private fun moveRow(title: String, by: Int) {
         // Among every row the page could show, so rows that are off keep their places.
-        val all = if (page.hasGenreShortcuts) orderedRows(HomeStyle.rowOrder(this, page.label),
+        val all = if (page.hasGenreShortcuts) HomeStyle.ordered(this, page.label, page == Page.MOVIES,
             HomeStyle.knownRows(this, page.label, page == Page.MOVIES)) { it } else pageRows
         HomeStyle.saveRowOrder(this, page.label, movedAmong(all, pageRows, title, by))
         lastHomeRows = HomeStyle.signature(this, page.label)

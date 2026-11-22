@@ -839,7 +839,7 @@ class SettingsActivity : Screen() {
                 addView(text("·  ${getString(R.string.always_first)}", SMALL, color = 0x80FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
             }, LinearLayout.LayoutParams(-1, dp(36)))
             val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
-            val order = orderedRows(HomeStyle.rowOrder(this, page), HomeStyle.knownRows(this, page, movie)) { it }.toMutableList()
+            val order = HomeStyle.ordered(this, page, movie, HomeStyle.knownRows(this, page, movie)) { it }.toMutableList()
             val binds = mutableListOf<() -> Unit>()
             order.indices.forEach { i ->
                 val check = ImageView(this).apply { setImageResource(R.drawable.ic_check) }

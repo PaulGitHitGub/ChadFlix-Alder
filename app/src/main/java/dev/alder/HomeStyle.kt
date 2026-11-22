@@ -199,6 +199,20 @@ internal object HomeStyle {
     /** What the page's rows depend on in Customize Home, to tell when coming back that they changed. */
     fun signature(c: Context, page: String) = rowsOn(c, page).toString() + rowOrder(c, page)
 
+    /**
+     * [items] in this page's saved order ([orderedRows]); platform rows that order has never seen (an order saved before
+     * they existed) go after the genres, where the page puts them, not at the end.
+     */
+    fun <T> ordered(c: Context, page: String, movie: Boolean, items: List<T>, title: (T) -> String): List<T> {
+        val saved = rowOrder(c, page)
+        val out = orderedRows(saved, items, title)
+        val fresh = out.filter { t -> title(t) !in saved && platforms.any { it.name == title(t) } }
+        if (saved.isEmpty() || fresh.isEmpty()) return out
+        val rest = out - fresh.toSet()
+        val at = rest.indexOfLast { t -> genres(movie).any { it.second == title(t) } } + 1
+        return rest.take(at) + fresh + rest.drop(at)
+    }
+
     fun setRowOn(c: Context, page: String, title: String, on: Boolean) =
         prefs(c).edit().putString(Settings.profileKey(c, "rowsOn:$page"), rowsOn(c, page).put(title, on).toString()).apply()
 
