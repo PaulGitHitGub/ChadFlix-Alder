@@ -1534,7 +1534,7 @@ class MainActivity : Screen() {
         page = p
         val grid = p.isGrid
         val libraryPage = p == Page.LIBRARY
-        val gridTop = GRID_TOP + if (libraryPage) 20 else 0
+        val gridTop = GRID_TOP + if (libraryPage) 40 else 0
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
             topMargin = if (grid) dp(gridTop) else browseRowTop
@@ -1542,7 +1542,7 @@ class MainActivity : Screen() {
         }
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
-            topMargin = if (grid) dp(GRID_HERO_TOP) else 0
+            topMargin = if (grid) dp(GRID_HERO_TOP + if (libraryPage) 12 else 0) else 0
             bottomMargin = if (grid) 0 else heroBottom
             width = if (grid) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
@@ -1555,7 +1555,7 @@ class MainActivity : Screen() {
         heroLogo.maxHeight = dp(if (grid) 46 else 55)
         heroLogo.maxWidth = dp(if (grid) 280 else Int.MAX_VALUE)
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
-        browseInfo.getChildAt(1).marginTop(if (libraryPage) 4 else 8)
+        browseInfo.getChildAt(1).marginTop(if (libraryPage) 12 else 8)
         for (i in 1 until browseInfo.childCount) {
             browseInfo.getChildAt(i).visibility = if (!grid || (libraryPage && i == 1)) View.VISIBLE else View.GONE
         }
