@@ -189,6 +189,58 @@ internal object HomeStyle {
         "complete" to R.string.showing_complete)
 
     private const val TILE = "chadflix:showing:"
+    const val LIST_RED = 0xFFEF4B55.toInt()
+    const val LABEL_GREY = 0xFF9A9A9A.toInt()
+
+    /** The name of the list genre row [title] shows on [page] ("Trending"), or null when it isn't a genre row. */
+    fun rowList(c: Context, page: String, movie: Boolean, title: String): String? {
+        val id = genres(movie).firstOrNull { it.second == title }?.first ?: return null
+        val key = showing(c, page, id)
+        return c.getString((lists(movie).firstOrNull { it.first == key } ?: lists(movie)[0]).second)
+    }
+
+    /** "Action · Trending": the list in red on the row the remote is in, all of it quiet on the others. */
+    fun rowTitle(genre: String, list: String, lit: Boolean): CharSequence = android.text.SpannableString("$genre · $list").apply {
+        if (lit) setSpan(android.text.style.ForegroundColorSpan(LIST_RED), genre.length, length, 0)
+    }
+
+    /**
+     * The Showing tile as ChadFlix draws it: "SHOWING" in small grey capitals over the list's name, a third of the way
+     * down, and a small red list mark near the foot. Under the card's shade and border, so it dims and focuses like a poster.
+     */
+    /**
+     * Returns how to show the tile's state: 2 focused (grey label, white list, red mark), 1 its row in use (both grey,
+     * no mark), 0 another row (blank).
+     */
+    fun dressTile(screen: Screen, card: MediaCardView, label: String, list: String): (Int) -> Unit {
+        val pad = px(screen, 12f).toInt()
+        card.contentDescription = "$label $list"
+        val words = LinearLayout(screen).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(screen.text(label.uppercase(), 10.5f, bold = true, color = LABEL_GREY).apply { letterSpacing = 0.08f })
+            addView(screen.text(list, 15f, bold = true, color = WHITE).apply { maxLines = 2 },
+                LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(screen, 2f).toInt() })
+            visibility = View.INVISIBLE
+        }
+        val name = words.getChildAt(1) as TextView
+        card.addView(words, 0, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
+            leftMargin = pad; rightMargin = pad; topMargin = card.heightPx * 32 / 100
+        })
+        val size = px(screen, 10f).toInt()
+        val mark = object : View(screen) {
+            private val paint = android.graphics.Paint().apply { color = LIST_RED }
+            override fun onDraw(canvas: android.graphics.Canvas) { // three short lines
+                val h = height / 7f
+                for (i in 0 until 3) canvas.drawRect(0f, (1 + 2 * i) * h, width.toFloat(), (2 + 2 * i) * h, paint)
+            }
+        }.apply { visibility = View.INVISIBLE }
+        card.addView(mark, 1, FrameLayout.LayoutParams(size, size, Gravity.TOP).apply { leftMargin = pad; topMargin = card.heightPx * 80 / 100 - size / 2 })
+        return { state ->
+            words.visibility = if (state > 0) View.VISIBLE else View.INVISIBLE
+            name.setTextColor(if (state == 2) WHITE else LABEL_GREY)
+            mark.visibility = if (state == 2) View.VISIBLE else View.INVISIBLE
+        }
+    }
 
     /** A genre row's first card, the Showing tile: it opens the list picker instead of a title. */
     fun isTile(id: String) = id.startsWith(TILE)
@@ -199,9 +251,8 @@ internal object HomeStyle {
      */
     fun genreTitles(c: Context, movie: Boolean, source: String): Pair<List<Meta>, Boolean> {
         val parts = source.removePrefix(TMDB).split(":")
-        val list = lists(movie).firstOrNull { it.first == parts.getOrElse(1) { "" } } ?: lists(movie)[0]
-        val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series")
-            .put("name", c.getString(R.string.showing) + "\n" + c.getString(list.second)))
+        // No name: the card's own title would draw over the tile's words ([dressTile]).
+        val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series").put("name", ""))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
         val (titles, complete) = Tmdb.discoverRow(movie, genreParams(movie, parts[0].toInt(), parts.getOrElse(1) { "trending" },

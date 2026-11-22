@@ -391,14 +391,11 @@
     <string name="search_remove_query">Quitar %1$s</string>
     <string name="search_hold_to_remove">Mantén OK para quitar</string>
     <string name="search_popular_unavailable">Los títulos populares no están disponibles.</string>
-    <string name="search_popular">Populares</string>
+    <string name="search_popular_titles">Títulos populares</string>
+    <string name="search_voice">Búsqueda por voz</string>
+    <string name="search_delete">Borrar</string>
     <string name="search_unavailable">La búsqueda no está disponible ahora.</string>
     <string name="search_no_matches">Sin resultados · Prueba con un título más corto</string>
-    <plurals name="search_titles">
-        <item quantity="one">%1$d título</item>
-        <item quantity="many">%1$d títulos</item>
-        <item quantity="other">%1$d títulos</item>
-    </plurals>
 
     <!-- Sources -->
     <string name="streams_quality">Calidad</string>

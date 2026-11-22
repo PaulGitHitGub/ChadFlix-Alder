@@ -119,6 +119,7 @@ internal class MediaCardView(
     private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
     /** ChadFlix: the title's logo, shown at the foot of the widened card ([expand]). */
     var logoUrl: String? = null
+    private var shownWide = false // ChadFlix: the picture showing was decoded at the widened size
     private var wantWide = false // focused: widen as soon as there's a backdrop to show
     private val expanded get() = wantWide && artUrl != null
     /** How much wider than a poster this card is about to be (its row scrolls for that). */
@@ -316,8 +317,10 @@ internal class MediaCardView(
             face.alpha = 1f
             return
         }
-        if (url == shownUrl) return
+        val backdrop = expanded && url == artUrl
+        if (url == shownUrl && backdrop == shownWide) return // the same picture at the same size (a widened card's is bigger)
         shownUrl = url
+        shownWide = backdrop
         face.animate().cancel()
         face.alpha = 0f
         loadUrl(url, retry = retryOnFailure)
@@ -506,13 +509,13 @@ internal class HorizontalCardRail(
     }
 
     /** [widenBy]: ChadFlix, how much wider the card is about to be (the row's end stops later by that much). */
-    fun scrollToCard(index: Int, widenBy: Int = 0): Int {
+    fun scrollToCard(index: Int, widenBy: Int = 0, pinAt: Int = index): Int { // pinAt: ChadFlix, the card the row scrolls to
         selected = index
         anim?.cancel()
         val startScroll = scroller.scrollX
         val stripW = if (widenBy <= 0) strip.width else
             strip.paddingLeft + strip.paddingRight + cards.sumOf { it.widthPx } + cardGapPx * (cards.size - 1) + widenBy
-        val targetScroll = railTargetScroll(index, stepPx, stripW, scroller.width)
+        val targetScroll = railTargetScroll(pinAt, stepPx, stripW, scroller.width)
         if (cullLeft) showVisibleCards()
         val glideTime = rowGlideDuration(held, wideMotion, ViewConfiguration.getKeyRepeatDelay().toLong())
         anim = ValueAnimator.ofInt(startScroll, targetScroll).setDuration(glideTime).apply {
