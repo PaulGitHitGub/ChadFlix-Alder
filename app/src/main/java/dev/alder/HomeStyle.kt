@@ -80,6 +80,28 @@ internal object HomeStyle {
         visibility = View.INVISIBLE // INVISIBLE, not GONE: showing it then needs no layout pass
     }
 
+    const val SCRIM = 112 // dp: the corner shade under a card's rating
+
+    /** A card's rating: the source's white mark and the score, no box, with a soft shadow. */
+    fun badge(screen: Screen) = LinearLayout(screen).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(android.widget.ImageView(screen))
+        addView(screen.text("", 12.5f, bold = true, color = WHITE).apply {
+            includeFontPadding = false
+            setShadowLayer(px(screen, 2f), 0f, px(screen, 1f), 0x99000000.toInt())
+        }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = px(screen, 4f).toInt() })
+    }
+
+    /** Under a card's rating: black from the bottom-right corner, 72% there, 40% halfway, none at 112 dp. */
+    fun scrim(c: Context) = View(c).apply {
+        background = GradientDrawable().apply {
+            gradientType = GradientDrawable.RADIAL_GRADIENT
+            colors = intArrayOf(0xB8000000.toInt(), 0x66000000, 0)
+            setGradientCenter(1f, 1f)
+            gradientRadius = px(c, SCRIM.toFloat())
+        }
+    }
+
     /** Continue Watching's watched-so-far bar: red on a grey track, along the foot of the card. */
     fun bar(c: Context, progress: Float) = LinearLayout(c).apply {
         val p = progress.coerceIn(0f, 1f)

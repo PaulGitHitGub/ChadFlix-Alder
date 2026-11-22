@@ -1583,9 +1583,13 @@ class MainActivity : Screen() {
         if (wantsLetterboxd && letterboxdScore == null) {
             val key = Settings.mdblistKey(this)
             background({ letterboxd(item.id, key) }) { r ->
-                if (r.getOrNull() != null && heroItem === item && mode == Mode.BROWSE) showHero(item)
+                if (r.getOrNull() == null || mode != Mode.BROWSE) return@background
+                if (page.isBrowse) rows.forEach { row -> row.cards.forEach { if (it.payload === item) row.rate(it, item, fade = true) } }
+                else if (heroItem === item) showHero(item)
             }
         }
+        // ChadFlix: on the home pages the rating sits on the card (its corner badge), not in the info line.
+        if (page.isBrowse) { heroRatings.removeAllViews(); ratingsItem = item; return }
         val ratings = shownRatings(Settings.ratings(this), rating, letterboxdScore)
         heroRatings.removeAllViews()
         addRatings(heroRatings, ratings)
@@ -3011,6 +3015,7 @@ class MainActivity : Screen() {
         // remote is on the tile or that first title the row doesn't scroll, so the tile stays in view.
         private val tileRow = homeRow && first.firstOrNull()?.id?.let(HomeStyle::isTile) == true
         private var tileLook: ((Int) -> Unit)? = null
+        private val ratingPick = Settings.ratings(this@MainActivity) // ChadFlix: Settings › Ratings, read once per row (before the cards)
         private fun pinOf(i: Int) = if (tileRow && i <= 1) 0 else i
         private fun styleTile() = tileLook?.invoke(when { cards.firstOrNull()?.isFocused == true -> 2; active -> 1; else -> 0 })
 
@@ -3039,6 +3044,7 @@ class MainActivity : Screen() {
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
+            rate(this, item, fade = false)
             if (HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
             dim(grid || !active, animate = false)
             payload = item
@@ -3048,6 +3054,7 @@ class MainActivity : Screen() {
                 setNewEpisodes(item.newEpisodeCount)
                 logoUrl = item.logo
                 refresh(item.poster, item.art, item.settled)
+                rate(this, item, fade = true) // its score came with its details
                 if (homeRow && active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
             }
             // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
@@ -3093,6 +3100,17 @@ class MainActivity : Screen() {
         }
 
         fun focusFirst() = rail.focusSelected()
+
+        /**
+         * ChadFlix: [card]'s corner rating, from what's known without asking anyone: IMDb (also for "Both"), or Letterboxd
+         * from this session's MDBList answers. Nothing until it's known.
+         */
+        fun rate(card: MediaCardView, item: Item, fade: Boolean) {
+            if (!homeRow || HomeStyle.isTile(item.id)) return
+            val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)
+                else R.drawable.ic_rating_imdb to (metas[item.id]?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "))
+            card.setRating(mark, score, fade)
+        }
 
         /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
         fun pin(index: Int, snap: Boolean = false): Int {
