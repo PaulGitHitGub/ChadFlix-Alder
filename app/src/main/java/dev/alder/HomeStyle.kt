@@ -270,14 +270,16 @@ internal object HomeStyle {
      * film filter for Disney+, Hulu, Paramount+ or Peacock (TMDb has no such company, or only a foreign one), so their
      * film rows have no Exclusives switch.
      */
-    class Platform(val name: String, val providers: String, val networks: String, val companies: String?)
+    /** [brand]: how TMDb's names for the service (and its channels elsewhere) begin, letters and digits only ([onlyOn]). */
+    class Platform(val name: String, val providers: String, val networks: String, val companies: String?,
+                   val brand: String = name.lowercase().filter(Char::isLetterOrDigit))
 
     val platforms = listOf(
         Platform("Netflix", "8", "213", "178464|145174|171251"), // Netflix, Netflix International Pictures, Netflix Animation Studios
         Platform("Apple TV+", "350", "2552", "194232"), // Apple Studios (TMDb's "Apple Original Films")
         Platform("Disney+", "337", "2739", null),
-        Platform("Prime Video", "9", "1024", "210099|20580"), // Amazon MGM Studios, Amazon Studios
-        Platform("Max", "1899", "3186|49", "7429|158691|138252"), // HBO Max and HBO networks; HBO Films, HBO Max, Warner Max
+        Platform("Prime Video", "9", "1024", "210099|20580", "amazonprime"), // Amazon MGM Studios, Amazon Studios
+        Platform("Max", "1899", "3186|49", "7429|158691|138252", "hbomax"), // HBO Max and HBO networks; HBO Films, HBO Max, Warner Max
         Platform("Hulu", "15", "453", null),
         Platform("Paramount+", "2303|2616", "4330", null), // Premium and Essential
         Platform("Peacock", "386|387", "3353", null), // Premium and Premium Plus
@@ -460,7 +462,11 @@ internal object HomeStyle {
             animeParams(movie, list.substringBefore('~'), list.substringAfter('~', "").toIntOrNull() ?: 0,
                 day.format(java.util.Date()), day.format(since), day.format(month))
         } else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
-        val (titles, complete) = Tmdb.discoverRow(movie, params, genres(movie).toMap())
+        // Exclusives Only: TMDb's network/company filter matches any network a show was ever on (Netflix for The Loud
+        // House, Good Mythical Morning, Sesame Street), so each title must also stream on this service alone here.
+        val only = parts[0].takeIf { it.startsWith("p") && list.substringBefore('~').endsWith("!") }?.let { platforms[it.drop(1).toInt()] }
+        val (titles, complete) = Tmdb.discoverRow(movie, params, genres(movie).toMap(),
+            only?.let { p -> { flatrate: List<Pair<Int, String>> -> onlyOn(flatrate, p) } })
         return listOf(tile) + titles to complete
     }
 }
@@ -505,6 +511,13 @@ internal fun genreParams(movie: Boolean, genre: Int, list: String, today: String
         }
     }
     return p
+}
+
+/** Whether a title's subscription services in the region ([flatrate]: TMDb id and name) are all [p] (its plans and
+ *  its channels on other stores, as "Paramount+ Amazon Channel"); none listed counts as yes, the discover query said so. */
+internal fun onlyOn(flatrate: List<Pair<Int, String>>, p: HomeStyle.Platform): Boolean {
+    val ids = p.providers.split('|').toSet()
+    return flatrate.all { (id, name) -> "$id" in ids || name.lowercase().filter(Char::isLetterOrDigit).startsWith(p.brand) }
 }
 
 /** ChadFlix's wash: full strength in the top 40%, then shading down to 15% at the bottom. */

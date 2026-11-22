@@ -93,8 +93,33 @@ class HomeStyleTest {
     }
 
     @Test fun serviceRowsAddTheirGenreToTheSameQuery() {
+        // Exclusives and a genre together: both filters, neither replacing the other (Netflix 213 + Comedy 35).
+        val both = platformParams(false, "8", "213", null, "trending", true, "US", "", 35)
+        assertEquals("213", both["with_networks"]); assertEquals("35", both["with_genres"]); assertEquals("8", both["with_watch_providers"])
         assertEquals("35", platformParams(false, "8", "213", null, "trending", true, "US", "", 35)["with_genres"])
         assertEquals(null, platformParams(false, "8", "213", null, "trending", true, "US", "", 0)["with_genres"])
+    }
+
+    @Test fun animeStartsOffUntilTurnedOn() {
+        val never = org.json.JSONObject()
+        assertEquals(false, HomeStyle.isOn(never, HomeStyle.ANIME, true)); assertEquals(false, HomeStyle.isOn(never, HomeStyle.ANIME, false))
+        assertEquals(true, HomeStyle.isOn(org.json.JSONObject().put(HomeStyle.ANIME, true), HomeStyle.ANIME, true))
+    }
+
+    @Test fun exclusivesKeepTitlesOnThatServiceAlone() {
+        val netflix = HomeStyle.platforms[0]
+        // Checked against TMDb (US, 2026-11-22): BoJack streams on Netflix's plans only; The Loud House on Paramount+ too.
+        assertEquals(true, onlyOn(listOf(8 to "Netflix", 1796 to "Netflix Standard with Ads"), netflix))
+        assertEquals(false, onlyOn(listOf(8 to "Netflix", 2303 to "Paramount Plus Premium"), netflix))
+        assertEquals(false, onlyOn(listOf(8 to "Netflix", 188 to "YouTube Premium"), netflix))
+        assertEquals(true, onlyOn(emptyList(), netflix))
+        val paramount = HomeStyle.platforms.first { it.name == "Paramount+" }
+        assertEquals(true, onlyOn(listOf(2303 to "Paramount Plus Premium", 582 to "Paramount+ Amazon Channel"), paramount))
+        val max = HomeStyle.platforms.first { it.name == "Max" }
+        assertEquals(true, onlyOn(listOf(1899 to "HBO Max", 1825 to "HBO Max Amazon Channel"), max))
+        assertEquals(false, onlyOn(listOf(1899 to "HBO Max", 289 to "Cinemax Amazon Channel"), max))
+        val apple = HomeStyle.platforms.first { it.name == "Apple TV+" }
+        assertEquals(false, onlyOn(listOf(350 to "Apple TV", 1855 to "Starz Apple TV channel"), apple))
     }
 
     @Test fun animeRowIsJapaneseAnimationWithItsGenreAndSort() {

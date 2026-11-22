@@ -792,7 +792,9 @@ class SettingsActivity : Screen() {
     private var customStop: (() -> Unit)? = null // stops the jiggle (leaving the group, pausing)
 
     /** A list that scrolls in its own space, with the thin scroll bar whenever it runs past it; [maxH] caps its height. */
-    private inner class BarScroll(private val maxH: Int = 0) : ScrollView(this@SettingsActivity) {
+    /** [clipRows]: rows scrolled past the top or bottom are cut at its edges (its parents don't clip, for focus growth),
+     *  so they never draw over the column's label above; sideways they may still grow past it. */
+    private inner class BarScroll(private val maxH: Int = 0, private val clipRows: Boolean = false) : ScrollView(this@SettingsActivity) {
         private val track = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AFFFFFF }
         private val thumb = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x59FFFFFF }
         private val box = android.graphics.RectF()
@@ -801,7 +803,12 @@ class SettingsActivity : Screen() {
             super.onMeasure(widthSpec, if (maxH > 0) MeasureSpec.makeMeasureSpec(maxH, MeasureSpec.AT_MOST) else heightSpec)
 
         override fun dispatchDraw(canvas: android.graphics.Canvas) {
-            super.dispatchDraw(canvas)
+            if (clipRows) {
+                val saved = canvas.save()
+                canvas.clipRect(scrollX - dp(24), scrollY, scrollX + width + dp(24), scrollY + height)
+                super.dispatchDraw(canvas)
+                canvas.restoreToCount(saved)
+            } else super.dispatchDraw(canvas)
             val content = getChildAt(0)?.height ?: return
             val range = content + paddingTop + paddingBottom - height
             if (range <= 0) return
@@ -853,7 +860,7 @@ class SettingsActivity : Screen() {
         val colH = rowsMaxPx - dp(96)
         fun column(header: String): Pair<LinearLayout, BarScroll> {
             val list = column(Gravity.START).apply { clipChildren = false }
-            val scroll = BarScroll().apply { isVerticalScrollBarEnabled = false; clipToPadding = false; setPadding(0, dp(4), dp(12), dp(4)); addView(list) }
+            val scroll = BarScroll(clipRows = true).apply { isVerticalScrollBarEnabled = false; clipToPadding = false; setPadding(0, dp(4), dp(12), dp(4)); addView(list) }
             return list to scroll.also { it.tag = header }
         }
         val (onList, onScroll) = column(on)

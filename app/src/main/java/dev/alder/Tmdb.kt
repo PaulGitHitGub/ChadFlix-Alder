@@ -169,20 +169,32 @@ object Tmdb {
      * whether at least half its titles found theirs. The page is kept on disk for 12 hours and IMDb ids for good (they
      * never change); an error answer (429 too many requests) throws.
      */
-    fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>): Pair<List<Meta>, Boolean> {
+    /** [only]: a title stays only if its subscription services in the region pass (Exclusives Only); null keeps all. */
+    fun discoverRow(movie: Boolean, params: Map<String, String>, genreNames: Map<Int, String>,
+                    only: ((List<Pair<Int, String>>) -> Boolean)? = null): Pair<List<Meta>, Boolean> {
         val media = if (movie) "movie" else "tv"
         val query = (mapOf("api_key" to KEY, "language" to language, "include_adult" to "false", "page" to "1") + params)
             .entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
         fun kept(url: String, maxAgeMs: Long?) = Http.savedAnswer(url, maxAgeMs = maxAgeMs) ?: Http.get(url, keep = true, timeoutMs = ROW_WAIT, strict = true)
         val found = JSONObject(kept("$BASE/discover/$media?$query", 12 * 3600_000L)).optJSONArray("results").objects()
+        val region = params["watch_region"] ?: this.region
+        val elsewhere = "elsewhere" // a title that streams on another service too: dropped, not missing its IMDb id
         val ids = pool.invokeAll(found.map { t ->
             java.util.concurrent.Callable {
-                runCatching { JSONObject(kept("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", null)).text("imdb_id") }
-                    .getOrNull()?.takeIf { it.startsWith("tt") }
+                runCatching {
+                    if (only == null) JSONObject(kept("$BASE/$media/${t.optInt("id")}/external_ids?api_key=$KEY", null)).text("imdb_id")
+                    else {
+                        val d = JSONObject(kept("$BASE/$media/${t.optInt("id")}?api_key=$KEY&append_to_response=external_ids,watch/providers", 24 * 3600_000L))
+                        val flatrate = d.optJSONObject("watch/providers")?.optJSONObject("results")?.optJSONObject(region)
+                            ?.optJSONArray("flatrate").objects().map { it.optInt("provider_id") to it.optString("provider_name") }
+                        if (only(flatrate)) d.optJSONObject("external_ids")?.text("imdb_id") else elsewhere
+                    }
+                }.getOrNull()?.takeIf { it.startsWith("tt") || it == elsewhere }
             }
         }).map { runCatching { it.get() }.getOrNull() }
-        val titles = found.zip(ids).mapNotNull { (t, imdb) -> imdb?.let { discoverMeta(t, it, movie, genreNames) } }
-        return titles to (titles.size * 2 >= found.size && found.isNotEmpty())
+        val titles = found.zip(ids).mapNotNull { (t, imdb) -> imdb?.takeIf { it != elsewhere }?.let { discoverMeta(t, it, movie, genreNames) } }
+        val counted = ids.count { it != elsewhere }
+        return titles to (titles.size * 2 >= counted && counted > 0)
     }
 
     private const val ROW_WAIT = 8_000
