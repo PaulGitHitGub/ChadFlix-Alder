@@ -18,37 +18,20 @@ are Alder's own: see [Alder](https://github.com/aradhyas8/Alder).
 
 ## Features
 
-### Streaming Exclusives
-
-A **Services** tab with a row each for Netflix, Apple TV+, Disney+, Prime Video, Max, Hulu, Paramount+ and Peacock.
-**Exclusives Only** (on by default) keeps shows that stream on that service alone. Each row can pick a genre and
-Trending, New Series or Top Rated.
-
-<p><img src="docs/chadflix/services.jpg" alt="Services tab" width="49%"> <img src="docs/chadflix/services-menu.jpg" alt="Services row menu" width="49%"></p>
-
-### Showing Tile
-
-The first card of each genre row picks its list:
-
-- **Movies**: Trending (Default), New Releases, Blockbusters, Most Watched, Top Rated.
-- **Shows**: Trending (Default), New Series, Most Watched, Top Rated, Complete Series.
-
-Each row keeps its choice.
-
-<p align="center"><img src="docs/chadflix/showing-tile.jpg" alt="Showing tile" width="75%"></p>
-
-### Customizable Home Page
-
-Turn rows on or off and reorder them, separately for Movies, Shows and Services. Hold OK to rearrange. Rows that are
-off don't load.
-
-<p align="center"><img src="docs/chadflix/customize-home.jpg" alt="Customize Home" width="60%"></p>
-
-### Continue Watching
-
-A progress bar on each card and the time left under the row.
-
-<img src="docs/chadflix/continue-watching.jpg" alt="Continue Watching" width="100%">
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/chadflix/services.jpg" alt="Services tab"><br><b>Streaming Exclusives.</b> A Services tab with a row each for Netflix, Apple TV+, Disney+, Prime Video, Max, Hulu, Paramount+ and Peacock.</td>
+    <td width="50%" valign="top"><img src="docs/chadflix/services-menu.jpg" alt="Services row menu"><br><b>Exclusives Only.</b> On by default: keeps shows that stream on that service alone. Each row can also pick a genre and Trending, New Series or Top Rated.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/chadflix/showing-tile.jpg" alt="Showing tile"><br><b>Showing Tile.</b> The first card of each genre row picks its list, like Trending, New Releases, Most Watched or Top Rated.</td>
+    <td valign="top"><img src="docs/chadflix/genre-rows.jpg" alt="Genre rows on the Shows tab"><br><b>Genre Rows.</b> Rows by genre on Movies and Shows. Each one keeps the list you chose.</td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/chadflix/customize-home.jpg" alt="Customize Home"><br><b>Customizable Home Page.</b> Turn rows on or off and reorder them, separately for Movies, Shows and Services. Hold OK to rearrange.</td>
+    <td valign="top"><img src="docs/chadflix/continue-watching.jpg" alt="Continue Watching"><br><b>Continue Watching.</b> A progress bar on each card and the time left under the row.</td>
+  </tr>
+</table>
 
 ## Install
 
