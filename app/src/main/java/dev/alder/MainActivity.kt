@@ -750,6 +750,55 @@ class MainActivity : Screen() {
         prefetchLanding(ordered.getOrNull(at + 1), round)
     }
 
+    // ChadFlix: Settings › Show FPS. Off, nothing is registered. On, Android reports each drawn frame on a thread of its
+    // own, where a counter goes up (nothing allocated per frame), and the corner's words change once a second.
+    private var fpsView: TextView? = null
+    private var fpsThread: android.os.HandlerThread? = null
+    private var fpsListener: Any? = null // a Window.OnFrameMetricsAvailableListener (Android 7+)
+    private val fpsFrames = java.util.concurrent.atomic.AtomicInteger()
+    private var fpsShown = -1
+    private val fpsTick = object : Runnable {
+        override fun run() {
+            val n = fpsFrames.getAndSet(0)
+            fpsView?.let { v ->
+                // Updating the words draws a frame itself: a second with at most that one is idle, the last count dimmed.
+                if (n <= 1) v.alpha = 0.35f
+                else { if (n != fpsShown) { fpsShown = n; v.text = getString(R.string.fps, n) }; v.alpha = 0.7f }
+            }
+            main.postDelayed(this, 1000L)
+        }
+    }
+
+    private fun startFps() {
+        if (android.os.Build.VERSION.SDK_INT < 24 || fpsListener != null || !Settings.showFps(this)) return
+        val view = fpsView ?: text("", 10f, color = HomeStyle.WHITE).also { v ->
+            fpsView = v
+            findViewById<FrameLayout>(android.R.id.content).addView(v, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START)
+                .apply { leftMargin = dp(8); topMargin = dp(4) }) // the corner, left of and above the avatar
+        }
+        view.alpha = 0.35f
+        view.visibility = View.VISIBLE
+        val thread = android.os.HandlerThread("fps").also { it.start() }
+        val listener = android.view.Window.OnFrameMetricsAvailableListener { _, _, _ -> fpsFrames.incrementAndGet() }
+        window.addOnFrameMetricsAvailableListener(listener, android.os.Handler(thread.looper))
+        fpsThread = thread
+        fpsListener = listener
+        fpsFrames.set(0)
+        main.postDelayed(fpsTick, 1000L)
+    }
+
+    private fun stopFps() {
+        main.removeCallbacks(fpsTick)
+        val listener = fpsListener ?: return
+        if (android.os.Build.VERSION.SDK_INT >= 24) runCatching {
+            window.removeOnFrameMetricsAvailableListener(listener as android.view.Window.OnFrameMetricsAvailableListener)
+        }
+        fpsListener = null
+        fpsThread?.quitSafely()
+        fpsThread = null
+        fpsView?.visibility = View.GONE
+    }
+
     /** ChadFlix: where the remote goes back to in the rows: the last card, but a genre row's title rather than its tile. */
     private fun lastOrTitle(): View? {
         val card = last as? MediaCardView ?: return last
@@ -761,6 +810,7 @@ class MainActivity : Screen() {
     override fun onResume() {
         super.onResume()
         if (!::profile.isInitialized) return
+        startFps()
         val key = profile.authKey
         background({ syncWatchProgress(key) }) {}
         // ponytail: idle dim and the cinema screensaver are off (2026-10-26, not wanted yet); post `idle` here to bring the cinema back.
@@ -788,6 +838,7 @@ class MainActivity : Screen() {
 
     override fun onPause() {
         cancelStreamResolution()
+        stopFps()
         super.onPause()
         main.removeCallbacks(idle)
         main.removeCallbacks(idleDim)
