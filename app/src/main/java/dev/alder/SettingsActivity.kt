@@ -410,17 +410,20 @@ class SettingsActivity : Screen() {
 
             override fun dispatchDraw(canvas: android.graphics.Canvas) {
                 super.dispatchDraw(canvas)
+                // this.width / this.height: onCreate's own width and height (the screen in dp) would shadow them here.
+                val viewW = this.width
+                val viewH = this.height
                 val content = getChildAt(0)?.height ?: return
-                val range = content + paddingTop + paddingBottom - height
+                val range = content + paddingTop + paddingBottom - viewH
                 if (range <= 0) return
                 val w = dp(3).toFloat()
                 val r = w / 2
-                val x = width - dp(6) - w // in the rows' right padding
+                val x = viewW - dp(6) - w // in the rows' right padding
                 val top = scrollY + paddingTop.toFloat()
-                val trackH = height - paddingTop - paddingBottom.toFloat()
+                val trackH = viewH - paddingTop - paddingBottom.toFloat()
                 box.set(x, top, x + w, top + trackH)
                 canvas.drawRoundRect(box, r, r, track)
-                val thumbH = maxOf(dp(24).toFloat(), trackH * height / (content + paddingTop + paddingBottom))
+                val thumbH = maxOf(dp(24).toFloat(), trackH * viewH / (content + paddingTop + paddingBottom))
                 val thumbTop = top + (trackH - thumbH) * scrollY / range
                 box.set(x, thumbTop, x + w, thumbTop + thumbH)
                 canvas.drawRoundRect(box, r, r, thumb)
