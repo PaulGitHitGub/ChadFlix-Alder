@@ -337,6 +337,7 @@ class SettingsActivity : Screen() {
     private lateinit var groups: LinearLayout
     private lateinit var detailRows: LinearLayout
     private lateinit var rowsScroll: ScrollView
+    private var rowsMaxPx = 0 // ChadFlix: the settings list's height, for Customize Home's columns
     private lateinit var detailTitle: TextView
     private lateinit var hint: TextView
     private lateinit var profileName: TextView
@@ -400,36 +401,8 @@ class SettingsActivity : Screen() {
         // A long group (Profile) scrolls in its own space: drawn past it, rows ran over the group's title and pushed the
         // help off the screen. The padding keeps room for the focused row's glow inside that space.
         val rowsMax = dp((height - 210).toInt())
-        rowsScroll = object : ScrollView(this) {
-            override fun onMeasure(widthSpec: Int, heightSpec: Int) =
-                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(rowsMax, MeasureSpec.AT_MOST))
-
-            // ChadFlix: a thin bar on the right whenever the rows run past the panel, so it's clear there's more below.
-            private val track = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AFFFFFF }
-            private val thumb = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x59FFFFFF }
-            private val box = android.graphics.RectF()
-
-            override fun dispatchDraw(canvas: android.graphics.Canvas) {
-                super.dispatchDraw(canvas)
-                // this.width / this.height: onCreate's own width and height (the screen in dp) would shadow them here.
-                val viewW = this.width
-                val viewH = this.height
-                val content = getChildAt(0)?.height ?: return
-                val range = content + paddingTop + paddingBottom - viewH
-                if (range <= 0) return
-                val w = dp(3).toFloat()
-                val r = w / 2
-                val x = viewW - dp(6) - w // in the rows' right padding
-                val top = scrollY + paddingTop.toFloat()
-                val trackH = viewH - paddingTop - paddingBottom.toFloat()
-                box.set(x, top, x + w, top + trackH)
-                canvas.drawRoundRect(box, r, r, track)
-                val thumbH = maxOf(dp(24).toFloat(), trackH * viewH / (content + paddingTop + paddingBottom))
-                val thumbTop = top + (trackH - thumbH) * scrollY / range
-                box.set(x, thumbTop, x + w, thumbTop + thumbH)
-                canvas.drawRoundRect(box, r, r, thumb)
-            }
-        }.apply {
+        rowsMaxPx = rowsMax
+        rowsScroll = BarScroll(rowsMax).apply {
             isVerticalScrollBarEnabled = false
             clipToPadding = false
             setPadding(dp(12), dp(6), dp(12), dp(12))
@@ -467,6 +440,11 @@ class SettingsActivity : Screen() {
         (reopenGroup ?: selectedGroup)?.let { outState.putString("group", it.name) }
     }
 
+    override fun onPause() {
+        customStop?.invoke() // ChadFlix: Customize Home's edit mode ends (and its rows stop wobbling)
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
         groupBadges[Group.ABOUT]?.visibility = if (Updates.hasUpdate(this)) View.VISIBLE else View.GONE
@@ -491,14 +469,16 @@ class SettingsActivity : Screen() {
                 groupViews.values.any { it.hasFocus() }) {
                 if (firstDetail?.requestFocus() == true) return true
             }
-            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customMoving && currentFocus !== customLeftStop &&
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customOwnsLeft(currentFocus) &&
                 currentFocus?.let { isInside(it, detailRows) && it !in choiceRows } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
             }
             // The rows end where they end: Down past the last one stays put instead of falling into the group list.
             if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN && detailRows.childCount > 0 &&
                 currentFocus === detailRows.getChildAt(detailRows.childCount - 1)) return true
-            if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK) customMoving = false // ChadFlix: Back drops a picked-up row
+            // ChadFlix: in Customize Home, Back drops a picked-up row or leaves edit mode before it leaves the panel.
+            if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK && currentFocus?.let { isInside(it, detailRows) } == true &&
+                customBack?.invoke() == true) return true
             if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK &&
                 currentFocus?.let { isInside(it, detailRows) } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
@@ -546,6 +526,8 @@ class SettingsActivity : Screen() {
             if (!view.hasFocus()) view.background = if (item == group) tile(8) else null
         }
         detailTitle.text = getString(group.words)
+        customStop?.invoke() // ChadFlix: Customize Home's edit mode ends with its group
+        customStop = null; customBack = null; customOwnsLeft = { false }
         detailRows.removeAllViews()
         rowsScroll.scrollTo(0, 0)
         choiceRows.clear()
@@ -802,127 +784,238 @@ class SettingsActivity : Screen() {
         }
     }
 
-    // ---------- ChadFlix: Customize Home, as ChadFlix on Kodi has it ----------
+    // ---------- ChadFlix: Customize Home v2: an On and an Off column, and an iPhone-style edit mode ----------
 
-    private var customMoving = false // a row is picked up
-    private var customLeftStop: View? = null // Customize Home's Shows pill
+    private var customOwnsLeft: (View?) -> Boolean = { false } // views where Left stays in the panel (not back to the menu)
+    private var customBack: (() -> Boolean)? = null // Back: drops a picked-up row, or leaves edit mode
+    private var customStop: (() -> Unit)? = null // stops the jiggle (leaving the group, pausing)
+
+    /** A list that scrolls in its own space, with the thin scroll bar whenever it runs past it; [maxH] caps its height. */
+    private inner class BarScroll(private val maxH: Int = 0) : ScrollView(this@SettingsActivity) {
+        private val track = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x1AFFFFFF }
+        private val thumb = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = 0x59FFFFFF }
+        private val box = android.graphics.RectF()
+
+        override fun onMeasure(widthSpec: Int, heightSpec: Int) =
+            super.onMeasure(widthSpec, if (maxH > 0) MeasureSpec.makeMeasureSpec(maxH, MeasureSpec.AT_MOST) else heightSpec)
+
+        override fun dispatchDraw(canvas: android.graphics.Canvas) {
+            super.dispatchDraw(canvas)
+            val content = getChildAt(0)?.height ?: return
+            val range = content + paddingTop + paddingBottom - height
+            if (range <= 0) return
+            val w = dp(3).toFloat()
+            val r = w / 2
+            val x = width - dp(6) - w // in the rows' right padding
+            val top = scrollY + paddingTop.toFloat()
+            val trackH = height - paddingTop - paddingBottom.toFloat()
+            box.set(x, top, x + w, top + trackH)
+            canvas.drawRoundRect(box, r, r, track)
+            val thumbH = maxOf(dp(24).toFloat(), trackH * height / (content + paddingTop + paddingBottom))
+            val thumbTop = top + (trackH - thumbH) * scrollY / range
+            box.set(x, thumbTop, x + w, thumbTop + thumbH)
+            canvas.drawRoundRect(box, r, r, thumb)
+        }
+    }
 
     /**
-     * Movies | Shows pills (focusing one shows its rows), a fixed "Continue Watching · Always First" line, then the page's
-     * rows (genres, then add-on rows): check when on, name, grip, On / Off. On a row: OK turns it on or off, Right picks it
-     * up; picked up, Up / Down move it a place and OK or Left drop it. Back drops it and leaves. Every change is saved at
-     * once, in the order and on/off the home rows' hold-OK menu uses too.
+     * Movies | Shows pills, then two columns. On: "Continue Watching · Always First", then the page's rows in their order,
+     * each with a grip. Off: every other row it could show (genres, then add-on rows), A to Z. OK moves a row to the other
+     * column (turned on, it goes to the bottom of On); Left / Right switch columns. Hold OK in On: edit mode, every On row
+     * wobbles; OK picks one up (red outline) and drops it, Up / Down move it; hold OK again or Back leaves (Back drops a
+     * picked-up row first). Saved at once, in the order and on/off the home rows' hold-OK menu uses too.
      */
     private fun customizeHome() {
         detailRows.addView(text(R.string.customize_home_sub, SMALL, color = TEXT_2),
             LinearLayout.LayoutParams(-1, -2).apply { marginStart = dp(12); bottomMargin = dp(12) })
-        val list = column(Gravity.START)
         var movie = true
-        customMoving = false
+        var edit = false
+        var picked = -1 // the On row picked up in edit mode
+        var onRows = mutableListOf<String>()
+        var offRows = listOf<String>()
+        val onViews = mutableListOf<View>()
+        val offViews = mutableListOf<View>()
+        val jiggles = HashMap<View, android.animation.ValueAnimator>()
+        val still = android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        // Room for a third pill (Services) later: the pills are a list.
         val tabViews = listOf(R.string.tab_movies, R.string.tab_shows).map { words ->
             text(words, BODY, bold = true).apply { id = View.generateViewId(); gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
         }
-        fun styleTabs() = tabViews.forEachIndexed { i, t ->
-            val open = (i == 0) == movie
+        fun openPill() = tabViews[if (movie) 0 else 1]
+        fun styleTabs() = tabViews.forEach { t ->
+            val open = t === openPill()
             t.background = if (t.isFocused) HomeStyle.pill(HomeStyle.WHITE) else if (open) HomeStyle.pill(0x40FFFFFF) else null
             t.setTextColor(if (t.isFocused) HomeStyle.BLACK else if (open) HomeStyle.WHITE else 0xB0FFFFFF.toInt())
         }
-        fun fill() {
-            list.removeAllViews()
-            list.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off
+        val colH = rowsMaxPx - dp(96)
+        fun column(header: String): Pair<LinearLayout, BarScroll> {
+            val list = column(Gravity.START).apply { clipChildren = false }
+            val scroll = BarScroll().apply { isVerticalScrollBarEnabled = false; clipToPadding = false; setPadding(0, dp(4), dp(12), dp(4)); addView(list) }
+            return list to scroll.also { it.tag = header }
+        }
+        val (onList, onScroll) = column(on)
+        val (offList, offScroll) = column(off)
+        val columns = LinearLayout(this).apply {
+            listOf(onScroll, offScroll).forEachIndexed { i, sc ->
+                addView(column(Gravity.START,
+                    text(sc.tag as String, SMALL, bold = true, color = TEXT_3).apply { setPadding(dp(12), 0, 0, dp(4)) },
+                ).apply { addView(sc, LinearLayout.LayoutParams(-1, colH)) },
+                    LinearLayout.LayoutParams(0, -2, 1f).apply { if (i == 1) marginStart = dp(8) })
+            }
+        }
+        fun page() = if (movie) "Movies" else "Shows" // the page's label in MainActivity
+        fun shown(t: String) = HomeStyle.isOn(HomeStyle.rowsOn(this, page()), t, movie) && t !in Settings.hiddenRows(this)
+        fun save() = HomeStyle.saveRowOrder(this, page(), onRows + offRows)
+        fun jiggle() = onViews.forEachIndexed { i, v -> // the visible On rows only; transforms on the render thread, no layout
+            val visible = v.bottom > onScroll.scrollY && v.top < onScroll.scrollY + onScroll.height
+            val want = edit && visible && i != picked && !still
+            val a = jiggles[v]
+            if (want && a == null) jiggles[v] = android.animation.ValueAnimator.ofFloat(-1f, 1f).apply {
+                duration = (250L..300L).random()
+                repeatCount = android.animation.ValueAnimator.INFINITE
+                repeatMode = android.animation.ValueAnimator.REVERSE
+                interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+                val lift = resources.displayMetrics.density * 0.5f
+                addUpdateListener { val f = it.animatedValue as Float; v.rotation = 0.8f * f; v.translationY = lift * f }
+                start()
+                currentPlayTime = (0L until duration).random() // out of phase
+            } else if (!want && a != null) {
+                a.cancel(); jiggles.remove(v)
+                v.animate().rotation(0f).translationY(0f).setDuration(Screen.FOCUS_MS).setInterpolator(Screen.EASE_OUT).start()
+            }
+        }
+        fun stopJiggle() { jiggles.forEach { (v, a) -> a.cancel(); v.rotation = 0f; v.translationY = 0f }; jiggles.clear() }
+        fun style(v: View, name: TextView, grip: ImageView?, lit: Boolean, isOn: Boolean, up: Boolean) {
+            v.background = when {
+                up -> android.graphics.drawable.GradientDrawable().apply { setColor(HomeStyle.WHITE); cornerRadius = 999f; setStroke(dp(2), HomeStyle.LIST_RED) }
+                lit -> HomeStyle.pill(HomeStyle.WHITE)
+                edit && still && isOn -> android.graphics.drawable.GradientDrawable().apply { cornerRadius = 999f; setStroke(dp(1), 0x66FFFFFF) }
+                else -> null
+            }
+            v.scaleX = if (up) 1.03f else 1f; v.scaleY = v.scaleX
+            name.setTextColor(if (lit || up) HomeStyle.BLACK else if (isOn) HomeStyle.WHITE else 0xB3FFFFFF.toInt())
+            name.paint.isFakeBoldText = lit || up
+            grip?.imageTintList = ColorStateList.valueOf(if (lit || up) 0xFF3A3A3A.toInt() else 0x80FFFFFF.toInt())
+        }
+        lateinit var render: (Boolean, Int, Boolean) -> Unit // (in On, at index, move the remote there)
+        fun row(title: String, isOn: Boolean, index: Int): View {
+            val name = text(title, BODY).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+            val grip = if (isOn) ImageView(this).apply { setImageResource(R.drawable.ic_grip) } else null
+            val v = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                isFocusable = true
+                setPadding(dp(12), 0, dp(14), 0)
+                addView(name, LinearLayout.LayoutParams(0, -2, 1f))
+                grip?.let { addView(it, LinearLayout.LayoutParams(dp(14), dp(14))) }
+            }
+            fun restyle() = style(v, name, grip, v.isFocused, isOn, isOn && index == picked)
+            v.setOnFocusChangeListener { _, has -> restyle(); if (has) hint.text = getString(R.string.hint_customize) }
+            v.setOnClickListener {
+                when {
+                    isOn && edit -> { picked = if (picked == index) -1 else index; restyle(); jiggle() } // pick it up / drop it
+                    isOn -> { // off: out of the order, into Off
+                        HomeStyle.setRowOn(this, page(), title, false)
+                        onRows.removeAt(index); offRows = (offRows + title).sortedBy { it.lowercase() }; save()
+                        render(true, index, true)
+                    }
+                    else -> { // on: at the bottom of On
+                        HomeStyle.setRowOn(this, page(), title, true); Settings.unhideRow(this, title)
+                        onRows.add(title); offRows = offRows - title; save()
+                        render(false, index, true)
+                    }
+                }
+            }
+            if (isOn) v.setOnLongClickListener { // hold OK: into or out of edit mode
+                edit = !edit
+                picked = -1
+                render(true, index, true)
+                true
+            }
+            v.setOnKeyListener { _, code, event ->
+                if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                val list = if (isOn) onRows else offRows
+                when (code) {
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        if (isOn && !edit) offViews.getOrNull(index.coerceAtMost(offViews.size - 1))?.requestFocus()
+                        true
+                    }
+                    android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (!isOn) onViews.getOrNull(index.coerceAtMost(onViews.size - 1))?.requestFocus()
+                        !isOn || edit // in On (not editing) Left goes back to the menu, as elsewhere in Settings
+                    }
+                    android.view.KeyEvent.KEYCODE_DPAD_UP, android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        val up = code == android.view.KeyEvent.KEYCODE_DPAD_UP
+                        val j = index + if (up) -1 else 1
+                        when {
+                            isOn && edit && picked == index -> { // move the picked-up row
+                                if (j in onRows.indices) {
+                                    onRows[index] = onRows[j].also { onRows[j] = onRows[index] }
+                                    picked = j; save(); render(true, j, true)
+                                }
+                                true
+                            }
+                            j > list.lastIndex -> true // the list ends here
+                            else -> false
+                        }
+                    }
+                    else -> false
+                }
+            }
+            restyle()
+            return v
+        }
+        render = { inOn, at, refocus ->
+            if (refocus) openPill().requestFocus() // focus waits on the panel's own pill while the lists are rebuilt
+            stopJiggle()
+            onList.removeAllViews(); offList.removeAllViews(); onViews.clear(); offViews.clear()
+            onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), 0, dp(14), 0)
                 addView(ImageView(context).apply { setImageResource(R.drawable.ic_lock); imageTintList = ColorStateList.valueOf(0x80FFFFFF.toInt()) },
-                    LinearLayout.LayoutParams(dp(14), dp(14)))
-                addView(text(R.string.row_continue, BODY, color = 0x99FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
-                addView(text("·  ${getString(R.string.always_first)}", SMALL, color = 0x80FFFFFF.toInt()), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
-            }, LinearLayout.LayoutParams(-1, dp(36)))
-            val page = if (movie) "Movies" else "Shows" // the page's label in MainActivity
-            val order = HomeStyle.ordered(this, page, movie, HomeStyle.knownRows(this, page, movie)) { it }.toMutableList()
-            val binds = mutableListOf<() -> Unit>()
-            order.indices.forEach { i ->
-                val check = ImageView(this).apply { setImageResource(R.drawable.ic_check) }
-                val name = text("", BODY)
-                val grip = ImageView(this).apply { setImageResource(R.drawable.ic_grip) }
-                val state = text("", SMALL).apply { gravity = Gravity.END }
-                val row = LinearLayout(this).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    isFocusable = true
-                    setPadding(dp(12), 0, dp(14), 0)
-                    addView(check, LinearLayout.LayoutParams(dp(16), dp(16)))
-                    addView(name, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
-                    addView(grip, LinearLayout.LayoutParams(dp(14), dp(14)))
-                    addView(state, LinearLayout.LayoutParams(dp(36), -2).apply { marginStart = dp(12) })
-                }
-                fun on() = HomeStyle.isOn(HomeStyle.rowsOn(this, page), order[i], movie) && order[i] !in Settings.hiddenRows(this)
-                fun bind() {
-                    val lit = row.isFocused
-                    val on = on()
-                    name.text = order[i]
-                    state.text = if (on) this.on else off
-                    check.visibility = if (on) View.VISIBLE else View.INVISIBLE
-                    row.background = if (!lit) null else android.graphics.drawable.GradientDrawable().apply {
-                        setColor(HomeStyle.WHITE); cornerRadius = 999f
-                        if (customMoving) setStroke(dp(2), HomeStyle.LIST_RED) // picked up
-                    }
-                    name.setTextColor(if (lit) HomeStyle.BLACK else if (on) HomeStyle.WHITE else 0x99FFFFFF.toInt())
-                    name.paint.isFakeBoldText = lit
-                    check.imageTintList = ColorStateList.valueOf(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
-                    grip.imageTintList = ColorStateList.valueOf(if (lit) 0xFF3A3A3A.toInt() else 0x80FFFFFF.toInt())
-                    state.setTextColor(if (lit) 0xFF3A3A3A.toInt() else if (on) 0xB0FFFFFF.toInt() else 0x80FFFFFF.toInt())
-                }
-                binds += ::bind
-                row.setOnFocusChangeListener { _, has -> bind(); if (has) hint.text = getString(R.string.hint_customize) }
-                row.setOnClickListener {
-                    if (customMoving) customMoving = false // drop it here
-                    else {
-                        val turnOn = !on()
-                        HomeStyle.setRowOn(this, page, order[i], turnOn)
-                        if (turnOn) Settings.unhideRow(this, order[i])
-                    }
-                    bind()
-                }
-                row.setOnKeyListener { _, code, event ->
-                    if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-                    val up = code == android.view.KeyEvent.KEYCODE_DPAD_UP
-                    when {
-                        code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> { customMoving = true; bind(); true } // pick it up
-                        customMoving && code == android.view.KeyEvent.KEYCODE_DPAD_LEFT -> { customMoving = false; bind(); true } // drop
-                        customMoving && (up || code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) -> {
-                            val j = i + if (up) -1 else 1
-                            if (j in order.indices) {
-                                order[i] = order[j].also { order[j] = order[i] }
-                                HomeStyle.saveRowOrder(this, page, order)
-                                list.getChildAt(j + 1).requestFocus()
-                                binds[i](); binds[j]()
-                            }
-                            true // the fixed first line and the list's end stop it
-                        }
-                        code == android.view.KeyEvent.KEYCODE_DPAD_DOWN && i == order.lastIndex -> true
-                        else -> false
-                    }
-                }
-                list.addView(row, LinearLayout.LayoutParams(-1, dp(36)))
-                bind()
-            }
-            // Up from the first row goes to the open list's pill, not to the nearest one (which would switch the list).
-            list.getChildAt(1)?.nextFocusUpId = tabViews[if (movie) 0 else 1].id
+                    LinearLayout.LayoutParams(dp(13), dp(13)))
+                addView(text("${getString(R.string.row_continue)}  ·  ${getString(R.string.always_first)}", SMALL, color = 0x99FFFFFF.toInt()).apply {
+                    maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
+            }, LinearLayout.LayoutParams(-1, dp(34)))
+            onRows.forEachIndexed { i, t -> row(t, true, i).also { onViews += it; onList.addView(it, LinearLayout.LayoutParams(-1, dp(34))) } }
+            offRows.forEachIndexed { i, t -> row(t, false, i).also { offViews += it; offList.addView(it, LinearLayout.LayoutParams(-1, dp(34))) } }
+            // Up from the top of either column goes to the open list's pill.
+            listOfNotNull(onViews.firstOrNull(), offViews.firstOrNull()).forEach { it.nextFocusUpId = openPill().id }
+            if (refocus) ((if (inOn) onViews else offViews).let { it.getOrNull(at.coerceAtMost(it.size - 1)) }
+                ?: (if (inOn) offViews else onViews).firstOrNull())?.requestFocus()
+            onScroll.post { jiggle() }
         }
+        fun load() {
+            val all = HomeStyle.ordered(this, page(), movie, HomeStyle.knownRows(this, page(), movie)) { it }
+            onRows = all.filter(::shown).toMutableList()
+            offRows = all.filterNot(::shown).sortedBy { it.lowercase() }
+            edit = false; picked = -1
+            render(true, 0, false) // the remote stays where it is (a pill, or the menu)
+        }
+        onScroll.setOnScrollChangeListener { _, _, _, _, _ -> if (edit) jiggle() }
         tabViews.forEachIndexed { i, t ->
             t.setOnFocusChangeListener { _, has ->
-                if (has && movie != (i == 0)) { movie = i == 0; customMoving = false; fill() }
+                if (has && movie != (i == 0)) { movie = i == 0; load() }
                 if (has) hint.text = getString(R.string.hint_customize)
                 styleTabs()
             }
-            t.setOnClickListener { list.getChildAt(1)?.requestFocus() }
+            t.setOnClickListener { (onViews.firstOrNull() ?: offViews.firstOrNull())?.requestFocus() }
             tabs.addView(t, LinearLayout.LayoutParams(-2, dp(30)).apply { marginEnd = dp(8) })
         }
         detailRows.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12); bottomMargin = dp(8) })
-        detailRows.addView(list, LinearLayout.LayoutParams(-1, -2))
+        detailRows.addView(columns, LinearLayout.LayoutParams(-1, -2))
         firstDetail = tabViews[0]
-        customLeftStop = tabViews[1] // Left on Shows goes to Movies, not to the menu
-        fill()
+        customOwnsLeft = { v -> v === tabViews[1] || v in offViews || (edit && v in onViews) }
+        customBack = {
+            when {
+                picked >= 0 -> { picked = -1; render(true, onViews.indexOfFirst { it.isFocused }.coerceAtLeast(0), true); true } // drop it first
+                edit -> { edit = false; render(true, onViews.indexOfFirst { it.isFocused }.coerceAtLeast(0), true); true } // leave edit mode
+                else -> false
+            }
+        }
+        customStop = { edit = false; picked = -1; stopJiggle() }
+        load()
         styleTabs()
     }
 
