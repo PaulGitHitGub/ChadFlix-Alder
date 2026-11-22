@@ -434,6 +434,8 @@ class DetailsActivity : Screen() {
                 }
                 addView(logo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
                 title.visibility = View.INVISIBLE // ChadFlix: no flash of the text title while the logo loads; the failed path below shows it
+                // A slow logo host only fails after the network timeouts: show the text title after 1.5 s instead of a blank space.
+                title.postDelayed({ if (logo.visibility != View.VISIBLE) title.visibility = View.VISIBLE }, 1500)
                 // ChadFlix: cropped to its ink, decoded at full source width (1000 px > the 800 px logos: no scale-down first),
                 // then sized by constant area and never above its own pixels.
                 Images.load(m.logo ?: Images.logoFor(m.id), logo, 1000, urgent = true, look = Images.trimmedLogo, failed = {

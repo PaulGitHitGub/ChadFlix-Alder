@@ -101,7 +101,9 @@ object Images {
         val w = src.width; val h = src.height
         val pixels = IntArray(w * h).also { src.getPixels(it, 0, w, 0, 0, w, h) }
         val box = inkBounds(w, h, pixels)
-        if (box == null || (box[0] == 0 && box[1] == 0 && box[2] == w && box[3] == h)) src
+        // A logo with no visible ink fails (not cached), so the page falls back to the text title.
+        if (box == null) { src.recycle(); error("logo has no ink") }
+        if (box[0] == 0 && box[1] == 0 && box[2] == w && box[3] == h) src
         else Bitmap.createBitmap(src, box[0], box[1], box[2] - box[0], box[3] - box[1]).also { if (it !== src) src.recycle() }
     }
 
