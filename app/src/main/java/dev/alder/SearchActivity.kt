@@ -88,6 +88,7 @@ class SearchActivity : Screen() {
     private var beforeVoice: String? = null // the query as it was when listening began, while the header shows voice's words
     private var quiet = false // the header's words are changing for voice: don't search them
     private val restoreHeader = Runnable { restoreQuery() }
+    private var searched: String? = null // the query the results on screen are for
     private var navTabIds = emptyList<String>()
     private val rightEdgeKeys = mutableSetOf<View>()
     private val cards = mutableListOf<MediaCardView>()
@@ -179,6 +180,18 @@ class SearchActivity : Screen() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                if (!quiet) {
+                    // Real words (typing, a recent chip, Clear, Delete): voice gives way, so a late result
+                    // or the "Didn't catch that" restore never overwrites them.
+                    if (listening) {
+                        Log.i(VOICE_TAG, "cancel: typed")
+                        runCatching { recognizer?.cancel() }
+                        listening = false
+                        styleVoice()
+                    }
+                    main.removeCallbacks(restoreHeader)
+                    beforeVoice = null
+                }
                 updateClear()
                 if (quiet) return
                 ++request
@@ -465,6 +478,8 @@ class SearchActivity : Screen() {
         val old = beforeVoice ?: return
         beforeVoice = null
         setHeader(old)
+        // Listening dropped a pending typed search: run it now so the header and the results agree.
+        if (old.trim() != searched) { main.removeCallbacks(typed); main.post(typed) }
     }
 
     /** The Shield's own speech service, named outright: tried once when the default binding refuses. */
@@ -488,6 +503,7 @@ class SearchActivity : Screen() {
         val r = runCatching { recognizer() }.getOrElse { Log.w(VOICE_TAG, "create failed", it); return }
         r.cancel() // one session at a time
         restoreQuery()
+        main.removeCallbacks(typed) // a pending typed search mustn't run on voice's partial words
         beforeVoice = input.text.toString()
         heardSpeech = false
         listening = true
@@ -763,6 +779,7 @@ class SearchActivity : Screen() {
 
     private fun search(moveFocus: Boolean, previous: Failure? = null) {
         val query = input.text.toString().trim()
+        searched = query
         val token = ++request
         userMovedFocus = false
         searchTasks.forEach { it.cancel(true) }
