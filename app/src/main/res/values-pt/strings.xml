@@ -368,8 +368,8 @@
     <string name="unhide_row_hint">Selecione uma fileira para trazê-la de volta.</string>
     <string name="custom">Personalizado</string>
     <string name="source_choice">Escolha de fonte</string>
-    <string name="source_choice_hint">Melhor imagem: Blu-ray completo e Dolby Vision primeiro. Equilibrado: arquivos menores. Início rápido: versões web. Ordem do complemento: segue o complemento.</string>
-    <string name="preset_addon_order">Ordem do complemento</string>
+    <string name="source_choice_hint">Melhor imagem: Blu-ray completo e Dolby Vision primeiro. Equilibrado: arquivos menores. Início rápido: versões web. Qualquer versão: a cópia mais nítida, seja qual for a versão.</string>
+    <string name="preset_addon_order">Qualquer versão</string>
     <string name="preset_best_picture">Melhor imagem</string>
     <string name="preset_balanced">Equilibrado</string>
     <string name="preset_fast_start">Início rápido</string>

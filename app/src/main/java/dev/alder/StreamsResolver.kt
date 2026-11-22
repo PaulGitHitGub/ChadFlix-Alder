@@ -28,8 +28,7 @@ object StreamsResolver {
         val file = prefs.getString("file:$videoId", null)
         val binge = metaId?.let { prefs.getString("binge:$it", null) }
         val tv = Device.of(context)
-        val preferResolution = Settings.release(context) == "remux" && Settings.hdrPref(context) == "dv"
-        return rank(streams, tv, Settings.displayHeight(context), file, binge, maxHeight > 0, preference(context), preferResolution)
+        return rank(streams, tv, Settings.displayHeight(context), file, binge, maxHeight > 0, preference(context))
     }
 
     internal fun rank(
@@ -39,8 +38,7 @@ object StreamsResolver {
         file: String?,
         binge: String?,
         lower: Boolean,
-        prefer: (Stream) -> Int,
-        preferResolution: Boolean
+        prefer: (Stream) -> Int
     ): List<Stream> {
         val displayHeight = if (displayOverride > 0) displayOverride else tv.height
         // P2P after every direct or debrid source: peers start slower and can't be checked first.
@@ -54,7 +52,8 @@ object StreamsResolver {
             .thenBy { it.dolbyVisionOnly && !tv.dolbyVision }
             .thenByDescending { it.fit(tv, displayHeight) }
             .thenByDescending(prefer)
-            .thenByDescending { if (preferResolution && it.height <= displayHeight) it.height else 0 }
+            // Among equally preferred sources, the sharpest picture the TV can show, not the add-on's first.
+            .thenByDescending { if (it.height <= displayHeight) it.height else 0 }
             .thenByDescending { if (it.torrent != null) it.seeders ?: 0 else 0 })
     }
 

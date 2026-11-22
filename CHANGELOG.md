@@ -36,6 +36,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **Send a crash report.** If Alder stops, it offers to send a report the next time you open it. Reports never include your account.
 
 ### Easier to use
+- **The sharpest picture, first.** Press Play and Alder picks the sharpest copy your TV can show, not the first one an add-on lists. Your language and quality choices still come first. The **Add-on's order** choice is now called **Any release**.
 - **See the updated My Alder.** The README shows how title details appear above the posters.
 - **More space in My Alder.** The title and its details have more room below the filters.
 - **See more in Discover.** Above the posters, see a title's year or run, genre, seasons and ratings, like in **My Alder**.
