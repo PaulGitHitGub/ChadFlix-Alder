@@ -771,7 +771,7 @@ class MainActivity : Screen() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
-            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false) } // where the hold ends
+            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false); showInfo() } // where the hold ends
         }
         if (event.action == KeyEvent.ACTION_DOWN) {
             restoreCatalogFocus = null
@@ -1454,6 +1454,24 @@ class MainActivity : Screen() {
         if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() }, left)
         else factsList += listOfNotNull(kind, genre, year, length, meta?.certification, left)
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
+        // ChadFlix: the ratings (views, and any MDBList request) only for the card the remote stops on: racing past films
+        // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
+        main.removeCallbacks(ratingsTask)
+        if (ratingsItem !== item) heroRatings.removeAllViews() // another title's ratings go at once; the same title's stay
+        ratingsTask = Runnable { if (heroItem === item) showRatings(item, meta) }
+        if (page.isBrowse) main.postDelayed(ratingsTask, HOME_HERO_WAIT) else ratingsTask.run()
+        val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
+        heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
+        // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
+        heroAbout.text = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
+        if (mode == Mode.BROWSE && !page.isBrowse) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS) // ChadFlix: showHero fades home's
+            .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
+    }
+
+    private var ratingsTask = Runnable {}
+    private var ratingsItem: Item? = null // whose ratings show
+
+    private fun showRatings(item: Item, meta: Meta?) {
         val rating = meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb ")
         // Letterboxd comes from this session or the disk at once; a film never asked yet fills in when MDBList answers.
         val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
@@ -1468,12 +1486,7 @@ class MainActivity : Screen() {
         heroRatings.removeAllViews()
         addRatings(heroRatings, ratings)
         HomeStyle.plainRatings(heroRatings)
-        val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
-        // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
-        heroAbout.text = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
-        heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
-        if (mode == Mode.BROWSE && !page.isBrowse) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS) // ChadFlix: showHero fades home's
-            .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
+        ratingsItem = item
     }
 
     private fun showCaption(item: Item) {
@@ -3234,16 +3247,27 @@ class MainActivity : Screen() {
     }
 
     private var slideAnim: android.animation.ValueAnimator? = null
+    private var slideTarget = -1
+
+    /** ChadFlix: the info line fades back in once the rows have stopped. */
+    private fun showInfo() {
+        if (heroItem != null && mode == Mode.BROWSE && slideAnim == null)
+            browseInfo.animate().alpha(1f).setDuration(INFO_IN_MS).setInterpolator(EASE_OUT).start()
+    }
 
     /**
      * ChadFlix: the rows slide to [target] in [ROW_SLIDE_MS] (ScrollView's own smooth scroll took 250 ms). The info line
      * hides at once and fades in as soon as the slide ends, so the last title's words never sit over the incoming card.
      */
     private fun slideRows(target: Int) {
+        if (slideAnim != null && target == slideTarget) return // already going there (Left/Right mid-slide)
         if (scroller.scrollY == target && slideAnim == null) return
         slideAnim.also { slideAnim = null }?.cancel()
         browseInfo.animate().cancel()
         browseInfo.alpha = 0f
+        // Up/Down held: the rows keep up with the remote, no eased slide per repeat; the words come back on key-up.
+        if (verticalHeld) return scroller.scrollTo(0, target)
+        slideTarget = target
         slideAnim = android.animation.ValueAnimator.ofInt(scroller.scrollY, target).setDuration(ROW_SLIDE_MS).apply {
             interpolator = EASE_OUT
             addUpdateListener { scroller.scrollTo(0, it.animatedValue as Int) }
@@ -3251,8 +3275,7 @@ class MainActivity : Screen() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     if (slideAnim !== animation) return
                     slideAnim = null
-                    if (heroItem != null && mode == Mode.BROWSE)
-                        browseInfo.animate().alpha(1f).setDuration(INFO_IN_MS).setInterpolator(EASE_OUT).start()
+                    showInfo()
                 }
             })
             start()
