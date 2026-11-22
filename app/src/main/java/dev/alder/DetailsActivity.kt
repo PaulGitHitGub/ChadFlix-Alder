@@ -170,7 +170,10 @@ class DetailsActivity : Screen() {
     private val name by lazy { intent.getStringExtra("name") ?: "" }
     private val poster by lazy { intent.getStringExtra("poster") }
     private val initialArt by lazy { intent.getStringExtra("background") }
-    private val cardLogo by lazy { intent.getStringExtra("logo") } // ChadFlix: the logo the home card showed, known before the details
+    // ChadFlix: opened from a home card: its art and logo are the page's, known before the details arrive.
+    private val fromHome by lazy { intent.getBooleanExtra("fromHome", false) }
+    private val cardLogo by lazy { intent.getStringExtra("logo")?.takeIf { fromHome } }
+    private var cardLogoFailed = false // ChadFlix: once the card's logo won't load, the page uses the details' logo from then on
 
     private lateinit var key: String
     override val backdrop get() = heroArt
@@ -267,15 +270,21 @@ class DetailsActivity : Screen() {
                 refrost()
             }
         }
-        // ChadFlix: the card's art is the page's art, so it never waits on the details; only if it won't load do they choose.
+        // ChadFlix: from Home the card's art is the page's art, so it never waits on the details; elsewhere the details'
+        // art wins as before. Art that won't load gives way to the details' art, else the poster.
         var cardArtFailed = false
+        fun pageArt(m: Meta?): String? = when {
+            cardArtFailed -> m?.background?.takeIf { it != initialArt } ?: poster
+            fromHome -> initialArt ?: m?.background ?: poster
+            else -> m?.background ?: initialArt ?: poster
+        }
         (initialArt ?: poster)?.let { first ->
             Images.load(first, heroArt, artWidth, urgent = true, failed = {
-                if (first == initialArt) { cardArtFailed = true; meta?.background?.let(::showArt) }
+                if (first == initialArt) { cardArtFailed = true; showArt(pageArt(meta)) }
             }) { arrive() }
             // ChadFlix: still on its way: the home card's backdrop (the same picture, smaller, already in memory) opens
             // the page at once and is swapped for the sharp copy in place when it lands.
-            if (!arrived && first == initialArt) Images.cachedBitmap(first, dp(HomeStyle.WIDE_W), wide = true)?.let {
+            if (!arrived && fromHome && first == initialArt) Images.cachedBitmap(first, dp(HomeStyle.WIDE_W), wide = true)?.let {
                 heroArt.setImageBitmap(it); arrive()
             }
         }
@@ -284,7 +293,7 @@ class DetailsActivity : Screen() {
 
         fun show(m: Meta) {
             meta = m
-            showArt(initialArt?.takeIf { !cardArtFailed } ?: m.background ?: poster)
+            showArt(pageArt(m))
             richCast = m.castMembers
             certificate = m.certification ?: certificate
             val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
@@ -458,10 +467,13 @@ class DetailsActivity : Screen() {
                 title.postDelayed({ if (logo.visibility != View.VISIBLE) title.visibility = View.VISIBLE }, 1500)
                 // ChadFlix: cropped to its ink, decoded at full source width (1000 px > the 800 px logos: no scale-down first),
                 // then sized by constant area and never above its own pixels.
-                val detailsLogo = m.logo ?: Images.logoFor(m.id)
-                Images.load(cardLogo ?: detailsLogo, logo, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo,
-                    orElse = detailsLogo?.takeIf { cardLogo != null && it != cardLogo }, failed = {
-                    title.visibility = View.VISIBLE; logo.visibility = View.GONE
+                // ChadFlix: the card's logo first; once it has failed, never asked for again on this page.
+                val detailsLogo = (m.logo ?: Images.logoFor(m.id))?.takeIf { !cardLogoFailed || it != cardLogo }
+                val first = if (cardLogoFailed) detailsLogo else cardLogo ?: detailsLogo
+                fun loadLogo(url: String?): Unit = Images.load(url, logo, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo, failed = {
+                    if (url != null && url == cardLogo) cardLogoFailed = true
+                    val next = detailsLogo?.takeIf { url == cardLogo && it != cardLogo }
+                    if (next != null) loadLogo(next) else { title.visibility = View.VISIBLE; logo.visibility = View.GONE }
                 }) {
                     val bitmap = (logo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     if (bitmap == null || bitmap.width < 1 || bitmap.height < 1) {
@@ -472,6 +484,7 @@ class DetailsActivity : Screen() {
                         title.visibility = View.GONE; logo.visibility = View.VISIBLE
                     }
                 }
+                loadLogo(first)
             }
         }
         val stack = column(Gravity.START).apply { addView(titleArea, LinearLayout.LayoutParams(-1, dp(68))) } // ChadFlix: fixed, so the logo arriving never moves what is below

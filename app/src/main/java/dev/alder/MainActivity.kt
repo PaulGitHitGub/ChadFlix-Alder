@@ -3263,7 +3263,7 @@ class MainActivity : Screen() {
         startActivity(Intent(this, DetailsActivity::class.java)
             .putExtra("type", item.type).putExtra("id", item.id).putExtra("name", item.name)
             .putExtra("poster", item.poster).putExtra("background", item.art).putExtra("videoId", item.videoId)
-            .putExtra("logo", item.logo))
+            .putExtra("logo", item.logo).putExtra("fromHome", true))
     }
 
     // ---------- vertical movement ----------
