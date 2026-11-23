@@ -175,6 +175,7 @@ internal object HomeStyle {
 
     fun rowOrder(c: Context, page: String): List<String> =
         runCatching { org.json.JSONArray(prefs(c).getString(key(c, page), "[]")).strings() }.getOrDefault(emptyList())
+            .let { if (page == HOME) homeOrder(it) else it }
 
     /** Moves [title] [by] places among the page's [shown] rows and keeps that order. */
     fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) = saveRowOrder(c, page, movedRow(shown, title, by))
@@ -528,13 +529,24 @@ internal fun allParams(movie: Boolean, list: String, today: String, since: Strin
  */
 internal fun <T> mixedRow(halves: List<() -> Pair<List<T>, Boolean>>, pool: java.util.concurrent.ExecutorService,
                           id: (T) -> String): Pair<List<T>, Boolean> {
-    val got = halves.map { half -> pool.submit(java.util.concurrent.Callable { half() }) }.map { f ->
-        runCatching { f.get() }.recoverCatching { throw (it as? java.util.concurrent.ExecutionException)?.cause ?: it }
+    val futures = halves.map { half -> pool.submit(java.util.concurrent.Callable { half() }) }
+    val got = futures.map { f ->
+        try { Result.success(f.get()) }
+        catch (e: InterruptedException) { // the row's thread was stopped: stop the halves and say so, don't call it a failed fetch
+            futures.forEach { it.cancel(true) }
+            Thread.currentThread().interrupt()
+            throw e
+        }
+        catch (e: java.util.concurrent.ExecutionException) { Result.failure(e.cause ?: e) }
+        catch (e: Exception) { Result.failure(e) }
     }
     if (got.all { it.isFailure }) throw got.first().exceptionOrNull()!!
     val rows = got.mapNotNull { it.getOrNull() }
     return rows.map { it.first }.reduce { a, b -> interleaved(a, b, id) } to (rows.size == got.size && rows.all { it.second })
 }
+
+/** Home's saved row order, with All Genres first (after Continue Watching) when it was saved before the row existed. */
+internal fun homeOrder(saved: List<String>) = if (saved.isNotEmpty() && HomeStyle.ALL_GENRES !in saved) listOf(HomeStyle.ALL_GENRES) + saved else saved
 
 /** A row's title on screen: [ALL_GENRES][HomeStyle.ALL_GENRES] as [allGenres] (the app's language), any other as it is. */
 internal fun rowName(title: String, allGenres: String) = if (title == HomeStyle.ALL_GENRES) allGenres else title

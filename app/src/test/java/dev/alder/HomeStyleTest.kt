@@ -216,6 +216,24 @@ class HomeStyleTest {
         assertEquals("HTTP 429", (error as java.io.IOException).message) // the half's own failure, not the pool's wrapper
     }
 
+    @Test fun allGenresRowStopsWhenItsThreadIsStopped() = withPool { pool ->
+        val never = java.util.concurrent.CountDownLatch(1)
+        val waits: () -> Pair<List<String>, Boolean> = { never.await(); emptyList<String>() to true }
+        Thread.currentThread().interrupt()
+        val error = runCatching { mixedRow(listOf(waits, waits), pool) { it } }.exceptionOrNull()
+        val stillStopped = Thread.interrupted() // and clears it for the next test
+        assertEquals(true, error is InterruptedException) // not taken for a failed fetch
+        assertEquals(true, stillStopped)
+    }
+
+    @Test fun allGenresGoesFirstInAHomeOrderSavedBeforeIt() {
+        assertEquals(listOf("All Genres", "Watchly A", "Watchly B"), homeOrder(listOf("Watchly A", "Watchly B")))
+        assertEquals(listOf("Watchly A", "All Genres", "Watchly B"), homeOrder(listOf("Watchly A", "All Genres", "Watchly B"))) // moved: stays
+        assertEquals(emptyList<String>(), homeOrder(emptyList())) // nothing saved: the page's own order (All Genres first)
+        assertEquals(listOf(HomeStyle.ALL_GENRES, "Watchly B", "Watchly A"),
+            orderedRows(homeOrder(listOf("Watchly B", "Watchly A")), listOf(HomeStyle.ALL_GENRES, "Watchly A", "Watchly B")) { it })
+    }
+
     @Test fun homeSaysNoPicksOnlyWhenNoRowIsOn() {
         assertEquals(false, showsNoCatalogs(home = true, noCatalogs = true, rows = 1)) // All Genres is on: no words above it
         assertEquals(true, showsNoCatalogs(home = true, noCatalogs = true, rows = 0)) // All Genres off too

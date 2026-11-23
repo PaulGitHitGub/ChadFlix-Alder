@@ -1980,8 +1980,7 @@ class MainActivity : Screen() {
                 it.first !in hiddenRows && (!(p.hasGenreShortcuts || services || home) || HomeStyle.isOn(rowsOn, it.first, movie, services || home))
             }) { it.first }
             pageRows = sections.map { it.first }
-            // ChadFlix: Movies and Shows have their genre rows; Home says so only when no row is on (not even All Genres).
-            if (!p.hasGenreShortcuts && p != Page.SERVICES && showsNoCatalogs(home, catalogs.isEmpty(), sections.size)) {
+            fun sayNoCatalogs() {
                 val none = when (p) {
                     Page.HOME -> R.string.home_no_picks
                     Page.MOVIES -> R.string.page_no_movie_catalogs
@@ -1994,6 +1993,8 @@ class MainActivity : Screen() {
                     content.addView(this)
                 }
             }
+            // ChadFlix: Movies and Shows have their genre rows; Home says so only when no row is on (not even All Genres).
+            if (!p.hasGenreShortcuts && p != Page.SERVICES && showsNoCatalogs(home, catalogs.isEmpty(), sections.size)) sayNoCatalogs()
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
             val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
                 else emptyList()).toMutableList()
@@ -2150,6 +2151,9 @@ class MainActivity : Screen() {
                             }
                             return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
+                        // ChadFlix: All Genres was Home's only row and brought nothing: the words, not a blank page.
+                        if (home && noCatalogs == null && r.getOrNull()?.first.orEmpty().size <= 1 &&
+                            showsNoCatalogs(true, catalogs.isEmpty(), sections.size - 1)) sayNoCatalogs()
                         onAnswer(r.map { listOf(it.first to false) })
                     }
                     return

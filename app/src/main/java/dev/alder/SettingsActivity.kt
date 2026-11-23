@@ -1040,7 +1040,7 @@ class SettingsActivity : Screen() {
 
     /** The catalog rows hidden from home, movies or shows; OK on one puts it back. */
     private fun unhideRowsMenu(done: () -> Unit) {
-        val all = Settings.hiddenRows(this).toList().sorted()
+        val all = Settings.hiddenRows(this).toList().sortedBy { HomeStyle.rowName(this, it) } // by the name shown; unhidden by its key
         if (all.isEmpty()) return choose(getString(R.string.no_hidden_rows), listOf(getString(R.string.action_ok)), getString(R.string.no_hidden_rows_desc)) {}
         choose(getString(R.string.hidden_rows), all.map { HomeStyle.rowName(this, it) }, getString(R.string.unhide_row_hint)) { i ->
             Settings.unhideRow(this, all[i])
