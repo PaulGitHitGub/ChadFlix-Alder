@@ -2,6 +2,7 @@ package dev.alder
 
 import android.view.KeyEvent
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 
 // ChadFlix: what the player's Audio & Subtitles menu and Info pop-up decide, kept apart from the views so it can be tested.
@@ -166,7 +167,13 @@ internal fun appearanceKeyAction(code: Int, rtl: Boolean, index: Int, lastIndex:
 // One Appearance row, from its left edge in dp: [APPEARANCE_INDENT] (the other columns' text starts here), the label cell (as wide as the widest of the
 // three labels), a fixed gap, then the value and one "›" right after it. Every row has the same label cell, so the values start at one x; the Color
 // row's dot hangs in the gap before its value. Nothing floats at the far end: the column ends [APPEARANCE_END] after the widest value and its arrow.
-internal const val APPEARANCE_INDENT = 42 // 10 row margin + 32: where a name starts in every column
+internal const val MENU_ROW_MARGIN = 10 // dp, a row's margin at both sides, in every column
+internal const val MENU_CHECK_START = 8 // dp before a row's check
+internal const val MENU_CHECK_SIZE = 18 // dp, the check
+internal const val MENU_CHECK_END = 6 // dp between the check and the name
+/** Where a name (and a column's title) starts, from the column's edge: the row margin, then the check and its two gaps. The same in every column. */
+internal const val MENU_TEXT_INDENT = MENU_ROW_MARGIN + MENU_CHECK_START + MENU_CHECK_SIZE + MENU_CHECK_END // 42
+internal const val APPEARANCE_INDENT = MENU_TEXT_INDENT
 internal const val APPEARANCE_LABEL_GAP = 24 // dp from the widest label to where the values start
 internal const val APPEARANCE_CHEVRON_GAP = 2 // dp between a value and its arrow
 internal const val APPEARANCE_END = 22 // dp after the arrow: 12 row padding + 10 row margin
@@ -187,7 +194,19 @@ internal fun appearanceLabelDp(columnDp: Int, widestValueDp: Int, chevronDp: Int
  * backdrop as bright as itself (contrast 1.05 measured on the owner's photo). At 0.9 a highlight keeps 10%, so the text has about 3:1
  * against the picture before its shadow, and more with it.
  */
-internal fun menuDimColor(hdr: Boolean): Int = if (hdr) 0xE6000000.toInt() else 0x99000000.toInt()
+internal const val MENU_DIM_SDR = 0x99000000.toInt() // black at 0.6
+internal const val MENU_DIM_HDR = 0xE6000000.toInt() // black at 0.9
+internal fun menuDimColor(hdr: Boolean): Int = if (hdr) MENU_DIM_HDR else MENU_DIM_SDR
+
+/**
+ * Whether the video is HDR. The video's own colour transfer wins: PQ (HDR10, Dolby Vision) and HLG are HDR; any other transfer is not, so
+ * an SDR file named "HDRip" is not. Only when the format says nothing ([colorTransfer] null or no value) does the source's name decide ([nameSaysHdr]).
+ */
+internal fun isHdrVideo(colorTransfer: Int?, nameSaysHdr: Boolean): Boolean = when (colorTransfer) {
+    C.COLOR_TRANSFER_ST2084, C.COLOR_TRANSFER_HLG -> true
+    null, Format.NO_VALUE -> nameSaysHdr
+    else -> false
+}
 
 /**
  * Where the sample subtitle's bottom edge sits, in px from the top: 280 of a 1080 px screen, but never lower than [gapPx] above the

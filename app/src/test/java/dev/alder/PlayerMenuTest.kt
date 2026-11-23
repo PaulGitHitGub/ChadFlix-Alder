@@ -375,24 +375,41 @@ class PlayerMenuTest {
 
     @Test fun theAppearanceColumnIsLabelGapValueAndArrow() {
         assertEquals(42 + 78 + 24 + 73 + 2 + 16 + 22, appearanceColumnDp(78, 73)) // 257: nothing floats at the far end
-        assertEquals(78 + 73 + 106, appearanceColumnDp(78, 73))
         assertEquals(340, appearanceColumnDp(250, 200)) // a long translation stays on the screen
         // ...and then the label gives way, not the values: label + the rest = the column
         assertEquals(340 - 106 - 73, appearanceLabelDp(340, 73))
         assertEquals(78, appearanceLabelDp(appearanceColumnDp(78, 73), 73))
     }
 
+    @Test fun theAppearanceRowsStartWhereEveryOtherNameStarts() {
+        assertEquals(42, MENU_TEXT_INDENT)
+        assertEquals(MENU_ROW_MARGIN + MENU_CHECK_START + MENU_CHECK_SIZE + MENU_CHECK_END, APPEARANCE_INDENT)
+        assertEquals(MENU_TEXT_INDENT, APPEARANCE_INDENT)
+    }
+
+    @Test fun theVideosOwnColourTransferDecidesHdr() {
+        assertTrue(isHdrVideo(C.COLOR_TRANSFER_ST2084, nameSaysHdr = false)) // HDR10 and Dolby Vision, whatever the name
+        assertTrue(isHdrVideo(C.COLOR_TRANSFER_HLG, nameSaysHdr = false))
+        assertFalse(isHdrVideo(C.COLOR_TRANSFER_SDR, nameSaysHdr = true)) // an SDR file named "HDRip"
+        assertFalse(isHdrVideo(C.COLOR_TRANSFER_GAMMA_2_2, nameSaysHdr = true))
+        assertTrue(isHdrVideo(null, nameSaysHdr = true)) // the format says nothing: the name decides
+        assertTrue(isHdrVideo(Format.NO_VALUE, nameSaysHdr = true))
+        assertFalse(isHdrVideo(null, nameSaysHdr = false))
+        assertFalse(isHdrVideo(Format.NO_VALUE, nameSaysHdr = false))
+    }
+
     @Test fun theMenuDimIsStrongerOverHdrVideo() {
-        assertEquals(0x99000000.toInt(), menuDimColor(hdr = false)) // 60%
-        assertEquals(0xE6000000.toInt(), menuDimColor(hdr = true)) // 90%
+        assertEquals(MENU_DIM_SDR, menuDimColor(hdr = false))
+        assertEquals(0x99000000.toInt(), MENU_DIM_SDR) // 60%
+        assertEquals(MENU_DIM_HDR, menuDimColor(hdr = true))
+        assertEquals(0xE6000000.toInt(), MENU_DIM_HDR) // 90%
         assertTrue((menuDimColor(true) ushr 24) > (menuDimColor(false) ushr 24))
     }
 
     @Test fun theThreeColumnsFitA960DpScreenInTheWidestCase() {
         // Audio and Subtitles at their widest, Appearance at its widest, plus the panel's padding (2 x 8) and the screen margin (48).
         val widest = 2 * languageColumnDp(400) + appearanceColumnDp(300, 300) + 2 * 8 + 48
-        assertEquals(250 * 2 + 340 + 64, widest)
-        assertTrue(widest <= 960)
+        assertEquals(250 * 2 + 340 + 64, widest) // 904 of 960
         // the usual case: "English" columns and the real English Appearance strings
         assertEquals(170 * 2 + 257, 2 * languageColumnDp(52) + appearanceColumnDp(78, 73))
     }

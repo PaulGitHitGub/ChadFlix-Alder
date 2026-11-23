@@ -2262,6 +2262,7 @@ class PlayerActivity : Screen() {
     private var askedOriginal = false
     private var menuRows = 7
     private var menuPanel: View? = null
+    private var menuDim: View? = null // the dim under the menu: stronger over HDR video
     private var sample: SubtitleView? = null // the sample line above the menu, while an Appearance row has focus
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
     private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
@@ -2384,12 +2385,8 @@ class PlayerActivity : Screen() {
     /** The shadow every other text over the picture has (onArt), on the dark menu rows; the focused row is dark ink on white and has none. */
     private fun TextView.menuShadow(on: Boolean) { if (on) onArt() else setShadowLayer(0f, 0f, 0f, 0) }
 
-    /** Whether the picture playing is HDR (the same word and format reading as the Info badges): the source's name says HDR or Dolby Vision, or the video itself is PQ or HLG. */
-    private fun videoIsHdr(): Boolean {
-        if (sources.getOrNull(at)?.isHdr == true) return true
-        val transfer = player.videoFormat?.colorInfo?.colorTransfer
-        return transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG
-    }
+    /** Whether the picture playing is HDR: the video's own colour transfer, else the source's name (see [isHdrVideo]). */
+    private fun videoIsHdr() = isHdrVideo(player.videoFormat?.colorInfo?.colorTransfer, sources.getOrNull(at)?.isHdr == true)
 
     private fun makeRow(col: MenuColumn, key: String, item: MenuItem?, shownDetail: String = ""): MenuRow {
         val check = ImageView(this).apply { setImageResource(R.drawable.ic_check); visibility = View.INVISIBLE }
@@ -2399,7 +2396,7 @@ class PlayerActivity : Screen() {
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
             setPaddingRelative(0, 0, dp(12), 0)
-            addView(check, LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginStart = dp(8); marginEnd = dp(6) })
+            addView(check, LinearLayout.LayoutParams(dp(MENU_CHECK_SIZE), dp(MENU_CHECK_SIZE)).apply { marginStart = dp(MENU_CHECK_START); marginEnd = dp(MENU_CHECK_END) })
             addView(name, wrap())
             addView(detail, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(7) })
         }
@@ -2456,7 +2453,7 @@ class PlayerActivity : Screen() {
         // ChadFlix: a row shows its language (and a role word like "Commentary"); an audio track's codec and channels only under More
         val rows = shown.map { item -> makeRow(col, item.track.id, item, rowDetail(col.expanded, item.role, item.format)) }.toMutableList()
         if (!col.expanded && shown.size < col.items.size) rows += makeRow(col, if (col.audio) "more:audio" else "more:subs", null)
-        rows.forEach { col.inner.addView(it.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) }) }
+        rows.forEach { col.inner.addView(it.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(MENU_ROW_MARGIN), dp(2), dp(MENU_ROW_MARGIN), dp(2)) }) }
         col.rows = rows
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
@@ -2474,7 +2471,7 @@ class PlayerActivity : Screen() {
     /** A column's title, at the text's own indent (past the check). */
     private fun columnHeader(title: Int) = FrameLayout(this).apply {
         addView(text(title, BODY, bold = true, color = 0xFFFFFFFF.toInt()).onArt(),
-            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START).apply { marginStart = dp(42); topMargin = dp(4) })
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START).apply { marginStart = dp(MENU_TEXT_INDENT); topMargin = dp(4) })
     }
 
     private fun columnView(col: MenuColumn): LinearLayout {
@@ -2501,7 +2498,9 @@ class PlayerActivity : Screen() {
         menuLayer.visibility = View.VISIBLE
         // ChadFlix (owner): no glass and no blur; what is playing is dimmed, black at 0.6, as Alder's menus dim the page.
         // Over HDR video the dim is stronger (see menuDimColor): the menu is drawn at SDR white, no brighter than the highlights behind it.
-        menuLayer.addView(View(this).apply { setBackgroundColor(menuDimColor(videoIsHdr())) }, FrameLayout.LayoutParams(-1, -1))
+        val dim = View(this).apply { setBackgroundColor(menuDimColor(videoIsHdr())) }
+        menuDim = dim // refreshMenu sets it again when the tracks change: the video's colour is known only once it plays
+        menuLayer.addView(dim, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
         panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(LANGUAGE_MIN_DP), -2)) // fillColumn sets the real width
@@ -2542,6 +2541,7 @@ class PlayerActivity : Screen() {
     /** New tracks, a pick or the title's original language: the open menu follows, and focus stays on its row. */
     private fun refreshMenu() {
         if (!menuOpen) return
+        menuDim?.setBackgroundColor(menuDimColor(videoIsHdr()))
         menuBusy = true
         try {
             val focusedKey = (audioColumn.rows + subsColumn.rows).firstOrNull { it.view.isFocused }?.let { it.key to (it in audioColumn.rows) }
@@ -2695,8 +2695,14 @@ class PlayerActivity : Screen() {
         row.dot?.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(subtitleColorValue(Settings.subtitleColorName(this@PlayerActivity)))
-            setStroke(dp(1), 0x59FFFFFF)
         }
+        paintDotRing(row, row.view.isFocused)
+    }
+
+    /** The dot's ring: light on the dark menu, dark on the white focused row, where a White, Cream or Warm White dot would vanish. */
+    private fun paintDotRing(row: AppearanceRow, focused: Boolean) {
+        val dot = row.dot?.background as? GradientDrawable ?: return
+        if (focused) dot.setStroke(maxOf(1, (1.5f * resources.displayMetrics.density).toInt()), 0x73141414) else dot.setStroke(dp(1), 0x59FFFFFF)
     }
 
     /** Unfocused: label, value and arrows are the colour and weight of the language rows' names, at full strength; focused: all dark ink on white. */
@@ -2706,6 +2712,7 @@ class PlayerActivity : Screen() {
         row.label.setTextColor(ink)
         row.value.setTextColor(ink)
         row.chevron.setColorFilter(ink)
+        paintDotRing(row, focused)
         listOf(row.label, row.value).forEach { it.menuShadow(!focused) }
     }
 
@@ -2734,7 +2741,7 @@ class PlayerActivity : Screen() {
         val view = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
-            setPaddingRelative(dp(APPEARANCE_INDENT - 10), 0, dp(APPEARANCE_END - 10), 0) // the label starts where the other columns' names do
+            setPaddingRelative(dp(APPEARANCE_INDENT - MENU_ROW_MARGIN), 0, dp(APPEARANCE_END - MENU_ROW_MARGIN), 0) // the label starts where the other columns' names do
             addView(name, LinearLayout.LayoutParams(dp(m.labelDp + APPEARANCE_LABEL_GAP) - (if (dot != null) dotSlot else 0), -2))
             dot?.let { addView(it, LinearLayout.LayoutParams(dp(APPEARANCE_DOT), dp(APPEARANCE_DOT)).apply { marginEnd = dp(APPEARANCE_DOT_GAP) }) }
             addView(value, wrap())
@@ -2760,7 +2767,7 @@ class PlayerActivity : Screen() {
         listOf(Look.SIZE to R.string.subtitle_size, Look.COLOR to R.string.color, Look.BACKGROUND to R.string.appearance_background).forEach { (look, label) ->
             val row = appearanceRow(look, label, m)
             appearanceRows += row
-            list.addView(row.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) })
+            list.addView(row.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(MENU_ROW_MARGIN), dp(2), dp(MENU_ROW_MARGIN), dp(2)) })
         }
         column.addView(list, LinearLayout.LayoutParams(-1, appearanceRows.size * dp(36)))
         return column

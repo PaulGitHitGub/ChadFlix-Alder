@@ -31,7 +31,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
 - **Audio and subtitle names.** **Audio** and **Subtitles** show only the language, for example **Korean**. Names of add-ons and providers no longer show. Names that uploaders put on tracks no longer show. Under **More**, a commentary, an audio description, a forced track or an SDH track also shows that word. The word comes from the flags of the track or from a word in its name. Only the word shows. Under **More**, audio tracks also show codec and channels, for example **Dolby TrueHD Atmos 7.1**. A track with no language shows **Track 2**. The number is the place of the track in its column. **Off** does not count.
-- **Column width.** Each column is as wide as its longest row. The space between the columns is always the same. A long name, for example **Portuguese (Brazil)**, no longer pushes **Appearance** off the screen.
+- **Column width.** Each column is as wide as its longest row. The space between the columns is the same. A long name, for example **Portuguese (Brazil)**, no longer pushes **Appearance** off the screen.
 - **Menu over HDR.** When the video is HDR, the **Audio & Subtitles** menu dims the picture more. The text in the menu is easier to read.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No Sleep Timer.** The player no longer has a Sleep Timer.
