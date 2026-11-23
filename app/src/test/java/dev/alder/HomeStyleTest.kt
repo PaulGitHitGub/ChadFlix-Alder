@@ -136,4 +136,109 @@ class HomeStyleTest {
         assertEquals("2026-10-23", airing["air_date.gte"]); assertEquals("2026-11-22", airing["air_date.lte"])
         assertEquals("3", animeParams(false, "complete", 0, "", "", "")["with_status"])
     }
+
+    @Test fun allGenresInterleavesFilmsAndShowsByRankOnce() {
+        assertEquals(listOf("f1", "s1", "f2", "s2", "s3"), interleaved(listOf("f1", "f2"), listOf("s1", "s2", "s3")) { it })
+        assertEquals(listOf("a", "b", "c"), interleaved(listOf("a", "b"), listOf("b", "c")) { it }) // a title in both: once, first place
+        assertEquals(listOf("s1"), interleaved(emptyList(), listOf("s1")) { it })
+    }
+
+    @Test fun allGenresOffersEveryListOnceAndAsksTheTypesThatHaveIt() {
+        assertEquals(listOf("trending", "new", "blockbusters", "most_watched", "top_rated", "complete"), HomeStyle.allLists().map { it.first })
+        assertEquals(R.string.showing_new_releases, HomeStyle.allLists().first { it.first == "new" }.second)
+        assertEquals(HomeStyle.allLists(), HomeStyle.listsFor(false, HomeStyle.ALL))
+        assertEquals(listOf(true, false), HomeStyle.allMedia("trending"))
+        assertEquals(listOf(true, false), HomeStyle.allMedia("most_watched"))
+        assertEquals(listOf(true), HomeStyle.allMedia("blockbusters")) // films only
+        assertEquals(listOf(false), HomeStyle.allMedia("complete")) // shows only
+    }
+
+    @Test fun allGenresHasItsOwnSourceAndNoGenreFilter() {
+        assertEquals("tmdb:g:top_rated", HomeStyle.allSource("top_rated"))
+        assertEquals("tmdb:g", HomeStyle.slotSource(HomeStyle.allSource("new")))
+        assertEquals(null, genreParams(true, 0, "trending", "2026-11-23", "2026-05-23")["with_genres"])
+        assertEquals("popularity.desc", genreParams(false, 0, "trending", "2026-11-23", "2025-11-23")["sort_by"])
+        for (list in HomeStyle.allLists().map { it.first }) { // shows leave out News, Soap and Talk; films keep every genre
+            assertEquals("10763|10766|10767", allParams(false, list, "2026-11-23", "2025-11-23")["without_genres"])
+            assertEquals(null, allParams(true, list, "2026-11-23", "2026-05-23")["without_genres"])
+            assertEquals(null, allParams(false, list, "2026-11-23", "2025-11-23")["with_genres"])
+        }
+        assertEquals("first_air_date.desc", allParams(false, "new", "2026-11-23", "")["sort_by"])
+        assertEquals(null, genreParams(false, 18, "trending", "2026-11-23", "2025-11-23")["without_genres"]) // other rows unchanged
+        assertEquals("100", allParams(true, "trending", "2026-11-23", "2026-05-23")["vote_count.gte"]) // a vote floor on Home
+        assertEquals("100", allParams(false, "new", "2026-11-23", "")["vote_count.gte"])
+        assertEquals("100", allParams(true, "most_watched", "", "")["vote_count.gte"])
+        assertEquals("500", allParams(true, "top_rated", "", "")["vote_count.gte"]) // Top Rated keeps its own
+        assertEquals(null, allParams(true, "blockbusters", "", "")["vote_count.gte"])
+        assertEquals("20", genreParams(true, 28, "new", "2026-11-23", "")["vote_count.gte"]) // genre rows keep theirs
+    }
+
+    @Test fun allGenresKeepsOneKeyInEveryLanguage() {
+        // On/off, order and Hidden rows know it as "All Genres"; only the screen shows the app's language.
+        for (shown in listOf("All Genres", "Tous les genres", "كل الأنواع", "सभी शैलियाँ")) {
+            assertEquals("g", HomeStyle.rowKey(false, HomeStyle.ALL_GENRES, HomeStyle.HOME))
+            assertEquals(shown, rowName(HomeStyle.ALL_GENRES, shown))
+            assertEquals("For You", rowName("For You", shown))
+        }
+        assertEquals("All Genres", HomeStyle.ALL_GENRES)
+        assertEquals(null, HomeStyle.rowKey(false, "Tous les genres", HomeStyle.HOME)) // the shown name is never the key
+        assertEquals(null, HomeStyle.rowKey(false, "For You", HomeStyle.HOME))
+        assertEquals(null, HomeStyle.rowKey(true, HomeStyle.ALL_GENRES, "Movies"))
+        assertEquals(listOf("All Genres", "For You"), orderedRows(listOf("All Genres", "For You"), listOf("For You", HomeStyle.ALL_GENRES)) { it })
+    }
+
+    private fun <T> withPool(block: (java.util.concurrent.ExecutorService) -> T): T {
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try { return block(pool) } finally { pool.shutdownNow() }
+    }
+
+    @Test fun allGenresRowMixesBothHalvesFetchedSideBySide() = withPool { pool ->
+        val bothStarted = java.util.concurrent.CountDownLatch(2)
+        fun half(titles: List<String>, complete: Boolean = true): () -> Pair<List<String>, Boolean> = {
+            bothStarted.countDown()
+            // Each half waits for the other to start: this only finishes if they run at the same time.
+            check(bothStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            titles to complete
+        }
+        assertEquals(listOf("f1", "s1", "f2", "s2") to true, mixedRow(listOf(half(listOf("f1", "f2")), half(listOf("s1", "s2"))), pool) { it })
+    }
+
+    @Test fun allGenresRowKeepsTheHalfThatAnsweredAndFailsOnlyWhenBothDo() = withPool { pool ->
+        val films = { listOf("f1", "f2") to true }
+        val failed: () -> Pair<List<String>, Boolean> = { throw java.io.IOException("HTTP 429") }
+        // One half failed: the other's titles, and the row is incomplete so it's asked again next time.
+        assertEquals(listOf("f1", "f2") to false, mixedRow(listOf(films, failed), pool) { it })
+        assertEquals(listOf("f1", "f2") to false, mixedRow(listOf(failed, films), pool) { it })
+        // A half that mostly lacked IMDb ids leaves it incomplete too; one list (Blockbusters) is just that half.
+        assertEquals(listOf("f1", "s1", "f2") to false, mixedRow(listOf(films, { listOf("s1") to false }), pool) { it })
+        assertEquals(listOf("f1", "f2") to true, mixedRow(listOf(films), pool) { it })
+        val error = runCatching { mixedRow(listOf(failed, failed), pool) { it } }.exceptionOrNull()
+        assertEquals("HTTP 429", (error as java.io.IOException).message) // the half's own failure, not the pool's wrapper
+    }
+
+    @Test fun allGenresRowStopsWhenItsThreadIsStopped() = withPool { pool ->
+        val never = java.util.concurrent.CountDownLatch(1)
+        val waits: () -> Pair<List<String>, Boolean> = { never.await(); emptyList<String>() to true }
+        Thread.currentThread().interrupt()
+        val error = runCatching { mixedRow(listOf(waits, waits), pool) { it } }.exceptionOrNull()
+        val stillStopped = Thread.interrupted() // and clears it for the next test
+        assertEquals(true, error is InterruptedException) // not taken for a failed fetch
+        assertEquals(true, stillStopped)
+    }
+
+    @Test fun allGenresGoesFirstInAHomeOrderSavedBeforeIt() {
+        assertEquals(listOf("All Genres", "Watchly A", "Watchly B"), homeOrder(listOf("Watchly A", "Watchly B")))
+        assertEquals(listOf("Watchly A", "All Genres", "Watchly B"), homeOrder(listOf("Watchly A", "All Genres", "Watchly B"))) // moved: stays
+        assertEquals(emptyList<String>(), homeOrder(emptyList())) // nothing saved: the page's own order (All Genres first)
+        assertEquals(listOf(HomeStyle.ALL_GENRES, "Watchly B", "Watchly A"),
+            orderedRows(homeOrder(listOf("Watchly B", "Watchly A")), listOf(HomeStyle.ALL_GENRES, "Watchly A", "Watchly B")) { it })
+    }
+
+    @Test fun homeSaysNoPicksOnlyWhenNoRowIsOn() {
+        assertEquals(false, showsNoCatalogs(home = true, noCatalogs = true, rows = 1)) // All Genres is on: no words above it
+        assertEquals(true, showsNoCatalogs(home = true, noCatalogs = true, rows = 0)) // All Genres off too
+        assertEquals(false, showsNoCatalogs(home = true, noCatalogs = false, rows = 0))
+        assertEquals(true, showsNoCatalogs(home = false, noCatalogs = true, rows = 0)) // other pages as before
+        assertEquals(true, showsNoCatalogs(home = false, noCatalogs = true, rows = 3))
+    }
 }

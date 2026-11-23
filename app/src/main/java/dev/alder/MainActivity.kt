@@ -221,7 +221,7 @@ class MainActivity : Screen() {
     /** A page in the top bar: the five fixed ones, then one per other catalog type the add-ons list ([Page.of]). */
     private class Page private constructor(val label: String, val words: Int, val type: String? = null) {
         companion object {
-            val HOME = Page("Home", R.string.tab_home)
+            val HOME = Page(HomeStyle.HOME, R.string.tab_home)
             val DISCOVER = Page("Discover", R.string.tab_discover)
             val SHOWS = Page("Shows", R.string.tab_shows)
             val MOVIES = Page("Movies", R.string.tab_movies)
@@ -1955,7 +1955,32 @@ class MainActivity : Screen() {
                 shelf(c)?.takeIf { it.page == p || (featuredHome && (it.page == Page.MOVIES || it.page == Page.SHOWS) && it.rank <= 2) }?.let { c to it }
             }.sortedBy { it.second.rank }
             val catalogs = shelves.map { it.first }
-            if (catalogs.isEmpty() && !p.hasGenreShortcuts && p != Page.SERVICES) { // ChadFlix: Movies and Shows have their genre rows
+            val genres = catalogGenres(catalogs.flatMap { it.genres }.map { if (p.hasGenreShortcuts) genreLabel(it) else it })
+            val hiddenRows = Settings.hiddenRows(this@MainActivity)
+            // ChadFlix: Movies and Shows are TMDb genre rows, then the add-on rows, which stay off until Customize Home
+            // turns them on; rows that are off are never built or fetched. Move Up / Move Down set the order.
+            val movie = p == Page.MOVIES
+            val services = p == Page.SERVICES // ChadFlix: the Services tab: one row of shows per streaming service
+            val home = p == Page.HOME // ChadFlix: Home's All Genres row first (after Continue Watching), then the add-on rows
+            val allGenres = listOf(HomeStyle.ALL_GENRES, HomeStyle.rowName(this@MainActivity, HomeStyle.ALL_GENRES)) // an add-on row of that name gives way
+            val candidates = if (services) HomeStyle.platforms.mapIndexed { i, platform ->
+                    Triple(platform.name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.platformSource(this@MainActivity, p.label, i, false) as String?)
+                } else if (home) listOf(Triple(HomeStyle.ALL_GENRES, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.allGenresSource(this@MainActivity) as String?)) +
+                    sections(p, shelves, featuredHome).filterNot { s -> allGenres.any { it.equals(s.first, true) } }
+                else if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
+                HomeStyle.genres(movie).map { (id, name) ->
+                    Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
+                } + Triple(HomeStyle.ANIME, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.animeSource(this@MainActivity, p.label, movie) as String?) +
+                    sections(p, shelves, featuredHome).filterNot { s ->
+                        HomeStyle.genres(movie).any { it.second.equals(s.first, true) } || s.first.equals(HomeStyle.ANIME, true)
+                    }
+            if (p.hasGenreShortcuts || services || home) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
+            val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
+            val sections = HomeStyle.ordered(this@MainActivity, p.label, movie, candidates.filter {
+                it.first !in hiddenRows && (!(p.hasGenreShortcuts || services || home) || HomeStyle.isOn(rowsOn, it.first, movie, services || home))
+            }) { it.first }
+            pageRows = sections.map { it.first }
+            fun sayNoCatalogs() {
                 val none = when (p) {
                     Page.HOME -> R.string.home_no_picks
                     Page.MOVIES -> R.string.page_no_movie_catalogs
@@ -1968,27 +1993,8 @@ class MainActivity : Screen() {
                     content.addView(this)
                 }
             }
-            val genres = catalogGenres(catalogs.flatMap { it.genres }.map { if (p.hasGenreShortcuts) genreLabel(it) else it })
-            val hiddenRows = Settings.hiddenRows(this@MainActivity)
-            // ChadFlix: Movies and Shows are TMDb genre rows, then the add-on rows, which stay off until Customize Home
-            // turns them on; rows that are off are never built or fetched. Move Up / Move Down set the order.
-            val movie = p == Page.MOVIES
-            val services = p == Page.SERVICES // ChadFlix: the Services tab: one row of shows per streaming service
-            val candidates = if (services) HomeStyle.platforms.mapIndexed { i, platform ->
-                    Triple(platform.name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.platformSource(this@MainActivity, p.label, i, false) as String?)
-                } else if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
-                HomeStyle.genres(movie).map { (id, name) ->
-                    Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
-                } + Triple(HomeStyle.ANIME, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.animeSource(this@MainActivity, p.label, movie) as String?) +
-                    sections(p, shelves, featuredHome).filterNot { s ->
-                        HomeStyle.genres(movie).any { it.second.equals(s.first, true) } || s.first.equals(HomeStyle.ANIME, true)
-                    }
-            if (p.hasGenreShortcuts || services) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
-            val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
-            val sections = HomeStyle.ordered(this@MainActivity, p.label, movie, candidates.filter {
-                it.first !in hiddenRows && (!(p.hasGenreShortcuts || services) || HomeStyle.isOn(rowsOn, it.first, movie, services))
-            }) { it.first }
-            pageRows = sections.map { it.first }
+            // ChadFlix: Movies and Shows have their genre rows; Home says so only when no row is on (not even All Genres).
+            if (!p.hasGenreShortcuts && p != Page.SERVICES && showsNoCatalogs(home, catalogs.isEmpty(), sections.size)) sayNoCatalogs()
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
             val genreNames = (if (p.isCatalog) sections.take(initialSections).map { it.first }.filter { name -> genres.any { it.equals(name, true) } }
                 else emptyList()).toMutableList()
@@ -2024,7 +2030,7 @@ class MainActivity : Screen() {
                     val version = ++rowVersion
                     val results = answer.getOrNull() ?: emptyList()
                     val items = results.flatMap { it.first }.filterNot { isAddonMessage(it.name) }.distinctBy { it.id }.map(::metaItem)
-                    if (p == Page.HOME && cinema.isEmpty() && items.isNotEmpty()) startCinema(items.take(CINEMA_MAX))
+                    if (p == Page.HOME && cinema.isEmpty() && items.any { !HomeStyle.isTile(it.id) }) startCinema(items.filterNot { HomeStyle.isTile(it.id) }.take(CINEMA_MAX))
                     if (completed == rowCatalogs.size && !reported) {
                         reported = true
                         batchPending--
@@ -2145,6 +2151,9 @@ class MainActivity : Screen() {
                             }
                             return@background onAnswer(Result.success(emptyList())) // focus and all (nothing to add)
                         }
+                        // ChadFlix: All Genres was Home's only row and brought nothing: the words, not a blank page.
+                        if (home && noCatalogs == null && r.getOrNull()?.first.orEmpty().size <= 1 &&
+                            showsNoCatalogs(true, catalogs.isEmpty(), sections.size - 1)) sayNoCatalogs()
                         onAnswer(r.map { listOf(it.first to false) })
                     }
                     return
@@ -2867,14 +2876,14 @@ class MainActivity : Screen() {
             (getString(R.string.action_choose_source) to { play(item, pick = true) }).takeIf { !HomeStyle.isTile(item.id) },
             (getString(R.string.row_move_up) to { moveRow(row.title, -1) }).takeIf { at > 0 },
             (getString(R.string.row_move_down) to { moveRow(row.title, 1) }).takeIf { at >= 0 && at < pageRows.lastIndex },
-            (getString(R.string.action_hide_row, row.title) to {
+            (getString(R.string.action_hide_row, HomeStyle.rowName(this, row.title)) to {
                 // ChadFlix: on Movies and Shows a row is turned off for that page only (Drama on Movies, not on Shows)
                 if (page.hasGenreShortcuts || page == Page.SERVICES) HomeStyle.setRowOn(this, page.label, row.title, false) else Settings.hideRow(this, row.title)
                 showPage(page)
             })
                 .takeIf { row.title.isNotEmpty() },
         )
-        choose(item.name.ifEmpty { row.title }, actions.map { it.first }) { actions[it].second() }
+        choose(item.name.ifEmpty { HomeStyle.rowName(this, row.title) }, actions.map { it.first }) { actions[it].second() }
     }
 
     /**
@@ -2954,7 +2963,7 @@ class MainActivity : Screen() {
         val checked = head.size + lists.indexOfFirst { it.first == current }.coerceAtLeast(0)
         val at = if (focus >= 0) focus else if (focus == GENRE_LINE) switch.size else checked
         showingFor = changing
-        choose("${row.title} · ${getString(R.string.showing)}", names, checked = checked, focus = at, header = true,
+        choose("${HomeStyle.rowName(this, row.title)} · ${getString(R.string.showing)}", names, checked = checked, focus = at, header = true,
             right = { i -> if (service != null && i == switch.size) ({ genreMenu() }) else null }) { picked ->
             val shown = showingChanged[changing]?.second ?: HomeStyle.choiceOf(this, page.label, key, movie)
             if (platform != null && picked == 0) {
@@ -2977,7 +2986,7 @@ class MainActivity : Screen() {
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
     private fun moveRow(title: String, by: Int) {
         // Among every row the page could show, so rows that are off keep their places.
-        val all = if (page.hasGenreShortcuts || page == Page.SERVICES) HomeStyle.ordered(this, page.label, page == Page.MOVIES,
+        val all = if (page.hasGenreShortcuts || page == Page.SERVICES || page == Page.HOME) HomeStyle.ordered(this, page.label, page == Page.MOVIES,
             HomeStyle.knownRows(this, page.label, page == Page.MOVIES)) { it } else pageRows
         HomeStyle.saveRowOrder(this, page.label, movedAmong(all, pageRows, title, by))
         lastHomeRows = HomeStyle.signature(this, page.label)
@@ -3018,7 +3027,7 @@ class MainActivity : Screen() {
         // The hint on the right names the next row instead.
         visible.forEachIndexed { i, row -> row.peek(i <= active + 1) } // ChadFlix: the next row's title peeks in, dimmed
         val next = visible.getOrNull(active + 1)
-        nextRowHint.text = next?.let { "⌄  ${it.title}" } ?: ""
+        nextRowHint.text = next?.let { "⌄  ${HomeStyle.rowName(this, it.title)}" } ?: ""
         if (page.polishedRail) next?.let { it.items.getOrNull(it.selected)?.let(::warm) }
         nextRowHint.visibility = View.GONE // ChadFlix: the next row shows itself
         nextRowHint.post(::clearHint)
@@ -3123,10 +3132,11 @@ class MainActivity : Screen() {
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         // ChadFlix: a genre row's title names its list, "Action · Trending".
-        private val list = if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
-        private val quietTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = false) }
-        private val litTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = true) }
-        private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
+        private val list = if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES || page == Page.HOME)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
+        private val shownTitle = HomeStyle.titleCase(HomeStyle.rowName(this@MainActivity, title)) // All Genres in the app's language
+        private val quietTitle = list?.let { HomeStyle.rowTitle(shownTitle, it, lit = false) }
+        private val litTitle = list?.let { HomeStyle.rowTitle(shownTitle, it, lit = true) }
+        private val heading = text(shownTitle, HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
             quietTitle?.let { text = it }
             setPadding(inset, 0, dp(PAD), 0)
             setSingleLine()

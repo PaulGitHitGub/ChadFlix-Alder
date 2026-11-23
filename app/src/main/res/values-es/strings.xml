@@ -79,6 +79,7 @@
     </plurals>
     <string name="home_unreachable">No se pudo conectar con Stremio. Revisa la conexión del televisor.</string>
     <string name="row_continue">Seguir viendo</string>
+    <string name="row_all_genres">Todos los géneros</string>
     <string name="home_no_picks">Aquí aparecen recomendaciones para ti cuando Watchly está instalado en la cuenta de Stremio de este perfil. En Series y Películas hay más para explorar.</string>
     <string name="page_no_movie_catalogs">Ninguno de tus complementos tiene catálogos de películas. Añade uno (AIOMetadata, Cinemeta) en Stremio.</string>
     <string name="page_no_show_catalogs">Ninguno de tus complementos tiene catálogos de series. Añade uno (AIOMetadata, Cinemeta) en Stremio.</string>

@@ -26,6 +26,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Appearance.** The **Audio & Subtitles** menu has a third column, **Appearance**, next to **Subtitles**. It has the rows **Size**, **Color** and **Background**. Move right from **Subtitles** to **Appearance**. Press **Left** or **Right** to change the value of a row. The change is at once. A sample line shows above the menu.
 <!-- Spotlight -->
 - **Info pop-up.** In the player, move to **Info**. A pop-up shows the logo, the year, the age rating, the length, the story, the ratings and the video and sound badges. The badges are only in this pop-up. The video continues to play. Move to another button to close the pop-up. **OK** on **Info** does nothing.
+- **All Genres row.** Home has an **All Genres** row with movies and shows from all genres. It does not show news, soap or talk shows. Select the **Showing** card at the start of the row to change the list, for example **Top Rated**. To move or hide the row, select **Settings → Customize Home → Home**. **Customize Home** now has a **Home** section for the rows of Home.
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
