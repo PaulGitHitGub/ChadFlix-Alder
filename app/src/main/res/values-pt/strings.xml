@@ -131,9 +131,6 @@
     <string name="loading_trailer">Carregando trailer…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">Ao fim deste episódio</string>
-    <string name="sleep_after_movie">Ao fim deste filme</string>
-    <string name="sleep_in_minutes">Em %1$d min</string>
     <string name="state_off">Desativado</string>
     <string name="state_on">Ativado</string>
     <string name="timing_on_time">Sincronizado</string>
@@ -157,7 +154,6 @@
     <string name="player_exit_home">Sair para o início</string>
     <string name="player_still_watching">Ainda está assistindo?</string>
     <string name="player_quiet_episodes">%1$d episódios foram exibidos sem nenhum toque no controle remoto.</string>
-    <string name="player_sleep_paused">O timer pausou a reprodução.</string>
     <string name="skip_intro">Pular abertura</string>
     <string name="skip_recap">Pular resumo</string>
     <string name="player_seek">Avançar ou voltar</string>
@@ -191,7 +187,6 @@
     <string name="size_large">Grande</string>
     <string name="size_extra_large">Muito grande</string>
     <string name="color">Cor</string>
-    <string name="sleep_timer">Timer para dormir</string>
     <string name="subtitles_off">Legendas desativadas</string>
     <string name="subtitles_on">Legendas ativadas</string>
     <string name="subtitles_in">Legendas em %1$s</string>

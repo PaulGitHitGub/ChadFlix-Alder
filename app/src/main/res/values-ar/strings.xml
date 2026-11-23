@@ -141,9 +141,6 @@
     <string name="loading_trailer">جارٍ تحميل الإعلان التشويقي…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">بعد هذه الحلقة</string>
-    <string name="sleep_after_movie">بعد هذا الفيلم</string>
-    <string name="sleep_in_minutes">بعد %1$d دقيقة</string>
     <string name="state_off">إيقاف</string>
     <string name="state_on">تشغيل</string>
     <string name="timing_on_time">في موعدها</string>
@@ -167,7 +164,6 @@
     <string name="player_exit_home">الخروج إلى الرئيسية</string>
     <string name="player_still_watching">هل ما زلت تشاهد؟</string>
     <string name="player_quiet_episodes">تم تشغيل %1$d من الحلقات دون أي ضغط على جهاز التحكم.</string>
-    <string name="player_sleep_paused">أوقف مؤقت النوم التشغيل مؤقتًا.</string>
     <string name="skip_intro">تخطّي المقدّمة</string>
     <string name="skip_recap">تخطّي الملخّص</string>
     <string name="player_seek">تقديم أو ترجيع</string>
@@ -201,7 +197,6 @@
     <string name="size_large">كبير</string>
     <string name="size_extra_large">كبير جدًا</string>
     <string name="color">اللون</string>
-    <string name="sleep_timer">مؤقت النوم</string>
     <string name="subtitles_off">إيقاف الترجمة</string>
     <string name="subtitles_on">تشغيل الترجمة</string>
     <string name="subtitles_in">ترجمة باللغة %1$s</string>

@@ -62,32 +62,8 @@ internal fun plausibleEpisode(durationMs: Long) = durationMs >= 2 * 60_000L
 // Fall-asleep protection: episodes that end in a row with no remote key pressed are counted, and the next one waits
 // behind "Still watching?" instead of streaming all night (debrid traffic, and Stremio's watched ticks).
 internal const val QUIET_EPISODES = 3
-internal const val SLEEP_TIMER = 60 * 60_000L
 /** [endedQuietly] episodes in a row, this one included, ended with no key pressed: ask before the next one. */
 internal fun askStillWatching(endedQuietly: Int) = endedQuietly >= QUIET_EPISODES
-/** The Sleep row's value in Audio & subtitles: "Off", "After this episode" or "In 42 min". The screen passes its words. */
-internal fun sleepLabel(stopAfter: Boolean, sleepAt: Long, now: Long,
-                        afterEpisode: String = "After this episode", inMinutes: String = "In %1\$d min", off: String = "Off",
-                        episodic: Boolean = true, afterMovie: String = "After this movie") = when {
-    stopAfter -> if (episodic) afterEpisode else afterMovie
-    sleepAt > now -> inMinutes.format(((sleepAt - now + 59_999) / 60_000).toInt())
-    else -> off
-}
-
-/** The Sleep Timer's two settings: stop at the end of this video, or at the wall-clock time [sleepAt] (0: none). */
-internal data class SleepState(val stopAfter: Boolean, val sleepAt: Long)
-
-/**
- * What OK on Sleep Timer does: Off → After This Episode (series) or After This Movie (film) → In 60 min → Off. [live]: no "after",
- * Off → In 60 min. A film not yet known to be live counts as a film.
- */
-internal fun nextSleepState(stopAfter: Boolean, sleepAt: Long, episodic: Boolean, live: Boolean, now: Long) = when {
-    stopAfter -> SleepState(false, now + SLEEP_TIMER)
-    sleepAt > 0 -> SleepState(false, 0)
-    episodic || !live -> SleepState(true, sleepAt)
-    else -> SleepState(false, now + SLEEP_TIMER)
-}
-
 internal fun formatTiming(delay: Long, onTime: String = "On time",
                           earlier: String = "%1\$+.2f s  earlier", later: String = "%1\$+.2f s  later") = when {
     delay == 0L -> onTime
@@ -417,11 +393,9 @@ class PlayerActivity : Screen() {
     private lateinit var upNextPanel: FrameLayout
     private var upNextDismissed = false
     // "Still watching?": episodes before this one that ended with no key pressed (carried in the intent from one
-    // episode to the next, and to another source), and the sleep choices: stop when this one ends, or pause at sleepAt.
+    // episode to the next, and to another source).
     private lateinit var stillPanel: FrameLayout
     private var quiet = 0
-    private var stopAfter = false
-    private var sleepAt = 0L
     // The pill's other use: a source that keeps stalling (three times in a minute) is offered a lower quality once.
     private var offeringLower = false
     private val stalls = ArrayDeque<Long>()
@@ -520,8 +494,6 @@ class PlayerActivity : Screen() {
         upNextPanel = FrameLayout(this).apply { visibility = View.GONE }
         stillPanel = FrameLayout(this).apply { visibility = View.GONE }
         quiet = intent.getIntExtra("quiet", 0)
-        sleepAt = intent.getLongExtra("sleepAt", 0L)
-        stopAfter = intent.getBooleanExtra("stopAfter", false) // another source of this video; the next episode gets a fresh intent
         controls = buildControls()
         loading = buildLoading()
         stallPanel = FrameLayout(this).apply { visibility = View.GONE }
@@ -630,8 +602,8 @@ class PlayerActivity : Screen() {
             }
 
             override fun onPlaybackStateChanged(state: Int) {
-                // At the real end the next episode starts, unless the viewer chose to watch the credits or to stop after
-                // this one, or this is the third episode in a row with no key pressed: then "Still watching?" waits.
+                // At the real end the next episode starts, unless the viewer chose to watch the credits,
+                // or this is the third episode in a row with no key pressed: then "Still watching?" waits.
                 if (state == Player.STATE_ENDED) {
                     if (isTrailer) {
                         finish()
@@ -642,7 +614,7 @@ class PlayerActivity : Screen() {
                     if (episodic && !plausibleEpisode(player.duration)) {
                         started = false // retry from the original resume point, not the placeholder's short ending
                         next(Failure.MISSING)
-                    } else if (upcoming == null || upNextDismissed || stopAfter) finish()
+                    } else if (upcoming == null || upNextDismissed) finish()
                     else if (askStillWatching(quiet + 1)) showStillWatching(upcoming)
                     else playNext(quiet + 1)
                 }
@@ -1266,10 +1238,6 @@ class PlayerActivity : Screen() {
 
     // Progress every 10 s, pushed to Stremio every minute (Stremio's own apps push every 3 minutes).
     private fun tick() {
-        if (sleepAt in 1..System.currentTimeMillis() && stillPanel.visibility != View.VISIBLE) {
-            setSleepAt(0)
-            showStillWatching(null)
-        }
         record()
         if (++ticks % 6 == 0) push()
         main.postDelayed(tickTask, TICK)
@@ -1426,7 +1394,7 @@ class PlayerActivity : Screen() {
 
     private fun showUpNext() {
         if (episodic && !plausibleEpisode(player.duration)) return
-        if (stopAfter || stillPanel.visibility == View.VISIBLE) return // Sleep: After this episode
+        if (stillPanel.visibility == View.VISIBLE) return
         val next = nextVideo() ?: return
         if (offeringLower) dismissStall()
         if (shown) hideControls(force = true)
@@ -1468,15 +1436,15 @@ class PlayerActivity : Screen() {
             .putExtra("label", "$name  ·  S${next.season} E${next.episode}")
             .putExtra("logo", meta?.logo).putExtra("still", next.thumbnail).putExtra("runtime", meta?.runtime)
             .putExtra("episode", "S${next.season} E${next.episode}  ·  ${next.title}")
-            .putExtra("quiet", quietly).putExtra("sleepAt", sleepAt))
+            .putExtra("quiet", quietly))
         finish()
     }
 
     /**
-     * "Still watching?", in the Up next place: before the next episode once [QUIET_EPISODES] ended with no key pressed
-     * ([next]), or when the sleep timer runs out (null: Resume). Playback stops, and the screen may sleep.
+     * "Still watching?", in the Up next place: before the next episode ([next]) once [QUIET_EPISODES] ended with no key
+     * pressed. Playback stops, and the screen may sleep.
      */
-    private fun showStillWatching(next: Video?) {
+    private fun showStillWatching(next: Video) {
         if (offeringLower) dismissStall()
         if (shown) hideControls(force = true)
         dropAppearance()
@@ -1487,9 +1455,8 @@ class PlayerActivity : Screen() {
         player.pause()
         pausedShade.visibility = View.VISIBLE
         view.keepScreenOn = false // nobody may be watching: let the TV's own screen saver and sleep take over
-        val play = pill(if (next != null) getString(R.string.player_play_episode, next.season, next.episode)
-            else getString(R.string.action_resume), R.drawable.ic_play).apply {
-            setOnClickListener { if (next != null) playNext() else leaveStillWatching() }
+        val play = pill(getString(R.string.player_play_episode, next.season, next.episode), R.drawable.ic_play).apply {
+            setOnClickListener { playNext() }
         }
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         actions.addView(play, wrap())
@@ -1500,8 +1467,8 @@ class PlayerActivity : Screen() {
                 finish()
             }
         }, wrap().apply { marginStart = dp(8) })
-        val title = next?.let { it.title.ifBlank { getString(R.string.episode_number, it.episode) } } ?: pauseTitle.text.toString()
-        val why = if (next != null) getString(R.string.player_quiet_episodes, QUIET_EPISODES) else getString(R.string.player_sleep_paused)
+        val title = next.title.ifBlank { getString(R.string.episode_number, next.episode) }
+        val why = getString(R.string.player_quiet_episodes, QUIET_EPISODES)
         val content = column(Gravity.START).apply {
             setPadding(dp(18), dp(14), dp(18), dp(14))
             background = videoGlass(14)
@@ -1525,19 +1492,6 @@ class PlayerActivity : Screen() {
         view.keepScreenOn = true
         if (resume) player.play()
         showControls(playPause)
-    }
-
-    private fun setSleepAt(at: Long) {
-        sleepAt = at
-        intent.putExtra("sleepAt", at) // so another source of this video keeps the timer
-    }
-
-    /** OK on the Sleep Timer button: Off → After This Episode (series) or After This Movie → In 60 min → Off. Live: no "after". */
-    private fun cycleSleep() {
-        val next = nextSleepState(stopAfter, sleepAt, episodic, isLive(), System.currentTimeMillis())
-        if (next.sleepAt != sleepAt) setSleepAt(next.sleepAt)
-        stopAfter = next.stopAfter
-        intent.putExtra("stopAfter", stopAfter)
     }
 
     /**
@@ -1766,7 +1720,6 @@ class PlayerActivity : Screen() {
     private lateinit var trackStatus: TextView // "English  ·  Spanish subtitles", under the bar whenever the controls are up
     private lateinit var nextCell: FrameLayout
     private lateinit var infoButton: TextView
-    private lateinit var sleepButton: TextView // ChadFlix: Sleep Timer has its own button; its label shows the choice
     private val dimmed = mutableListOf<View>() // the other buttons, dimmed while the menu is open
     private lateinit var endsAt: TextView
     private lateinit var playerLogo: ImageView // the Info pop-up's logo, or its name when there is none
@@ -1942,7 +1895,6 @@ class PlayerActivity : Screen() {
             val face = onFocusChangeListener
             setOnFocusChangeListener { v, has -> face?.onFocusChange(v, has); infoFocusChanged(has) }
         }
-        sleepButton = button(getString(R.string.sleep_timer), R.drawable.ic_sleep) { cycleSleep(); showSleepChoice() }
         nextCell = buttonCell(nextButton).apply { visibility = View.GONE }
         val buttons = LinearLayout(this).apply {
             clipChildren = false // a focused button's label is wider than its cell
@@ -1967,11 +1919,10 @@ class PlayerActivity : Screen() {
                         LinearLayout.LayoutParams(dp(1), dp(22)).apply { topMargin = dp(14); marginStart = dp(10) })
                     addView(nextCell.also { dimmed += it })
                     addView(buttonCell(infoButton).also { dimmed += it })
-                    addView(buttonCell(sleepButton, labelDp = 320).also { dimmed += it }) // room for "Sleep Timer  ·  After This Episode"
                 }, LinearLayout.LayoutParams(0, -2, 1f))
             }
         }
-        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton, sleepButton))
+        for (button in listOf(streamButton, audioButton, playPause, nextButton, infoButton))
             button.nextFocusUpId = bar.id
         playPause.id = View.generateViewId()
         bar.nextFocusDownId = playPause.id
@@ -2151,12 +2102,12 @@ class PlayerActivity : Screen() {
         return control
     }
 
-    private fun buttonCell(control: TextView, primary: Boolean = false, labelDp: Int = 160) = FrameLayout(this).apply {
+    private fun buttonCell(control: TextView, primary: Boolean = false) = FrameLayout(this).apply {
         clipChildren = false
         clipToPadding = false
         addView(control, FrameLayout.LayoutParams(dp(if (primary) 50 else 40), dp(if (primary) 50 else 40),
             Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-        addView(buttonLabels.getValue(control), FrameLayout.LayoutParams(dp(labelDp), dp(18),
+        addView(buttonLabels.getValue(control), FrameLayout.LayoutParams(dp(160), dp(18),
             Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin = dp(if (primary) 53 else 48) })
         layoutParams = LinearLayout.LayoutParams(dp(if (primary) 70 else 62), dp(76))
     }
@@ -2199,7 +2150,6 @@ class PlayerActivity : Screen() {
         val duration = player.duration.takeIf { it != C.TIME_UNSET } ?: 0L
         val position = if (scrubTo >= 0) scrubTo else player.currentPosition
         if (shown) {
-            showSleepChoice()
             if (!bar.isIndeterminate) {
                 bar.set(position, player.bufferedPosition, if (live) 0L else duration)
                 elapsed.text = if (live) getString(R.string.player_live) else clock(position)
@@ -3066,15 +3016,6 @@ class PlayerActivity : Screen() {
             else frame.indexOfChild(frame.findViewById(androidx.media3.ui.R.id.exo_buffering)).takeIf { it >= 0 } ?: frame.childCount
         home.addView(subs, at, FrameLayout.LayoutParams(-1, -1))
     }
-
-    private fun showSleepChoice() {
-        if (!::sleepButton.isInitialized) return
-        val words = getString(R.string.sleep_timer) + DOT + sleep()
-        buttonLabels[sleepButton]?.takeIf { it.text.toString() != words }?.text = words
-    }
-
-    private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(R.string.sleep_after_episode),
-        getString(R.string.sleep_in_minutes), getString(R.string.state_off), episodic, getString(R.string.sleep_after_movie))
 
     override fun onPause() {
         paused = true

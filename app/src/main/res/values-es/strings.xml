@@ -131,9 +131,6 @@
     <string name="loading_trailer">Cargando tráiler…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">Al terminar este episodio</string>
-    <string name="sleep_after_movie">Al terminar esta película</string>
-    <string name="sleep_in_minutes">En %1$d min</string>
     <string name="state_off">Desactivado</string>
     <string name="state_on">Activado</string>
     <string name="timing_on_time">Sincronizado</string>
@@ -157,7 +154,6 @@
     <string name="player_exit_home">Salir al inicio</string>
     <string name="player_still_watching">¿Sigues viendo?</string>
     <string name="player_quiet_episodes">Se reprodujeron %1$d episodios sin pulsar el control remoto.</string>
-    <string name="player_sleep_paused">El temporizador pausó la reproducción.</string>
     <string name="skip_intro">Saltar intro</string>
     <string name="skip_recap">Saltar resumen</string>
     <string name="player_seek">Avanzar o retroceder</string>
@@ -191,7 +187,6 @@
     <string name="size_large">Grande</string>
     <string name="size_extra_large">Muy grande</string>
     <string name="color">Color</string>
-    <string name="sleep_timer">Temporizador</string>
     <string name="subtitles_off">Subtítulos desactivados</string>
     <string name="subtitles_on">Subtítulos activados</string>
     <string name="subtitles_in">Subtítulos en %1$s</string>

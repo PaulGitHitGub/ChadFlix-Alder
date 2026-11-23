@@ -128,9 +128,6 @@
     <string name="loading_trailer">ट्रेलर लोड हो रहा है…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">इस एपिसोड के बाद</string>
-    <string name="sleep_after_movie">इस फ़िल्म के बाद</string>
-    <string name="sleep_in_minutes">%1$d मि में</string>
     <string name="state_off">बंद</string>
     <string name="state_on">चालू</string>
     <string name="timing_on_time">सही समय पर</string>
@@ -154,7 +151,6 @@
     <string name="player_exit_home">होम पर जाएँ</string>
     <string name="player_still_watching">अभी भी देख रहे हैं?</string>
     <string name="player_quiet_episodes">रिमोट दबाए बिना %1$d एपिसोड चले।</string>
-    <string name="player_sleep_paused">स्लीप टाइमर ने प्लेबैक रोक दिया।</string>
     <string name="skip_intro">इंट्रो छोड़ें</string>
     <string name="skip_recap">रीकैप छोड़ें</string>
     <string name="player_seek">आगे-पीछे करें</string>
@@ -188,7 +184,6 @@
     <string name="size_large">बड़ा</string>
     <string name="size_extra_large">बहुत बड़ा</string>
     <string name="color">रंग</string>
-    <string name="sleep_timer">स्लीप टाइमर</string>
     <string name="subtitles_off">सबटाइटल बंद</string>
     <string name="subtitles_on">सबटाइटल चालू</string>
     <string name="subtitles_in">%1$s सबटाइटल</string>

@@ -154,9 +154,6 @@
     <string name="loading_trailer">Loading trailer…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">After This Episode</string>
-    <string name="sleep_after_movie">After This Movie</string>
-    <string name="sleep_in_minutes">In %1$d min</string>
     <string name="state_off">Off</string>
     <string name="state_on">On</string>
     <string name="timing_on_time">On time</string>
@@ -181,7 +178,6 @@
     <string name="player_exit_home">Exit to Home</string>
     <string name="player_still_watching">Still watching?</string>
     <string name="player_quiet_episodes">%1$d episodes played with no remote press.</string>
-    <string name="player_sleep_paused">The sleep timer paused playback.</string>
     <string name="skip_intro">Skip intro</string>
     <string name="skip_recap">Skip recap</string>
     <string name="player_seek">Seek</string>
@@ -215,7 +211,6 @@
     <string name="size_large">Large</string>
     <string name="size_extra_large">Extra Large</string>
     <string name="color">Color</string>
-    <string name="sleep_timer">Sleep Timer</string>
     <string name="subtitles_off">Subtitles off</string>
     <string name="subtitles_on">Subtitles on</string>
     <string name="subtitles_in">%1$s subtitles</string>

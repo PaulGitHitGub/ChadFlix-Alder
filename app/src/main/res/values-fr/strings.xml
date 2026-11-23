@@ -131,9 +131,6 @@
     <string name="loading_trailer">Chargement de la bande-annonce…</string>
 
     <!-- Player -->
-    <string name="sleep_after_episode">Après cet épisode</string>
-    <string name="sleep_after_movie">Après ce film</string>
-    <string name="sleep_in_minutes">Dans %1$d min</string>
     <string name="state_off">Désactivé</string>
     <string name="state_on">Activé</string>
     <string name="timing_on_time">Synchronisé</string>
@@ -157,7 +154,6 @@
     <string name="player_exit_home">Revenir à l’accueil</string>
     <string name="player_still_watching">Vous regardez toujours ?</string>
     <string name="player_quiet_episodes">%1$d épisodes ont été lus sans aucune pression sur la télécommande.</string>
-    <string name="player_sleep_paused">La minuterie de veille a mis la lecture en pause.</string>
     <string name="skip_intro">Passer l’intro</string>
     <string name="skip_recap">Passer le récap</string>
     <string name="player_seek">Avancer ou reculer</string>
@@ -191,7 +187,6 @@
     <string name="size_large">Grande</string>
     <string name="size_extra_large">Très grande</string>
     <string name="color">Couleur</string>
-    <string name="sleep_timer">Minuterie de veille</string>
     <string name="subtitles_off">Sous-titres désactivés</string>
     <string name="subtitles_on">Sous-titres activés</string>
     <string name="subtitles_in">Sous-titres en %1$s</string>
