@@ -914,7 +914,7 @@ class SettingsActivity : Screen() {
         var swallowUp = false // a held OK's release: it clicks nothing
         fun editMode(on: Boolean) { edit = on; picked = -1; restyles.forEach { it() }; jiggle() } // rows settle (150 ms) as they stop
         fun row(title: String, isOn: Boolean, index: Int): View {
-            val name = text(title, BODY).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
+            val name = text(HomeStyle.rowName(this, title), BODY).apply { maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END }
             val grip = if (isOn) ImageView(this).apply { setImageResource(R.drawable.ic_grip) } else null
             val v = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -931,7 +931,7 @@ class SettingsActivity : Screen() {
                     isOn && edit -> { picked = if (picked == index) -1 else index; restyle(); jiggle() } // pick it up / drop it
                     isOn -> { // off: out of the order, into Off
                         HomeStyle.setRowOn(this, page(), title, false)
-                        onRows.removeAt(index); offRows = (offRows + title).sortedBy { it.lowercase() }; save()
+                        onRows.removeAt(index); offRows = (offRows + title).sortedBy { HomeStyle.rowName(this, it).lowercase() }; save()
                         render(true, index, true)
                     }
                     else -> { // on: at the bottom of On
@@ -1008,7 +1008,7 @@ class SettingsActivity : Screen() {
         fun load() {
             val all = HomeStyle.ordered(this, page(), movie, HomeStyle.knownRows(this, page(), movie)) { it }
             onRows = all.filter(::shown).toMutableList()
-            offRows = all.filterNot(::shown).sortedBy { it.lowercase() }
+            offRows = all.filterNot(::shown).sortedBy { HomeStyle.rowName(this, it).lowercase() }
             edit = false; picked = -1
             render(true, 0, false) // the remote stays where it is (a pill, or the menu)
         }
@@ -1042,7 +1042,7 @@ class SettingsActivity : Screen() {
     private fun unhideRowsMenu(done: () -> Unit) {
         val all = Settings.hiddenRows(this).toList().sorted()
         if (all.isEmpty()) return choose(getString(R.string.no_hidden_rows), listOf(getString(R.string.action_ok)), getString(R.string.no_hidden_rows_desc)) {}
-        choose(getString(R.string.hidden_rows), all, getString(R.string.unhide_row_hint)) { i ->
+        choose(getString(R.string.hidden_rows), all.map { HomeStyle.rowName(this, it) }, getString(R.string.unhide_row_hint)) { i ->
             Settings.unhideRow(this, all[i])
             done()
         }
