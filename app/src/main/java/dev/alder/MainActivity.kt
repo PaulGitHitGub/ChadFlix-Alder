@@ -1685,7 +1685,7 @@ class MainActivity : Screen() {
                 val known = if (grid) emptyMap() else metas.toMap()
                 val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
                 background({
-                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid) }
+                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid, offline = true) }
                 }, cacheReads) { r -> if (g == generation && !fresh) r.getOrNull()?.let { show(it) } }
             }
             var libraryRequest = 0
@@ -2909,6 +2909,8 @@ class MainActivity : Screen() {
         if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
             metas[item.id]?.let { applyMeta(item, it); return }
         }
+        // A library series past its 6 h: last time's details show now, so its art doesn't wait on the network.
+        val stale = metas[item.id]?.also { applyMeta(item, it) }
         val key = profile.authKey
         metaPool.execute {
             // Last time's details from disk when fresh; the network for unseen titles or library series past TTL.
@@ -2922,9 +2924,14 @@ class MainActivity : Screen() {
             )
             main.post {
                 if (isDestroyed) return@post
-                if (resolved == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
+                if (resolved == null) return@post if (stale != null) Unit else metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
                 cacheMeta(item.id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[item.id]))
-                applyMeta(item, resolved.meta)
+                if (stale == null) return@post applyMeta(item, resolved.meta)
+                // Already showing: only what a newer copy changes (new episodes), without settling the card again.
+                val count = newEpisodeCount(item.id, resolved.meta)
+                item.facts = facts(resolved.meta)
+                if (item.art == null) item.art = resolved.meta.background
+                if (count != item.newEpisodeCount) { item.newEpisodeCount = count; item.onFill.forEach { it() } }
             }
         }
     }
@@ -2973,10 +2980,12 @@ class MainActivity : Screen() {
         knownFetchedAt: Map<String, Long>,
         key: String,
         grid: Boolean,
+        offline: Boolean = false,
     ): HomeLibrary {
         if (grid) return HomeLibrary(list)
         val addons by lazy { Stremio.savedAddons(key).orEmpty() }
         val remote by lazy { runCatching { Stremio.addons(key) } }
+        val fetch: ((String, String) -> Meta?)? = if (offline) null else { type, id -> remote.getOrThrow().meta(type, id) }
         val found = mutableMapOf<String, MetaResolution>()
         val continuing = Library.continueWatching(list) { item, videoId ->
             val id = item.optString("_id")
@@ -2986,7 +2995,7 @@ class MainActivity : Screen() {
             val meta = freshKnown ?: found[id]?.meta ?: resolveMetaWithOfflineFallback(
                 ttl = ttl,
                 readSaved = { age -> addons.savedMeta(type, id, age) },
-                fetchRemote = { remote.getOrThrow().meta(type, id) },
+                fetchRemote = fetch?.let { f -> { f(type, id) } },
             )?.also { found[id] = it }?.meta ?: known[id]
             val video = meta?.videos?.firstOrNull { it.id == videoId }
             video != null && !isEpisodeAired(video.released)
@@ -3270,12 +3279,16 @@ internal fun preservedMetaTimestamp(
     nowMs: Long = System.currentTimeMillis(),
 ): Long = if (fresh) nowMs else previousFetchedAtMs ?: 0L
 
-/** Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. */
+/**
+ * Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. A null
+ * [fetchRemote] never touches the network: a screen's first draw from disk must not wait on it (a series last
+ * fetched over 6 h ago held Continue on the network at every morning start); the refresh that follows fetches.
+ */
 internal fun resolveMetaWithOfflineFallback(
     ttl: Long?,
     readSaved: (Long?) -> Meta?,
-    fetchRemote: () -> Meta?,
+    fetchRemote: (() -> Meta?)?,
 ): MetaResolution? =
     readSaved(ttl)?.let { MetaResolution(it, fresh = true) }
-        ?: runCatching { fetchRemote() }.getOrNull()?.let { MetaResolution(it, fresh = true) }
+        ?: fetchRemote?.let { runCatching { it() }.getOrNull() }?.let { MetaResolution(it, fresh = true) }
         ?: if (ttl != null) readSaved(null)?.let { MetaResolution(it, fresh = false) } else null

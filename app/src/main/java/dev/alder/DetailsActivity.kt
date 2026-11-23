@@ -36,20 +36,31 @@ internal fun heroCastPreview(allMembers: List<CastMember>, maxCount: Int = 3): L
     return ordered.take(maxCount)
 }
 
+private val dayPattern = Regex("\\d{4}-\\d{2}-\\d{2}")
+
+// Made once per thread, not per episode: building them for every episode of every series in Continue held Home's
+// main thread for 1.5 s at start (SimpleDateFormat isn't thread-safe, so not one shared copy).
+private class EpisodeDates {
+    val utcDay = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
+    val utcTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+    val localDay = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+}
+private val episodeDates = object : ThreadLocal<EpisodeDates>() { override fun initialValue() = EpisodeDates() }
+
 internal fun isEpisodeAired(released: String?, now: Long = System.currentTimeMillis()): Boolean {
     if (released.isNullOrBlank()) return true
-    val day = released.take(10).takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) } ?: return true
-    val source = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
-    if (runCatching { source.parse(day) }.getOrNull() == null) return true
+    val day = released.take(10).takeIf { it.matches(dayPattern) } ?: return true
+    val f = episodeDates.get()!!
+    if (runCatching { f.utcDay.parse(day) }.getOrNull() == null) return true
 
     if (released.length >= 19 && released.contains('T')) {
-        val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
-        val full = runCatching { iso.parse(released.take(19)) }.getOrNull()
+        val full = runCatching { f.utcTime.parse(released.take(19)) }.getOrNull()
         if (full != null && full.time <= now) return true
     }
 
-    val localToday = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now))
-    val utcToday = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(now))
+    f.localDay.timeZone = TimeZone.getDefault()
+    val localToday = f.localDay.format(Date(now))
+    val utcToday = f.utcDay.format(Date(now))
     return day <= localToday || day <= utcToday
 }
 
