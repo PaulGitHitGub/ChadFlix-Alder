@@ -24,6 +24,8 @@
     <string name="whats_new">ما الجديد</string>
     <string name="whats_new_no_notes">لا توجد ملاحظات للإصدار %1$s.</string>
     <string name="whats_new_version">الإصدار %1$s</string>
+    <string name="whats_new_preview">معاينة الإصدار</string>
+    <string name="whats_new_example_player">مثال على مشغّل خارجي</string>
     <string name="whats_new_group">جديد</string>
     <string name="whats_new_highlights_short">أبرز التغييرات</string>
 

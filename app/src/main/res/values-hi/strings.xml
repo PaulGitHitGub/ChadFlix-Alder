@@ -24,6 +24,8 @@
     <string name="whats_new">नया क्या है</string>
     <string name="whats_new_no_notes">वर्शन %1$s के लिए कोई नोट नहीं है।</string>
     <string name="whats_new_version">वर्शन %1$s</string>
+    <string name="whats_new_preview">रिलीज़ का पूर्वावलोकन</string>
+    <string name="whats_new_example_player">बाहरी प्लेयर का उदाहरण</string>
     <string name="whats_new_group">नया</string>
     <string name="whats_new_highlights_short">खास बातें</string>
 

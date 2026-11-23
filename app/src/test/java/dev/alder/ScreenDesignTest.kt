@@ -115,6 +115,27 @@ class ScreenDesignTest {
             showcaseHighlights(changes.map { Change(it.group, it.text) }).map { it.title })
     }
 
+    @Test fun whatsNewReadsCompactArtAndKeepsSettingsPathsSeparate() {
+        val log = """## Unreleased
+            |### New
+            |<!-- Spotlight -->
+            |<!-- Player: VLC whats-new/player-icon.webp -->
+            |- **External player.** Choose an installed player. **Settings → Streams → Video player**.
+            |<!-- Detail: whats-new/sources.webp -->
+            |- **Sources.** Find more sources.
+            |- **Picture size.** Choose **Zoom**. **Audio & subtitles → Sync & Style → Picture**.
+            |- **Older entry.** Select **Settings → Profile** to change it.
+        """.trimMargin()
+        val changes = changesFor(log, "Unreleased")
+        assertEquals(listOf("External player"), showcaseHighlights(changes).map { it.title })
+        assertEquals(listOf(null, "whats-new/sources.webp", null, null), changes.map { it.detailImage })
+        assertEquals(listOf(PlayerExample("VLC", "whats-new/player-icon.webp"), null, null, null), changes.map { it.player })
+        assertEquals(listOf("Settings → Streams → Video player", null, "Audio & subtitles → Sync & Style → Picture", null),
+            changes.map { it.settingsPath })
+        assertEquals(listOf("Choose an installed player.", "Find more sources.", "Choose **Zoom**.",
+            "Select **Settings → Profile** to change it."), changes.map { it.summary })
+    }
+
     @Test fun debridServiceFromTagsAndLinks() {
         fun of(name: String, url: String = "https://example.com/v.mkv") = debridOf(name, url)?.let { "${it.short} ${it.cached}" }
         assertEquals("RD true", of("[RD+] Torrentio\n4k"))
