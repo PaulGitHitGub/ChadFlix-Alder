@@ -80,21 +80,27 @@ internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
     else -> 8
 }
 
-/** What a track's menu row says: [name] (the language), [detail] (label and/or codec and channels, under More) and [note] (the label alone). */
-internal class TrackText(val name: String, val detail: String, val note: String)
+/**
+ * What a track's menu row says: [name] (the language), [detail] (label and/or codec and channels, under More), [note] (the label
+ * alone) and [label] (the file's own label, or "": [audioDetails] uses it to tell twins apart).
+ */
+internal class TrackText(val name: String, val detail: String, val note: String, val label: String = "")
+
+/** The number in "Track N": the track's place among the tracks of its column (1 for the first), never the file's own id ("2", "aac:Main", "1/257"). */
+internal fun trackNumber(position: Int): String = (position + 1).toString()
 
 /**
  * The text of one track's row. [label] is the file's own label (already without the language); [audio] is false for subtitles; [format] is the audio codec and
  * channels, or null (subtitles, or unknown). [unnamed] is the "Track N" name. The name is the [language]. A track with no language
- * is named by its label only when that label is descriptive (not plain), so a codec never becomes the name; otherwise it is
- * [unnamed]. A subtitle track with no language keeps its label as the name. The detail is the format; a plain label is left out
- * when there is a format ("English" is no use there), and a descriptive one comes first: "Commentary · Dolby Digital 5.1".
+ * is named by its label whenever it has one (plain or not, so a rendition "Main" shows as "Main"), and by [unnamed] only when
+ * it has none. The detail is the format; a plain label is left out when there is a format ("English" is no use there), and
+ * a descriptive one comes first: "Commentary · Dolby Digital 5.1".
  */
 internal fun trackText(audio: Boolean, language: String?, label: String?, format: String?, selectionFlags: Int, roleFlags: Int, unnamed: String): TrackText {
     val plain = plainTrack(selectionFlags, roleFlags, label)
-    val name = language ?: if (!audio) label ?: unnamed else label?.takeIf { !plain } ?: unnamed
+    val name = language ?: label ?: unnamed
     val shownLabel = label?.takeIf { it != name && (!plain || !audio || format == null) }
-    return TrackText(name, listOfNotNull(shownLabel, format).joinToString(" · "), trackNote(language, label, selectionFlags, roleFlags))
+    return TrackText(name, listOfNotNull(shownLabel, format).joinToString(" · "), trackNote(language, label, selectionFlags, roleFlags), label.orEmpty())
 }
 
 /**
@@ -105,15 +111,23 @@ internal fun trackText(audio: Boolean, language: String?, label: String?, format
 internal fun trackNote(language: String?, label: String?, selectionFlags: Int, roleFlags: Int): String =
     if (language != null && label != null && !plainTrack(selectionFlags, roleFlags, label)) label else ""
 
-/** One audio row as [audioDetails] sees it. */
-internal class AudioText(val name: String, val detail: String, val note: String)
+/** One audio row as [audioDetails] sees it. [label] is the file's own label, or "". */
+internal class AudioText(val name: String, val detail: String, val note: String, val label: String = "")
 
 /**
  * The detail each audio row shows. Under More it is all of it. Before More only the [AudioText.note] (a label such as
  * "Commentary"), not codec and channels, except that rows with the same name show all of it, so two English tracks look different.
+ * Rows with the same name and the same detail (labels "US" and "UK", both Dolby Digital 5.1) would still look the same, so
+ * their label goes in front: "US · Dolby Digital 5.1".
  */
-internal fun audioDetails(rows: List<AudioText>, expanded: Boolean): List<String> =
-    rows.map { r -> if (expanded || rows.count { it.name.equals(r.name, ignoreCase = true) } > 1) r.detail else r.note }
+internal fun audioDetails(rows: List<AudioText>, expanded: Boolean): List<String> {
+    val base = rows.map { r -> if (expanded || rows.count { it.name.equals(r.name, ignoreCase = true) } > 1) r.detail else r.note }
+    return rows.mapIndexed { i, r ->
+        val twin = rows.indices.any { j -> j != i && rows[j].name.equals(r.name, ignoreCase = true) && base[j].equals(base[i], ignoreCase = true) }
+        val has = base[i] == r.label || base[i].startsWith("${r.label} · ")
+        if (twin && r.label.isNotEmpty() && !has) listOf(r.label, base[i]).filter { it.isNotEmpty() }.joinToString(" · ") else base[i]
+    }
+}
 
 /** Whether the Audio column is wide: under More, or when any row shows a detail. Narrow keeps Subtitles on screen. */
 internal fun audioColumnWide(expanded: Boolean, details: List<String>): Boolean = expanded || details.any { it.isNotEmpty() }

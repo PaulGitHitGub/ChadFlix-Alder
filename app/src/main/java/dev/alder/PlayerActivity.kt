@@ -2291,7 +2291,7 @@ class PlayerActivity : Screen() {
     // ----- the menu -----
 
     /** [detail]: all the row can add to its name; [note]: the part of it that is not codec or channels, which shows without More. */
-    private class MenuItem(val track: MenuTrack, val name: String, val detail: String, val tag: String, val note: String = "", val pick: () -> Unit)
+    private class MenuItem(val track: MenuTrack, val name: String, val detail: String, val tag: String, val note: String = "", val label: String = "", val pick: () -> Unit)
     private class MenuRow(val key: String, val item: MenuItem?, val view: LinearLayout, val check: ImageView,
                           val name: TextView, val detail: TextView, val tag: TextView)
     private class MenuColumn(val audio: Boolean) {
@@ -2314,7 +2314,7 @@ class PlayerActivity : Screen() {
             val f = g.getTrackFormat(0)
             val text = trackName(f, true, i)
             MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
-                text.name, text.detail, "", text.note) { pickAudio(g, Languages.code(f.language)) }
+                text.name, text.detail, "", text.note, text.label) { pickAudio(g, Languages.code(f.language)) }
         }
     }
 
@@ -2458,7 +2458,7 @@ class PlayerActivity : Screen() {
         val shown = if (col.expanded) col.items else col.items.filter { it.track.id in shownIds }
         col.inner.removeAllViews()
         // ChadFlix: an audio row's codec and channels show only under More; a label like "Commentary" always does
-        val details = if (col.audio) audioDetails(shown.map { AudioText(it.name, it.detail, it.note) }, col.expanded) else shown.map { it.detail }
+        val details = if (col.audio) audioDetails(shown.map { AudioText(it.name, it.detail, it.note, it.label) }, col.expanded) else shown.map { it.detail }
         val rows = shown.mapIndexed { i, item -> makeRow(col, item.track.id, item, details[i]) }.toMutableList()
         if (!col.expanded && shown.size < col.items.size) rows += makeRow(col, if (col.audio) "more:audio" else "more:subs", null)
         rows.forEach { col.inner.addView(it.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) }) }
@@ -2971,7 +2971,7 @@ class PlayerActivity : Screen() {
 
     private fun isAddonSub(g: Tracks.Group) = g.type == C.TRACK_TYPE_TEXT && g.getTrackFormat(0).id?.contains(ADDON_SUB) == true
 
-    /** The row text for a track: see [trackText]. [position] numbers a track that has no id. */
+    /** The row text for a track: see [trackText]. [position] is its place in its column, which numbers a track with no language or label ("Track 2"). */
     private fun trackName(f: Format, audio: Boolean, position: Int): TrackText {
         val language = f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
         val format = if (!audio) null else listOfNotNull(when (f.sampleMimeType) {
@@ -2992,7 +2992,7 @@ class PlayerActivity : Screen() {
             .joinToString(" ").ifEmpty { null }
         val label = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
         return trackText(audio, language, label, format, f.selectionFlags, f.roleFlags,
-            getString(R.string.track_number, f.id?.takeIf { it.isNotBlank() } ?: (position + 1).toString()))
+            getString(R.string.track_number, trackNumber(position)))
     }
 
     private fun timing(delay: Long) = formatTiming(delay, getString(R.string.timing_on_time),

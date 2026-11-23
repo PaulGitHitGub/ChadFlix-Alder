@@ -193,24 +193,56 @@ class PlayerMenuTest {
         assertEquals("", trackNote("English", null, 0, C.ROLE_FLAG_COMMENTARY))
     }
 
-    @Test fun anAudioTrackWithNoLanguageIsNeverNamedByItsCodec() {
+    @Test fun anAudioTrackWithNoLanguageIsNamedByItsLabelElseTrackN() {
         val dd = "Dolby Digital Plus 5.1"
-        // No label, or a plain one: "Track 2", and the codec is the detail.
+        // No label: "Track 2", and the codec is the detail.
         assertEquals("Track 2", trackText(true, null, null, dd, 0, 0, "Track 2").name)
         assertEquals(dd, trackText(true, null, null, dd, 0, 0, "Track 2").detail)
-        assertEquals("Track 2", trackText(true, null, "Surround", dd, 0, 0, "Track 2").name)
-        assertEquals(dd, trackText(true, null, "Surround", dd, 0, 0, "Track 2").detail)
-        // A descriptive label names it.
+        // Any label names it, plain or not: an HLS rendition "Main" shows as "Main".
+        val main = trackText(true, null, "Main", dd, 0, 0, "Track 2")
+        assertEquals("Main", main.name)
+        assertEquals(dd, main.detail)
+        assertEquals("Surround", trackText(true, null, "Surround", dd, C.SELECTION_FLAG_DEFAULT, C.ROLE_FLAG_MAIN, "Track 2").name)
         val commentary = trackText(true, null, "Commentary", dd, 0, 0, "Track 2")
         assertEquals("Commentary", commentary.name)
         assertEquals(dd, commentary.detail)
-        // Nothing known about the codec: a plain label is the detail rather than lost.
-        assertEquals("Surround", trackText(true, null, "Surround", null, 0, 0, "Track 2").detail)
+        // The label is the name, so it is not repeated in the detail, with or without a codec.
+        assertEquals("", trackText(true, null, "Surround", null, 0, 0, "Track 2").detail)
         // A subtitle with no language keeps its label as the name.
         val sub = trackText(false, null, "Full", null, 0, 0, "Track 3")
         assertEquals("Full", sub.name)
         assertEquals("", sub.detail)
         assertEquals("Track 3", trackText(false, null, null, null, 0, 0, "Track 3").name)
+    }
+
+    @Test fun trackNumberIsThePlaceNotTheFileId() {
+        // The id of a track ("2" in an MP4, "aac:Main" in HLS, "1/257" in TS) never reaches the name.
+        assertEquals("1", trackNumber(0))
+        assertEquals("2", trackNumber(1))
+        assertEquals("12", trackNumber(11))
+    }
+
+    @Test fun twinsWithTheSameDetailGetTheirLabelInFront() {
+        val dd = "Dolby Digital 5.1"
+        val us = trackText(true, "English", "US", dd, 0, 0, "Track 1")
+        val uk = trackText(true, "English", "UK", dd, 0, 0, "Track 2")
+        val rows = listOf(AudioText(us.name, us.detail, us.note, us.label), AudioText(uk.name, uk.detail, uk.note, uk.label),
+            AudioText("French", dd, "", ""))
+        for (expanded in listOf(false, true)) {
+            val d = audioDetails(rows, expanded)
+            assertEquals("US · $dd", d[0])
+            assertEquals("UK · $dd", d[1])
+            // A different name has no twin.
+            assertEquals(if (expanded) dd else "", d[2])
+        }
+        // Details that differ already tell the rows apart: no label in front.
+        val other = listOf(AudioText("English", dd, "", "US"), AudioText("English", "AAC Stereo", "", "UK"))
+        assertEquals(listOf(dd, "AAC Stereo"), audioDetails(other, false))
+        // A descriptive label is in the detail already: not twice.
+        val both = listOf(AudioText("English", "Commentary · $dd", "Commentary", "Commentary"), AudioText("English", "Commentary · $dd", "Commentary", "Commentary"))
+        assertEquals(listOf("Commentary · $dd", "Commentary · $dd"), audioDetails(both, false))
+        // Twins with no label have nothing to put in front.
+        assertEquals(listOf(dd, dd), audioDetails(listOf(AudioText("English", dd, ""), AudioText("English", dd, "")), false))
     }
 
     @Test fun theDetailShowsTheFormatForAPlainLabelAndBothForADescriptiveOne() {
