@@ -303,7 +303,7 @@ class DetailsActivity : Screen() {
             }
         }
         background({
-            (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
+            (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId, episodes = true) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
         }) { result ->
             result.getOrNull()?.let { (saved, libraryItem) ->
                 if (!itemChangedHere && item == null && libraryItem != null) {
@@ -315,7 +315,7 @@ class DetailsActivity : Screen() {
                 if (meta == null) saved?.let(::show)
             }
         }
-        background({ Stremio.addons(key).meta(type, metaId, together = true, reportFailure = true) }) { result ->
+        background({ Stremio.addons(key).meta(type, metaId, together = true, reportFailure = true, episodes = true) }) { result ->
             val fresh = result.getOrNull()
             if (fresh != null) show(fresh)
             else if (meta == null) {
