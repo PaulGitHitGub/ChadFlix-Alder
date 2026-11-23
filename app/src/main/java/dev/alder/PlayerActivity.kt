@@ -1484,7 +1484,7 @@ class PlayerActivity : Screen() {
         play.requestFocus()
     }
 
-    /** Back or Resume on "Still watching?": at the end the player closes; mid-episode it stays paused with the controls. */
+    /** Back on "Still watching?": at the end the player closes; mid-episode it stays paused with the controls. */
     private fun leaveStillWatching(resume: Boolean = true) {
         if (player.playbackState == Player.STATE_ENDED) return finish()
         stillPanel.visibility = View.GONE
@@ -2248,7 +2248,7 @@ class PlayerActivity : Screen() {
     }
 
     // ---------- ChadFlix: the Audio & Subtitles menu, Appearance and the Info pop-up (after the player-menu and info-popup drafts) ----------
-    // Landing on Audio & Subtitles opens a menu above the buttons, over a 60% dim,, after a short dwell so passing over
+    // Landing on Audio & Subtitles opens a menu above the buttons, over a 60% dim, after a short dwell so passing over
     // does not flash it. OK or Up goes into it, Left or Right leaves it, Back closes it. Landing on Info shows its pop-up
     // over the playing picture. Each is built when it opens and taken away when it closes: nothing exists or runs while
     // they are shut. An open one keeps the controls up.
@@ -2467,7 +2467,7 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded) AUDIO_WIDE else AUDIO_NARROW) }
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded || details.any { it.isNotEmpty() }) AUDIO_WIDE else AUDIO_NARROW) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2994,7 +2994,7 @@ class PlayerActivity : Screen() {
         val label = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
         val parts = listOfNotNull(language, label ?: format)
         return TrackText(parts.firstOrNull() ?: getString(R.string.track_number, f.id.orEmpty()).trim(), parts.getOrNull(1).orEmpty(),
-            if (language != null) label.orEmpty() else "")
+            trackNote(language, label, f.selectionFlags, f.roleFlags))
     }
 
     private fun timing(delay: Long) = formatTiming(delay, getString(R.string.timing_on_time),

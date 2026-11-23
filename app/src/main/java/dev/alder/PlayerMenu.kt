@@ -84,6 +84,14 @@ internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
 /** What a track's menu row says: [name] (the language), [detail] (a label from the file, else codec and channels) and [note] (the label alone). */
 internal class TrackText(val name: String, val detail: String, val note: String)
 
+/**
+ * The note on a track's row, the file's own [label] (already without the language), shown before More only for a track
+ * that is not plain: a commentary, a description, SDH or forced. A label like "DD+ 5.1" or "English" on a plain track is
+ * no note, and a track with no [language] has none.
+ */
+internal fun trackNote(language: String?, label: String?, selectionFlags: Int, roleFlags: Int): String =
+    if (language != null && label != null && !plainTrack(selectionFlags, roleFlags, label)) label else ""
+
 /** One audio row as [audioDetails] sees it. */
 internal class AudioText(val name: String, val detail: String, val note: String)
 

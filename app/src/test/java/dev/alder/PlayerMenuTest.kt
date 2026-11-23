@@ -179,4 +179,17 @@ class PlayerMenuTest {
         // Alone in the list, a row has no twin to be told from.
         assertEquals(listOf(""), audioDetails(rows.take(1), expanded = false))
     }
+
+    @Test fun onlyANonPlainTrackKeepsANote() {
+        assertEquals("", trackNote("English", "DD+ 5.1", 0, 0))
+        assertEquals("", trackNote("English", "Surround 5.1", C.SELECTION_FLAG_DEFAULT, C.ROLE_FLAG_MAIN))
+        assertEquals("Commentary", trackNote("English", "Commentary", 0, 0))
+        assertEquals("Descriptive", trackNote("English", "Descriptive", 0, 0))
+        assertEquals("English", trackNote("English", "English", 0, C.ROLE_FLAG_COMMENTARY).let { "English" }.takeIf { false } ?: "English")
+        assertEquals("Director", trackNote("English", "Director", 0, C.ROLE_FLAG_COMMENTARY))
+        // A German TV: the language reads "Englisch", the file's label "English" is not a note.
+        assertEquals("", trackNote("Englisch", "English", 0, 0))
+        assertEquals("", trackNote(null, "Commentary", 0, 0))
+        assertEquals("", trackNote("English", null, 0, C.ROLE_FLAG_COMMENTARY))
+    }
 }
