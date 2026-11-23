@@ -61,3 +61,22 @@ internal fun runtimeWords(ms: Long, hoursMinutes: String = "%1\$d hr %2\$d mins"
 internal fun infoFacts(year: String?, certificate: String?, runtime: String?): String =
     listOfNotNull(year, certificate, runtime).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" • ")
 
+
+/** The Info pop-up's rows, top to bottom: the logo (or name) is always there, the others only when there is something to show. */
+internal enum class InfoRow { LOGO, FACTS, PLOT, RATINGS, BADGES }
+
+internal const val INFO_META_H = 20 // dp, a ratings or badges row
+internal const val INFO_BADGE_GAP = 8 // dp between badges
+internal const val INFO_BOTTOM = 183 // dp from the screen's bottom: 48 above the seek bar's top (135)
+
+/**
+ * dp between a row and the row above it that is showing, on a 4 / 8 / 12 / 16 dp scale: the logo then the facts 12, the facts
+ * and plot one block 8, a 16 break before the ratings and badges, which sit 8 apart as one group. Asked of the row above that
+ * is actually there, so a missing row (no ratings, no plot) leaves no gap behind it.
+ */
+internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
+    above == InfoRow.LOGO -> 12
+    row == InfoRow.BADGES && above == InfoRow.RATINGS -> 8
+    row == InfoRow.RATINGS || row == InfoRow.BADGES -> 16
+    else -> 8
+}

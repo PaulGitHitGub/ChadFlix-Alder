@@ -113,6 +113,36 @@ class PlayerMenuTest {
         assertEquals("", infoFacts(null, "", null))
     }
 
+    /** The gaps down a pop-up that shows [rows] under its logo, the way showInfo places them. */
+    private fun infoGaps(vararg rows: InfoRow): List<Int> {
+        var above = InfoRow.LOGO
+        return rows.map { row -> infoGap(above, row).also { above = row } }
+    }
+
+    @Test fun infoRowsKeepToOneSpacingScale() {
+        val scale = setOf(4, 8, 12, 16, 24, 32)
+        for (above in InfoRow.values()) for (row in InfoRow.values()) assertTrue("$above to $row", infoGap(above, row) in scale)
+        assertTrue(INFO_BADGE_GAP in scale && INFO_META_H in 4..32 step 4)
+        assertEquals(48, INFO_BOTTOM - 135) // the seek bar's top is 135 dp up
+    }
+
+    @Test fun infoRowsGroupTitleTextAndTags() {
+        // A movie with everything: logo 12 facts 8 plot 16 ratings 8 badges.
+        assertEquals(listOf(12, 8, 16, 8), infoGaps(InfoRow.FACTS, InfoRow.PLOT, InfoRow.RATINGS, InfoRow.BADGES))
+    }
+
+    @Test fun infoRowsThatAreMissingLeaveNoGap() {
+        // No ratings: the badges take the ratings' 16 under the plot, not the 8 that sits between the two tag rows.
+        assertEquals(listOf(12, 8, 16), infoGaps(InfoRow.FACTS, InfoRow.PLOT, InfoRow.BADGES))
+        // An episode with one rating and no badges ends on the ratings row.
+        assertEquals(listOf(12, 8, 16), infoGaps(InfoRow.FACTS, InfoRow.PLOT, InfoRow.RATINGS))
+        // No facts: the plot follows the logo at the logo's gap. No plot: the ratings still open the tag group with 16.
+        assertEquals(listOf(12, 16, 8), infoGaps(InfoRow.PLOT, InfoRow.RATINGS, InfoRow.BADGES))
+        assertEquals(listOf(12, 16, 8), infoGaps(InfoRow.FACTS, InfoRow.RATINGS, InfoRow.BADGES))
+        assertEquals(listOf(12), infoGaps(InfoRow.FACTS))
+        assertEquals(emptyList<Int>(), infoGaps())
+    }
+
     @Test fun runtimeWordsReadHoursAndMinutes() {
         assertEquals("2 hr 52 mins", runtimeWords(172 * 60_000L))
         assertEquals("2 hr", runtimeWords(120 * 60_000L))

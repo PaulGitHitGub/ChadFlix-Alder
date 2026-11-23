@@ -2936,27 +2936,32 @@ class PlayerActivity : Screen() {
             ?: player.duration.takeIf { it > 0 && !isLive() } ?: 0L
         val facts = infoFacts(m?.year?.take(4), certificate, runtimeWords(length, getString(R.string.info_runtime_hours_minutes),
             getString(R.string.info_runtime_hours), getString(R.string.info_runtime_minutes)))
-        if (facts.isNotEmpty()) stack.addView(text(facts, BODY, color = soft).apply { maxLines = 1 }, wrap().apply { topMargin = dp(13) })
+        // Each row sits infoGap() under the row above it that is showing, so a missing row leaves no gap.
+        var above = InfoRow.LOGO
+        fun place(row: InfoRow, view: View, width: Int = -2) {
+            stack.addView(view, LinearLayout.LayoutParams(width, -2).apply { topMargin = dp(infoGap(above, row)) })
+            above = row
+        }
+        if (facts.isNotEmpty()) place(InfoRow.FACTS, text(facts, BODY, color = soft).apply { maxLines = 1 })
         m?.description?.takeIf { it.isNotBlank() }?.let { plot ->
-            stack.addView(text(plot, BODY, color = soft).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END },
-                LinearLayout.LayoutParams(dp(560), -2).apply { topMargin = dp(10) })
+            place(InfoRow.PLOT, text(plot, BODY, color = soft).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }, dp(560))
         }
         val scores = knownRatings(metaId).orEmpty()
         val ratings = shownRatings("both", m?.rating, scores["letterboxd"], scores["tomatoes"])
         if (ratings.isNotEmpty()) {
-            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; minimumHeight = dp(INFO_META_H) }
             addRatingLogos(row, ratings)
-            stack.addView(row, wrap().apply { topMargin = dp(10) })
+            place(InfoRow.RATINGS, row)
         }
         if (shownBadges.isNotEmpty()) {
             val chips = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
             shownBadges.forEachIndexed { i, b -> // Alder's own badges, Dolby and DTS marks included (owner)
-                chips.addView(badgeView(b), LinearLayout.LayoutParams(-2, dp(20)).apply { if (i > 0) marginStart = dp(6) })
+                chips.addView(badgeView(b), LinearLayout.LayoutParams(-2, dp(INFO_META_H)).apply { if (i > 0) marginStart = dp(INFO_BADGE_GAP) })
             }
-            stack.addView(chips, wrap().apply { topMargin = dp(6) })
+            place(InfoRow.BADGES, chips)
         }
         infoLayer.addView(stack, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
-            marginStart = dp(PAD); bottomMargin = dp(185)
+            marginStart = dp(PAD); bottomMargin = dp(INFO_BOTTOM)
         })
         if (refresh) return
         infoLayer.alpha = 0f
