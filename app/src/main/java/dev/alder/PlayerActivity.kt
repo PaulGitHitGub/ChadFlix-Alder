@@ -2378,6 +2378,17 @@ class PlayerActivity : Screen() {
         row.name.setTextColor(ink)
         row.detail.setTextColor(if (focused) ink else 0xB8C4C4C8.toInt())
         row.check.setColorFilter(if (focused) ink else 0xFFFFFFFF.toInt())
+        row.name.menuShadow(!focused); row.detail.menuShadow(!focused)
+    }
+
+    /** The shadow every other text over the picture has (onArt), on the dark menu rows; the focused row is dark ink on white and has none. */
+    private fun TextView.menuShadow(on: Boolean) { if (on) onArt() else setShadowLayer(0f, 0f, 0f, 0) }
+
+    /** Whether the picture playing is HDR (the same word and format reading as the Info badges): the source's name says HDR or Dolby Vision, or the video itself is PQ or HLG. */
+    private fun videoIsHdr(): Boolean {
+        if (sources.getOrNull(at)?.isHdr == true) return true
+        val transfer = player.videoFormat?.colorInfo?.colorTransfer
+        return transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG
     }
 
     private fun makeRow(col: MenuColumn, key: String, item: MenuItem?, shownDetail: String = ""): MenuRow {
@@ -2450,15 +2461,19 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        val anyLong = rows.any { it.item != null && it.name.paint.measureText(it.name.text.toString()) > dp(NARROW_NAME_DP) }
-        col.view.layoutParams = col.view.layoutParams?.apply { width = dp(languageColumnDp(col.expanded, shown.any { it.role.isNotEmpty() }, anyLong)) }
+        // the column is as wide as its widest row (name, then a role word or format), measured with the row's own paints
+        val widest = rows.maxOfOrNull { r ->
+            r.name.paint.measureText(r.name.text.toString()) +
+                if (r.detail.visibility == View.VISIBLE) dp(7) + r.detail.paint.measureText(r.detail.text.toString()) else 0f
+        } ?: 0f
+        col.view.layoutParams = col.view.layoutParams?.apply { width = dp(languageColumnDp(Math.ceil((widest / resources.displayMetrics.density).toDouble()).toInt())) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
 
     /** A column's title, at the text's own indent (past the check). */
     private fun columnHeader(title: Int) = FrameLayout(this).apply {
-        addView(text(title, BODY, bold = true, color = 0xFFFFFFFF.toInt()),
+        addView(text(title, BODY, bold = true, color = 0xFFFFFFFF.toInt()).onArt(),
             FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START).apply { marginStart = dp(42); topMargin = dp(4) })
     }
 
@@ -2485,12 +2500,14 @@ class PlayerActivity : Screen() {
         menuLayer.alpha = 0f
         menuLayer.visibility = View.VISIBLE
         // ChadFlix (owner): no glass and no blur; what is playing is dimmed, black at 0.6, as Alder's menus dim the page.
-        menuLayer.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
+        // Over HDR video the dim is stronger (see menuDimColor): the menu is drawn at SDR white, no brighter than the highlights behind it.
+        menuLayer.addView(View(this).apply { setBackgroundColor(menuDimColor(videoIsHdr())) }, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
-        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(languageColumnDp(false, false)), -2))
-        panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(languageColumnDp(false, false)), -2))
-        panel.addView(appearanceColumn(), LinearLayout.LayoutParams(dp(appearanceWidth()), -2))
+        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(LANGUAGE_MIN_DP), -2)) // fillColumn sets the real width
+        panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(LANGUAGE_MIN_DP), -2))
+        val look = appearanceMetrics()
+        panel.addView(appearanceColumn(look), LinearLayout.LayoutParams(dp(look.columnDp), -2))
         menuPanel = panel
         // a taller or shorter menu (More, a refresh) moves the sample so it never overlaps it
         panel.addOnLayoutChangeListener { _, _, top, _, _, _, oldTop, _, _ -> if (top != oldTop) placeSample() }
@@ -2623,12 +2640,12 @@ class PlayerActivity : Screen() {
     }
 
     // ----- Appearance -----
-    // The third column: Size, Color and Background, each "‹ value ›". Left and Right (or OK) step the value, wrapping, and it
-    // applies at once, to the real subtitles too. While a row has focus the sample line shows above the menu.
+    // The third column: Size, Color and Background, each "value ›". OK or Right steps the value, wrapping, and it applies at once, to the real
+    // subtitles too; Left goes back to Subtitles. While a row has focus the sample line shows above the menu.
 
     private enum class Look { SIZE, COLOR, BACKGROUND }
     private class AppearanceRow(val look: Look, val view: LinearLayout, val label: TextView, val value: TextView,
-                                val before: ImageView, val after: ImageView, val dot: View?, val names: List<String>)
+                                val chevron: ImageView, val dot: View?, val names: List<String>)
     private val appearanceRows = mutableListOf<AppearanceRow>()
 
     private fun subtitleStyle() = CaptionStyleCompat(Settings.subtitleColor(this),
@@ -2682,68 +2699,66 @@ class PlayerActivity : Screen() {
         }
     }
 
+    /** Unfocused: label, value and arrows are the colour and weight of the language rows' names, at full strength; focused: all dark ink on white. */
     private fun appearanceStyle(row: AppearanceRow, focused: Boolean) {
         row.view.background = if (focused) rounded(0xFFFFFFFF.toInt(), 4) else null
         val ink = if (focused) 0xFF141414.toInt() else 0xFFC4C4C8.toInt()
         row.label.setTextColor(ink)
         row.value.setTextColor(ink)
-        row.value.alpha = if (focused) 0.85f else 0.78f
-        listOf(row.before, row.after).forEach { it.setColorFilter(ink); it.alpha = if (focused) 1f else 0.4f }
+        row.chevron.setColorFilter(ink)
+        listOf(row.label, row.value).forEach { it.menuShadow(!focused) }
     }
 
-    private fun appearanceRow(look: Look, label: Int): AppearanceRow {
+    /** The Appearance column's measures in dp, from the real strings of this language: the widest label and value, and the column. */
+    private class AppearanceMetrics(val labelDp: Int, val valueDp: Int, val columnDp: Int)
+
+    private fun appearanceMetrics(): AppearanceMetrics {
+        val d = resources.displayMetrics.density
+        fun toDp(px: Float) = Math.ceil((px / d).toDouble()).toInt()
+        val body = text("", BODY)
+        val labels = listOf(R.string.subtitle_size, R.string.color, R.string.appearance_background)
+        val widestLabel = toDp(labels.maxOf { body.paint.measureText(getString(it)) })
+        val widestValue = toDp(Look.values().maxOf { look -> lookNames(look).maxOf { body.paint.measureText(it) } })
+        val column = appearanceColumnDp(widestLabel, widestValue, APPEARANCE_CHEVRON)
+        return AppearanceMetrics(minOf(widestLabel, appearanceLabelDp(column, widestValue, APPEARANCE_CHEVRON)), widestValue, column)
+    }
+
+    private fun appearanceRow(look: Look, label: Int, m: AppearanceMetrics): AppearanceRow {
         val names = lookNames(look)
-        fun chevron() = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_end) }
-        val before = chevron().apply { rotation = 180f } // points to the previous choice: left, or right in a right-to-left layout
-        val after = chevron()
-        val value = text("", SMALL).apply {
-            gravity = Gravity.CENTER; maxLines = 1
-            minWidth = names.maxOf { paint.measureText(it) }.toInt() + dp(2)
-        }
+        val chevron = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_end) } // the "press to change" cue; mirrors in a right-to-left layout
+        val value = text("", BODY).apply { maxLines = 1 } // the size and weight of the language rows' names
         val dot = if (look == Look.COLOR) View(this) else null
         val name = text(label, BODY).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        // Every row has the same label cell, so the values start at one x. The Color row's dot hangs in the gap before its value.
+        val dotSlot = dp(APPEARANCE_DOT + APPEARANCE_DOT_GAP)
         val view = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
-            setPaddingRelative(dp(32), 0, dp(12), 0) // the label starts where the other columns' names do
-            addView(name, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(before, LinearLayout.LayoutParams(dp(APPEARANCE_CHEVRON), dp(APPEARANCE_CHEVRON)).apply { marginEnd = dp(2) })
-            dot?.let { addView(it, LinearLayout.LayoutParams(dp(APPEARANCE_DOT), dp(APPEARANCE_DOT)).apply { marginEnd = dp(6) }) }
+            setPaddingRelative(dp(APPEARANCE_INDENT - 10), 0, dp(APPEARANCE_END - 10), 0) // the label starts where the other columns' names do
+            addView(name, LinearLayout.LayoutParams(dp(m.labelDp + APPEARANCE_LABEL_GAP) - (if (dot != null) dotSlot else 0), -2))
+            dot?.let { addView(it, LinearLayout.LayoutParams(dp(APPEARANCE_DOT), dp(APPEARANCE_DOT)).apply { marginEnd = dp(APPEARANCE_DOT_GAP) }) }
             addView(value, wrap())
-            addView(after, LinearLayout.LayoutParams(dp(APPEARANCE_CHEVRON), dp(APPEARANCE_CHEVRON)).apply { marginStart = dp(2) })
+            addView(chevron, LinearLayout.LayoutParams(dp(APPEARANCE_CHEVRON), dp(APPEARANCE_CHEVRON)).apply { marginStart = dp(APPEARANCE_CHEVRON_GAP) })
         }
-        val row = AppearanceRow(look, view, name, value, before, after, dot, names)
+        val row = AppearanceRow(look, view, name, value, chevron, dot, names)
         appearanceStyle(row, false)
         paintAppearance(row)
         view.setOnFocusChangeListener { _, has ->
             appearanceStyle(row, has)
             if (has) showSample() else view.post { if (appearanceRows.none { it.view.isFocused }) hideSample() }
         }
-        view.setOnClickListener { stepLook(row, 1) }
+        view.setOnClickListener { stepLook(row, 1) } // a touch or a mouse click; OK on the remote is handled in appearanceKey
         view.setOnKeyListener { _, code, ev -> appearanceKey(row, code, ev) }
         return row
     }
 
-    /** The widest label and the widest "‹ value ›" of the three rows, in dp, from the real strings of this language. */
-    private fun appearanceWidth(): Int {
-        val d = resources.displayMetrics.density
-        val probe = text("", BODY)
-        val small = text("", SMALL)
-        val labels = listOf(R.string.subtitle_size, R.string.color, R.string.appearance_background)
-        val widestLabel = labels.maxOf { probe.paint.measureText(getString(it)) } / d
-        val widestValue = Look.values().maxOf { look ->
-            lookNames(look).maxOf { small.paint.measureText(it) } / d + 2 * (APPEARANCE_CHEVRON + 2) + (if (look == Look.COLOR) APPEARANCE_DOT + 6 else 0) + 2
-        }
-        return appearanceColumnDp(Math.ceil(widestLabel.toDouble()).toInt(), Math.ceil(widestValue.toDouble()).toInt())
-    }
-
-    private fun appearanceColumn(): LinearLayout {
+    private fun appearanceColumn(m: AppearanceMetrics): LinearLayout {
         appearanceRows.clear()
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         column.addView(columnHeader(R.string.menu_appearance), LinearLayout.LayoutParams(-1, dp(50)))
         val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         listOf(Look.SIZE to R.string.subtitle_size, Look.COLOR to R.string.color, Look.BACKGROUND to R.string.appearance_background).forEach { (look, label) ->
-            val row = appearanceRow(look, label)
+            val row = appearanceRow(look, label, m)
             appearanceRows += row
             list.addView(row.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) })
         }
@@ -2773,18 +2788,18 @@ class PlayerActivity : Screen() {
         menuMoving = false
     }
 
-    /** Up and Down move between the rows (Up on Size goes back to the subtitle in use), Left and Right (and OK) step the value; Left never leaves the column. */
+    /** OK or Right (Left in right-to-left) steps the value; the other way goes back to the checked subtitle; Up and Down move between the rows. See [appearanceKeyAction]. */
     private fun appearanceKey(row: AppearanceRow, code: Int, ev: KeyEvent): Boolean {
-        if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN &&
-            code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false
-        if (ev.action != KeyEvent.ACTION_DOWN) return true
-        // a key held down to arrive here (Right from Subtitles) must not go on to step the value
-        if (ev.repeatCount > 0 && (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)) return true
         val index = appearanceRows.indexOf(row)
-        when (code) {
-            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusAppearance(index - 1) else focusRow(subsColumn, checkedIndex(subsColumn))
-            KeyEvent.KEYCODE_DPAD_DOWN -> if (index < appearanceRows.lastIndex) focusAppearance(index + 1) else focusAudioButton()
-            else -> stepLook(row, stepForKey(code == KeyEvent.KEYCODE_DPAD_RIGHT, isRtl()))
+        val action = appearanceKeyAction(code, isRtl(), index, appearanceRows.lastIndex, ev.repeatCount) ?: return false
+        if (ev.action != KeyEvent.ACTION_DOWN) return true
+        when (action) {
+            AppearanceKey.NEXT_VALUE -> stepLook(row, 1)
+            AppearanceKey.TO_SUBTITLES -> focusRow(subsColumn, checkedIndex(subsColumn))
+            AppearanceKey.UP -> focusAppearance(index - 1)
+            AppearanceKey.DOWN -> focusAppearance(index + 1)
+            AppearanceKey.TO_BUTTON -> focusAudioButton()
+            AppearanceKey.NOTHING -> {}
         }
         return true
     }
@@ -3061,8 +3076,9 @@ class PlayerActivity : Screen() {
         const val START_WAIT = 12_000L // ms for a source to show a picture before the next is tried (4K DV from debrid took 6 s)
         const val ADDON_SUB = "addon-subtitle" // the id an addon subtitle file is attached under
         const val SUB_WAIT = 2_000L // ms the start waits for the addon's subtitles
-        const val APPEARANCE_CHEVRON = 16 // dp, the arrows beside an Appearance value
+        const val APPEARANCE_CHEVRON = 16 // dp, the arrow after an Appearance value
         const val APPEARANCE_DOT = 11 // dp, the colour dot before the Color value
+        const val APPEARANCE_DOT_GAP = 6 // dp between the dot and the Color value
         const val DWELL = 180L // ms on Audio & Subtitles or Info before its panel opens, so passing over does not flash it
         const val RETRIES = 2
         const val RETRY_WAIT = 1_500L

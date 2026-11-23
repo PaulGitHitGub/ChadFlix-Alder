@@ -1,5 +1,6 @@
 package dev.alder
 
+import android.view.KeyEvent
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -244,12 +245,14 @@ class PlayerMenuTest {
         assertEquals("zh", parseOriginalLanguage(JSONObject("""{"movie_results":[{"original_language":"cn"}]}"""), "movie"))
     }
 
-    @Test fun aRowShowsOnlyTheRoleBeforeMoreAndTheFormatToo() {
+    @Test fun aRowShowsOnlyTheLanguageBeforeMoreAndTheRoleAndFormatUnderIt() {
         assertEquals("", rowDetail(false, "", "Dolby Digital 5.1"))
-        assertEquals("Commentary", rowDetail(false, "Commentary", "Dolby Digital 5.1"))
+        assertEquals("", rowDetail(false, "Commentary", "Dolby Digital 5.1")) // no role word before More
+        assertEquals("", rowDetail(false, "SDH", ""))
         assertEquals("Dolby Digital 5.1", rowDetail(true, "", "Dolby Digital 5.1"))
         assertEquals("Commentary · Dolby Digital 5.1", rowDetail(true, "Commentary", "Dolby Digital 5.1"))
         assertEquals("Forced", rowDetail(true, "Forced", "")) // a subtitle has no format
+        assertEquals("SDH", rowDetail(true, "SDH", ""))
         assertEquals("", rowDetail(true, "", ""))
     }
 
@@ -300,11 +303,18 @@ class PlayerMenuTest {
         assertNull(trackRole(true, 0, 0, "No Commentary"))
     }
 
-    @Test fun theAudioColumnIsWideForARoleWordOrMore() {
-        assertEquals(170, languageColumnDp(expanded = false, anyRole = false))
-        assertEquals(250, languageColumnDp(expanded = false, anyRole = true))
-        assertEquals(250, languageColumnDp(expanded = true, anyRole = false))
-        assertEquals(250, languageColumnDp(expanded = true, anyRole = true))
+    @Test fun aLanguageColumnIsAsWideAsItsWidestRowPlusOneFixedGap() {
+        assertEquals(170, languageColumnDp(52)) // "English" and "More": the width the menu was approved at
+        assertEquals(168, languageColumnDp(50)) // "Korean"
+        assertEquals(223, languageColumnDp(105)) // "Portuguese (Brazil)"
+        assertEquals(140, languageColumnDp(20)) // Off alone is never narrower than 140
+        assertEquals(250, languageColumnDp(400)) // a very long row is cut with an ellipsis, not allowed to push the screen
+    }
+
+    @Test fun theGapBeforeTheNextColumnIsTheSameForEveryColumn() {
+        // white space from a column's widest row to the next column's text = width - row; the same 118 dp for every row from 22 to 132 dp
+        // (a short name, a long name, or a name with its role under More), so Subtitles -> Appearance equals Audio -> Subtitles
+        assertEquals(setOf(LANGUAGE_GAP_DP), (22..132).map { languageColumnDp(it) - it }.toSet())
     }
 
     @Test fun appearanceStepsWrapAtBothEnds() {
@@ -335,32 +345,56 @@ class PlayerMenuTest {
         assertEquals(2, SUBTITLE_BACKGROUNDS.size)
     }
 
-    @Test fun leftAndRightStepTheValueAndMirrorInRtl() {
-        assertEquals(1, stepForKey(right = true, rtl = false))
-        assertEquals(-1, stepForKey(right = false, rtl = false))
-        assertEquals(-1, stepForKey(right = true, rtl = true))
-        assertEquals(1, stepForKey(right = false, rtl = true))
+    @Test fun okOrRightStepsTheValueAndLeftGoesBack() {
+        val ok = listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
+        ok.forEach { assertEquals(AppearanceKey.NEXT_VALUE, appearanceKeyAction(it, false, 1, 2, 0)) }
+        ok.forEach { assertEquals(AppearanceKey.NEXT_VALUE, appearanceKeyAction(it, true, 1, 2, 0)) } // OK is the same in right-to-left
+        assertEquals(AppearanceKey.NEXT_VALUE, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_RIGHT, false, 0, 2, 0))
+        assertEquals(AppearanceKey.TO_SUBTITLES, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_LEFT, false, 2, 2, 0))
+        // right-to-left mirrors the arrows: Left steps, Right goes back
+        assertEquals(AppearanceKey.NEXT_VALUE, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_LEFT, true, 0, 2, 0))
+        assertEquals(AppearanceKey.TO_SUBTITLES, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_RIGHT, true, 0, 2, 0))
     }
 
-    @Test fun theAppearanceColumnFitsItsWidestRowWithinBounds() {
-        assertEquals(240, appearanceColumnDp(40, 60)) // never narrower than 240
-        assertEquals(42 + 90 + 16 + 110 + 22, appearanceColumnDp(90, 110))
-        assertEquals(340, appearanceColumnDp(200, 200)) // a long translation stays on the screen
+    @Test fun aHeldKeyNeverStepsOrGoesBack() {
+        // the Right that brought focus here, still held, must not change a value
+        listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_LEFT).forEach {
+            assertEquals(AppearanceKey.NOTHING, appearanceKeyAction(it, false, 0, 2, 1))
+            assertEquals(AppearanceKey.NOTHING, appearanceKeyAction(it, true, 0, 2, 3))
+        }
+        assertEquals(AppearanceKey.DOWN, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_DOWN, false, 0, 2, 5)) // Up and Down may repeat
+    }
+
+    @Test fun upAndDownMoveBetweenTheRows() {
+        assertEquals(AppearanceKey.NOTHING, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_UP, false, 0, 2, 0)) // Up on Size stays
+        assertEquals(AppearanceKey.UP, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_UP, false, 1, 2, 0))
+        assertEquals(AppearanceKey.DOWN, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_DOWN, false, 0, 2, 0))
+        assertEquals(AppearanceKey.TO_BUTTON, appearanceKeyAction(KeyEvent.KEYCODE_DPAD_DOWN, false, 2, 2, 0))
+        assertNull(appearanceKeyAction(KeyEvent.KEYCODE_BACK, false, 0, 2, 0)) // Back is the menu's own
+    }
+
+    @Test fun theAppearanceColumnIsLabelGapValueAndArrow() {
+        assertEquals(42 + 78 + 24 + 73 + 2 + 16 + 22, appearanceColumnDp(78, 73)) // 257: nothing floats at the far end
+        assertEquals(78 + 73 + 106, appearanceColumnDp(78, 73))
+        assertEquals(340, appearanceColumnDp(250, 200)) // a long translation stays on the screen
+        // ...and then the label gives way, not the values: label + the rest = the column
+        assertEquals(340 - 106 - 73, appearanceLabelDp(340, 73))
+        assertEquals(78, appearanceLabelDp(appearanceColumnDp(78, 73), 73))
+    }
+
+    @Test fun theMenuDimIsStrongerOverHdrVideo() {
+        assertEquals(0x99000000.toInt(), menuDimColor(hdr = false)) // 60%
+        assertEquals(0xE6000000.toInt(), menuDimColor(hdr = true)) // 90%
+        assertTrue((menuDimColor(true) ushr 24) > (menuDimColor(false) ushr 24))
     }
 
     @Test fun theThreeColumnsFitA960DpScreenInTheWidestCase() {
-        // Audio and Subtitles wide (under More), Appearance at its widest, plus the panel's padding (2 x 8) and the screen margin (48).
-        val widest = 2 * languageColumnDp(expanded = true, anyRole = true, anyLong = true) + appearanceColumnDp(300, 300) + 2 * 8 + 48
+        // Audio and Subtitles at their widest, Appearance at its widest, plus the panel's padding (2 x 8) and the screen margin (48).
+        val widest = 2 * languageColumnDp(400) + appearanceColumnDp(300, 300) + 2 * 8 + 48
         assertEquals(250 * 2 + 340 + 64, widest)
         assertTrue(widest <= 960)
-        // the narrow case, with the widest Appearance column for the real English strings
-        assertEquals(170 * 2 + 280, 2 * languageColumnDp(false, false) + appearanceColumnDp(90, 110))
-    }
-
-    @Test fun aLongNameWidensTheColumn() {
-        assertEquals(170, languageColumnDp(expanded = false, anyRole = false, anyLong = false))
-        assertEquals(250, languageColumnDp(expanded = false, anyRole = false, anyLong = true)) // "Portuguese (Brazil)"
-        assertEquals(106, NARROW_NAME_DP)
+        // the usual case: "English" columns and the real English Appearance strings
+        assertEquals(170 * 2 + 257, 2 * languageColumnDp(52) + appearanceColumnDp(78, 73))
     }
 
     @Test fun theSampleSitsAt280OfAHeightOf1080ClearOfTheMenu() {

@@ -1,5 +1,6 @@
 package dev.alder
 
+import android.view.KeyEvent
 import androidx.media3.common.C
 import androidx.media3.common.MimeTypes
 
@@ -119,14 +120,15 @@ internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int, labe
 }
 
 /**
- * The width of the Audio or Subtitles column in dp: wide under More, before More when a row shows a role word (so "English Commentary" is not cut),
- * and when a name does not fit the narrow column ([anyLong], measured with the row's own paint: "Portuguese (Brazil)", "Norwegian Bokmål").
+ * The width of the Audio or Subtitles column in dp: its widest row ([widestRowDp]: a name and, after it, a role word or an audio format,
+ * measured with the row's own paint) plus [LANGUAGE_GAP_DP], so the white space from a column's widest row to the next column's text is the
+ * same for Audio and for Subtitles, whatever the rows are ("English SDH" no longer pushes Appearance away). Never narrower than
+ * [LANGUAGE_MIN_DP] and never wider than [LANGUAGE_MAX_DP] (a longer row is cut with an ellipsis).
  */
-internal fun languageColumnDp(expanded: Boolean, anyRole: Boolean, anyLong: Boolean = false): Int =
-    if (expanded || anyRole || anyLong) 250 else 170
-
-/** The room a name has in the narrow column, in dp: 170 less the row margins (20), the check (32) and the row's end padding (12). */
-internal const val NARROW_NAME_DP = 106
+internal fun languageColumnDp(widestRowDp: Int): Int = (widestRowDp + LANGUAGE_GAP_DP).coerceIn(LANGUAGE_MIN_DP, LANGUAGE_MAX_DP)
+internal const val LANGUAGE_GAP_DP = 118 // dp from a column's widest row to the next column's text; "English" (52) makes the 170 the menu was approved at
+internal const val LANGUAGE_MIN_DP = 140
+internal const val LANGUAGE_MAX_DP = 250
 
 /** Alder's own choices for the subtitle look, in the order the Appearance column steps through them. */
 internal val SUBTITLE_SIZES = listOf(80, 100, 130, 160) // percent of Media3's default size: Small, Medium, Large, Extra Large
@@ -139,15 +141,53 @@ internal fun <T> choiceIndex(choices: List<T>, current: T): Int = choices.indexO
 /** One step along [count] choices from [index], wrapping at both ends: after the last comes the first, so both arrows always work. */
 internal fun steppedIndex(index: Int, delta: Int, count: Int): Int = if (count <= 0) 0 else Math.floorMod(index + delta, count)
 
-/** What a Left or Right press on an Appearance row steps by: +1 is the next choice. Right is next, except in a right-to-left layout, where the arrows mirror. */
-internal fun stepForKey(right: Boolean, rtl: Boolean): Int = if (right != rtl) 1 else -1
+/** What a key does on an Appearance row. */
+internal enum class AppearanceKey { NEXT_VALUE, TO_SUBTITLES, UP, DOWN, TO_BUTTON, NOTHING }
 
 /**
- * The width of the Appearance column in dp: the label's indent, the widest label, a gap, the widest "‹ value ›" and the end margin.
- * Never narrower than 240, so the three rows have room, and never wider than 340, so the three columns fit one screen.
+ * OK or Right steps to the next value, wrapping; Left goes back to the checked subtitle, as it does from Subtitles to Audio. In a right-to-left
+ * layout the arrows mirror: Left steps and Right goes back. A held key ([repeat] above 0) never steps or goes back, so the Right that brought
+ * focus here does not go on to change a value. Up and Down move between the rows; Up on the first row stays there, Down on the last goes to the
+ * button. Null: a key an Appearance row does not use.
  */
-internal fun appearanceColumnDp(widestLabelDp: Int, widestValueDp: Int): Int =
-    (42 + widestLabelDp + 16 + widestValueDp + 22).coerceIn(240, 340)
+internal fun appearanceKeyAction(code: Int, rtl: Boolean, index: Int, lastIndex: Int, repeat: Int): AppearanceKey? {
+    val forward = if (rtl) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+    val back = if (rtl) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+    return when (code) {
+        KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, forward ->
+            if (repeat > 0) AppearanceKey.NOTHING else AppearanceKey.NEXT_VALUE
+        back -> if (repeat > 0) AppearanceKey.NOTHING else AppearanceKey.TO_SUBTITLES
+        KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) AppearanceKey.UP else AppearanceKey.NOTHING
+        KeyEvent.KEYCODE_DPAD_DOWN -> if (index < lastIndex) AppearanceKey.DOWN else AppearanceKey.TO_BUTTON
+        else -> null
+    }
+}
+
+// One Appearance row, from its left edge in dp: [APPEARANCE_INDENT] (the other columns' text starts here), the label cell (as wide as the widest of the
+// three labels), a fixed gap, then the value and one "›" right after it. Every row has the same label cell, so the values start at one x; the Color
+// row's dot hangs in the gap before its value. Nothing floats at the far end: the column ends [APPEARANCE_END] after the widest value and its arrow.
+internal const val APPEARANCE_INDENT = 42 // 10 row margin + 32: where a name starts in every column
+internal const val APPEARANCE_LABEL_GAP = 24 // dp from the widest label to where the values start
+internal const val APPEARANCE_CHEVRON_GAP = 2 // dp between a value and its arrow
+internal const val APPEARANCE_END = 22 // dp after the arrow: 12 row padding + 10 row margin
+internal const val APPEARANCE_MAX = 340 // the three columns must fit one screen
+
+/** The width of the Appearance column in dp: indent, widest label, gap, the widest value of all rows, its arrow and the end. At most [APPEARANCE_MAX]. */
+internal fun appearanceColumnDp(widestLabelDp: Int, widestValueDp: Int, chevronDp: Int = 16): Int =
+    (APPEARANCE_INDENT + widestLabelDp + APPEARANCE_LABEL_GAP + widestValueDp + APPEARANCE_CHEVRON_GAP + chevronDp + APPEARANCE_END)
+        .coerceAtMost(APPEARANCE_MAX)
+
+/** What the label cell gets of a column [columnDp] wide, so a long translation shortens the label and not the values. */
+internal fun appearanceLabelDp(columnDp: Int, widestValueDp: Int, chevronDp: Int = 16): Int =
+    columnDp - APPEARANCE_INDENT - APPEARANCE_LABEL_GAP - widestValueDp - APPEARANCE_CHEVRON_GAP - chevronDp - APPEARANCE_END
+
+/**
+ * The menu's dim over the picture: black at 0.6 (0x99); over HDR video 0.9 (0xE6). The menu is drawn at SDR white, which on an HDR
+ * picture is no brighter than the highlights behind it, and 0.6 leaves those at 40% of their light: the grey text (#C4C4C8) sits on a
+ * backdrop as bright as itself (contrast 1.05 measured on the owner's photo). At 0.9 a highlight keeps 10%, so the text has about 3:1
+ * against the picture before its shadow, and more with it.
+ */
+internal fun menuDimColor(hdr: Boolean): Int = if (hdr) 0xE6000000.toInt() else 0x99000000.toInt()
 
 /**
  * Where the sample subtitle's bottom edge sits, in px from the top: 280 of a 1080 px screen, but never lower than [gapPx] above the
@@ -175,11 +215,12 @@ internal fun audioFormatText(codec: String?, mime: String?, label: String?, chan
 }
 
 /**
- * What follows a track's name on its row. Before More only the [role] word ("Commentary"); under More the [format] too,
- * the audio codec and channels: "Commentary · Dolby Digital 5.1". The file's own label (where uploaders put release group names) never shows.
+ * What follows a track's name on its row. Before More nothing: a row is only the language (or "Track N"). Under More the [role] word
+ * ("Commentary", "Forced", "SDH") and an audio track's [format]: "Commentary · Dolby Digital 5.1". The file's own label (where uploaders put
+ * release group names) never shows.
  */
 internal fun rowDetail(expanded: Boolean, role: String, format: String): String =
-    (if (expanded) listOf(role, format) else listOf(role)).filter { it.isNotEmpty() }.joinToString(" · ")
+    if (!expanded) "" else listOf(role, format).filter { it.isNotEmpty() }.joinToString(" · ")
 
 internal const val SEEK_BAR_BOTTOM = 111 // dp from the screen's bottom to the seek bar
 internal const val SEEK_BAR_H = 24 // dp, the seek bar's height
