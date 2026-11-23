@@ -1,6 +1,7 @@
 package dev.alder
 
 import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 
 // ChadFlix: what the player's Audio & Subtitles menu and Info pop-up decide, kept apart from the views so it can be tested.
 
@@ -18,14 +19,15 @@ internal data class MenuTrack(
  * The rows a column shows before "More": Off, the track in use, the best plain English track, and the best plain track
  * in the title's [originalLanguage] (null: unknown, so only English and the track in use). "English" is literal, not the
  * TV's language. The best track of a language is a plain one, from the file before an add-on, then in file order; a
- * language with no plain track gives its first. A track with no language shows only when it is in use. Every track not
- * listed here is behind More.
+ * language with no plain track gives its first. A language never shows twice: when the track in use is of that language
+ * it is the one shown. A track with no language shows only when it is in use. Every track not listed here is behind More.
  */
 internal fun defaultTrackIds(tracks: List<MenuTrack>, originalLanguage: String?): Set<String> {
     val shown = HashSet<String>()
     tracks.forEach { if (it.off || it.selected) shown += it.id }
     fun best(language: String?) = language?.let { code ->
-        tracks.filter { !it.off && Languages.match(it.language, code) > 0 }.sortedWith(compareBy({ !it.plain }, { it.addon })).firstOrNull()
+        if (tracks.any { it.id in shown && !it.off && Languages.match(it.language, code) > 0 }) null
+        else tracks.filter { !it.off && Languages.match(it.language, code) > 0 }.sortedWith(compareBy({ !it.plain }, { it.addon })).firstOrNull()
     }
     best("en")?.let { shown += it.id }
     best(originalLanguage)?.let { shown += it.id }
@@ -80,57 +82,45 @@ internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
     else -> 8
 }
 
-/**
- * What a track's menu row says: [name] (the language), [detail] (label and/or codec and channels, under More), [note] (the label
- * alone) and [label] (the file's own label, or "": [audioDetails] uses it to tell twins apart).
- */
-internal class TrackText(val name: String, val detail: String, val note: String, val label: String = "")
-
 /** The number in "Track N": the track's place among the tracks of its column (1 for the first), never the file's own id ("2", "aac:Main", "1/257"). */
 internal fun trackNumber(position: Int): String = (position + 1).toString()
 
-/**
- * The text of one track's row. [label] is the file's own label (already without the language); [audio] is false for subtitles; [format] is the audio codec and
- * channels, or null (subtitles, or unknown). [unnamed] is the "Track N" name. The name is the [language]. A track with no language
- * is named by its label whenever it has one (plain or not, so a rendition "Main" shows as "Main"), and by [unnamed] only when
- * it has none. The detail is the format; a plain label is left out when there is a format ("English" is no use there), and
- * a descriptive one comes first: "Commentary · Dolby Digital 5.1".
- */
-internal fun trackText(audio: Boolean, language: String?, label: String?, format: String?, selectionFlags: Int, roleFlags: Int, unnamed: String): TrackText {
-    val plain = plainTrack(selectionFlags, roleFlags, label)
-    val name = language ?: label ?: unnamed
-    val shownLabel = label?.takeIf { it != name && (!plain || !audio || format == null) }
-    return TrackText(name, listOfNotNull(shownLabel, format).joinToString(" · "), trackNote(language, label, selectionFlags, roleFlags), label.orEmpty())
+/** A role the viewer may care about, read from the track's flags only, never from the file's free-text label. */
+internal enum class TrackRole { COMMENTARY, DESCRIPTIVE, FORCED, SDH }
+
+/** The role of a track, from its [selectionFlags] and [roleFlags]. Audio can be a commentary or a description; subtitles forced or SDH. */
+internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int): TrackRole? = when {
+    audio && roleFlags and C.ROLE_FLAG_COMMENTARY != 0 -> TrackRole.COMMENTARY
+    audio && roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> TrackRole.DESCRIPTIVE
+    !audio && selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> TrackRole.FORCED
+    !audio && roleFlags and (C.ROLE_FLAG_CAPTION or C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0 -> TrackRole.SDH
+    else -> null
 }
 
 /**
- * The note on a track's row, the file's own [label] (already without the language), shown before More only for a track
- * that is not plain: a commentary, a description, SDH or forced. A label like "DD+ 5.1" or "English" on a plain track is
- * no note, and a track with no [language] has none.
+ * An audio track's codec and channels for under More: "Dolby TrueHD Atmos 7.1". Matroska reports Atmos as plain TrueHD or E-AC-3
+ * and DTS:X and DTS-HD MA as DTS, so those three words (and only those) are taken from the file's [label] when it has them as
+ * whole words. Nothing else from the label ever shows, so "BTM TrueHD Atmos 7.1" gives no "BTM".
  */
-internal fun trackNote(language: String?, label: String?, selectionFlags: Int, roleFlags: Int): String =
-    if (language != null && label != null && !plainTrack(selectionFlags, roleFlags, label)) label else ""
-
-/** One audio row as [audioDetails] sees it. [label] is the file's own label, or "". */
-internal class AudioText(val name: String, val detail: String, val note: String, val label: String = "")
-
-/**
- * The detail each audio row shows. Under More it is all of it. Before More only the [AudioText.note] (a label such as
- * "Commentary"), not codec and channels, except that rows with the same name show all of it, so two English tracks look different.
- * Rows with the same name and the same detail (labels "US" and "UK", both Dolby Digital 5.1) would still look the same, so
- * their label goes in front: "US · Dolby Digital 5.1".
- */
-internal fun audioDetails(rows: List<AudioText>, expanded: Boolean): List<String> {
-    val base = rows.map { r -> if (expanded || rows.count { it.name.equals(r.name, ignoreCase = true) } > 1) r.detail else r.note }
-    return rows.mapIndexed { i, r ->
-        val twin = rows.indices.any { j -> j != i && rows[j].name.equals(r.name, ignoreCase = true) && base[j].equals(base[i], ignoreCase = true) }
-        val has = base[i] == r.label || base[i].startsWith("${r.label} · ")
-        if (twin && r.label.isNotEmpty() && !has) listOf(r.label, base[i]).filter { it.isNotEmpty() }.joinToString(" · ") else base[i]
+internal fun audioFormatText(codec: String?, mime: String?, label: String?, channels: String?): String {
+    fun has(re: String) = label != null && Regex(re, RegexOption.IGNORE_CASE).containsMatchIn(label)
+    val dts = mime?.startsWith("audio/vnd.dts") == true
+    val named = when {
+        codec == null -> null
+        (mime == MimeTypes.AUDIO_E_AC3 || mime == MimeTypes.AUDIO_TRUEHD) && has("\\batmos\\b") -> "$codec Atmos"
+        dts && has("\\bdts[-_.: ]?x\\b") -> "DTS:X"
+        dts && has("\\bdts[-_.: ]?hd[-_.: ]?ma\\b") -> "DTS-HD MA"
+        else -> codec
     }
+    return listOfNotNull(named, channels).joinToString(" ")
 }
 
-/** Whether the Audio column is wide: under More, or when any row shows a detail. Narrow keeps Subtitles on screen. */
-internal fun audioColumnWide(expanded: Boolean, details: List<String>): Boolean = expanded || details.any { it.isNotEmpty() }
+/**
+ * What follows a track's name on its row. Before More only the [role] word ("Commentary"); under More the [format] too,
+ * the audio codec and channels: "Commentary · Dolby Digital 5.1". The file's own label (where uploaders put release group names) never shows.
+ */
+internal fun rowDetail(expanded: Boolean, role: String, format: String): String =
+    (if (expanded) listOf(role, format) else listOf(role)).filter { it.isNotEmpty() }.joinToString(" · ")
 
 internal const val SEEK_BAR_BOTTOM = 111 // dp from the screen's bottom to the seek bar
 internal const val SEEK_BAR_H = 24 // dp, the seek bar's height

@@ -204,6 +204,10 @@
     <string name="audio_stereo">ستيريو</string>
     <string name="audio_channels">%1$d قناة</string>
     <string name="track_number">المسار %1$s</string>
+    <string name="role_commentary">تعليق</string>
+    <string name="role_descriptive">وصف صوتي</string>
+    <string name="role_forced">إجباري</string>
+    <string name="role_sdh">SDH</string>
 
     <!-- Settings -->
     <string name="settings_title">الإعدادات</string>

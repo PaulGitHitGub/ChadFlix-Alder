@@ -194,6 +194,10 @@
     <string name="audio_stereo">Stereo</string>
     <string name="audio_channels">%1$d canali</string>
     <string name="track_number">Traccia %1$s</string>
+    <string name="role_commentary">Commento</string>
+    <string name="role_descriptive">Descrittivo</string>
+    <string name="role_forced">Forzati</string>
+    <string name="role_sdh">SDH</string>
 
     <!-- Settings -->
     <string name="settings_title">Impostazioni</string>

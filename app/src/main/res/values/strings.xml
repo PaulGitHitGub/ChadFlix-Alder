@@ -218,6 +218,10 @@
     <string name="audio_stereo">Stereo</string>
     <string name="audio_channels">%1$d ch</string>
     <string name="track_number">Track %1$s</string>
+    <string name="role_commentary">Commentary</string>
+    <string name="role_descriptive">Descriptive</string>
+    <string name="role_forced">Forced</string>
+    <string name="role_sdh">SDH</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>

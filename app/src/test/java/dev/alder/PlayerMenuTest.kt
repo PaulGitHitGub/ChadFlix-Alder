@@ -1,6 +1,7 @@
 package dev.alder
 
 import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -63,6 +64,18 @@ class PlayerMenuTest {
         assertEquals(setOf("en", "fr"), defaultTrackIds(audio, "en"))
         val untagged = listOf(off, t("en", "en"), t("x", null, selected = true), t("y", "und"))
         assertEquals(setOf("off", "en", "x"), defaultTrackIds(untagged, "ko")) // untagged and unknown show only when in use
+    }
+
+    @Test fun aLanguageNeverShowsTwice() {
+        // The track in use is English SDH: it is the English row, the plain English track goes under More.
+        val subs = listOf(off, t("sdh", "en", selected = true, plain = false), t("en", "en"), t("ko", "ko"))
+        assertEquals(setOf("sdh", "off", "ko"), defaultTrackIds(subs, "ko"))
+        // Two English audio tracks, neither in use: one row, the best.
+        val audio = listOf(t("a", "ko", selected = true), t("en-com", "en", plain = false), t("en", "en"))
+        assertEquals(setOf("a", "en"), defaultTrackIds(audio, "ko"))
+        // The track in use is the original language: the best original-language track is not added beside it.
+        val ko = listOf(t("k1", "ko"), t("k2", "ko", selected = true), t("en", "en"))
+        assertEquals(setOf("k2", "en"), defaultTrackIds(ko, "ko"))
     }
 
     @Test fun noTracksShowNothingBeyondOff() {
@@ -165,54 +178,26 @@ class PlayerMenuTest {
         assertEquals("zh", parseOriginalLanguage(JSONObject("""{"movie_results":[{"original_language":"cn"}]}"""), "movie"))
     }
 
-    @Test fun audioRowsHideCodecAndChannelsButKeepALabel() {
-        val rows = listOf(AudioText("English", "Dolby Digital Plus 5.1", ""), AudioText("French", "AAC Stereo", ""),
-            AudioText("Spanish", "Descriptive", "Descriptive"))
-        assertEquals(listOf("", "", "Descriptive"), audioDetails(rows, expanded = false))
-        assertEquals(listOf("Dolby Digital Plus 5.1", "AAC Stereo", "Descriptive"), audioDetails(rows, expanded = true))
+    @Test fun aRowShowsOnlyTheRoleBeforeMoreAndTheFormatToo() {
+        assertEquals("", rowDetail(false, "", "Dolby Digital 5.1"))
+        assertEquals("Commentary", rowDetail(false, "Commentary", "Dolby Digital 5.1"))
+        assertEquals("Dolby Digital 5.1", rowDetail(true, "", "Dolby Digital 5.1"))
+        assertEquals("Commentary · Dolby Digital 5.1", rowDetail(true, "Commentary", "Dolby Digital 5.1"))
+        assertEquals("Forced", rowDetail(true, "Forced", "")) // a subtitle has no format
+        assertEquals("", rowDetail(true, "", ""))
     }
 
-    @Test fun audioRowsWithTheSameNameShowTheirDetail() {
-        val rows = listOf(AudioText("English", "Dolby TrueHD 7.1", ""), AudioText("English", "Commentary", "Commentary"),
-            AudioText("French", "AAC Stereo", ""))
-        assertEquals(listOf("Dolby TrueHD 7.1", "Commentary", ""), audioDetails(rows, expanded = false))
-        // Alone in the list, a row has no twin to be told from.
-        assertEquals(listOf(""), audioDetails(rows.take(1), expanded = false))
-    }
-
-    @Test fun onlyANonPlainTrackKeepsANote() {
-        assertEquals("", trackNote("English", "DD+ 5.1", 0, 0))
-        assertEquals("", trackNote("English", "Surround 5.1", C.SELECTION_FLAG_DEFAULT, C.ROLE_FLAG_MAIN))
-        assertEquals("Commentary", trackNote("English", "Commentary", 0, 0))
-        assertEquals("Descriptive", trackNote("English", "Descriptive", 0, 0))
-        assertEquals("English", trackNote("English", "English", 0, C.ROLE_FLAG_COMMENTARY))
-        assertEquals("Director", trackNote("English", "Director", 0, C.ROLE_FLAG_COMMENTARY))
-        // A German TV: the language reads "Englisch", the file's label "English" is not a note.
-        assertEquals("", trackNote("Englisch", "English", 0, 0))
-        assertEquals("", trackNote(null, "Commentary", 0, 0))
-        assertEquals("", trackNote("English", null, 0, C.ROLE_FLAG_COMMENTARY))
-    }
-
-    @Test fun anAudioTrackWithNoLanguageIsNamedByItsLabelElseTrackN() {
-        val dd = "Dolby Digital Plus 5.1"
-        // No label: "Track 2", and the codec is the detail.
-        assertEquals("Track 2", trackText(true, null, null, dd, 0, 0, "Track 2").name)
-        assertEquals(dd, trackText(true, null, null, dd, 0, 0, "Track 2").detail)
-        // Any label names it, plain or not: an HLS rendition "Main" shows as "Main".
-        val main = trackText(true, null, "Main", dd, 0, 0, "Track 2")
-        assertEquals("Main", main.name)
-        assertEquals(dd, main.detail)
-        assertEquals("Surround", trackText(true, null, "Surround", dd, C.SELECTION_FLAG_DEFAULT, C.ROLE_FLAG_MAIN, "Track 2").name)
-        val commentary = trackText(true, null, "Commentary", dd, 0, 0, "Track 2")
-        assertEquals("Commentary", commentary.name)
-        assertEquals(dd, commentary.detail)
-        // The label is the name, so it is not repeated in the detail, with or without a codec.
-        assertEquals("", trackText(true, null, "Surround", null, 0, 0, "Track 2").detail)
-        // A subtitle with no language keeps its label as the name.
-        val sub = trackText(false, null, "Full", null, 0, 0, "Track 3")
-        assertEquals("Full", sub.name)
-        assertEquals("", sub.detail)
-        assertEquals("Track 3", trackText(false, null, null, null, 0, 0, "Track 3").name)
+    @Test fun theRoleComesFromTheFlagsOnly() {
+        assertNull(trackRole(true, 0, 0))
+        assertNull(trackRole(false, 0, 0))
+        assertEquals(TrackRole.COMMENTARY, trackRole(true, 0, C.ROLE_FLAG_COMMENTARY))
+        assertEquals(TrackRole.DESCRIPTIVE, trackRole(true, 0, C.ROLE_FLAG_DESCRIBES_VIDEO))
+        assertEquals(TrackRole.FORCED, trackRole(false, C.SELECTION_FLAG_FORCED, 0))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, C.ROLE_FLAG_CAPTION))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND))
+        // a subtitle is never a commentary, and audio is never forced or SDH
+        assertNull(trackRole(false, 0, C.ROLE_FLAG_COMMENTARY))
+        assertNull(trackRole(true, C.SELECTION_FLAG_FORCED, C.ROLE_FLAG_CAPTION))
     }
 
     @Test fun trackNumberIsThePlaceNotTheFileId() {
@@ -222,43 +207,19 @@ class PlayerMenuTest {
         assertEquals("12", trackNumber(11))
     }
 
-    @Test fun twinsWithTheSameDetailGetTheirLabelInFront() {
-        val dd = "Dolby Digital 5.1"
-        val us = trackText(true, "English", "US", dd, 0, 0, "Track 1")
-        val uk = trackText(true, "English", "UK", dd, 0, 0, "Track 2")
-        val rows = listOf(AudioText(us.name, us.detail, us.note, us.label), AudioText(uk.name, uk.detail, uk.note, uk.label),
-            AudioText("French", dd, "", ""))
-        for (expanded in listOf(false, true)) {
-            val d = audioDetails(rows, expanded)
-            assertEquals("US · $dd", d[0])
-            assertEquals("UK · $dd", d[1])
-            // A different name has no twin.
-            assertEquals(if (expanded) dd else "", d[2])
-        }
-        // Details that differ already tell the rows apart: no label in front.
-        val other = listOf(AudioText("English", dd, "", "US"), AudioText("English", "AAC Stereo", "", "UK"))
-        assertEquals(listOf(dd, "AAC Stereo"), audioDetails(other, false))
-        // A descriptive label is in the detail already: not twice.
-        val both = listOf(AudioText("English", "Commentary · $dd", "Commentary", "Commentary"), AudioText("English", "Commentary · $dd", "Commentary", "Commentary"))
-        assertEquals(listOf("Commentary · $dd", "Commentary · $dd"), audioDetails(both, false))
-        // Twins with no label have nothing to put in front.
-        assertEquals(listOf(dd, dd), audioDetails(listOf(AudioText("English", dd, ""), AudioText("English", dd, "")), false))
-    }
-
-    @Test fun theDetailShowsTheFormatForAPlainLabelAndBothForADescriptiveOne() {
-        val dd = "Dolby Digital 5.1"
-        assertEquals(dd, trackText(true, "English", "DD+ 5.1", dd, 0, 0, "Track 1").detail)
-        assertEquals("Commentary · $dd", trackText(true, "English", "Commentary", dd, 0, 0, "Track 1").detail)
-        assertEquals("Commentary", trackText(true, "English", "Commentary", dd, 0, 0, "Track 1").note)
-        assertEquals("English", trackText(true, "English", null, dd, 0, 0, "Track 1").name)
-        // Subtitles have no format: the label is the detail.
-        assertEquals("SDH", trackText(false, "English", "SDH", null, 0, 0, "Track 1").detail)
-    }
-
-    @Test fun theAudioColumnIsWideOnlyWhenItShowsDetails() {
-        assertFalse(audioColumnWide(false, listOf("", "")))
-        assertFalse(audioColumnWide(false, emptyList()))
-        assertTrue(audioColumnWide(false, listOf("", "Commentary")))
-        assertTrue(audioColumnWide(true, listOf("", "")))
+    @Test fun theAudioFormatTakesAtmosFromTheLabelButNeverTheReleaseGroup() {
+        val truehd = MimeTypes.AUDIO_TRUEHD
+        assertEquals("Dolby TrueHD Atmos 7.1", audioFormatText("Dolby TrueHD", truehd, "BTM TrueHD Atmos 7.1", "7.1"))
+        assertEquals("Dolby TrueHD 7.1", audioFormatText("Dolby TrueHD", truehd, "BTM TrueHD 7.1", "7.1"))
+        assertEquals("Dolby Digital Plus Atmos 5.1", audioFormatText("Dolby Digital Plus", MimeTypes.AUDIO_E_AC3, "DDP ATMOS", "5.1"))
+        assertEquals("Dolby Atmos 5.1", audioFormatText("Dolby Atmos", MimeTypes.AUDIO_E_AC3_JOC, "Atmos", "5.1")) // not twice
+        assertEquals("AAC Stereo", audioFormatText("AAC", MimeTypes.AUDIO_AAC, "Atmos", "Stereo")) // only a Dolby track
+        assertEquals("Dolby TrueHD 7.1", audioFormatText("Dolby TrueHD", truehd, "Atmosphere", "7.1")) // whole word
+        assertEquals("DTS:X 7.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "BTM DTS-X 7.1", "7.1"))
+        assertEquals("DTS-HD MA 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "DTS-HD.MA 5.1", "5.1"))
+        assertEquals("DTS-HD MA 5.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "BTM DTS-HD MA", "5.1"))
+        assertEquals("Dolby Digital", audioFormatText("Dolby Digital", MimeTypes.AUDIO_AC3, null, null))
+        assertEquals("", audioFormatText(null, null, "BTM", null))
+        assertEquals("Stereo", audioFormatText(null, null, "BTM", "Stereo"))
     }
 }

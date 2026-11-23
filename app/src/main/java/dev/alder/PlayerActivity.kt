@@ -2290,10 +2290,10 @@ class PlayerActivity : Screen() {
 
     // ----- the menu -----
 
-    /** [detail]: all the row can add to its name; [note]: the part of it that is not codec or channels, which shows without More. */
-    private class MenuItem(val track: MenuTrack, val name: String, val detail: String, val tag: String, val note: String = "", val label: String = "", val pick: () -> Unit)
+    /** [role]: a word like "Commentary" or "Forced" (or ""); [format]: an audio track's codec and channels, shown only under More. */
+    private class MenuItem(val track: MenuTrack, val name: String, val role: String, val format: String, val pick: () -> Unit)
     private class MenuRow(val key: String, val item: MenuItem?, val view: LinearLayout, val check: ImageView,
-                          val name: TextView, val detail: TextView, val tag: TextView)
+                          val name: TextView, val detail: TextView)
     private class MenuColumn(val audio: Boolean) {
         var items = emptyList<MenuItem>()
         var rows = emptyList<MenuRow>()
@@ -2312,9 +2312,8 @@ class PlayerActivity : Screen() {
         val groups = audioGroups.filter { it.isTrackSupported(0) }
         return groups.mapIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val text = trackName(f, true, i)
             MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
-                text.name, text.detail, "", text.note, text.label) { pickAudio(g, Languages.code(f.language)) }
+                trackName(f, i), roleWord(true, f), audioFormat(f)) { pickAudio(g, Languages.code(f.language)) }
         }
     }
 
@@ -2335,13 +2334,12 @@ class PlayerActivity : Screen() {
         })
         subs.forEachIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val text = trackName(f, false, i)
             out += MenuItem(MenuTrack("sub:${1 + i}", Languages.code(f.language), chosen == 1 + i, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
-                text.name, text.detail, "") { pickSubtitle(1 + i, subs, loaded) }
+                trackName(f, i), roleWord(false, f), "") { pickSubtitle(1 + i, subs, loaded) }
         }
         addonSubs.forEachIndexed { i, sub ->
             out += MenuItem(MenuTrack("addon:${sub.url}", Languages.code(sub.lang), chosen == 1 + subs.size + i, addon = true),
-                sub.language, "", sub.addon) { pickSubtitle(1 + subs.size + i, subs, loaded) }
+                sub.language, "", "") { pickSubtitle(1 + subs.size + i, subs, loaded) }
         }
         return out
     }
@@ -2381,7 +2379,6 @@ class PlayerActivity : Screen() {
         val ink = if (focused) 0xFF141414.toInt() else 0xFFC4C4C8.toInt()
         row.name.setTextColor(ink)
         row.detail.setTextColor(if (focused) ink else 0xB8C4C4C8.toInt())
-        row.tag.setTextColor(if (focused) ink else 0xB8C4C4C8.toInt())
         row.check.setColorFilter(if (focused) ink else 0xFFFFFFFF.toInt())
     }
 
@@ -2389,7 +2386,6 @@ class PlayerActivity : Screen() {
         val check = ImageView(this).apply { setImageResource(R.drawable.ic_check); visibility = View.INVISIBLE }
         val name = text(item?.name ?: getString(R.string.menu_more), BODY).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         val detail = text(shownDetail, SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
-        val tag = text(item?.tag.orEmpty(), SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         val view = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
@@ -2397,12 +2393,9 @@ class PlayerActivity : Screen() {
             addView(check, LinearLayout.LayoutParams(dp(18), dp(18)).apply { marginStart = dp(8); marginEnd = dp(6) })
             addView(name, wrap())
             addView(detail, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(7) })
-            addView(tag, wrap().apply { marginStart = dp(8) })
         }
-        val row = MenuRow(key, item, view, check, name, detail, tag)
+        val row = MenuRow(key, item, view, check, name, detail)
         if (shownDetail.isEmpty()) detail.visibility = View.GONE
-        if (item?.tag.isNullOrEmpty()) tag.visibility = View.GONE
-        // a row with no detail still needs the weight to push its tag to the end
         if (detail.visibility == View.GONE) name.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
         rowStyle(row, false)
         view.setOnFocusChangeListener { _, has ->
@@ -2457,16 +2450,15 @@ class PlayerActivity : Screen() {
         val shownIds = defaultTrackIds(col.items.map { it.track }, originalLanguage)
         val shown = if (col.expanded) col.items else col.items.filter { it.track.id in shownIds }
         col.inner.removeAllViews()
-        // ChadFlix: an audio row's codec and channels show only under More; a label like "Commentary" always does
-        val details = if (col.audio) audioDetails(shown.map { AudioText(it.name, it.detail, it.note, it.label) }, col.expanded) else shown.map { it.detail }
-        val rows = shown.mapIndexed { i, item -> makeRow(col, item.track.id, item, details[i]) }.toMutableList()
+        // ChadFlix: a row shows its language (and a role word like "Commentary"); an audio track's codec and channels only under More
+        val rows = shown.map { item -> makeRow(col, item.track.id, item, rowDetail(col.expanded, item.role, item.format)) }.toMutableList()
         if (!col.expanded && shown.size < col.items.size) rows += makeRow(col, if (col.audio) "more:audio" else "more:subs", null)
         rows.forEach { col.inner.addView(it.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) }) }
         col.rows = rows
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (audioColumnWide(col.expanded, details)) AUDIO_WIDE else AUDIO_NARROW) }
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded) AUDIO_WIDE else AUDIO_NARROW) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2971,29 +2963,36 @@ class PlayerActivity : Screen() {
 
     private fun isAddonSub(g: Tracks.Group) = g.type == C.TRACK_TYPE_TEXT && g.getTrackFormat(0).id?.contains(ADDON_SUB) == true
 
-    /** The row text for a track: see [trackText]. [position] is its place in its column, which numbers a track with no language or label ("Track 2"). */
-    private fun trackName(f: Format, audio: Boolean, position: Int): TrackText {
-        val language = f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
-        val format = if (!audio) null else listOfNotNull(when (f.sampleMimeType) {
-            MimeTypes.AUDIO_AC3 -> "Dolby Digital"
-            MimeTypes.AUDIO_E_AC3 -> "Dolby Digital Plus"
-            MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Atmos"
-            MimeTypes.AUDIO_TRUEHD -> "Dolby TrueHD"
-            MimeTypes.AUDIO_DTS -> "DTS"
-            MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
-            MimeTypes.AUDIO_AAC -> "AAC"
-            MimeTypes.AUDIO_OPUS -> "Opus"
-            MimeTypes.AUDIO_FLAC -> "FLAC"
-            else -> null
-        }, when (f.channelCount) {
-            1 -> getString(R.string.audio_mono); 2 -> getString(R.string.audio_stereo); 6 -> "5.1"; 8 -> "7.1"
-            Format.NO_VALUE -> null; else -> getString(R.string.audio_channels, f.channelCount)
-        })
-            .joinToString(" ").ifEmpty { null }
-        val label = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
-        return trackText(audio, language, label, format, f.selectionFlags, f.roleFlags,
-            getString(R.string.track_number, trackNumber(position)))
+    /** A track's name: its language, or "Track N" ([position] is its place in its column). The file's own label is never used: uploaders put release group names there. */
+    private fun trackName(f: Format, position: Int): String =
+        f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
+            ?: getString(R.string.track_number, trackNumber(position))
+
+    /** The short word for a commentary, description, forced or SDH track, from the track's flags; "" for the rest. */
+    private fun roleWord(audio: Boolean, f: Format): String = when (trackRole(audio, f.selectionFlags, f.roleFlags)) {
+        TrackRole.COMMENTARY -> getString(R.string.role_commentary)
+        TrackRole.DESCRIPTIVE -> getString(R.string.role_descriptive)
+        TrackRole.FORCED -> getString(R.string.role_forced)
+        TrackRole.SDH -> getString(R.string.role_sdh)
+        null -> ""
     }
+
+    /** An audio track's codec and channels, "Dolby Digital 5.1", or "". See [audioFormatText]. */
+    private fun audioFormat(f: Format): String = audioFormatText(when (f.sampleMimeType) {
+        MimeTypes.AUDIO_AC3 -> "Dolby Digital"
+        MimeTypes.AUDIO_E_AC3 -> "Dolby Digital Plus"
+        MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Atmos"
+        MimeTypes.AUDIO_TRUEHD -> "Dolby TrueHD"
+        MimeTypes.AUDIO_DTS -> "DTS"
+        MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+        MimeTypes.AUDIO_AAC -> "AAC"
+        MimeTypes.AUDIO_OPUS -> "Opus"
+        MimeTypes.AUDIO_FLAC -> "FLAC"
+        else -> null
+    }, f.sampleMimeType, f.label, when (f.channelCount) {
+        1 -> getString(R.string.audio_mono); 2 -> getString(R.string.audio_stereo); 6 -> "5.1"; 8 -> "7.1"
+        Format.NO_VALUE -> null; else -> getString(R.string.audio_channels, f.channelCount)
+    })
 
     private fun timing(delay: Long) = formatTiming(delay, getString(R.string.timing_on_time),
         getString(R.string.timing_earlier), getString(R.string.timing_later))
