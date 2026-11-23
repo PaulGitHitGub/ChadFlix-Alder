@@ -123,7 +123,7 @@ class PlayerMenuTest {
         val scale = setOf(4, 8, 12, 16, 24, 32)
         for (above in InfoRow.values()) for (row in InfoRow.values()) assertTrue("$above to $row", infoGap(above, row) in scale)
         assertTrue(INFO_BADGE_GAP in scale && INFO_META_H in 4..32 step 4)
-        assertEquals(48, INFO_BOTTOM - 135) // the seek bar's top is 135 dp up
+        assertEquals(48, INFO_BOTTOM - (SEEK_BAR_BOTTOM + SEEK_BAR_H)) // 48 dp above the seek bar's top
     }
 
     @Test fun infoRowsGroupTitleTextAndTags() {
@@ -163,5 +163,20 @@ class PlayerMenuTest {
         assertNull(parseOriginalLanguage(JSONObject("""{"movie_results":[{"original_language":"xx"}]}"""), "movie"))
         assertNull(parseOriginalLanguage(JSONObject("""{"movie_results":[{"title":"No language"}]}"""), "movie"))
         assertEquals("zh", parseOriginalLanguage(JSONObject("""{"movie_results":[{"original_language":"cn"}]}"""), "movie"))
+    }
+
+    @Test fun audioRowsHideCodecAndChannelsButKeepALabel() {
+        val rows = listOf(AudioText("English", "Dolby Digital Plus 5.1", ""), AudioText("French", "AAC Stereo", ""),
+            AudioText("Spanish", "Descriptive", "Descriptive"))
+        assertEquals(listOf("", "", "Descriptive"), audioDetails(rows, expanded = false))
+        assertEquals(listOf("Dolby Digital Plus 5.1", "AAC Stereo", "Descriptive"), audioDetails(rows, expanded = true))
+    }
+
+    @Test fun audioRowsWithTheSameNameShowTheirDetail() {
+        val rows = listOf(AudioText("English", "Dolby TrueHD 7.1", ""), AudioText("English", "Commentary", "Commentary"),
+            AudioText("French", "AAC Stereo", ""))
+        assertEquals(listOf("Dolby TrueHD 7.1", "Commentary", ""), audioDetails(rows, expanded = false))
+        // Alone in the list, a row has no twin to be told from.
+        assertEquals(listOf(""), audioDetails(rows.take(1), expanded = false))
     }
 }

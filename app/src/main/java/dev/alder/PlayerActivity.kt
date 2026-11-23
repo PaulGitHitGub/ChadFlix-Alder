@@ -67,10 +67,25 @@ internal const val SLEEP_TIMER = 60 * 60_000L
 internal fun askStillWatching(endedQuietly: Int) = endedQuietly >= QUIET_EPISODES
 /** The Sleep row's value in Audio & subtitles: "Off", "After this episode" or "In 42 min". The screen passes its words. */
 internal fun sleepLabel(stopAfter: Boolean, sleepAt: Long, now: Long,
-                        afterEpisode: String = "After this episode", inMinutes: String = "In %1\$d min", off: String = "Off") = when {
-    stopAfter -> afterEpisode
+                        afterEpisode: String = "After this episode", inMinutes: String = "In %1\$d min", off: String = "Off",
+                        episodic: Boolean = true, afterMovie: String = "After this movie") = when {
+    stopAfter -> if (episodic) afterEpisode else afterMovie
     sleepAt > now -> inMinutes.format(((sleepAt - now + 59_999) / 60_000).toInt())
     else -> off
+}
+
+/** The Sleep Timer's two settings: stop at the end of this video, or at the wall-clock time [sleepAt] (0: none). */
+internal data class SleepState(val stopAfter: Boolean, val sleepAt: Long)
+
+/**
+ * What OK on Sleep Timer does: Off → After This Episode (series) or After This Movie (film) → In 60 min → Off. [live]: no "after",
+ * Off → In 60 min. A film not yet known to be live counts as a film.
+ */
+internal fun nextSleepState(stopAfter: Boolean, sleepAt: Long, episodic: Boolean, live: Boolean, now: Long) = when {
+    stopAfter -> SleepState(false, now + SLEEP_TIMER)
+    sleepAt > 0 -> SleepState(false, 0)
+    episodic || !live -> SleepState(true, sleepAt)
+    else -> SleepState(false, now + SLEEP_TIMER)
 }
 
 internal fun formatTiming(delay: Long, onTime: String = "On time",
@@ -1519,12 +1534,9 @@ class PlayerActivity : Screen() {
 
     /** OK on the Sleep Timer button: Off → After This Episode (series) or After This Movie → In 60 min → Off. Live: no "after". */
     private fun cycleSleep() {
-        when {
-            stopAfter -> { stopAfter = false; setSleepAt(System.currentTimeMillis() + SLEEP_TIMER) }
-            sleepAt > 0 -> setSleepAt(0)
-            episodic || !isLive() -> stopAfter = true // ChadFlix: films too, "After This Movie" (owner)
-            else -> setSleepAt(System.currentTimeMillis() + SLEEP_TIMER)
-        }
+        val next = nextSleepState(stopAfter, sleepAt, episodic, isLive(), System.currentTimeMillis())
+        if (next.sleepAt != sleepAt) setSleepAt(next.sleepAt)
+        stopAfter = next.stopAfter
         intent.putExtra("stopAfter", stopAfter)
     }
 
@@ -1762,7 +1774,6 @@ class PlayerActivity : Screen() {
     private lateinit var pauseTitle: TextView
     private lateinit var pauseInfo: LinearLayout
     private lateinit var pauseFacts: TextView
-    private lateinit var pauseBadges: LinearLayout
     private lateinit var subtitle: TextView // the year or S5 E2
     private val buttonLabels = mutableMapOf<View, TextView>()
     private var shown = false
@@ -1811,11 +1822,9 @@ class PlayerActivity : Screen() {
         }
         subtitle = text(if (isTrailer) getString(R.string.action_trailer) else intent.getStringExtra("episode")?.substringBefore("  ·  ").orEmpty(), SMALL, color = TEXT_2).onArt()
         pauseFacts = text(if (sources.isEmpty() && !isTrailer) getString(R.string.finding_sources) else "", SMALL, color = TEXT_2).onArt()
-        pauseBadges = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val pauseMetaRow = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(pauseFacts, wrap().apply { marginEnd = dp(10) })
-            addView(pauseBadges, wrap())
+            addView(pauseFacts, wrap())
         }
         pauseInfo = column(Gravity.START).apply {
             if (isTrailer) addView(caps(R.string.action_trailer, TUNGSTEN).onArt())
@@ -1987,8 +1996,8 @@ class PlayerActivity : Screen() {
             addView(chapterPill, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
                 leftMargin = dp(PAD); bottomMargin = dp(137)
             })
-            addView(bar, FrameLayout.LayoutParams(-1, dp(24), Gravity.BOTTOM).apply {
-                leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(111)
+            addView(bar, FrameLayout.LayoutParams(-1, dp(SEEK_BAR_H), Gravity.BOTTOM).apply {
+                leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(SEEK_BAR_BOTTOM)
             })
             addView(elapsed, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
                 leftMargin = dp(PAD); bottomMargin = dp(91)
@@ -2006,11 +2015,7 @@ class PlayerActivity : Screen() {
     }
 
     private fun refreshBadges(tracks: Tracks = player.currentTracks) {
-        if (!::pauseBadges.isInitialized) return
-        if (isTrailer) {
-            pauseBadges.visibility = View.GONE
-            return
-        }
+        if (!::pauseInfo.isInitialized || isTrailer) return
         val audio = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO && it.isSelected }?.getTrackFormat(0)
         val videoHeight = player.videoFormat?.height?.takeIf { it > 0 }
             ?: tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected }?.getTrackFormat(0)?.height ?: 0
@@ -2025,7 +2030,6 @@ class PlayerActivity : Screen() {
             audioChannels = audio?.channelCount?.takeIf { it > 0 } ?: 0,
         )
         // ChadFlix (owner): the badges show only in the Info pop-up, not on the play page.
-        pauseBadges.visibility = View.GONE
         if (badges == shownBadges) return
         shownBadges = badges
         if (infoOpen) showInfo()
@@ -2294,7 +2298,7 @@ class PlayerActivity : Screen() {
     }
 
     // ---------- ChadFlix: the Audio & Subtitles menu, Appearance and the Info pop-up (after the player-menu and info-popup drafts) ----------
-    // Landing on Audio & Subtitles opens a menu of frosted glass above the buttons, after a short dwell so passing over
+    // Landing on Audio & Subtitles opens a menu above the buttons, over a 60% dim,, after a short dwell so passing over
     // does not flash it. OK or Up goes into it, Left or Right leaves it, Back closes it. Landing on Info shows its pop-up
     // over the playing picture. Each is built when it opens and taken away when it closes: nothing exists or runs while
     // they are shut. An open one keeps the controls up.
@@ -2337,7 +2341,8 @@ class PlayerActivity : Screen() {
 
     // ----- the menu -----
 
-    private class MenuItem(val track: MenuTrack, val name: String, val detail: String, val tag: String, val pick: () -> Unit)
+    /** [detail]: all the row can add to its name; [note]: the part of it that is not codec or channels, which shows without More. */
+    private class MenuItem(val track: MenuTrack, val name: String, val detail: String, val tag: String, val note: String = "", val pick: () -> Unit)
     private class MenuRow(val key: String, val item: MenuItem?, val view: LinearLayout, val check: ImageView,
                           val name: TextView, val detail: TextView, val tag: TextView)
     private class MenuColumn(val audio: Boolean) {
@@ -2354,15 +2359,13 @@ class PlayerActivity : Screen() {
     private val audioColumn = MenuColumn(true)
     private val subsColumn = MenuColumn(false)
 
-    private fun splitName(full: String) = full.substringBefore(DOT) to full.substringAfter(DOT, "")
-
     private fun audioItems(): List<MenuItem> {
         val groups = audioGroups.filter { it.isTrackSupported(0) }
         return groups.mapIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val (name, detail) = splitName(trackName(f, true))
+            val text = trackName(f, true)
             MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
-                name, detail, "") { pickAudio(g, Languages.code(f.language)) }
+                text.name, text.detail, "", text.note) { pickAudio(g, Languages.code(f.language)) }
         }
     }
 
@@ -2383,9 +2386,9 @@ class PlayerActivity : Screen() {
         })
         subs.forEachIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val (name, detail) = splitName(trackName(f, false))
+            val text = trackName(f, false)
             out += MenuItem(MenuTrack("sub:${1 + i}", Languages.code(f.language), chosen == 1 + i, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
-                name, detail, "") { pickSubtitle(1 + i, subs, loaded) }
+                text.name, text.detail, "") { pickSubtitle(1 + i, subs, loaded) }
         }
         addonSubs.forEachIndexed { i, sub ->
             out += MenuItem(MenuTrack("addon:${sub.url}", Languages.code(sub.lang), chosen == 1 + subs.size + i, addon = true),
@@ -2433,10 +2436,10 @@ class PlayerActivity : Screen() {
         row.check.setColorFilter(if (focused) ink else 0xFFFFFFFF.toInt())
     }
 
-    private fun makeRow(col: MenuColumn, key: String, item: MenuItem?): MenuRow {
+    private fun makeRow(col: MenuColumn, key: String, item: MenuItem?, shownDetail: String = ""): MenuRow {
         val check = ImageView(this).apply { setImageResource(R.drawable.ic_check); visibility = View.INVISIBLE }
         val name = text(item?.name ?: getString(R.string.menu_more), BODY).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
-        val detail = text(item?.detail.orEmpty(), SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val detail = text(shownDetail, SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         val tag = text(item?.tag.orEmpty(), SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         val view = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -2448,7 +2451,7 @@ class PlayerActivity : Screen() {
             addView(tag, wrap().apply { marginStart = dp(8) })
         }
         val row = MenuRow(key, item, view, check, name, detail, tag)
-        if (item?.detail.isNullOrEmpty() || (col.audio && !col.expanded)) detail.visibility = View.GONE // ChadFlix: audio details only under More
+        if (shownDetail.isEmpty()) detail.visibility = View.GONE
         if (item?.tag.isNullOrEmpty()) tag.visibility = View.GONE
         // a row with no detail still needs the weight to push its tag to the end
         if (detail.visibility == View.GONE) name.layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
@@ -2505,14 +2508,16 @@ class PlayerActivity : Screen() {
         val shownIds = defaultTrackIds(col.items.map { it.track }, originalLanguage)
         val shown = if (col.expanded) col.items else col.items.filter { it.track.id in shownIds }
         col.inner.removeAllViews()
-        val rows = shown.map { makeRow(col, it.track.id, it) }.toMutableList()
+        // ChadFlix: an audio row's codec and channels show only under More; a label like "Commentary" always does
+        val details = if (col.audio) audioDetails(shown.map { AudioText(it.name, it.detail, it.note) }, col.expanded) else shown.map { it.detail }
+        val rows = shown.mapIndexed { i, item -> makeRow(col, item.track.id, item, details[i]) }.toMutableList()
         if (!col.expanded && shown.size < col.items.size) rows += makeRow(col, if (col.audio) "more:audio" else "more:subs", null)
         rows.forEach { col.inner.addView(it.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) }) }
         col.rows = rows
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = if (col.expanded) dp(AUDIO_WIDE) else -2 }
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded) AUDIO_WIDE else AUDIO_NARROW) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2567,7 +2572,7 @@ class PlayerActivity : Screen() {
         menuLayer.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
-        panel.addView(columnView(audioColumn).apply { minimumWidth = dp(AUDIO_NARROW) }, LinearLayout.LayoutParams(-2, -2))
+        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(AUDIO_NARROW), -2))
         panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(240), -2))
         menuLayer.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
             marginStart = dp(PAD); bottomMargin = dp(150)
@@ -3018,7 +3023,7 @@ class PlayerActivity : Screen() {
 
     private fun isAddonSub(g: Tracks.Group) = g.type == C.TRACK_TYPE_TEXT && g.getTrackFormat(0).id?.contains(ADDON_SUB) == true
 
-    private fun trackName(f: Format, audio: Boolean): String {
+    private fun trackName(f: Format, audio: Boolean): TrackText {
         val language = f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
         val format = if (!audio) null else listOfNotNull(when (f.sampleMimeType) {
             MimeTypes.AUDIO_AC3 -> "Dolby Digital"
@@ -3037,7 +3042,9 @@ class PlayerActivity : Screen() {
         })
             .joinToString(" ").ifEmpty { null }
         val label = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
-        return listOfNotNull(language, label ?: format).joinToString("  ·  ").ifEmpty { getString(R.string.track_number, f.id.orEmpty()).trim() }
+        val parts = listOfNotNull(language, label ?: format)
+        return TrackText(parts.firstOrNull() ?: getString(R.string.track_number, f.id.orEmpty()).trim(), parts.getOrNull(1).orEmpty(),
+            if (language != null) label.orEmpty() else "")
     }
 
     private fun timing(delay: Long) = formatTiming(delay, getString(R.string.timing_on_time),
@@ -3066,8 +3073,8 @@ class PlayerActivity : Screen() {
         buttonLabels[sleepButton]?.takeIf { it.text.toString() != words }?.text = words
     }
 
-    private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(if (episodic) R.string.sleep_after_episode else R.string.sleep_after_movie),
-        getString(R.string.sleep_in_minutes), getString(R.string.state_off))
+    private fun sleep() = sleepLabel(stopAfter, sleepAt, System.currentTimeMillis(), getString(R.string.sleep_after_episode),
+        getString(R.string.sleep_in_minutes), getString(R.string.state_off), episodic, getString(R.string.sleep_after_movie))
 
     override fun onPause() {
         paused = true

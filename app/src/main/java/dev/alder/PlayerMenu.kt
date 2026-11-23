@@ -67,7 +67,7 @@ internal enum class InfoRow { LOGO, FACTS, PLOT, RATINGS, BADGES }
 
 internal const val INFO_META_H = 20 // dp, a ratings or badges row
 internal const val INFO_BADGE_GAP = 8 // dp between badges
-internal const val INFO_BOTTOM = 183 // dp from the screen's bottom: 48 above the seek bar's top (135)
+internal const val INFO_BOTTOM = 183 // dp from the screen's bottom: 48 above the seek bar's top (SEEK_BAR_BOTTOM + SEEK_BAR_H)
 
 /**
  * dp between a row and the row above it that is showing, on a 4 / 8 / 12 / 16 dp scale: the logo then the facts 12, the facts
@@ -80,3 +80,19 @@ internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
     row == InfoRow.RATINGS || row == InfoRow.BADGES -> 16
     else -> 8
 }
+
+/** What a track's menu row says: [name] (the language), [detail] (a label from the file, else codec and channels) and [note] (the label alone). */
+internal class TrackText(val name: String, val detail: String, val note: String)
+
+/** One audio row as [audioDetails] sees it. */
+internal class AudioText(val name: String, val detail: String, val note: String)
+
+/**
+ * The detail each audio row shows. Under More it is all of it. Before More only the [AudioText.note] (a label such as
+ * "Commentary"), not codec and channels, except that rows with the same name show all of it, so they can be told apart.
+ */
+internal fun audioDetails(rows: List<AudioText>, expanded: Boolean): List<String> =
+    rows.map { r -> if (expanded || rows.count { it.name.equals(r.name, ignoreCase = true) } > 1) r.detail else r.note }
+
+internal const val SEEK_BAR_BOTTOM = 111 // dp from the screen's bottom to the seek bar
+internal const val SEEK_BAR_H = 24 // dp, the seek bar's height
