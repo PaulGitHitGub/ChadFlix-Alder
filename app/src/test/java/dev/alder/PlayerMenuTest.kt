@@ -119,8 +119,8 @@ class PlayerMenuTest {
             .setSampleMimeType(mime).setChannelCount(channels).setSelectionFlags(flags).setLabel(label).build().also {
                 Format::class.java.getField("language").apply { isAccessible = true }.set(it, language)
             }
-        val koAc3 = f(MimeTypes.AUDIO_AC3, "ko", 6)
-        val koTrueHd = f(MimeTypes.AUDIO_TRUEHD, "ko", 8)
+        val koAc3 = f(MimeTypes.AUDIO_AC3, "ko", 8)
+        val koTrueHd = f(MimeTypes.AUDIO_TRUEHD, "ko", 6)
         val enAc3 = f(MimeTypes.AUDIO_AC3, "en", 6)
         val enDefault = f(MimeTypes.AUDIO_AAC, "en", 2, C.SELECTION_FLAG_DEFAULT)
         val enCommentary = f(MimeTypes.AUDIO_AC3, "en", 6, label = "Commentary")
@@ -130,9 +130,9 @@ class PlayerMenuTest {
         assertEquals(2, picks.size) // one per language; "und" has none
         assertTrue(picks.any { it === koTrueHd } && picks.none { it === koAc3 })
         assertTrue(picks.any { it === enDefault }) // the default flag outranks channels, as in Alder's own pick
-        // A device that decodes everything to PCM: channels decide, so the 8-channel TrueHD still wins here.
+        // A device that decodes everything to PCM: channels decide, so the 8-channel Dolby Digital beats the 6-channel TrueHD.
         val pcm = preferredAudioFormats(formats, emptySet()) { false }
-        assertTrue(pcm.any { it === koTrueHd })
+        assertTrue(pcm.any { it === koAc3 } && pcm.none { it === koTrueHd })
         // A failed track is skipped, as at the start of playback.
         assertTrue(preferredAudioFormats(formats, setOf(koTrueHd), passes).any { it === koAc3 })
     }
@@ -166,6 +166,13 @@ class PlayerMenuTest {
         assertFalse(plainTrack(0, 0, "Director's Commentary"))
         assertFalse(plainTrack(0, 0, "English [CC]"))
         assertTrue(plainTrack(0, 0, "Dolby Digital 5.1"))
+        // a negated word says the track is not that kind
+        assertTrue(plainTrack(0, 0, "English Non-Forced"))
+        assertTrue(plainTrack(0, 0, "English non-SDH"))
+        assertTrue(plainTrack(0, 0, "English (No SDH)"))
+        assertTrue(plainTrack(0, 0, "English not forced"))
+        assertFalse(plainTrack(0, 0, "English Captions"))
+        assertFalse(plainTrack(0, 0, "Piano SDH")) // "no" inside a word is not a negation
     }
 
     @Test fun endsAtIsNoneForTrailersLiveAndUnknownLengths() {
@@ -271,6 +278,8 @@ class PlayerMenuTest {
         assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "English.HoH"))
         assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "Hearing Impaired"))
         assertEquals(TrackRole.FORCED, trackRole(false, 0, 0, "English (Forced)"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "English Captions"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "Piano SDH"))
         // flags still count, and come first
         assertEquals(TrackRole.COMMENTARY, trackRole(true, 0, C.ROLE_FLAG_COMMENTARY, "English"))
         assertEquals(TrackRole.FORCED, trackRole(false, C.SELECTION_FLAG_FORCED, 0, "English SDH"))
@@ -283,6 +292,12 @@ class PlayerMenuTest {
         assertNull(trackRole(false, 0, 0, "BTM Commentary")) // a subtitle is never a commentary
         assertNull(trackRole(false, 0, 0, "Success Forceddd"))
         assertNull(trackRole(false, 0, 0, "Occ"))
+        // "Non-Forced", "non-SDH" and "No SDH" are the opposite of the role
+        assertNull(trackRole(false, 0, 0, "English Non-Forced"))
+        assertNull(trackRole(false, 0, 0, "English non-SDH"))
+        assertNull(trackRole(false, 0, 0, "English (No SDH)"))
+        assertNull(trackRole(false, 0, 0, "English not forced"))
+        assertNull(trackRole(true, 0, 0, "No Commentary"))
     }
 
     @Test fun theAudioColumnIsWideForARoleWordOrMore() {
@@ -308,6 +323,10 @@ class PlayerMenuTest {
         assertEquals("AAC Stereo", audioFormatText("AAC", MimeTypes.AUDIO_AAC, "Atmos", "Stereo")) // only a Dolby track
         assertEquals("Dolby TrueHD 7.1", audioFormatText("Dolby TrueHD", truehd, "Atmosphere", "7.1")) // whole word
         assertEquals("DTS:X 7.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "BTM DTS-X 7.1", "7.1"))
+        assertEquals("DTS:X 7.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "DTS:X", "7.1"))
+        assertEquals("DTS:X 7.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "Movie DTSX 7.1", "7.1"))
+        assertEquals("DTS 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "Movie.2019.1080p.BluRay.DTS.x264-GRP", "5.1")) // x264 is a video codec
+        assertEquals("DTS 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "Movie.DTS-x265", "5.1"))
         assertEquals("DTS-HD MA 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "DTS-HD.MA 5.1", "5.1"))
         assertEquals("DTS-HD MA 5.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "BTM DTS-HD MA", "5.1"))
         assertEquals("DTS-HD MA 7.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "DTS-HD Master Audio", "7.1"))

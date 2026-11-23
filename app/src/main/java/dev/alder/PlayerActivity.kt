@@ -1202,13 +1202,16 @@ class PlayerActivity : Screen() {
     private val failedAudio = mutableSetOf<Format>()
 
     /** Whether a format would play lossless as it is, as Alder decides it at the start of playback. */
-    private fun audioLossless(): (Format) -> Boolean =
-        if (decodeAudio || retryWithPcm) ({ _: Format -> false }) else losslessOutput(this, player.audioAttributes)
+    private fun audioLossless(formats: List<Format>): (Format) -> Boolean =
+        // No lossless format among them (most web files): nothing to ask the audio route, the answer is no for each.
+        if (decodeAudio || retryWithPcm || formats.none { losslessEncoding(it) != null }) ({ _: Format -> false })
+        else losslessOutput(this, player.audioAttributes)
 
     private fun bestAudio(groups: List<Tracks.Group>): Tracks.Group? {
         val supported = groups.filter { it.isTrackSupported(0) }
         if (supported.isEmpty()) return null
-        val best = bestAudioFormat(supported.map { it.getTrackFormat(0) }, wantAudio, failedAudio, audioLossless())
+        val formats = supported.map { it.getTrackFormat(0) }
+        val best = bestAudioFormat(formats, wantAudio, failedAudio, audioLossless(formats))
         return supported.firstOrNull { it.getTrackFormat(0) === best }
     }
 
@@ -2310,7 +2313,8 @@ class PlayerActivity : Screen() {
 
     private fun audioItems(): List<MenuItem> {
         val groups = audioGroups.filter { it.isTrackSupported(0) }
-        val preferred = preferredAudioFormats(groups.map { it.getTrackFormat(0) }, failedAudio, audioLossless())
+        val formats = groups.map { it.getTrackFormat(0) }
+        val preferred = preferredAudioFormats(formats, failedAudio, audioLossless(formats))
         return groups.mapIndexed { i, g ->
             val f = g.getTrackFormat(0)
             MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label),
@@ -2969,7 +2973,7 @@ class PlayerActivity : Screen() {
 
     /** A track's name: its language, or "Track N" ([position] is its place in its column). The file's own label is never used: uploaders put release group names there. */
     private fun trackName(f: Format, position: Int): String =
-        f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
+        Languages.code(f.language)?.let(Languages::name)
             ?: getString(R.string.track_number, trackNumber(position))
 
     /** The short word for a commentary, description, forced or SDH track, from the track's flags; "" for the rest. */

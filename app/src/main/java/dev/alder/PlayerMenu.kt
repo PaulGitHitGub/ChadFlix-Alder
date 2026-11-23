@@ -39,11 +39,14 @@ internal fun defaultTrackIds(tracks: List<MenuTrack>, originalLanguage: String?)
 // Whole words only: a letter on either side ("Atmosphere", "Accessible") never counts, but "_", "." and digits do ("TrueHD_Atmos_7.1").
 private fun word(re: String) = Regex("(?<![a-z])(?:$re)(?![a-z])", RegexOption.IGNORE_CASE)
 
-private val LABEL_COMMENTARY = word("commentary")
-private val LABEL_DESCRIPTIVE = word("descriptive|descriptions?|audio[-_. ]?descriptions?")
-private val LABEL_SDH = word("sdh|cc|hoh|hearing[-_. ]?impaired|closed[-_. ]?captions?")
-private val LABEL_FORCED = word("forced")
-private val ODD_LABEL = word("sdh|cc|hoh|hearing|forced|commentary|description|descriptive|captions?")
+// A role word with "non", "no" or "not" before it ("Non-Forced", "No SDH", "not forced") says the track is not that kind.
+private fun roleLabel(re: String) = Regex("(?<![a-z])(?<!\\b(?:no|non|not)[-_. ])(?:$re)(?![a-z])", RegexOption.IGNORE_CASE)
+
+private val LABEL_COMMENTARY = roleLabel("commentary")
+private val LABEL_DESCRIPTIVE = roleLabel("descriptive|descriptions?|audio[-_. ]?descriptions?")
+private val LABEL_SDH = roleLabel("sdh|cc|hoh|hearing[-_. ]?impaired|(?:closed[-_. ]?)?captions?")
+private val LABEL_FORCED = roleLabel("forced")
+private val ODD_LABEL = roleLabel("sdh|cc|hoh|hearing|forced|commentary|description|descriptive|captions?")
 
 /** A track that is not forced-only, for the deaf and hard of hearing, a commentary or a description for the blind. */
 internal fun plainTrack(selectionFlags: Int, roleFlags: Int, label: String?): Boolean {
@@ -129,7 +132,7 @@ internal fun audioFormatText(codec: String?, mime: String?, label: String?, chan
     val named = when {
         codec == null -> null
         (mime == MimeTypes.AUDIO_E_AC3 || mime == MimeTypes.AUDIO_TRUEHD) && has("atmos") -> "$codec Atmos"
-        dts && has("dts[-_.: ]?x") -> "DTS:X"
+        dts && has("dts[-_.: ]?x(?!26[45])") -> "DTS:X"
         dts && has("dts[-_.: ]?hd[-_.: ]?(?:ma|master[-_.: ]?audio)") -> "DTS-HD MA"
         else -> codec
     }
