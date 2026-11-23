@@ -6,7 +6,6 @@ import androidx.media3.common.MimeTypes
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -321,16 +320,19 @@ class PlayerMenuTest {
     }
 
     @Test fun appearanceChoicesAreAldersOwnLists() {
-        assertEquals(listOf(80, 100, 130, 160), SUBTITLE_SIZES)
-        assertEquals(listOf("white", "gray", "yellow", "cyan", "cream", "warm_white"), SUBTITLE_COLORS)
-        assertEquals(listOf(true, false), SUBTITLE_BACKGROUNDS)
         assertEquals(1, choiceIndex(SUBTITLE_SIZES, 100)) // the default is Medium
+        assertEquals(3, choiceIndex(SUBTITLE_SIZES, 160)) // Extra Large
         assertEquals(0, choiceIndex(SUBTITLE_COLORS, "white"))
+        assertEquals(5, choiceIndex(SUBTITLE_COLORS, "warm_white"))
         assertEquals(0, choiceIndex(SUBTITLE_BACKGROUNDS, true)) // the default is On
         assertEquals(1, choiceIndex(SUBTITLE_BACKGROUNDS, false))
         assertEquals(0, choiceIndex(SUBTITLE_SIZES, 115)) // a value that is no choice counts as the first
-        // every colour name is one Alder draws in its own colour
-        SUBTITLE_COLORS.drop(1).forEach { assertNotEquals(subtitleColorValue("white"), subtitleColorValue(it)) }
+        assertEquals(0, choiceIndex(SUBTITLE_COLORS, "pink"))
+        // the six names are the six colours Alder draws
+        assertEquals(listOf(0xFFFFFFFF, 0xFFBFBFBF, 0xFFFFE600, 0xFF00FFFF, 0xFFFFF5C0, 0xFFF3EEE6).map { it.toInt() },
+            SUBTITLE_COLORS.map { subtitleColorValue(it) })
+        assertEquals(4, SUBTITLE_SIZES.size)
+        assertEquals(2, SUBTITLE_BACKGROUNDS.size)
     }
 
     @Test fun leftAndRightStepTheValueAndMirrorInRtl() {
@@ -346,13 +348,19 @@ class PlayerMenuTest {
         assertEquals(340, appearanceColumnDp(200, 200)) // a long translation stays on the screen
     }
 
-    @Test fun theThreeColumnsFitA960DpScreen() {
-        // Subtitles as narrow as Audio before More, wide under More; Appearance moves with them.
-        val before = 2 * languageColumnDp(false, false) + appearanceColumnDp(90, 110)
-        val after = 2 * languageColumnDp(true, true) + appearanceColumnDp(90, 110)
-        assertEquals(620, before)
-        assertEquals(780, after)
-        assertTrue(after + 2 * 8 + 48 <= 960) // the panel's own padding and the screen margin
+    @Test fun theThreeColumnsFitA960DpScreenInTheWidestCase() {
+        // Audio and Subtitles wide (under More), Appearance at its widest, plus the panel's padding (2 x 8) and the screen margin (48).
+        val widest = 2 * languageColumnDp(expanded = true, anyRole = true, anyLong = true) + appearanceColumnDp(300, 300) + 2 * 8 + 48
+        assertEquals(250 * 2 + 340 + 64, widest)
+        assertTrue(widest <= 960)
+        // the narrow case, with the widest Appearance column for the real English strings
+        assertEquals(170 * 2 + 280, 2 * languageColumnDp(false, false) + appearanceColumnDp(90, 110))
+    }
+
+    @Test fun aLongNameWidensTheColumn() {
+        assertEquals(170, languageColumnDp(expanded = false, anyRole = false, anyLong = false))
+        assertEquals(250, languageColumnDp(expanded = false, anyRole = false, anyLong = true)) // "Portuguese (Brazil)"
+        assertEquals(106, NARROW_NAME_DP)
     }
 
     @Test fun theSampleSitsAt280OfAHeightOf1080ClearOfTheMenu() {

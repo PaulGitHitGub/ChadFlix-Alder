@@ -118,8 +118,15 @@ internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int, labe
     else -> null
 }
 
-/** The width of the Audio or Subtitles column in dp: wide under More, and before More when a row shows a role word, so "English Commentary" is not cut. */
-internal fun languageColumnDp(expanded: Boolean, anyRole: Boolean): Int = if (expanded || anyRole) 250 else 170
+/**
+ * The width of the Audio or Subtitles column in dp: wide under More, before More when a row shows a role word (so "English Commentary" is not cut),
+ * and when a name does not fit the narrow column ([anyLong], measured with the row's own paint: "Portuguese (Brazil)", "Norwegian Bokmål").
+ */
+internal fun languageColumnDp(expanded: Boolean, anyRole: Boolean, anyLong: Boolean = false): Int =
+    if (expanded || anyRole || anyLong) 250 else 170
+
+/** The room a name has in the narrow column, in dp: 170 less the row margins (20), the check (32) and the row's end padding (12). */
+internal const val NARROW_NAME_DP = 106
 
 /** Alder's own choices for the subtitle look, in the order the Appearance column steps through them. */
 internal val SUBTITLE_SIZES = listOf(80, 100, 130, 160) // percent of Media3's default size: Small, Medium, Large, Extra Large

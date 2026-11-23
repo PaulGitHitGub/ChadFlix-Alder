@@ -2450,7 +2450,8 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        col.view.layoutParams = col.view.layoutParams?.apply { width = dp(languageColumnDp(col.expanded, shown.any { it.role.isNotEmpty() })) }
+        val anyLong = rows.any { it.item != null && it.name.paint.measureText(it.name.text.toString()) > dp(NARROW_NAME_DP) }
+        col.view.layoutParams = col.view.layoutParams?.apply { width = dp(languageColumnDp(col.expanded, shown.any { it.role.isNotEmpty() }, anyLong)) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2491,6 +2492,8 @@ class PlayerActivity : Screen() {
         panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(languageColumnDp(false, false)), -2))
         panel.addView(appearanceColumn(), LinearLayout.LayoutParams(dp(appearanceWidth()), -2))
         menuPanel = panel
+        // a taller or shorter menu (More, a refresh) moves the sample so it never overlaps it
+        panel.addOnLayoutChangeListener { _, _, top, _, _, _, oldTop, _, _ -> if (top != oldTop) placeSample() }
         sample = null
         menuLayer.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
             marginStart = dp(PAD); bottomMargin = dp(150)
@@ -2553,7 +2556,7 @@ class PlayerActivity : Screen() {
         when (code) {
             KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusRow(col, index - 1)
             KeyEvent.KEYCODE_DPAD_DOWN -> if (index < col.rows.lastIndex) focusRow(col, index + 1) else focusAudioButton()
-            towardsSubs -> if (col.audio) { if (subsColumn.rows.isNotEmpty()) focusRow(subsColumn, checkedIndex(subsColumn)) } else focusAppearance(0)
+            towardsSubs -> if (col.audio) { if (subsColumn.rows.isNotEmpty()) focusRow(subsColumn, checkedIndex(subsColumn)) } else { focusAppearance(0); foldMore() }
             else -> if (!col.audio && audioColumn.rows.isNotEmpty()) focusRow(audioColumn, checkedIndex(audioColumn))
         }
         return true
@@ -2748,6 +2751,21 @@ class PlayerActivity : Screen() {
         return column
     }
 
+    /**
+     * More folds when focus goes to Appearance: a long list makes the menu tall, and the sample must fit above it. Folded, the menu has at
+     * most five rows (Off, the track in use, English, the original language, More), so the sample always fits and never leaves the screen.
+     */
+    private fun foldMore() {
+        for (col in listOf(audioColumn, subsColumn)) {
+            if (!col.expanded) continue
+            col.expanded = false
+            col.scroll = 0
+            menuBusy = true
+            fillColumn(col)
+            menuBusy = false
+        }
+    }
+
     private fun focusAppearance(index: Int) {
         val row = appearanceRows.getOrNull(index) ?: return
         menuMoving = true
@@ -2755,14 +2773,16 @@ class PlayerActivity : Screen() {
         menuMoving = false
     }
 
-    /** Up and Down move between the rows, Left and Right (and OK) step the value; Left never leaves the column. */
+    /** Up and Down move between the rows (Up on Size goes back to the subtitle in use), Left and Right (and OK) step the value; Left never leaves the column. */
     private fun appearanceKey(row: AppearanceRow, code: Int, ev: KeyEvent): Boolean {
         if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN &&
             code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false
         if (ev.action != KeyEvent.ACTION_DOWN) return true
+        // a key held down to arrive here (Right from Subtitles) must not go on to step the value
+        if (ev.repeatCount > 0 && (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT)) return true
         val index = appearanceRows.indexOf(row)
         when (code) {
-            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusAppearance(index - 1)
+            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusAppearance(index - 1) else focusRow(subsColumn, checkedIndex(subsColumn))
             KeyEvent.KEYCODE_DPAD_DOWN -> if (index < appearanceRows.lastIndex) focusAppearance(index + 1) else focusAudioButton()
             else -> stepLook(row, stepForKey(code == KeyEvent.KEYCODE_DPAD_RIGHT, isRtl()))
         }
