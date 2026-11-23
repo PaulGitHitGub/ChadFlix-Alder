@@ -136,4 +136,30 @@ class HomeStyleTest {
         assertEquals("2026-10-23", airing["air_date.gte"]); assertEquals("2026-11-22", airing["air_date.lte"])
         assertEquals("3", animeParams(false, "complete", 0, "", "", "")["with_status"])
     }
+
+    @Test fun allGenresInterleavesFilmsAndShowsByRankOnce() {
+        assertEquals(listOf("f1", "s1", "f2", "s2", "s3"), interleaved(listOf("f1", "f2"), listOf("s1", "s2", "s3")) { it })
+        assertEquals(listOf("a", "b", "c"), interleaved(listOf("a", "b"), listOf("b", "c")) { it }) // a title in both: once, first place
+        assertEquals(listOf("s1"), interleaved(emptyList(), listOf("s1")) { it })
+    }
+
+    @Test fun allGenresOffersEveryListOnceAndAsksTheTypesThatHaveIt() {
+        assertEquals(listOf("trending", "new", "blockbusters", "most_watched", "top_rated", "complete"), HomeStyle.allLists().map { it.first })
+        assertEquals(R.string.showing_new_releases, HomeStyle.allLists().first { it.first == "new" }.second)
+        assertEquals(HomeStyle.allLists(), HomeStyle.listsFor(false, HomeStyle.ALL))
+        assertEquals(listOf(true, false), HomeStyle.allMedia("trending"))
+        assertEquals(listOf(true, false), HomeStyle.allMedia("most_watched"))
+        assertEquals(listOf(true), HomeStyle.allMedia("blockbusters")) // films only
+        assertEquals(listOf(false), HomeStyle.allMedia("complete")) // shows only
+    }
+
+    @Test fun allGenresHasItsOwnSourceAndNoGenreFilter() {
+        assertEquals("tmdb:g:top_rated", HomeStyle.allSource("top_rated"))
+        assertEquals("tmdb:g", HomeStyle.slotSource(HomeStyle.allSource("new")))
+        assertEquals(null, genreParams(true, 0, "trending", "2026-11-23", "2026-05-23")["with_genres"])
+        assertEquals("popularity.desc", genreParams(false, 0, "trending", "2026-11-23", "2025-11-23")["sort_by"])
+        assertEquals("g", HomeStyle.rowKey(false, "All Genres", HomeStyle.HOME, "All Genres"))
+        assertEquals(null, HomeStyle.rowKey(false, "For You", HomeStyle.HOME, "All Genres"))
+        assertEquals(null, HomeStyle.rowKey(true, "All Genres", "Movies", "All Genres"))
+    }
 }

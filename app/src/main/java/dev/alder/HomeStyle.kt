@@ -248,8 +248,9 @@ internal object HomeStyle {
         prefs(c).edit().putString(Settings.profileKey(c, "rowsKnown:$page"), org.json.JSONArray(titles).toString()).apply()
 
     fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
-        val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
-            .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second } + ANIME
+        val saved = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }.getOrNull()
+        if (page == HOME) return saved ?: listOf(allGenres(c)) // Home's add-on rows are listed once it's been built
+        val known = saved ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second } + ANIME
         // The Anime row is listed even before the page has been built with it (it's added after the genres).
         if (page == SERVICES || ANIME in known) return known
         val at = known.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
@@ -261,6 +262,24 @@ internal object HomeStyle {
         prefs(c).getString(Settings.profileKey(c, "showing:$page:$key"), "trending").orEmpty()
 
     fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, "$id")}"
+
+    // ---------- the All Genres row (Home): films and shows from every genre, one TMDb list of each, interleaved ----------
+
+    const val HOME = "Home" // the Home page's label: its rows all start on, as the Services tab's do
+    const val ALL = "g" // the All Genres row's Showing key
+
+    fun allGenres(c: Context): String = c.getString(R.string.row_all_genres)
+
+    fun allGenresSource(c: Context) = allSource(showing(c, HOME, ALL))
+
+    /** The All Genres row's source for [list]: "tmdb:g:<list>". */
+    fun allSource(list: String) = "$TMDB$ALL:$list"
+
+    /** The All Genres row's lists: the films' and the shows' together, each once (New Releases for both). */
+    fun allLists(): List<Pair<String, Int>> = (lists(true) + lists(false)).distinctBy { it.first }
+
+    /** Whether the All Genres row asks for films (true) and shows (false) for [list]: both, or only the one that has it. */
+    fun allMedia(list: String): List<Boolean> = listOf(true, false).filter { m -> lists(m).any { it.first == list } }.ifEmpty { listOf(true, false) }
 
     // ---------- platform rows: what streams on a service (TMDb watch providers, US), off until Customize Home ----------
 
@@ -327,9 +346,10 @@ internal object HomeStyle {
     fun setExclusive(c: Context, page: String, i: Int, on: Boolean) =
         prefs(c).edit().putBoolean(Settings.profileKey(c, "excl:$page:p$i"), on).apply()
 
-    /** A row's Showing key: its TMDb genre id, or "p<n>" for a platform row; null for any other row. */
-    fun rowKey(movie: Boolean, title: String, page: String): String? =
-        if (page == SERVICES) platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" } // only there: an
+    /** A row's Showing key: its TMDb genre id, "p<n>" for a platform row, [ALL] for All Genres ([allGenres] its title); null for any other row. */
+    fun rowKey(movie: Boolean, title: String, page: String, allGenres: String = ""): String? =
+        if (page == HOME) ALL.takeIf { title == allGenres }
+        else if (page == SERVICES) platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" } // only there: an
         else genres(movie).firstOrNull { it.second == title }?.first?.toString() ?: "a".takeIf { title == ANIME } // add-on "Netflix" row is its own
 
     // ---------- the Anime row (Movies and Shows): TMDb Animation in Japanese, a genre and a sort in one query ----------
@@ -357,6 +377,7 @@ internal object HomeStyle {
             "top_rated" to R.string.showing_top_rated, "most_watched" to R.string.showing_most_watched,
             ("airing" to R.string.showing_airing).takeIf { !movie }, ("complete" to R.string.showing_complete).takeIf { !movie },
             ("blockbusters" to R.string.showing_blockbusters).takeIf { movie })
+        else if (key == ALL) allLists()
         else if (!key.startsWith("p")) lists(movie)
         else listOfNotNull("trending" to R.string.showing_trending,
             "new" to if (movie) R.string.showing_new_releases else R.string.showing_new_series,
@@ -385,7 +406,7 @@ internal object HomeStyle {
 
     /** What genre or platform row [title] shows on [page] ("Trending", "Trending · Exclusives"), or null for any other row. */
     fun rowList(c: Context, page: String, movie: Boolean, title: String): String? {
-        val key = rowKey(movie, title, page) ?: return null
+        val key = rowKey(movie, title, page, allGenres(c)) ?: return null
         val lists = listsFor(movie, key)
         val list = c.getString((lists.firstOrNull { it.first == showing(c, page, key) } ?: lists[0]).second)
         if (key == "a") return listOfNotNull(animeGenres(movie).firstOrNull { it.first == animeGenre(c, page) }?.second, list).joinToString(" · ")
@@ -452,8 +473,19 @@ internal object HomeStyle {
         // No name: the card's own title would draw over the tile's words ([dressTile]).
         val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series").put("name", ""))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-        val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
+        fun sinceFor(m: Boolean) = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (m) -6 else -12) }.time
+        val since = sinceFor(movie)
         val list = parts.getOrElse(1) { "trending" }
+        if (parts[0] == ALL) { // All Genres: a page of films and one of shows (only one for Blockbusters, Complete Series)
+            val got = allMedia(list).map { m ->
+                runCatching { Tmdb.discoverRow(m, genreParams(m, 0, list, day.format(java.util.Date()), day.format(sinceFor(m))), genres(m).toMap()) }
+            }
+            if (got.all { it.isFailure }) throw got.first().exceptionOrNull()!!
+            val rows = got.mapNotNull { it.getOrNull() }
+            // A half that failed leaves the row incomplete, so it's asked again next time.
+            return listOf(tile) + rows.map { it.first }.reduce { a, b -> interleaved(a, b) { it.id } } to
+                (rows.size == got.size && rows.all { it.second })
+        }
         val params = if (parts[0].startsWith("p")) platforms[parts[0].drop(1).toInt()].let { p -> // a platform row
             val head = list.substringBefore('~')
             platformParams(movie, p.providers, p.networks, p.companies, head.removeSuffix("!"), head.endsWith("!"), Tmdb.region,
@@ -471,6 +503,10 @@ internal object HomeStyle {
         return listOf(tile) + titles to complete
     }
 }
+
+/** [a] and [b] in turn, rank by rank ([a]'s first), each id once: the All Genres row's films and shows. */
+internal fun <T> interleaved(a: List<T>, b: List<T>, id: (T) -> String): List<T> =
+    (0 until maxOf(a.size, b.size)).flatMap { listOfNotNull(a.getOrNull(it), b.getOrNull(it)) }.distinctBy(id)
 
 /** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
 internal fun <T> orderedRows(saved: List<String>, items: List<T>, title: (T) -> String): List<T> =
@@ -499,7 +535,8 @@ internal fun movedRow(titles: List<String>, title: String, by: Int): List<String
  */
 internal fun genreParams(movie: Boolean, genre: Int, list: String, today: String, since: String): Map<String, String> {
     val date = if (movie) "primary_release_date" else "first_air_date"
-    val p = linkedMapOf("with_genres" to "$genre")
+    val p = linkedMapOf<String, String>()
+    if (genre > 0) p["with_genres"] = "$genre" // 0: every genre (the All Genres row)
     when (list) {
         "new" -> { p["sort_by"] = "$date.desc"; p["$date.lte"] = today; p["vote_count.gte"] = "20" }
         "blockbusters" -> p["sort_by"] = "revenue.desc"

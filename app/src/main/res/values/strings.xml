@@ -78,6 +78,7 @@
     </plurals>
     <string name="home_unreachable">Couldn\'t reach Stremio. Check the TV\'s connection.</string>
     <string name="row_continue">Continue Watching</string>
+    <string name="row_all_genres">All Genres</string>
     <string name="home_no_picks">No picks yet. Browse Shows or Movies, or add Watchly in Stremio.</string>
     <string name="page_no_movie_catalogs">None of your addons has movie catalogs. Add one (AIOMetadata, Cinemeta) in Stremio.</string>
     <string name="page_no_show_catalogs">None of your addons has show catalogs. Add one (AIOMetadata, Cinemeta) in Stremio.</string>
@@ -110,7 +111,7 @@
     <string name="customize_home" translatable="false">Customize Home</string>
     <string name="customize_home_sub" translatable="false">Show, Hide and Reorder Your Rows</string>
     <string name="always_first" translatable="false">Always First</string>
-    <string name="hint_customize" translatable="false">The rows Movies and Shows show, and their order, for this profile.</string>
+    <string name="hint_customize" translatable="false">The rows each page shows, and their order, for this profile.</string>
     <string name="showing_default" translatable="false">(Default)</string>
     <string name="showing_exclusives" translatable="false">Exclusives</string>
     <string name="showing_exclusives_only" translatable="false">Exclusives Only</string>

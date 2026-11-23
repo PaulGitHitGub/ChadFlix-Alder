@@ -76,6 +76,7 @@
     </plurals>
     <string name="home_unreachable">Stremio से संपर्क नहीं हो सका। टीवी का कनेक्शन जाँचें।</string>
     <string name="row_continue">देखना जारी रखें</string>
+    <string name="row_all_genres">सभी शैलियाँ</string>
     <string name="home_no_picks">इस प्रोफ़ाइल के Stremio खाते पर Watchly इंस्टॉल होते ही आपके लिए सुझाव यहाँ दिखेंगे। शो और फ़िल्में में देखने को और भी है।</string>
     <string name="page_no_movie_catalogs">आपके किसी भी ऐड-ऑन में फ़िल्मों का कैटलॉग नहीं है। Stremio में एक जोड़ें (AIOMetadata, Cinemeta)।</string>
     <string name="page_no_show_catalogs">आपके किसी भी ऐड-ऑन में शो का कैटलॉग नहीं है। Stremio में एक जोड़ें (AIOMetadata, Cinemeta)।</string>

@@ -76,6 +76,7 @@
     </plurals>
     <string name="home_unreachable">Stremio ist nicht erreichbar. Prüfe die Verbindung des Fernsehers.</string>
     <string name="row_continue">Weiterschauen</string>
+    <string name="row_all_genres">Alle Genres</string>
     <string name="home_no_picks">Vorschläge für dich erscheinen hier, sobald Watchly im Stremio-Konto dieses Profils installiert ist. Unter Serien und Filme gibt es mehr zu entdecken.</string>
     <string name="page_no_movie_catalogs">Keines deiner Add-ons hat Filmkataloge. Füge eines (AIOMetadata, Cinemeta) in Stremio hinzu.</string>
     <string name="page_no_show_catalogs">Keines deiner Add-ons hat Serienkataloge. Füge eines (AIOMetadata, Cinemeta) in Stremio hinzu.</string>

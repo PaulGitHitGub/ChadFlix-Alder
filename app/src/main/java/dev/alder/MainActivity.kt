@@ -221,7 +221,7 @@ class MainActivity : Screen() {
     /** A page in the top bar: the five fixed ones, then one per other catalog type the add-ons list ([Page.of]). */
     private class Page private constructor(val label: String, val words: Int, val type: String? = null) {
         companion object {
-            val HOME = Page("Home", R.string.tab_home)
+            val HOME = Page(HomeStyle.HOME, R.string.tab_home)
             val DISCOVER = Page("Discover", R.string.tab_discover)
             val SHOWS = Page("Shows", R.string.tab_shows)
             val MOVIES = Page("Movies", R.string.tab_movies)
@@ -1974,19 +1974,23 @@ class MainActivity : Screen() {
             // turns them on; rows that are off are never built or fetched. Move Up / Move Down set the order.
             val movie = p == Page.MOVIES
             val services = p == Page.SERVICES // ChadFlix: the Services tab: one row of shows per streaming service
+            val home = p == Page.HOME // ChadFlix: Home's All Genres row first (after Continue Watching), then the add-on rows
+            val allGenres = HomeStyle.allGenres(this@MainActivity)
             val candidates = if (services) HomeStyle.platforms.mapIndexed { i, platform ->
                     Triple(platform.name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.platformSource(this@MainActivity, p.label, i, false) as String?)
-                } else if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
+                } else if (home) listOf(Triple(allGenres, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.allGenresSource(this@MainActivity) as String?)) +
+                    sections(p, shelves, featuredHome).filterNot { it.first.equals(allGenres, true) }
+                else if (!p.hasGenreShortcuts) sections(p, shelves, featuredHome) else
                 HomeStyle.genres(movie).map { (id, name) ->
                     Triple(name, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.genreSource(this@MainActivity, p.label, id) as String?)
                 } + Triple(HomeStyle.ANIME, emptyList<Pair<Addon.Catalog, Shelf>>(), HomeStyle.animeSource(this@MainActivity, p.label, movie) as String?) +
                     sections(p, shelves, featuredHome).filterNot { s ->
                         HomeStyle.genres(movie).any { it.second.equals(s.first, true) } || s.first.equals(HomeStyle.ANIME, true)
                     }
-            if (p.hasGenreShortcuts || services) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
+            if (p.hasGenreShortcuts || services || home) HomeStyle.rememberRows(this@MainActivity, p.label, candidates.map { it.first })
             val rowsOn = HomeStyle.rowsOn(this@MainActivity, p.label)
             val sections = HomeStyle.ordered(this@MainActivity, p.label, movie, candidates.filter {
-                it.first !in hiddenRows && (!(p.hasGenreShortcuts || services) || HomeStyle.isOn(rowsOn, it.first, movie, services))
+                it.first !in hiddenRows && (!(p.hasGenreShortcuts || services || home) || HomeStyle.isOn(rowsOn, it.first, movie, services || home))
             }) { it.first }
             pageRows = sections.map { it.first }
             val initialSections = maxOf(nextCatalogSection(sections.size, 0), minOf(oldSlots.size, sections.size))
@@ -2024,7 +2028,7 @@ class MainActivity : Screen() {
                     val version = ++rowVersion
                     val results = answer.getOrNull() ?: emptyList()
                     val items = results.flatMap { it.first }.filterNot { isAddonMessage(it.name) }.distinctBy { it.id }.map(::metaItem)
-                    if (p == Page.HOME && cinema.isEmpty() && items.isNotEmpty()) startCinema(items.take(CINEMA_MAX))
+                    if (p == Page.HOME && cinema.isEmpty() && items.any { !HomeStyle.isTile(it.id) }) startCinema(items.filterNot { HomeStyle.isTile(it.id) }.take(CINEMA_MAX))
                     if (completed == rowCatalogs.size && !reported) {
                         reported = true
                         batchPending--
@@ -2922,7 +2926,7 @@ class MainActivity : Screen() {
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
     private fun showingMenu(row: Row, focus: Int = -1) {
         val movie = page == Page.MOVIES
-        val key = HomeStyle.rowKey(movie, row.title, page.label) ?: return
+        val key = HomeStyle.rowKey(movie, row.title, page.label, HomeStyle.allGenres(this)) ?: return
         if (key == "a") return animeMenu(row, focus)
         val lists = HomeStyle.listsFor(movie, key)
         val current = HomeStyle.showing(this, page.label, key)
@@ -2977,7 +2981,7 @@ class MainActivity : Screen() {
     /** ChadFlix: moves a row a place on this page, for this profile; the remote stays on the same card. */
     private fun moveRow(title: String, by: Int) {
         // Among every row the page could show, so rows that are off keep their places.
-        val all = if (page.hasGenreShortcuts || page == Page.SERVICES) HomeStyle.ordered(this, page.label, page == Page.MOVIES,
+        val all = if (page.hasGenreShortcuts || page == Page.SERVICES || page == Page.HOME) HomeStyle.ordered(this, page.label, page == Page.MOVIES,
             HomeStyle.knownRows(this, page.label, page == Page.MOVIES)) { it } else pageRows
         HomeStyle.saveRowOrder(this, page.label, movedAmong(all, pageRows, title, by))
         lastHomeRows = HomeStyle.signature(this, page.label)
@@ -3123,7 +3127,7 @@ class MainActivity : Screen() {
         // The row the remote is in has a bright title; the next one, peeking in below, is a quiet hint.
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         // ChadFlix: a genre row's title names its list, "Action · Trending".
-        private val list = if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
+        private val list = if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES || page == Page.HOME)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
         private val quietTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = false) }
         private val litTitle = list?.let { HomeStyle.rowTitle(HomeStyle.titleCase(title), it, lit = true) }
         private val heading = text(HomeStyle.titleCase(title), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
