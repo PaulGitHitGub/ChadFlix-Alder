@@ -29,8 +29,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
-- **Audio and subtitle names.** **Audio** and **Subtitles** show only the language, for example **Korean**. A commentary, an audio description, a forced track or an SDH track also shows that word. Codec and channels show under **More**, for example **Dolby TrueHD Atmos 7.1**. Names that uploaders put on tracks no longer show. A track with no language shows **Track 2**. The number is the place of the track in the column.
-- **Audio column width.** The **Audio** column is narrow, and wider under **More**. A long name no longer pushes **Subtitles** off the screen.
+- **Audio and subtitle names.** **Audio** and **Subtitles** show only the language, for example **Korean**. Names of add-ons and providers no longer show. Names that uploaders put on tracks no longer show. A commentary, an audio description, a forced track or an SDH track also shows that word. The word comes from the track, not from its name. Codec and channels show under **More**, for example **Dolby TrueHD Atmos 7.1**. A track with no language shows **Track 2**. The number is the place of the track in its column. **Off** does not count.
+- **Audio column width.** The **Audio** column is narrow. It is wider under **More**, and when a row shows a word such as **Commentary**. A long name no longer pushes **Subtitles** off the screen.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No Sleep Timer.** The player no longer has a Sleep Timer.
 - **No subtitle timing.** The player no longer has controls to move subtitles earlier or later. If subtitles are out of time, select **More** and select a different subtitle.

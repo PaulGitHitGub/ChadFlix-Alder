@@ -43,6 +43,15 @@ internal fun bestAudioFormat(
         { it.channelCount }
     ))
 
+/**
+ * Per language in [formats], the format [bestAudioFormat] would pick if that language were wanted: the track the menu's one row
+ * for the language stands for. Formats are compared by identity; a language with no pick (all failed or commentary) has none.
+ */
+internal fun preferredAudioFormats(formats: List<Format>, failed: Set<Format>, hasLosslessOutput: (Format) -> Boolean): List<Format> =
+    formats.mapNotNull { Languages.code(it.language) }.distinct().mapNotNull { code ->
+        bestAudioFormat(formats, code, failed, hasLosslessOutput)?.takeIf { Languages.match(it.language, code) > 0 }
+    }
+
 /** Whether the audio route can take [Format]s as they are (passthrough), not decoded to PCM. */
 @androidx.annotation.OptIn(UnstableApi::class)
 internal fun passthroughOutput(context: Context, attributes: AudioAttributes): (Format) -> Boolean {

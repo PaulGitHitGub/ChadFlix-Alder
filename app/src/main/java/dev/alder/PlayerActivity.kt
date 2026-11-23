@@ -1201,11 +1201,14 @@ class PlayerActivity : Screen() {
     private var audioGroups: List<Tracks.Group> = emptyList()
     private val failedAudio = mutableSetOf<Format>()
 
+    /** Whether a format would play lossless as it is, as Alder decides it at the start of playback. */
+    private fun audioLossless(): (Format) -> Boolean =
+        if (decodeAudio || retryWithPcm) ({ _: Format -> false }) else losslessOutput(this, player.audioAttributes)
+
     private fun bestAudio(groups: List<Tracks.Group>): Tracks.Group? {
         val supported = groups.filter { it.isTrackSupported(0) }
         if (supported.isEmpty()) return null
-        val lossless = if (decodeAudio || retryWithPcm) ({ _: Format -> false }) else losslessOutput(this, player.audioAttributes)
-        val best = bestAudioFormat(supported.map { it.getTrackFormat(0) }, wantAudio, failedAudio, lossless)
+        val best = bestAudioFormat(supported.map { it.getTrackFormat(0) }, wantAudio, failedAudio, audioLossless())
         return supported.firstOrNull { it.getTrackFormat(0) === best }
     }
 
@@ -2265,9 +2268,6 @@ class PlayerActivity : Screen() {
     private var originalLanguage: String? = null
     private var askedOriginal = false
     private var menuRows = 7
-    // Audio column widths: Kodi's 170 dp column pitch while only languages show; room for codec and channels under More.
-    private val AUDIO_NARROW = 170
-    private val AUDIO_WIDE = 250
     private var menuPill: TextView? = null
     private var sample: SubtitleView? = null
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
@@ -2310,9 +2310,11 @@ class PlayerActivity : Screen() {
 
     private fun audioItems(): List<MenuItem> {
         val groups = audioGroups.filter { it.isTrackSupported(0) }
+        val preferred = preferredAudioFormats(groups.map { it.getTrackFormat(0) }, failedAudio, audioLossless())
         return groups.mapIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
+            MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label),
+                preferred = preferred.any { it === f }),
                 trackName(f, i), roleWord(true, f), audioFormat(f)) { pickAudio(g, Languages.code(f.language)) }
         }
     }
@@ -2339,7 +2341,9 @@ class PlayerActivity : Screen() {
         }
         addonSubs.forEachIndexed { i, sub ->
             out += MenuItem(MenuTrack("addon:${sub.url}", Languages.code(sub.lang), chosen == 1 + subs.size + i, addon = true),
-                sub.language, "", "") { pickSubtitle(1 + subs.size + i, subs, loaded) }
+                // an add-on's own language text never shows when it is no known language: "Track N" instead
+                if (Languages.code(sub.lang) != null) sub.language else getString(R.string.track_number, trackNumber(subs.size + i)),
+                "", "") { pickSubtitle(1 + subs.size + i, subs, loaded) }
         }
         return out
     }
@@ -2385,7 +2389,7 @@ class PlayerActivity : Screen() {
     private fun makeRow(col: MenuColumn, key: String, item: MenuItem?, shownDetail: String = ""): MenuRow {
         val check = ImageView(this).apply { setImageResource(R.drawable.ic_check); visibility = View.INVISIBLE }
         val name = text(item?.name ?: getString(R.string.menu_more), BODY).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
-        val detail = text(shownDetail, SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val detail = text(shownDetail, SMALL).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; textAlignment = View.TEXT_ALIGNMENT_VIEW_START }
         val view = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             isFocusable = true
@@ -2458,7 +2462,7 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded) AUDIO_WIDE else AUDIO_NARROW) }
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(audioColumnDp(col.expanded, shown.any { it.role.isNotEmpty() })) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2513,7 +2517,7 @@ class PlayerActivity : Screen() {
         menuLayer.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
-        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(AUDIO_NARROW), -2))
+        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(audioColumnDp(false, false)), -2))
         panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(240), -2))
         menuLayer.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
             marginStart = dp(PAD); bottomMargin = dp(150)
@@ -2969,7 +2973,7 @@ class PlayerActivity : Screen() {
             ?: getString(R.string.track_number, trackNumber(position))
 
     /** The short word for a commentary, description, forced or SDH track, from the track's flags; "" for the rest. */
-    private fun roleWord(audio: Boolean, f: Format): String = when (trackRole(audio, f.selectionFlags, f.roleFlags)) {
+    private fun roleWord(audio: Boolean, f: Format): String = when (trackRole(audio, f.selectionFlags, f.roleFlags, f.label)) {
         TrackRole.COMMENTARY -> getString(R.string.role_commentary)
         TrackRole.DESCRIPTIVE -> getString(R.string.role_descriptive)
         TrackRole.FORCED -> getString(R.string.role_forced)
@@ -2985,6 +2989,8 @@ class PlayerActivity : Screen() {
         MimeTypes.AUDIO_TRUEHD -> "Dolby TrueHD"
         MimeTypes.AUDIO_DTS -> "DTS"
         MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+        MimeTypes.AUDIO_DTS_X -> "DTS:X"
+        MimeTypes.AUDIO_DTS_EXPRESS -> "DTS Express"
         MimeTypes.AUDIO_AAC -> "AAC"
         MimeTypes.AUDIO_OPUS -> "Opus"
         MimeTypes.AUDIO_FLAC -> "FLAC"

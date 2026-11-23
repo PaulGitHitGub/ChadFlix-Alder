@@ -1,6 +1,7 @@
 package dev.alder
 
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -11,8 +12,8 @@ import org.junit.Test
 
 /** The player's Audio & Subtitles menu rows, the Info pop-up's lines, and the "Ends at" time. */
 class PlayerMenuTest {
-    private fun t(id: String, language: String?, selected: Boolean = false, plain: Boolean = true, addon: Boolean = false) =
-        MenuTrack(id, language, selected, plain, addon)
+    private fun t(id: String, language: String?, selected: Boolean = false, plain: Boolean = true, addon: Boolean = false,
+                  preferred: Boolean = false) = MenuTrack(id, language, selected, plain, addon, preferred = preferred)
     private val off = MenuTrack("off", null, off = true)
 
     /** Parasite: original Korean, with English, French, Spanish and German dubs and many subtitles. */
@@ -73,9 +74,67 @@ class PlayerMenuTest {
         // Two English audio tracks, neither in use: one row, the best.
         val audio = listOf(t("a", "ko", selected = true), t("en-com", "en", plain = false), t("en", "en"))
         assertEquals(setOf("a", "en"), defaultTrackIds(audio, "ko"))
+        // the row is the one best track, whatever the order: never both English tracks, never the commentary beside a plain one
+        val shown = defaultTrackIds(listOf(t("en-com", "en", plain = false), t("en2", "en"), t("en", "en", preferred = true), t("a", "ko", selected = true)), "ko")
+        assertEquals(setOf("a", "en"), shown)
         // The track in use is the original language: the best original-language track is not added beside it.
         val ko = listOf(t("k1", "ko"), t("k2", "ko", selected = true), t("en", "en"))
         assertEquals(setOf("k2", "en"), defaultTrackIds(ko, "ko"))
+    }
+
+    @Test fun anAddonSubtitleInUseIsTheRowOfItsLanguageEvenWithAnEmbeddedTwin() {
+        // The add-on's English file is in use and the file has English too: one English row, the one in use.
+        val subs = listOf(off, t("sub:1", "en"), t("sub:2", "ko"), t("addon:x", "en", selected = true, addon = true))
+        assertEquals(setOf("off", "addon:x", "sub:2"), defaultTrackIds(subs, "ko"))
+        // An add-on's Korean file in use beside an embedded Korean one: the add-on's is the Korean row, English is the file's.
+        val ko = listOf(off, t("sub:1", "ko"), t("sub:2", "en"), t("addon:k", "ko", selected = true, addon = true))
+        assertEquals(setOf("off", "addon:k", "sub:2"), defaultTrackIds(ko, "ko"))
+        // Nothing in use but Off: the file's English beats the add-on's, and the add-on's other language stays under More.
+        val none = listOf(off.copy(selected = true), t("addon:en", "en", addon = true), t("sub:1", "en"), t("addon:fr", "fr", addon = true))
+        assertEquals(setOf("off", "sub:1"), defaultTrackIds(none, null))
+    }
+
+    @Test fun aThirdLanguageInUseShowsBesideEnglishAndTheOriginal() {
+        val audio = listOf(t("ko", "ko"), t("en", "en"), t("fr", "fr", selected = true), t("de", "de"))
+        assertEquals(setOf("ko", "en", "fr"), defaultTrackIds(audio, "ko"))
+        val subs = listOf(off, t("ko", "ko"), t("en", "en"), t("fr", "fr", selected = true), t("de", "de"))
+        assertEquals(setOf("off", "ko", "en", "fr"), defaultTrackIds(subs, "ko"))
+        assertEquals(setOf("off", "en", "fr"), defaultTrackIds(subs, null))
+    }
+
+    @Test fun theTrackAlderWouldPlayBacksTheLanguageRow() {
+        // Korean: Dolby Digital 5.1 first, TrueHD second. Alder's pick for a Korean viewer is the TrueHD one, so the row backs it.
+        val audio = listOf(t("ac3", "ko"), t("truehd", "ko", preferred = true), t("en", "en", selected = true))
+        assertEquals(setOf("truehd", "en"), defaultTrackIds(audio, "ko"))
+        // Without a preferred mark the first plain one wins, as before.
+        assertEquals(setOf("ac3", "en"), defaultTrackIds(audio.map { it.copy(preferred = false) }, "ko"))
+        // Plain still comes first: a preferred commentary does not take the row from a plain track.
+        val odd = listOf(t("com", "ko", plain = false, preferred = true), t("ko", "ko"), t("en", "en", selected = true))
+        assertEquals(setOf("ko", "en"), defaultTrackIds(odd, "ko"))
+    }
+
+    @Test fun preferredAudioFormatsFollowBestAudioFormatPerLanguage() {
+        // Format.Builder.setLanguage needs Android's TextUtils, which local tests do not have: the field is set directly.
+        fun f(mime: String, language: String, channels: Int, flags: Int = 0, label: String? = null) = Format.Builder()
+            .setSampleMimeType(mime).setChannelCount(channels).setSelectionFlags(flags).setLabel(label).build().also {
+                Format::class.java.getField("language").apply { isAccessible = true }.set(it, language)
+            }
+        val koAc3 = f(MimeTypes.AUDIO_AC3, "ko", 6)
+        val koTrueHd = f(MimeTypes.AUDIO_TRUEHD, "ko", 8)
+        val enAc3 = f(MimeTypes.AUDIO_AC3, "en", 6)
+        val enDefault = f(MimeTypes.AUDIO_AAC, "en", 2, C.SELECTION_FLAG_DEFAULT)
+        val enCommentary = f(MimeTypes.AUDIO_AC3, "en", 6, label = "Commentary")
+        val formats = listOf(koAc3, koTrueHd, enAc3, enDefault, enCommentary, f(MimeTypes.AUDIO_AAC, "und", 2))
+        val passes: (Format) -> Boolean = { losslessEncoding(it) != null } // a device that passes lossless audio through
+        val picks = preferredAudioFormats(formats, emptySet(), passes)
+        assertEquals(2, picks.size) // one per language; "und" has none
+        assertTrue(picks.any { it === koTrueHd } && picks.none { it === koAc3 })
+        assertTrue(picks.any { it === enDefault }) // the default flag outranks channels, as in Alder's own pick
+        // A device that decodes everything to PCM: channels decide, so the 8-channel TrueHD still wins here.
+        val pcm = preferredAudioFormats(formats, emptySet()) { false }
+        assertTrue(pcm.any { it === koTrueHd })
+        // A failed track is skipped, as at the start of playback.
+        assertTrue(preferredAudioFormats(formats, setOf(koTrueHd), passes).any { it === koAc3 })
     }
 
     @Test fun noTracksShowNothingBeyondOff() {
@@ -200,6 +259,39 @@ class PlayerMenuTest {
         assertNull(trackRole(true, C.SELECTION_FLAG_FORCED, C.ROLE_FLAG_CAPTION))
     }
 
+    @Test fun theRoleAlsoComesFromWholeWordsInTheLabel() {
+        // Matroska does not report these flags, so the label is the only source.
+        assertEquals(TrackRole.COMMENTARY, trackRole(true, 0, 0, "BTM Commentary"))
+        assertEquals(TrackRole.COMMENTARY, trackRole(true, 0, 0, "English_commentary_2.0"))
+        assertEquals(TrackRole.DESCRIPTIVE, trackRole(true, 0, 0, "English Audio Description"))
+        assertEquals(TrackRole.DESCRIPTIVE, trackRole(true, 0, 0, "Descriptive"))
+        assertEquals(TrackRole.DESCRIPTIVE, trackRole(true, 0, 0, "English Descriptions"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "English SDH"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "English [CC]"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "English.HoH"))
+        assertEquals(TrackRole.SDH, trackRole(false, 0, 0, "Hearing Impaired"))
+        assertEquals(TrackRole.FORCED, trackRole(false, 0, 0, "English (Forced)"))
+        // flags still count, and come first
+        assertEquals(TrackRole.COMMENTARY, trackRole(true, 0, C.ROLE_FLAG_COMMENTARY, "English"))
+        assertEquals(TrackRole.FORCED, trackRole(false, C.SELECTION_FLAG_FORCED, 0, "English SDH"))
+        // a letter next to the word, or a word for the other kind of track, gives nothing
+        assertNull(trackRole(true, 0, 0, "Atmosphere"))
+        assertNull(trackRole(true, 0, 0, "BTM"))
+        assertNull(trackRole(true, 0, 0, "English"))
+        assertNull(trackRole(true, 0, 0, "DDP5.1 Accessible"))
+        assertNull(trackRole(true, 0, 0, "English SDH")) // audio is never SDH
+        assertNull(trackRole(false, 0, 0, "BTM Commentary")) // a subtitle is never a commentary
+        assertNull(trackRole(false, 0, 0, "Success Forceddd"))
+        assertNull(trackRole(false, 0, 0, "Occ"))
+    }
+
+    @Test fun theAudioColumnIsWideForARoleWordOrMore() {
+        assertEquals(170, audioColumnDp(expanded = false, anyRole = false))
+        assertEquals(250, audioColumnDp(expanded = false, anyRole = true))
+        assertEquals(250, audioColumnDp(expanded = true, anyRole = false))
+        assertEquals(250, audioColumnDp(expanded = true, anyRole = true))
+    }
+
     @Test fun trackNumberIsThePlaceNotTheFileId() {
         // The id of a track ("2" in an MP4, "aac:Main" in HLS, "1/257" in TS) never reaches the name.
         assertEquals("1", trackNumber(0))
@@ -218,6 +310,14 @@ class PlayerMenuTest {
         assertEquals("DTS:X 7.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "BTM DTS-X 7.1", "7.1"))
         assertEquals("DTS-HD MA 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "DTS-HD.MA 5.1", "5.1"))
         assertEquals("DTS-HD MA 5.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "BTM DTS-HD MA", "5.1"))
+        assertEquals("DTS-HD MA 7.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "DTS-HD Master Audio", "7.1"))
+        assertEquals("DTS-HD MA 7.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "DTS_HD_Master_Audio_7.1", "7.1"))
+        assertEquals("DTS-HD MA 5.1", audioFormatText("DTS", MimeTypes.AUDIO_DTS, "DTS-HD.Master.Audio", "5.1"))
+        assertEquals("DTS-HD 5.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "DTS-HD HRA 5.1", "5.1")) // High Resolution is not MA
+        assertEquals("DTS-HD 5.1", audioFormatText("DTS-HD", MimeTypes.AUDIO_DTS_HD, "DTS-HD High Resolution Audio", "5.1"))
+        assertEquals("Dolby TrueHD Atmos 7.1", audioFormatText("Dolby TrueHD", truehd, "TrueHD_Atmos_7.1", "7.1")) // "_" is no word letter
+        assertEquals("Dolby TrueHD 7.1", audioFormatText("Dolby TrueHD", truehd, "TrueHD_Atmosphere_7.1", "7.1"))
+        assertEquals("DTS:X 7.1", audioFormatText("DTS:X", MimeTypes.AUDIO_DTS_X, "DTS-HD MA", "7.1")) // a DTS:X track stays DTS:X
         assertEquals("Dolby Digital", audioFormatText("Dolby Digital", MimeTypes.AUDIO_AC3, null, null))
         assertEquals("", audioFormatText(null, null, "BTM", null))
         assertEquals("Stereo", audioFormatText(null, null, "BTM", "Stereo"))

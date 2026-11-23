@@ -13,12 +13,14 @@ internal data class MenuTrack(
     val plain: Boolean = true,
     val addon: Boolean = false,
     val off: Boolean = false,
+    /** Audio only: the format Alder itself would pick for this language (see [preferredAudioFormats]). */
+    val preferred: Boolean = false,
 )
 
 /**
  * The rows a column shows before "More": Off, the track in use, the best plain English track, and the best plain track
  * in the title's [originalLanguage] (null: unknown, so only English and the track in use). "English" is literal, not the
- * TV's language. The best track of a language is a plain one, from the file before an add-on, then in file order; a
+ * TV's language. The best track of a language is a plain one, then the one Alder would play ([MenuTrack.preferred]), from the file before an add-on, then in file order; a
  * language with no plain track gives its first. A language never shows twice: when the track in use is of that language
  * it is the one shown. A track with no language shows only when it is in use. Every track not listed here is behind More.
  */
@@ -27,14 +29,21 @@ internal fun defaultTrackIds(tracks: List<MenuTrack>, originalLanguage: String?)
     tracks.forEach { if (it.off || it.selected) shown += it.id }
     fun best(language: String?) = language?.let { code ->
         if (tracks.any { it.id in shown && !it.off && Languages.match(it.language, code) > 0 }) null
-        else tracks.filter { !it.off && Languages.match(it.language, code) > 0 }.sortedWith(compareBy({ !it.plain }, { it.addon })).firstOrNull()
+        else tracks.filter { !it.off && Languages.match(it.language, code) > 0 }.sortedWith(compareBy({ !it.plain }, { !it.preferred }, { it.addon })).firstOrNull()
     }
     best("en")?.let { shown += it.id }
     best(originalLanguage)?.let { shown += it.id }
     return shown
 }
 
-private val ODD_LABEL = Regex("""\b(sdh|cc|hoh|hearing|forced|commentary|description|descriptive|captions?)\b""", RegexOption.IGNORE_CASE)
+// Whole words only: a letter on either side ("Atmosphere", "Accessible") never counts, but "_", "." and digits do ("TrueHD_Atmos_7.1").
+private fun word(re: String) = Regex("(?<![a-z])(?:$re)(?![a-z])", RegexOption.IGNORE_CASE)
+
+private val LABEL_COMMENTARY = word("commentary")
+private val LABEL_DESCRIPTIVE = word("descriptive|descriptions?|audio[-_. ]?descriptions?")
+private val LABEL_SDH = word("sdh|cc|hoh|hearing[-_. ]?impaired|closed[-_. ]?captions?")
+private val LABEL_FORCED = word("forced")
+private val ODD_LABEL = word("sdh|cc|hoh|hearing|forced|commentary|description|descriptive|captions?")
 
 /** A track that is not forced-only, for the deaf and hard of hearing, a commentary or a description for the blind. */
 internal fun plainTrack(selectionFlags: Int, roleFlags: Int, label: String?): Boolean {
@@ -85,17 +94,29 @@ internal fun infoGap(above: InfoRow, row: InfoRow): Int = when {
 /** The number in "Track N": the track's place among the tracks of its column (1 for the first), never the file's own id ("2", "aac:Main", "1/257"). */
 internal fun trackNumber(position: Int): String = (position + 1).toString()
 
-/** A role the viewer may care about, read from the track's flags only, never from the file's free-text label. */
+/** A role the viewer may care about. Only the fixed role words ever show, never the file's own label text. */
 internal enum class TrackRole { COMMENTARY, DESCRIPTIVE, FORCED, SDH }
 
-/** The role of a track, from its [selectionFlags] and [roleFlags]. Audio can be a commentary or a description; subtitles forced or SDH. */
-internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int): TrackRole? = when {
+/**
+ * The role of a track, from its [selectionFlags] and [roleFlags], else from whole role words in its [label]: Matroska does not
+ * report the commentary, hearing impaired or visual impaired flags to Media3. Audio can be a commentary or a description;
+ * subtitles forced or SDH. Only the role comes out of the label, none of its text.
+ */
+internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int, label: String? = null): TrackRole? = when {
     audio && roleFlags and C.ROLE_FLAG_COMMENTARY != 0 -> TrackRole.COMMENTARY
     audio && roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO != 0 -> TrackRole.DESCRIPTIVE
     !audio && selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> TrackRole.FORCED
     !audio && roleFlags and (C.ROLE_FLAG_CAPTION or C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND) != 0 -> TrackRole.SDH
+    label == null -> null
+    audio && LABEL_COMMENTARY.containsMatchIn(label) -> TrackRole.COMMENTARY
+    audio && LABEL_DESCRIPTIVE.containsMatchIn(label) -> TrackRole.DESCRIPTIVE
+    !audio && LABEL_FORCED.containsMatchIn(label) -> TrackRole.FORCED
+    !audio && LABEL_SDH.containsMatchIn(label) -> TrackRole.SDH
     else -> null
 }
+
+/** The width of the Audio column in dp: wide under More, and before More when a row shows a role word, so "English Commentary" is not cut. */
+internal fun audioColumnDp(expanded: Boolean, anyRole: Boolean): Int = if (expanded || anyRole) 250 else 170
 
 /**
  * An audio track's codec and channels for under More: "Dolby TrueHD Atmos 7.1". Matroska reports Atmos as plain TrueHD or E-AC-3
@@ -103,13 +124,13 @@ internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int): Tra
  * whole words. Nothing else from the label ever shows, so "BTM TrueHD Atmos 7.1" gives no "BTM".
  */
 internal fun audioFormatText(codec: String?, mime: String?, label: String?, channels: String?): String {
-    fun has(re: String) = label != null && Regex(re, RegexOption.IGNORE_CASE).containsMatchIn(label)
-    val dts = mime?.startsWith("audio/vnd.dts") == true
+    fun has(re: String) = label != null && word(re).containsMatchIn(label)
+    val dts = mime == MimeTypes.AUDIO_DTS || mime == MimeTypes.AUDIO_DTS_HD
     val named = when {
         codec == null -> null
-        (mime == MimeTypes.AUDIO_E_AC3 || mime == MimeTypes.AUDIO_TRUEHD) && has("\\batmos\\b") -> "$codec Atmos"
-        dts && has("\\bdts[-_.: ]?x\\b") -> "DTS:X"
-        dts && has("\\bdts[-_.: ]?hd[-_.: ]?ma\\b") -> "DTS-HD MA"
+        (mime == MimeTypes.AUDIO_E_AC3 || mime == MimeTypes.AUDIO_TRUEHD) && has("atmos") -> "$codec Atmos"
+        dts && has("dts[-_.: ]?x") -> "DTS:X"
+        dts && has("dts[-_.: ]?hd[-_.: ]?(?:ma|master[-_.: ]?audio)") -> "DTS-HD MA"
         else -> codec
     }
     return listOfNotNull(named, channels).joinToString(" ")
