@@ -2273,7 +2273,6 @@ class PlayerActivity : Screen() {
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
     private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
 
-
     private fun panelUp() = menuOpen || infoOpen
     private fun isRtl() = controls.layoutDirection == View.LAYOUT_DIRECTION_RTL
 
@@ -2313,7 +2312,7 @@ class PlayerActivity : Screen() {
         val groups = audioGroups.filter { it.isTrackSupported(0) }
         return groups.mapIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val text = trackName(f, true)
+            val text = trackName(f, true, i)
             MenuItem(MenuTrack("audio:$i", Languages.code(f.language), g.isSelected, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
                 text.name, text.detail, "", text.note) { pickAudio(g, Languages.code(f.language)) }
         }
@@ -2336,7 +2335,7 @@ class PlayerActivity : Screen() {
         })
         subs.forEachIndexed { i, g ->
             val f = g.getTrackFormat(0)
-            val text = trackName(f, false)
+            val text = trackName(f, false, i)
             out += MenuItem(MenuTrack("sub:${1 + i}", Languages.code(f.language), chosen == 1 + i, plainTrack(f.selectionFlags, f.roleFlags, f.label)),
                 text.name, text.detail, "") { pickSubtitle(1 + i, subs, loaded) }
         }
@@ -2467,7 +2466,7 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (col.expanded || details.any { it.isNotEmpty() }) AUDIO_WIDE else AUDIO_NARROW) }
+        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(if (audioColumnWide(col.expanded, details)) AUDIO_WIDE else AUDIO_NARROW) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
@@ -2957,7 +2956,6 @@ class PlayerActivity : Screen() {
         return listOfNotNull(name(audio), subtitles).joinToString(DOT)
     }
 
-    /** "English · Dolby Digital 5.1": the language, then the release's own name for the track or, for audio, its format. */
     /** Sets subtitle delay in milliseconds live on the renderer without reloading playback. */
     private fun setSubtitleDelay(newDelay: Long) {
         val oldDelay = subDelay
@@ -2973,7 +2971,8 @@ class PlayerActivity : Screen() {
 
     private fun isAddonSub(g: Tracks.Group) = g.type == C.TRACK_TYPE_TEXT && g.getTrackFormat(0).id?.contains(ADDON_SUB) == true
 
-    private fun trackName(f: Format, audio: Boolean): TrackText {
+    /** The row text for a track: see [trackText]. [position] numbers a track that has no id. */
+    private fun trackName(f: Format, audio: Boolean, position: Int): TrackText {
         val language = f.language?.takeIf { it != "und" }?.let { Locale.forLanguageTag(it).getDisplayLanguage(Locale.getDefault()) }?.ifBlank { null }
         val format = if (!audio) null else listOfNotNull(when (f.sampleMimeType) {
             MimeTypes.AUDIO_AC3 -> "Dolby Digital"
@@ -2992,9 +2991,8 @@ class PlayerActivity : Screen() {
         })
             .joinToString(" ").ifEmpty { null }
         val label = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
-        val parts = listOfNotNull(language, label ?: format)
-        return TrackText(parts.firstOrNull() ?: getString(R.string.track_number, f.id.orEmpty()).trim(), parts.getOrNull(1).orEmpty(),
-            trackNote(language, label, f.selectionFlags, f.roleFlags))
+        return trackText(audio, language, label, format, f.selectionFlags, f.roleFlags,
+            getString(R.string.track_number, f.id?.takeIf { it.isNotBlank() } ?: (position + 1).toString()))
     }
 
     private fun timing(delay: Long) = formatTiming(delay, getString(R.string.timing_on_time),

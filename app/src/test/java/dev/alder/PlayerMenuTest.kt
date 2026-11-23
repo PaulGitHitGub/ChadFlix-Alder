@@ -185,11 +185,48 @@ class PlayerMenuTest {
         assertEquals("", trackNote("English", "Surround 5.1", C.SELECTION_FLAG_DEFAULT, C.ROLE_FLAG_MAIN))
         assertEquals("Commentary", trackNote("English", "Commentary", 0, 0))
         assertEquals("Descriptive", trackNote("English", "Descriptive", 0, 0))
-        assertEquals("English", trackNote("English", "English", 0, C.ROLE_FLAG_COMMENTARY).let { "English" }.takeIf { false } ?: "English")
+        assertEquals("English", trackNote("English", "English", 0, C.ROLE_FLAG_COMMENTARY))
         assertEquals("Director", trackNote("English", "Director", 0, C.ROLE_FLAG_COMMENTARY))
         // A German TV: the language reads "Englisch", the file's label "English" is not a note.
         assertEquals("", trackNote("Englisch", "English", 0, 0))
         assertEquals("", trackNote(null, "Commentary", 0, 0))
         assertEquals("", trackNote("English", null, 0, C.ROLE_FLAG_COMMENTARY))
+    }
+
+    @Test fun anAudioTrackWithNoLanguageIsNeverNamedByItsCodec() {
+        val dd = "Dolby Digital Plus 5.1"
+        // No label, or a plain one: "Track 2", and the codec is the detail.
+        assertEquals("Track 2", trackText(true, null, null, dd, 0, 0, "Track 2").name)
+        assertEquals(dd, trackText(true, null, null, dd, 0, 0, "Track 2").detail)
+        assertEquals("Track 2", trackText(true, null, "Surround", dd, 0, 0, "Track 2").name)
+        assertEquals(dd, trackText(true, null, "Surround", dd, 0, 0, "Track 2").detail)
+        // A descriptive label names it.
+        val commentary = trackText(true, null, "Commentary", dd, 0, 0, "Track 2")
+        assertEquals("Commentary", commentary.name)
+        assertEquals(dd, commentary.detail)
+        // Nothing known about the codec: a plain label is the detail rather than lost.
+        assertEquals("Surround", trackText(true, null, "Surround", null, 0, 0, "Track 2").detail)
+        // A subtitle with no language keeps its label as the name.
+        val sub = trackText(false, null, "Full", null, 0, 0, "Track 3")
+        assertEquals("Full", sub.name)
+        assertEquals("", sub.detail)
+        assertEquals("Track 3", trackText(false, null, null, null, 0, 0, "Track 3").name)
+    }
+
+    @Test fun theDetailShowsTheFormatForAPlainLabelAndBothForADescriptiveOne() {
+        val dd = "Dolby Digital 5.1"
+        assertEquals(dd, trackText(true, "English", "DD+ 5.1", dd, 0, 0, "Track 1").detail)
+        assertEquals("Commentary · $dd", trackText(true, "English", "Commentary", dd, 0, 0, "Track 1").detail)
+        assertEquals("Commentary", trackText(true, "English", "Commentary", dd, 0, 0, "Track 1").note)
+        assertEquals("English", trackText(true, "English", null, dd, 0, 0, "Track 1").name)
+        // Subtitles have no format: the label is the detail.
+        assertEquals("SDH", trackText(false, "English", "SDH", null, 0, 0, "Track 1").detail)
+    }
+
+    @Test fun theAudioColumnIsWideOnlyWhenItShowsDetails() {
+        assertFalse(audioColumnWide(false, listOf("", "")))
+        assertFalse(audioColumnWide(false, emptyList()))
+        assertTrue(audioColumnWide(false, listOf("", "Commentary")))
+        assertTrue(audioColumnWide(true, listOf("", "")))
     }
 }

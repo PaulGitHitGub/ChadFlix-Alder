@@ -29,8 +29,8 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
-- **Audio names.** In the **Audio** column, a label such as **Commentary** shows without **More**. Two rows with the same name also show their details, so you can tell them apart.
-- **Steady Audio column.** The **Audio** column has a fixed width. A long name no longer pushes **Subtitles** off the screen.
+- **Audio names.** In the **Audio** column, a label such as **Commentary** shows without **More**. Two rows with the same name also show their details, so two English tracks look different. A track with no language shows as **Track 2**, not as its codec. The codec and channels show under **More**.
+- **Audio column width.** The **Audio** column is narrow when it shows only names. It is wider when it shows details, and under **More**. A long name no longer pushes **Subtitles** off the screen.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No Sleep Timer.** The player no longer has a Sleep Timer.
 - **No subtitle timing.** The player no longer has controls to move subtitles earlier or later. If subtitles are out of time, select **More** and select a different subtitle.
