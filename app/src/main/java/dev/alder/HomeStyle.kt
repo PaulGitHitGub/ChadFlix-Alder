@@ -478,7 +478,7 @@ internal object HomeStyle {
         val list = parts.getOrElse(1) { "trending" }
         if (parts[0] == ALL) { // All Genres: a page of films and one of shows (only one for Blockbusters, Complete Series)
             val got = allMedia(list).map { m ->
-                runCatching { Tmdb.discoverRow(m, genreParams(m, 0, list, day.format(java.util.Date()), day.format(sinceFor(m))), genres(m).toMap()) }
+                runCatching { Tmdb.discoverRow(m, allParams(m, list, day.format(java.util.Date()), day.format(sinceFor(m))), genres(m).toMap()) }
             }
             if (got.all { it.isFailure }) throw got.first().exceptionOrNull()!!
             val rows = got.mapNotNull { it.getOrNull() }
@@ -507,6 +507,10 @@ internal object HomeStyle {
 /** [a] and [b] in turn, rank by rank ([a]'s first), each id once: the All Genres row's films and shows. */
 internal fun <T> interleaved(a: List<T>, b: List<T>, id: (T) -> String): List<T> =
     (0 until maxOf(a.size, b.size)).flatMap { listOfNotNull(a.getOrNull(it), b.getOrNull(it)) }.distinctBy(id)
+
+/** TMDb discover filters for the All Genres row: a genre row's [list] with no genre; shows leave out News, Soap and Talk. */
+internal fun allParams(movie: Boolean, list: String, today: String, since: String): Map<String, String> =
+    genreParams(movie, 0, list, today, since).let { if (movie) it else it + ("without_genres" to "10763|10766|10767") }
 
 /** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
 internal fun <T> orderedRows(saved: List<String>, items: List<T>, title: (T) -> String): List<T> =

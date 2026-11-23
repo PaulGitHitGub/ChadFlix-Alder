@@ -158,6 +158,13 @@ class HomeStyleTest {
         assertEquals("tmdb:g", HomeStyle.slotSource(HomeStyle.allSource("new")))
         assertEquals(null, genreParams(true, 0, "trending", "2026-11-23", "2026-05-23")["with_genres"])
         assertEquals("popularity.desc", genreParams(false, 0, "trending", "2026-11-23", "2025-11-23")["sort_by"])
+        for (list in HomeStyle.allLists().map { it.first }) { // shows leave out News, Soap and Talk; films keep every genre
+            assertEquals("10763|10766|10767", allParams(false, list, "2026-11-23", "2025-11-23")["without_genres"])
+            assertEquals(null, allParams(true, list, "2026-11-23", "2026-05-23")["without_genres"])
+            assertEquals(null, allParams(false, list, "2026-11-23", "2025-11-23")["with_genres"])
+        }
+        assertEquals("first_air_date.desc", allParams(false, "new", "2026-11-23", "")["sort_by"])
+        assertEquals(null, genreParams(false, 18, "trending", "2026-11-23", "2025-11-23")["without_genres"]) // other rows unchanged
         assertEquals("g", HomeStyle.rowKey(false, "All Genres", HomeStyle.HOME, "All Genres"))
         assertEquals(null, HomeStyle.rowKey(false, "For You", HomeStyle.HOME, "All Genres"))
         assertEquals(null, HomeStyle.rowKey(true, "All Genres", "Movies", "All Genres"))
