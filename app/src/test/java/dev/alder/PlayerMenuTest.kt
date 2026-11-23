@@ -6,6 +6,7 @@ import androidx.media3.common.MimeTypes
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -301,10 +302,65 @@ class PlayerMenuTest {
     }
 
     @Test fun theAudioColumnIsWideForARoleWordOrMore() {
-        assertEquals(170, audioColumnDp(expanded = false, anyRole = false))
-        assertEquals(250, audioColumnDp(expanded = false, anyRole = true))
-        assertEquals(250, audioColumnDp(expanded = true, anyRole = false))
-        assertEquals(250, audioColumnDp(expanded = true, anyRole = true))
+        assertEquals(170, languageColumnDp(expanded = false, anyRole = false))
+        assertEquals(250, languageColumnDp(expanded = false, anyRole = true))
+        assertEquals(250, languageColumnDp(expanded = true, anyRole = false))
+        assertEquals(250, languageColumnDp(expanded = true, anyRole = true))
+    }
+
+    @Test fun appearanceStepsWrapAtBothEnds() {
+        assertEquals(1, steppedIndex(0, 1, 4))
+        assertEquals(0, steppedIndex(3, 1, 4)) // after Extra Large comes Small
+        assertEquals(3, steppedIndex(0, -1, 4)) // before Small comes Extra Large
+        assertEquals(5, steppedIndex(0, -1, 6))
+        assertEquals(1, steppedIndex(0, 1, 2)) // Background: either arrow toggles
+        assertEquals(0, steppedIndex(1, 1, 2))
+        assertEquals(1, steppedIndex(0, -1, 2))
+        assertEquals(0, steppedIndex(0, 1, 1))
+        assertEquals(0, steppedIndex(0, 1, 0))
+    }
+
+    @Test fun appearanceChoicesAreAldersOwnLists() {
+        assertEquals(listOf(80, 100, 130, 160), SUBTITLE_SIZES)
+        assertEquals(listOf("white", "gray", "yellow", "cyan", "cream", "warm_white"), SUBTITLE_COLORS)
+        assertEquals(listOf(true, false), SUBTITLE_BACKGROUNDS)
+        assertEquals(1, choiceIndex(SUBTITLE_SIZES, 100)) // the default is Medium
+        assertEquals(0, choiceIndex(SUBTITLE_COLORS, "white"))
+        assertEquals(0, choiceIndex(SUBTITLE_BACKGROUNDS, true)) // the default is On
+        assertEquals(1, choiceIndex(SUBTITLE_BACKGROUNDS, false))
+        assertEquals(0, choiceIndex(SUBTITLE_SIZES, 115)) // a value that is no choice counts as the first
+        // every colour name is one Alder draws in its own colour
+        SUBTITLE_COLORS.drop(1).forEach { assertNotEquals(subtitleColorValue("white"), subtitleColorValue(it)) }
+    }
+
+    @Test fun leftAndRightStepTheValueAndMirrorInRtl() {
+        assertEquals(1, stepForKey(right = true, rtl = false))
+        assertEquals(-1, stepForKey(right = false, rtl = false))
+        assertEquals(-1, stepForKey(right = true, rtl = true))
+        assertEquals(1, stepForKey(right = false, rtl = true))
+    }
+
+    @Test fun theAppearanceColumnFitsItsWidestRowWithinBounds() {
+        assertEquals(240, appearanceColumnDp(40, 60)) // never narrower than 240
+        assertEquals(42 + 90 + 16 + 110 + 22, appearanceColumnDp(90, 110))
+        assertEquals(340, appearanceColumnDp(200, 200)) // a long translation stays on the screen
+    }
+
+    @Test fun theThreeColumnsFitA960DpScreen() {
+        // Subtitles as narrow as Audio before More, wide under More; Appearance moves with them.
+        val before = 2 * languageColumnDp(false, false) + appearanceColumnDp(90, 110)
+        val after = 2 * languageColumnDp(true, true) + appearanceColumnDp(90, 110)
+        assertEquals(620, before)
+        assertEquals(780, after)
+        assertTrue(after + 2 * 8 + 48 <= 960) // the panel's own padding and the screen margin
+    }
+
+    @Test fun theSampleSitsAt280OfAHeightOf1080ClearOfTheMenu() {
+        assertEquals(280, sampleBottomPx(1080, 452, 24)) // a short menu: the fixed place
+        assertEquals(140, sampleBottomPx(540, 226, 12)) // other heights keep the share
+        assertEquals(276, sampleBottomPx(1080, 300, 24)) // a taller menu pushes it up
+        assertEquals(76, sampleBottomPx(1080, 100, 24))
+        assertEquals(0, sampleBottomPx(1080, 10, 24)) // never below the top
     }
 
     @Test fun trackNumberIsThePlaceNotTheFileId() {

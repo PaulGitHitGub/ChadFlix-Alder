@@ -23,14 +23,14 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Updates in ChadFlix.** ChadFlix finds new versions. It asks you before it installs them. To find a new version yourself, select **Settings → About → Updates**.
 <!-- Spotlight -->
 - **Audio & Subtitles menu.** In the player, move to **Audio & Subtitles** and wait a short time. A menu opens with the columns **Audio** and **Subtitles**. Each column shows the track in use, the best English track and the best track in the original language of the title. Each language shows once. Select **More** to see all tracks, and the codec and channels of each audio track. Subtitles from add-ons join the list when they arrive.
-- **Appearance.** In the **Audio & Subtitles** menu, select **Appearance**. Change the size, the color and the background of the subtitles. A sample line shows each change at once.
+- **Appearance.** The **Audio & Subtitles** menu has a third column, **Appearance**, next to **Subtitles**. It has the rows **Size**, **Color** and **Background**. Move right from **Subtitles** to **Appearance**. Press **Left** or **Right** to change the value of a row. The change is at once. A sample line shows above the menu.
 <!-- Spotlight -->
 - **Info pop-up.** In the player, move to **Info**. A pop-up shows the logo, the year, the age rating, the length, the story, the ratings and the video and sound badges. The badges are only in this pop-up. The video continues to play. Move to another button to close the pop-up. **OK** on **Info** does nothing.
 
 ### Easier to use
 - **End time at the top left.** The player shows the end time at the top left, for example **Ends at 2:40 PM**. The clock and the name at the top left are gone. Trailers and live TV show no end time.
 - **Audio and subtitle names.** **Audio** and **Subtitles** show only the language, for example **Korean**. Names of add-ons and providers no longer show. Names that uploaders put on tracks no longer show. A commentary, an audio description, a forced track or an SDH track also shows that word. The word comes from the flags of the track or from a word in its name. Only the word shows. Codec and channels show under **More**, for example **Dolby TrueHD Atmos 7.1**. A track with no language shows **Track 2**. The number is the place of the track in its column. **Off** does not count.
-- **Audio column width.** The **Audio** column is narrow. It is wider under **More**, and when a row shows a word such as **Commentary**. A long name no longer pushes **Subtitles** off the screen.
+- **Column width.** The **Audio** and **Subtitles** columns are narrow. They are wider under **More**, and when a row shows a word such as **Commentary**. A long name no longer pushes **Appearance** off the screen.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No Sleep Timer.** The player no longer has a Sleep Timer.
 - **No subtitle timing.** The player no longer has controls to move subtitles earlier or later. If subtitles are out of time, select **More** and select a different subtitle.

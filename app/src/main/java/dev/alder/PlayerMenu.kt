@@ -118,8 +118,36 @@ internal fun trackRole(audio: Boolean, selectionFlags: Int, roleFlags: Int, labe
     else -> null
 }
 
-/** The width of the Audio column in dp: wide under More, and before More when a row shows a role word, so "English Commentary" is not cut. */
-internal fun audioColumnDp(expanded: Boolean, anyRole: Boolean): Int = if (expanded || anyRole) 250 else 170
+/** The width of the Audio or Subtitles column in dp: wide under More, and before More when a row shows a role word, so "English Commentary" is not cut. */
+internal fun languageColumnDp(expanded: Boolean, anyRole: Boolean): Int = if (expanded || anyRole) 250 else 170
+
+/** Alder's own choices for the subtitle look, in the order the Appearance column steps through them. */
+internal val SUBTITLE_SIZES = listOf(80, 100, 130, 160) // percent of Media3's default size: Small, Medium, Large, Extra Large
+internal val SUBTITLE_COLORS = listOf("white", "gray", "yellow", "cyan", "cream", "warm_white")
+internal val SUBTITLE_BACKGROUNDS = listOf(true, false) // On, Off
+
+/** The place of [current] in [choices]; a value that is no choice (an old setting) counts as the first. */
+internal fun <T> choiceIndex(choices: List<T>, current: T): Int = choices.indexOf(current).coerceAtLeast(0)
+
+/** One step along [count] choices from [index], wrapping at both ends: after the last comes the first, so both arrows always work. */
+internal fun steppedIndex(index: Int, delta: Int, count: Int): Int = if (count <= 0) 0 else Math.floorMod(index + delta, count)
+
+/** What a Left or Right press on an Appearance row steps by: +1 is the next choice. Right is next, except in a right-to-left layout, where the arrows mirror. */
+internal fun stepForKey(right: Boolean, rtl: Boolean): Int = if (right != rtl) 1 else -1
+
+/**
+ * The width of the Appearance column in dp: the label's indent, the widest label, a gap, the widest "‹ value ›" and the end margin.
+ * Never narrower than 240, so the three rows have room, and never wider than 340, so the three columns fit one screen.
+ */
+internal fun appearanceColumnDp(widestLabelDp: Int, widestValueDp: Int): Int =
+    (42 + widestLabelDp + 16 + widestValueDp + 22).coerceIn(240, 340)
+
+/**
+ * Where the sample subtitle's bottom edge sits, in px from the top: 280 of a 1080 px screen, but never lower than [gapPx] above the
+ * menu's top ([menuTopPx]), so a tall menu (many tracks) pushes it up and it never touches the menu.
+ */
+internal fun sampleBottomPx(screenPx: Int, menuTopPx: Int, gapPx: Int): Int =
+    minOf(screenPx * 280 / 1080, menuTopPx - gapPx).coerceAtLeast(0)
 
 /**
  * An audio track's codec and channels for under More: "Dolby TrueHD Atmos 7.1". Matroska reports Atmos as plain TrueHD or E-AC-3

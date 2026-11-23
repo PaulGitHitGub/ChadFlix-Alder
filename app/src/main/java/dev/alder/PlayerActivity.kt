@@ -503,7 +503,6 @@ class PlayerActivity : Screen() {
             visibility = View.GONE
         }
         if (!isTrailer) fetchSegments()
-        options = AppearanceLayer(this).apply { visibility = View.GONE }
         val (bArt, bShade) = buildBackdrop()
         backdropArt = bArt
         backdropShade = bShade
@@ -513,7 +512,6 @@ class PlayerActivity : Screen() {
             addView(backdropShade, FrameLayout.LayoutParams(-1, -1))
             addView(pausedShade, FrameLayout.LayoutParams(-1, -1))
             addView(controls, FrameLayout.LayoutParams(-1, -1))
-            addView(options, FrameLayout.LayoutParams(-1, -1))
             addView(loading, FrameLayout.LayoutParams(-1, -1))
             addView(stallPanel, FrameLayout.LayoutParams(-1, -1))
             addView(upNextPanel, FrameLayout.LayoutParams(-1, -1))
@@ -636,7 +634,7 @@ class PlayerActivity : Screen() {
                 buttonLabels[playPause]?.text = getString(if (playWhenReady) R.string.player_pause else R.string.action_play)
                 pausedShade.visibility = if (playWhenReady) View.GONE else View.VISIBLE
                 if (playWhenReady) { if (shown) showControls(null) }
-                else if (!panelUp() && options.visibility != View.VISIBLE && upNextPanel.visibility != View.VISIBLE &&
+                else if (!panelUp() && upNextPanel.visibility != View.VISIBLE &&
                     stallPanel.visibility != View.VISIBLE && stillPanel.visibility != View.VISIBLE) showControls(playPause)
             }
 
@@ -1404,7 +1402,6 @@ class PlayerActivity : Screen() {
         val next = nextVideo() ?: return
         if (offeringLower) dismissStall()
         if (shown) hideControls(force = true)
-        dropAppearance()
         hideLoading()
         upNextPanel.removeAllViews()
         val playNext = pill(R.string.player_next_episode, R.drawable.ic_play).apply { setOnClickListener { playNext() } }
@@ -1453,7 +1450,6 @@ class PlayerActivity : Screen() {
     private fun showStillWatching(next: Video) {
         if (offeringLower) dismissStall()
         if (shown) hideControls(force = true)
-        dropAppearance()
         upNextPanel.visibility = View.GONE
         hideLoading()
         stillPanel.removeAllViews()
@@ -1583,11 +1579,6 @@ class PlayerActivity : Screen() {
             KeyEvent.KEYCODE_MEDIA_PAUSE -> { if (down) player.pause(); return true }
             KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { if (down) { showControls(bar); scrub(SKIP) }; return true }
             KeyEvent.KEYCODE_MEDIA_REWIND -> { if (down) { showControls(bar); scrub(-SKIP) }; return true }
-        }
-        if (options.visibility == View.VISIBLE) { // Appearance
-            if (event.keyCode != KeyEvent.KEYCODE_BACK) return super.dispatchKeyEvent(event)
-            if (!down) closeAppearance()
-            return true
         }
         // The OK that woke the controls: its repeats and release would otherwise press the button it focused.
         // Skip intro: OK jumps past it while the pill shows over the picture (the controls down).
@@ -2253,14 +2244,13 @@ class PlayerActivity : Screen() {
         load(if (player.isCurrentMediaItemLive) 0L else position())
     }
 
-    // ---------- ChadFlix: the Audio & Subtitles menu, Appearance and the Info pop-up (after the player-menu and info-popup drafts) ----------
+    // ---------- ChadFlix: the Audio & Subtitles menu (with Appearance) and the Info pop-up (after the player-menu and info-popup drafts) ----------
     // Landing on Audio & Subtitles opens a menu above the buttons, over a 60% dim, after a short dwell so passing over
     // does not flash it. OK or Up goes into it, Left or Right leaves it, Back closes it. Landing on Info shows its pop-up
     // over the playing picture. Each is built when it opens and taken away when it closes: nothing exists or runs while
     // they are shut. An open one keeps the controls up.
     private lateinit var menuLayer: FrameLayout
     private lateinit var infoLayer: FrameLayout
-    private lateinit var options: FrameLayout // Appearance
     private var menuOpen = false
     private var infoOpen = false
     private var menuMoving = false // focus is moving into the menu on purpose, not leaving the button
@@ -2271,8 +2261,8 @@ class PlayerActivity : Screen() {
     private var originalLanguage: String? = null
     private var askedOriginal = false
     private var menuRows = 7
-    private var menuPill: TextView? = null
-    private var sample: SubtitleView? = null
+    private var menuPanel: View? = null
+    private var sample: SubtitleView? = null // the sample line above the menu, while an Appearance row has focus
     private val dwellMenu = Runnable { if (audioButton.isFocused && !menuOpen && shown && !paused) openMenu() }
     private val dwellInfo = Runnable { if (infoButton.isFocused && !infoOpen && shown && !paused) showInfo() }
 
@@ -2426,12 +2416,6 @@ class PlayerActivity : Screen() {
         menuMoving = false
     }
 
-    private fun focusPill() {
-        menuMoving = true
-        menuPill?.requestFocus()
-        menuMoving = false
-    }
-
     /** Down off the last row: focus goes back to the button, the menu stays. */
     private fun focusAudioButton() {
         suppressOpen = true
@@ -2466,38 +2450,20 @@ class PlayerActivity : Screen() {
         col.inner.layoutParams = (col.inner.layoutParams as FrameLayout.LayoutParams).apply { height = rows.size * dp(36) }
         col.list.layoutParams = (col.list.layoutParams as LinearLayout.LayoutParams).apply { height = minOf(rows.size, menuRows) * dp(36) }
         col.view.visibility = if (col.items.isEmpty()) View.GONE else View.VISIBLE
-        if (col.audio) col.view.layoutParams = col.view.layoutParams?.apply { width = dp(audioColumnDp(col.expanded, shown.any { it.role.isNotEmpty() })) }
+        col.view.layoutParams = col.view.layoutParams?.apply { width = dp(languageColumnDp(col.expanded, shown.any { it.role.isNotEmpty() })) }
         paintChecks(col)
         scrollTo(col, col.scroll)
     }
 
+    /** A column's title, at the text's own indent (past the check). */
+    private fun columnHeader(title: Int) = FrameLayout(this).apply {
+        addView(text(title, BODY, bold = true, color = 0xFFFFFFFF.toInt()),
+            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START).apply { marginStart = dp(42); topMargin = dp(4) })
+    }
+
     private fun columnView(col: MenuColumn): LinearLayout {
         col.view = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val header = FrameLayout(this)
-        header.addView(text(if (col.audio) R.string.tab_audio else R.string.tab_subtitles, BODY, bold = true, color = 0xFFFFFFFF.toInt()),
-            FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_VERTICAL or Gravity.START).apply { marginStart = dp(42); topMargin = dp(4) })
-        if (!col.audio) {
-            val pill = text(R.string.menu_appearance, BODY, color = 0xFFC4C4C8.toInt()).apply {
-                gravity = Gravity.CENTER
-                isFocusable = true
-                maxLines = 1
-                fun paint(has: Boolean) { background = if (has) rounded(0xFFFFFFFF.toInt(), 4) else null; setTextColor(if (has) 0xFF141414.toInt() else 0xFFC4C4C8.toInt()) }
-                setOnFocusChangeListener { _, has -> paint(has) }
-                setOnClickListener { openAppearance() }
-                setOnKeyListener { _, code, ev ->
-                    val towardsAudio = if (isRtl()) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-                    val handled = code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN ||
-                        code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
-                    if (handled && ev.action == KeyEvent.ACTION_DOWN) when (code) {
-                        KeyEvent.KEYCODE_DPAD_DOWN -> focusRow(subsColumn, checkedIndex(subsColumn))
-                        towardsAudio -> if (audioColumn.rows.isNotEmpty()) focusRow(audioColumn, checkedIndex(audioColumn))
-                    }
-                    handled
-                }
-            }
-            menuPill = pill
-            header.addView(pill, FrameLayout.LayoutParams(dp(110), dp(32), Gravity.TOP or Gravity.END).apply { topMargin = dp(10); marginEnd = dp(10) })
-        }
+        val header = columnHeader(if (col.audio) R.string.tab_audio else R.string.tab_subtitles)
         col.view.addView(header, LinearLayout.LayoutParams(-1, dp(50)))
         col.list = FrameLayout(this)
         col.inner = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -2521,8 +2487,11 @@ class PlayerActivity : Screen() {
         menuLayer.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
         menuRows = ((resources.displayMetrics.heightPixels - dp(150) - dp(120)) / dp(36)).coerceIn(3, 7)
         val panel = LinearLayout(this).apply { setPaddingRelative(dp(8), dp(2), dp(8), dp(8)) }
-        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(audioColumnDp(false, false)), -2))
-        panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(240), -2))
+        panel.addView(columnView(audioColumn), LinearLayout.LayoutParams(dp(languageColumnDp(false, false)), -2))
+        panel.addView(columnView(subsColumn), LinearLayout.LayoutParams(dp(languageColumnDp(false, false)), -2))
+        panel.addView(appearanceColumn(), LinearLayout.LayoutParams(dp(appearanceWidth()), -2))
+        menuPanel = panel
+        sample = null
         menuLayer.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
             marginStart = dp(PAD); bottomMargin = dp(150)
         })
@@ -2582,9 +2551,9 @@ class PlayerActivity : Screen() {
         if (ev.action != KeyEvent.ACTION_DOWN) return true
         val index = col.rows.indexOf(row)
         when (code) {
-            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusRow(col, index - 1) else if (!col.audio) focusPill()
+            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusRow(col, index - 1)
             KeyEvent.KEYCODE_DPAD_DOWN -> if (index < col.rows.lastIndex) focusRow(col, index + 1) else focusAudioButton()
-            towardsSubs -> if (col.audio && subsColumn.rows.isNotEmpty()) focusRow(subsColumn, checkedIndex(subsColumn))
+            towardsSubs -> if (col.audio) { if (subsColumn.rows.isNotEmpty()) focusRow(subsColumn, checkedIndex(subsColumn)) } else focusAppearance(0)
             else -> if (!col.audio && audioColumn.rows.isNotEmpty()) focusRow(audioColumn, checkedIndex(audioColumn))
         }
         return true
@@ -2616,8 +2585,12 @@ class PlayerActivity : Screen() {
         focusRow(col, checkedIndex(col))
     }
 
-    /** Back in the menu: a column that is showing More folds first; then the menu closes. */
+    /** Back in the menu: Appearance gives focus back to Subtitles; a column that is showing More folds; then the menu closes. */
     private fun backInMenu() {
+        if (appearanceRows.any { it.view.isFocused }) { // Back from Appearance: on to the subtitle in use
+            focusRow(subsColumn, checkedIndex(subsColumn))
+            return
+        }
         val col = listOf(audioColumn, subsColumn).firstOrNull { c -> c.rows.any { it.view.isFocused } }
         if (col != null && col.expanded) {
             col.expanded = false
@@ -2636,6 +2609,7 @@ class PlayerActivity : Screen() {
         if (!menuOpen) return
         menuOpen = false
         main.removeCallbacks(dwellMenu)
+        hideSample()
         if (focusButton) focusAudioButton()
         dimmed.forEach { it.animate().alpha(1f).setDuration(FOCUS_MS) }
         if (!infoOpen) pauseInfo.visibility = View.VISIBLE
@@ -2646,44 +2620,13 @@ class PlayerActivity : Screen() {
     }
 
     // ----- Appearance -----
+    // The third column: Size, Color and Background, each "‹ value ›". Left and Right (or OK) step the value, wrapping, and it
+    // applies at once, to the real subtitles too. While a row has focus the sample line shows above the menu.
 
-    private enum class Look { SIZE, BACKGROUND, COLOR }
-    private class Tile(val view: TextView, val look: Look, val value: Any, val row: Int, val face: TileFace, val name: String)
-
-    /** A tile: its fill, a ring when it is the one in use, a brighter one with focus, and a tick on the one in use. */
-    private class TileFace(private val d: Float) : android.graphics.drawable.Drawable() {
-        var selected = false
-        var focused = false
-        private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xE62B2B2B.toInt() }
-        private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-        private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF5F5F5.toInt() }
-        private val tick = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF1E1E1E.toInt(); style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND; strokeWidth = 1.7f * d
-        }
-        override fun draw(canvas: Canvas) {
-            val box = android.graphics.RectF(bounds)
-            canvas.drawRoundRect(box, 6 * d, 6 * d, fill)
-            ring.strokeWidth = (if (focused) 2f else if (selected) 1.5f else 1f) * d
-            ring.color = if (focused) 0xFFF5F5F5.toInt() else if (selected) 0x9EF5F5F5.toInt() else 0xEB5B5B5B.toInt()
-            val half = ring.strokeWidth / 2
-            canvas.drawRoundRect(box.apply { inset(half, half) }, 6 * d, 6 * d, ring)
-            if (selected) {
-                val cx = bounds.right - 7.5f * d
-                val cy = bounds.top + 2.5f * d
-                canvas.drawCircle(cx, cy, 8.5f * d, dot)
-                val path = android.graphics.Path().apply {
-                    moveTo(cx - 3.2f * d, cy + 0.2f * d); lineTo(cx - 0.9f * d, cy + 2.5f * d); lineTo(cx + 3.4f * d, cy - 2.6f * d)
-                }
-                canvas.drawPath(path, tick)
-            }
-        }
-        override fun setAlpha(alpha: Int) {}
-        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {}
-        @Deprecated("Drawable API") override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
-    }
-
-    private val tiles = mutableListOf<Tile>()
-    private val looks = mutableMapOf<Look, TextView>() // each group's value, after its name
+    private enum class Look { SIZE, COLOR, BACKGROUND }
+    private class AppearanceRow(val look: Look, val view: LinearLayout, val label: TextView, val value: TextView,
+                                val before: ImageView, val after: ImageView, val dot: View?, val names: List<String>)
+    private val appearanceRows = mutableListOf<AppearanceRow>()
 
     private fun subtitleStyle() = CaptionStyleCompat(Settings.subtitleColor(this),
         if (Settings.subtitleBackground(this)) 0xB3000000.toInt() else Color.TRANSPARENT, Color.TRANSPARENT,
@@ -2700,158 +2643,164 @@ class PlayerActivity : Screen() {
         sample?.setFractionalTextSize(fraction)
     }
 
-    private fun current(look: Look): Any = when (look) {
-        Look.SIZE -> Settings.subtitleSize(this)
-        Look.BACKGROUND -> Settings.subtitleBackground(this)
-        Look.COLOR -> Settings.subtitleColorName(this)
+    private fun lookNames(look: Look) = when (look) {
+        Look.SIZE -> listOf(R.string.size_small, R.string.size_medium, R.string.size_large, R.string.size_extra_large)
+        Look.COLOR -> listOf(R.string.color_white, R.string.color_gray, R.string.color_yellow, R.string.color_cyan, R.string.color_cream, R.string.color_warm_white)
+        Look.BACKGROUND -> listOf(R.string.state_on, R.string.state_off)
+    }.map { getString(it) }
+
+    private fun lookIndex(look: Look) = when (look) {
+        Look.SIZE -> choiceIndex(SUBTITLE_SIZES, Settings.subtitleSize(this))
+        Look.COLOR -> choiceIndex(SUBTITLE_COLORS, Settings.subtitleColorName(this))
+        Look.BACKGROUND -> choiceIndex(SUBTITLE_BACKGROUNDS, Settings.subtitleBackground(this))
     }
 
-    private fun applyLook(tile: Tile) {
-        when (tile.look) {
-            Look.SIZE -> { Settings.setSubtitleSize(this, tile.value as Int); applySubtitleSize() }
-            Look.BACKGROUND -> { Settings.setSubtitleBackground(this, tile.value as Boolean); applySubtitleStyle() }
-            Look.COLOR -> { Settings.setSubtitleColor(this, tile.value as String); applySubtitleStyle() }
-        }
-        paintTiles()
-    }
-
-    /** Each tile's ring and tick, and each group's label: the focused tile's name, else the one in use. */
-    private fun paintTiles() {
-        val focused = tiles.firstOrNull { it.view.isFocused }
-        tiles.forEach { it.face.selected = current(it.look) == it.value; it.face.invalidateSelf() }
-        looks.forEach { (look, label) ->
-            val tile = focused?.takeIf { it.look == look } ?: tiles.firstOrNull { it.look == look && current(look) == it.value }
-            label.text = tile?.name.orEmpty()
+    /** Alder's own setters, as the old Appearance screen called them. */
+    private fun applyLook(look: Look, index: Int) {
+        when (look) {
+            Look.SIZE -> { Settings.setSubtitleSize(this, SUBTITLE_SIZES[index]); applySubtitleSize() }
+            Look.COLOR -> { Settings.setSubtitleColor(this, SUBTITLE_COLORS[index]); applySubtitleStyle() }
+            Look.BACKGROUND -> { Settings.setSubtitleBackground(this, SUBTITLE_BACKGROUNDS[index]); applySubtitleStyle() }
         }
     }
 
-    private fun tileKey(tile: Tile, code: Int, ev: KeyEvent): Boolean {
-        val dpad = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT ||
-            code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN
-        if (!dpad) return false
+    private fun stepLook(row: AppearanceRow, delta: Int) {
+        applyLook(row.look, steppedIndex(lookIndex(row.look), delta, row.names.size))
+        paintAppearance(row)
+        placeSample()
+    }
+
+    private fun paintAppearance(row: AppearanceRow) {
+        row.value.text = row.names[lookIndex(row.look)]
+        row.dot?.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(subtitleColorValue(Settings.subtitleColorName(this@PlayerActivity)))
+            setStroke(dp(1), 0x59FFFFFF)
+        }
+    }
+
+    private fun appearanceStyle(row: AppearanceRow, focused: Boolean) {
+        row.view.background = if (focused) rounded(0xFFFFFFFF.toInt(), 4) else null
+        val ink = if (focused) 0xFF141414.toInt() else 0xFFC4C4C8.toInt()
+        row.label.setTextColor(ink)
+        row.value.setTextColor(ink)
+        row.value.alpha = if (focused) 0.85f else 0.78f
+        listOf(row.before, row.after).forEach { it.setColorFilter(ink); it.alpha = if (focused) 1f else 0.4f }
+    }
+
+    private fun appearanceRow(look: Look, label: Int): AppearanceRow {
+        val names = lookNames(look)
+        fun chevron() = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_end) }
+        val before = chevron().apply { rotation = 180f } // points to the previous choice: left, or right in a right-to-left layout
+        val after = chevron()
+        val value = text("", SMALL).apply {
+            gravity = Gravity.CENTER; maxLines = 1
+            minWidth = names.maxOf { paint.measureText(it) }.toInt() + dp(2)
+        }
+        val dot = if (look == Look.COLOR) View(this) else null
+        val name = text(label, BODY).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
+        val view = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            isFocusable = true
+            setPaddingRelative(dp(32), 0, dp(12), 0) // the label starts where the other columns' names do
+            addView(name, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(before, LinearLayout.LayoutParams(dp(APPEARANCE_CHEVRON), dp(APPEARANCE_CHEVRON)).apply { marginEnd = dp(2) })
+            dot?.let { addView(it, LinearLayout.LayoutParams(dp(APPEARANCE_DOT), dp(APPEARANCE_DOT)).apply { marginEnd = dp(6) }) }
+            addView(value, wrap())
+            addView(after, LinearLayout.LayoutParams(dp(APPEARANCE_CHEVRON), dp(APPEARANCE_CHEVRON)).apply { marginStart = dp(2) })
+        }
+        val row = AppearanceRow(look, view, name, value, before, after, dot, names)
+        appearanceStyle(row, false)
+        paintAppearance(row)
+        view.setOnFocusChangeListener { _, has ->
+            appearanceStyle(row, has)
+            if (has) showSample() else view.post { if (appearanceRows.none { it.view.isFocused }) hideSample() }
+        }
+        view.setOnClickListener { stepLook(row, 1) }
+        view.setOnKeyListener { _, code, ev -> appearanceKey(row, code, ev) }
+        return row
+    }
+
+    /** The widest label and the widest "‹ value ›" of the three rows, in dp, from the real strings of this language. */
+    private fun appearanceWidth(): Int {
+        val d = resources.displayMetrics.density
+        val probe = text("", BODY)
+        val small = text("", SMALL)
+        val labels = listOf(R.string.subtitle_size, R.string.color, R.string.appearance_background)
+        val widestLabel = labels.maxOf { probe.paint.measureText(getString(it)) } / d
+        val widestValue = Look.values().maxOf { look ->
+            lookNames(look).maxOf { small.paint.measureText(it) } / d + 2 * (APPEARANCE_CHEVRON + 2) + (if (look == Look.COLOR) APPEARANCE_DOT + 6 else 0) + 2
+        }
+        return appearanceColumnDp(Math.ceil(widestLabel.toDouble()).toInt(), Math.ceil(widestValue.toDouble()).toInt())
+    }
+
+    private fun appearanceColumn(): LinearLayout {
+        appearanceRows.clear()
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        column.addView(columnHeader(R.string.menu_appearance), LinearLayout.LayoutParams(-1, dp(50)))
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        listOf(Look.SIZE to R.string.subtitle_size, Look.COLOR to R.string.color, Look.BACKGROUND to R.string.appearance_background).forEach { (look, label) ->
+            val row = appearanceRow(look, label)
+            appearanceRows += row
+            list.addView(row.view, LinearLayout.LayoutParams(-1, dp(32)).apply { setMargins(dp(10), dp(2), dp(10), dp(2)) })
+        }
+        column.addView(list, LinearLayout.LayoutParams(-1, appearanceRows.size * dp(36)))
+        return column
+    }
+
+    private fun focusAppearance(index: Int) {
+        val row = appearanceRows.getOrNull(index) ?: return
+        menuMoving = true
+        row.view.requestFocus()
+        menuMoving = false
+    }
+
+    /** Up and Down move between the rows, Left and Right (and OK) step the value; Left never leaves the column. */
+    private fun appearanceKey(row: AppearanceRow, code: Int, ev: KeyEvent): Boolean {
+        if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN &&
+            code != KeyEvent.KEYCODE_DPAD_LEFT && code != KeyEvent.KEYCODE_DPAD_RIGHT) return false
         if (ev.action != KeyEvent.ACTION_DOWN) return true
-        val row = tiles.filter { it.row == tile.row }
-        if (code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT) {
-            val step = (if (code == KeyEvent.KEYCODE_DPAD_RIGHT) 1 else -1) * (if (isRtl()) -1 else 1)
-            row[(row.indexOf(tile) + step + row.size) % row.size].view.requestFocus()
-        } else {
-            val other = tiles.filter { it.row == tile.row + (if (code == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1) }
-            fun centre(v: View) = IntArray(2).also { v.getLocationOnScreen(it) }.let { it[0] + v.width / 2 }
-            val mine = centre(tile.view)
-            other.minByOrNull { abs(centre(it.view) - mine) }?.view?.requestFocus()
+        val index = appearanceRows.indexOf(row)
+        when (code) {
+            KeyEvent.KEYCODE_DPAD_UP -> if (index > 0) focusAppearance(index - 1)
+            KeyEvent.KEYCODE_DPAD_DOWN -> if (index < appearanceRows.lastIndex) focusAppearance(index + 1) else focusAudioButton()
+            else -> stepLook(row, stepForKey(code == KeyEvent.KEYCODE_DPAD_RIGHT, isRtl()))
         }
         return true
     }
 
-    private fun openAppearance() {
-        closeMenu(restartHide = false)
-        hideControls(force = true)
-        controls.visibility = View.GONE
-        options.removeAllViews()
-        tiles.clear(); looks.clear()
-        // The same dim as the menu's (black at 0.6); the sample line above the tiles is drawn as Alder draws subtitles.
-        options.addView(View(this).apply { setBackgroundColor(0x99000000.toInt()) }, FrameLayout.LayoutParams(-1, -1))
-        val sampleView = SubtitleView(this).also { sample = it }
-        options.addView(sampleView, FrameLayout.LayoutParams(-1, -1))
-
-        val d = resources.displayMetrics.density
-        val sizes = listOf(80 to R.string.size_small, 100 to R.string.size_medium, 130 to R.string.size_large, 160 to R.string.size_extra_large)
-        val colors = listOf("white" to R.string.color_white, "gray" to R.string.color_gray, "yellow" to R.string.color_yellow,
-            "cyan" to R.string.color_cyan, "cream" to R.string.color_cream, "warm_white" to R.string.color_warm_white)
-
-        fun group(look: Look, title: Int, row: Int, count: Int, tileOf: (Int) -> Triple<Any, String, TextView>, wide: Int = 66): LinearLayout {
-            val label = LinearLayout(this)
-            label.addView(text(getString(title) + ":", BODY + 2f, bold = true, color = 0xFFF5F5F5.toInt()), wrap())
-            val value = text("", BODY + 2f, color = 0xB8F5F5F5.toInt())
-            looks[look] = value
-            label.addView(value, wrap().apply { marginStart = dp(5) })
-            val tilesRow = LinearLayout(this).apply { clipChildren = false }
-            repeat(count) { i ->
-                val (v, name, view) = tileOf(i)
-                val face = TileFace(d)
-                view.apply {
-                    gravity = Gravity.CENTER
-                    isFocusable = true
-                    background = face
-                    maxLines = 1
-                }
-                val tile = Tile(view, look, v, row, face, name)
-                tiles += tile
-                view.setOnClickListener { applyLook(tile) }
-                view.setOnKeyListener { _, code, ev -> tileKey(tile, code, ev) }
-                view.setOnFocusChangeListener { _, has -> face.focused = has; face.invalidateSelf(); paintTiles() }
-                tilesRow.addView(view, LinearLayout.LayoutParams(dp(wide), dp(48)).apply { if (i < count - 1) marginEnd = dp(10) })
-            }
-            return column(Gravity.START).apply {
-                addView(label, wrap().apply { bottomMargin = dp(6) })
-                addView(tilesRow, wrap())
-            }
+    /** The sample line, drawn as Alder draws subtitles, centred above the menu. The real subtitles hide while it shows, as they did on the old screen. */
+    private fun showSample() {
+        val line = sample ?: SubtitleView(this).also {
+            sample = it
+            it.setCues(listOf(androidx.media3.common.text.Cue.Builder().setText(getString(R.string.appearance_sample)).build()))
+            menuLayer.addView(it, 1, FrameLayout.LayoutParams(-1, -1)) // above the dim, under the menu
         }
-        fun aa(sp: Float, color: Int = 0xFFFFFFFF.toInt()) = text(SAMPLE_LETTERS, sp, color = color)
-        // Kodi's layout, as the owner placed it: Size centred on top; Color where Kodi has Size, Background where it has Style.
-        val row1 = LinearLayout(this).apply { clipChildren = false }
-        row1.addView(group(Look.SIZE, R.string.subtitle_size, 0, sizes.size, { i ->
-            Triple(sizes[i].first, getString(sizes[i].second), aa(19f * sizes[i].first / 100))
-        }))
-        val row2 = LinearLayout(this).apply { clipChildren = false }
-        row2.addView(group(Look.COLOR, R.string.color, 1, colors.size, { i ->
-            Triple(colors[i].first, getString(colors[i].second), aa(19f, subtitleColorValue(colors[i].first)))
-        }))
-        row2.addView(group(Look.BACKGROUND, R.string.appearance_background, 1, 2, { i ->
-            val on = i == 0
-            Triple(on, getString(if (on) R.string.state_on else R.string.state_off), aa(19f).apply {
-                if (on) text = android.text.SpannableString(SAMPLE_LETTERS).apply {
-                    setSpan(android.text.style.BackgroundColorSpan(0xB3000000.toInt()), 0, 2, 0)
-                }
-            })
-        }), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(44) })
-
-        val panel = column(Gravity.CENTER_HORIZONTAL).apply { setPaddingRelative(dp(24), dp(16), dp(24), dp(16)) }
-        panel.addView(row1, wrap())
-        panel.addView(row2, wrap().apply { topMargin = dp(14) })
-        options.addView(panel, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(38) })
-
-        sampleView.setCues(listOf(androidx.media3.common.text.Cue.Builder().setText(getString(R.string.appearance_sample)).build()))
         applySubtitleStyle(); applySubtitleSize()
-        // the sample line sits just above the glass
-        panel.post { sampleView.setBottomPaddingFraction((panel.height + dp(38) + dp(24)).toFloat() / maxOf(options.height, 1)) }
-        options.visibility = View.VISIBLE // the real subtitles hide with it
-        paintTiles()
-        tiles.firstOrNull { it.look == Look.SIZE && it.value == Settings.subtitleSize(this) }?.view?.requestFocus()
+        line.visibility = View.VISIBLE
+        view.subtitleView?.visibility = View.INVISIBLE
+        placeSample()
     }
 
-    /** Back from Appearance: the real subtitles return, and the menu is open again with Appearance focused. */
-    private fun closeAppearance() {
-        dropAppearance()
-        suppressOpen = true
-        showControls(audioButton)
-        suppressOpen = false
-        openMenu()
-        focusPill()
+    private fun placeSample() {
+        val line = sample ?: return
+        val screen = menuLayer.height
+        if (screen <= 0) return
+        val bottom = sampleBottomPx(screen, menuPanel?.top ?: screen, dp(24))
+        line.setBottomPaddingFraction((screen - bottom).toFloat() / screen)
     }
 
-    /** Appearance gone by any way out: the real subtitles come back with it (see [AppearanceLayer]). */
-    private fun dropAppearance() {
-        if (options.visibility != View.VISIBLE) return
-        options.visibility = View.GONE
-        options.removeAllViews()
+    /** Focus left Appearance or the menu closed: the sample goes and the real subtitles come back. */
+    private fun hideSample() {
+        sample?.let { menuLayer.removeView(it) }
         sample = null
-        tiles.clear(); looks.clear()
-    }
-
-    /** Appearance, and it hides the real subtitles for as long as it shows, so every way out gives them back. */
-    private inner class AppearanceLayer(context: Context) : FrameLayout(context) {
-        override fun setVisibility(visibility: Int) {
-            super.setVisibility(visibility)
-            if (this@PlayerActivity::view.isInitialized) view.subtitleView?.visibility = if (visibility == VISIBLE) INVISIBLE else VISIBLE
-        }
+        view.subtitleView?.visibility = View.VISIBLE
     }
 
     /** Whatever panel is open goes away (an error, up next or still watching takes the screen). */
     private fun closePanels() {
         closeMenu(restartHide = false)
         hideInfo(restartHide = false)
-        dropAppearance()
     }
 
     // ----- Info -----
@@ -3092,7 +3041,8 @@ class PlayerActivity : Screen() {
         const val START_WAIT = 12_000L // ms for a source to show a picture before the next is tried (4K DV from debrid took 6 s)
         const val ADDON_SUB = "addon-subtitle" // the id an addon subtitle file is attached under
         const val SUB_WAIT = 2_000L // ms the start waits for the addon's subtitles
-        const val SAMPLE_LETTERS = "Aa" // a type sample on a tile, not a word
+        const val APPEARANCE_CHEVRON = 16 // dp, the arrows beside an Appearance value
+        const val APPEARANCE_DOT = 11 // dp, the colour dot before the Color value
         const val DWELL = 180L // ms on Audio & Subtitles or Info before its panel opens, so passing over does not flash it
         const val RETRIES = 2
         const val RETRY_WAIT = 1_500L
