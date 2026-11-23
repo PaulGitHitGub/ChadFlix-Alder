@@ -2932,6 +2932,7 @@ class MainActivity : Screen() {
                 item.facts = facts(resolved.meta)
                 if (item.art == null) item.art = resolved.meta.background
                 if (count != item.newEpisodeCount) { item.newEpisodeCount = count; item.onFill.forEach { it() } }
+                redrawIfShowing(item)
             }
         }
     }
@@ -2952,6 +2953,11 @@ class MainActivity : Screen() {
     private fun settle(item: Item) {
         item.settled = true
         item.onFill.forEach { it() }
+        redrawIfShowing(item)
+    }
+
+    /** The hero or cinema showing [item] picks up its newest details. */
+    private fun redrawIfShowing(item: Item) {
         if (heroItem === item && mode == Mode.BROWSE) showHero(item)
         if (mode == Mode.CINEMA && cinema.getOrNull(cinemaAt) === item) showCinema(cinemaAt)
     }
