@@ -25,6 +25,8 @@
     <string name="whats_new">What\'s new</string>
     <string name="whats_new_no_notes">There are no notes for version %1$s.</string>
     <string name="whats_new_version">Version %1$s</string>
+    <string name="whats_new_preview">Release preview</string>
+    <string name="whats_new_example_player">Example external player</string>
     <string name="whats_new_group">New</string>
     <string name="whats_new_highlights_short">Highlights</string>
 

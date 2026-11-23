@@ -947,169 +947,291 @@ abstract class Screen : Activity() {
 
     /** Highlights come from CHANGELOG.md; the full release notes remain one remote action away. */
     protected fun whatsNew(version: String = Updates.mine(this), quiet: Boolean = false) {
-        val changes = runCatching { assets.open("CHANGELOG.md").bufferedReader().use { it.readText() } }.getOrNull()
-            ?.let { text ->
-                // A debug build previews the next release's notes.
-                val debug = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
-                (if (debug) changesFor(text, "Unreleased") else emptyList()).ifEmpty { changesFor(text, version) }
-                    .ifEmpty { changesFor(text, "Unreleased") }
-            }.orEmpty()
+        val changelog = runCatching { assets.open("CHANGELOG.md").bufferedReader().use { it.readText() } }.getOrDefault("")
+        val debug = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val preview = if (debug) changesFor(changelog, "Unreleased") else emptyList()
+        val changes = preview.ifEmpty { changesFor(changelog, version) }.ifEmpty { changesFor(changelog, "Unreleased") }
         if (changes.isEmpty()) {
             if (!quiet) choose(getString(R.string.whats_new), listOf(getString(R.string.action_ok)),
                 getString(R.string.whats_new_no_notes, version)) {}
             return
         }
+
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
-        // Ranked: the pictured highlights first, then every other entry under its changelog heading.
         val highlights = showcaseHighlights(changes)
-        val rest = changes.filter { it !in highlights }
         val highlightsName = getString(R.string.whats_new_highlights_short)
+        val metrics = resources.displayMetrics
 
-        // Full screen on the 960 × 540 dp grid: a 16:9 frame on the left shows the whole TV screenshot (never
-        // cropped), the ranked list runs down the right.
-        val root = FrameLayout(this).apply { setBackgroundColor(0xF20E0C0A.toInt()) }
-        val page = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(PAD), dp(27), dp(PAD), dp(27))
-            clipChildren = false
-            clipToPadding = false
+        fun panel(radius: Int, first: Int, last: Int, edge: Int) =
+            GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(first, last)).apply {
+                cornerRadius = dp(radius).toFloat()
+                setStroke(dp(1), edge)
+            }
+
+        val root = column(Gravity.START).apply {
+            setPadding(dp(44), dp(24), dp(44), dp(27))
         }
-        root.addView(page, FrameLayout.LayoutParams(-1, -1))
-
-        val left = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; clipChildren = false }
-        page.addView(left, LinearLayout.LayoutParams(dp(WHATS_NEW_FRAME_W), -1))
-        left.addView(LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(brand(WORDMARK))
-            addView(tag(getString(R.string.whats_new_version, version), TUNGSTEN).apply {
-                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) }
+            addView(View(context).apply { setBackgroundColor(0x50DFB886) }, LinearLayout.LayoutParams(dp(1), dp(25)).apply {
+                marginStart = dp(12)
+                marginEnd = dp(14)
             })
+            addView(text(R.string.whats_new, BODY, bold = true))
+            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+            val label = if (preview.isNotEmpty()) getString(R.string.whats_new_preview)
+                else getString(R.string.whats_new_version, version)
+            addView(text(label, SMALL, color = TUNGSTEN))
+        }
+        root.addView(header, LinearLayout.LayoutParams(-1, dp(34)))
+        root.addView(View(this).apply { setBackgroundColor(0x40DFB886) }, LinearLayout.LayoutParams(-1, dp(1)).apply {
+            topMargin = dp(4)
+            bottomMargin = dp(14)
         })
 
-        // The frame: a screenshot when the entry has one, else its headline set large on glass, same size either way.
-        val frame = FrameLayout(this).apply {
-            background = glass(TILE_RADIUS)
-            outlineProvider = object : android.view.ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: android.graphics.Outline) =
-                    outline.setRoundRect(0, 0, view.width, view.height, dp(TILE_RADIUS).toFloat())
+        val page = LinearLayout(this)
+        root.addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
+        val left = column(Gravity.START)
+        val detailScroll = android.widget.ScrollView(this).apply {
+            isFocusable = false
+            isVerticalScrollBarEnabled = false
+            addView(left, FrameLayout.LayoutParams(-1, -2))
+        }
+        page.addView(detailScroll, LinearLayout.LayoutParams(0, -1, 1.94f))
+
+        val titleView = text("", 34f, serif = true).apply { includeFontPadding = false }
+        val caption = text("", BODY, color = TEXT_2)
+        val summary = text("", 16f, color = TEXT_2).apply {
+            setPadding(dp(12), 0, 0, 0)
+            background = LayerDrawable(arrayOf(rounded(0xA9EAC68C.toInt(), 0))).apply {
+                setLayerGravity(0, Gravity.START or Gravity.FILL_VERTICAL)
+                setLayerWidth(0, dp(1))
             }
+        }
+        val pathView = text("", SMALL, color = TEXT_2).apply {
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = panel(7, 0xFF2C221B.toInt(), 0xFF271E18.toInt(), 0x48DFB886)
+        }
+
+        var hero = true
+        val picture = object : ImageView(this) {
+            override fun onMeasure(widthSpec: Int, heightSpec: Int) {
+                val width = MeasureSpec.getSize(widthSpec)
+                val art = drawable
+                val height = if (art == null || art.intrinsicWidth <= 0) 0
+                    else (width.toFloat() * art.intrinsicHeight / art.intrinsicWidth).toInt()
+                setMeasuredDimension(width, minOf(height, (metrics.heightPixels * if (hero) 0.59f else 0.30f).toInt()))
+            }
+        }.apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            background = rounded(0xFF120E0B.toInt(), 7)
             clipToOutline = true
         }
-        val cardText = text("", SERIF_HERO, serif = true).apply {
-            gravity = Gravity.CENTER
-            setPadding(dp(36), 0, dp(36), 0)
+        val frame = FrameLayout(this).apply {
+            background = panel(10, 0xFF31271F.toInt(), 0xFF241C16.toInt(), 0x7AD9B889)
+            setPadding(dp(3), dp(3), dp(3), dp(3))
+            addView(picture, FrameLayout.LayoutParams(-1, -2))
         }
-        val picture = android.widget.ImageView(this).apply { scaleType = android.widget.ImageView.ScaleType.FIT_XY }
-        frame.addView(cardText, FrameLayout.LayoutParams(-1, -1))
-        frame.addView(picture, FrameLayout.LayoutParams(-1, -1))
-        left.addView(frame, LinearLayout.LayoutParams(-1, dp(WHATS_NEW_FRAME_W * 9 / 16)).apply { topMargin = dp(16) })
+        val handoff = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(24), dp(20), dp(24))
+            background = panel(10, 0xFF342820.toInt(), 0xFF2C221C.toInt(), 0x60DFB886)
+        }
+        fun detail(view: View, top: Int, width: Int = -1) =
+            left.addView(view, LinearLayout.LayoutParams(width, -2).apply { topMargin = dp(top) })
+        detail(titleView, 0)
+        detail(summary, 12)
+        detail(frame, 12)
+        detail(handoff, 16)
+        detail(caption, 10)
+        detail(pathView, 16, -2)
 
-        val groupTag = caps("", TUNGSTEN)
-        val titleView = text("", SERIF_TITLE, serif = true).apply {
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
+        val right = column(Gravity.START).apply {
+            clipChildren = true
+            background = panel(10, 0xFF30251F.toInt(), 0xFF241C18.toInt(), 0x42DFB886)
+            setPadding(dp(11), dp(10), dp(11), dp(8))
         }
-        val descView = text("", BODY, color = TEXT_2).apply {
-            maxLines = 3
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        left.addView(groupTag, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
-        left.addView(titleView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
-        left.addView(descView, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-
-        val right = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        page.addView(right, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(32) })
+        page.addView(right, LinearLayout.LayoutParams(0, -1, 1f).apply { marginStart = dp(30) })
         val listScroll = android.widget.ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             isVerticalFadingEdgeEnabled = true
-            setFadingEdgeLength(dp(24))
+            setFadingEdgeLength(dp(12))
         }
-        val list = column(Gravity.START)
+        val list = column(Gravity.START).apply {
+            clipChildren = true
+            setPadding(0, 0, 0, dp(6))
+        }
         listScroll.addView(list, FrameLayout.LayoutParams(-1, -2))
         right.addView(listScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        right.addView(View(this).apply { setBackgroundColor(0x40DFB886) }, LinearLayout.LayoutParams(-1, dp(1)))
         val gotIt = pill(R.string.action_got_it).apply { setOnClickListener { dialog.dismiss() } }
+        val hints = LinearLayout(this).apply {
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            addView(keyHint("↑ ↓", getString(R.string.key_browse)))
+            addView(keyHint(getString(R.string.key_back), getString(R.string.key_exit)), LinearLayout.LayoutParams(-2, -2).apply {
+                marginStart = dp(8)
+            })
+        }
         right.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(gotIt)
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(keyHint("↑ ↓", getString(R.string.key_browse)))
-            addView(keyHint(getString(R.string.key_back), getString(R.string.key_exit)).apply {
-                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12) }
-            })
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
-
-        val pictures = HashMap<String, android.graphics.Bitmap?>()
-        fun pictureFor(path: String, sample: Int = 1) = pictures.getOrPut("$path@$sample") {
-            runCatching {
-                assets.open(path).use {
-                    android.graphics.BitmapFactory.decodeStream(it, null,
-                        android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
-                }
-            }.getOrNull()
+            addView(hints, LinearLayout.LayoutParams(0, -2, 1f))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(7) })
+        // Long translated hints may need the width beneath the button at Large text size.
+        right.addOnLayoutChangeListener { _, l, _, r, _, oldL, _, oldR, _ ->
+            if (r - l == oldR - oldL) return@addOnLayoutChangeListener
+            hints.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            gotIt.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+            val stacked = hints.measuredWidth + gotIt.measuredWidth > r - l - right.paddingStart - right.paddingEnd
+            val footer = hints.parent as LinearLayout
+            footer.orientation = if (stacked) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+            hints.layoutParams = if (stacked) LinearLayout.LayoutParams(-1, -2) else LinearLayout.LayoutParams(0, -2, 1f)
         }
 
-        fun show(change: Change, label: String) {
-            val title = change.title.ifEmpty { change.text }
-            groupTag.text = label.uppercase()
-            titleView.text = title
-            descView.text = changeLine(change.description.ifEmpty { change.text })
-            val bitmap = change.image?.let { pictureFor(it) }
+        val thumbnails = HashMap<String, Bitmap?>()
+        val heroCache = android.util.LruCache<String, Bitmap>(2)
+        fun decode(path: String, sample: Int): Bitmap? = runCatching {
+            assets.open(path).use {
+                android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply {
+                    inSampleSize = sample
+                })
+            }
+        }.getOrNull()
+
+        fun renderHandoff(example: PlayerExample?) {
+            handoff.visibility = if (example == null) View.GONE else View.VISIBLE
+            handoff.removeAllViews()
+            if (example == null) return
+            fun card() = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = dp(68)
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = panel(8, 0xFF211914.toInt(), 0xFF1C1511.toInt(), 0x42DFB886)
+            }
+            handoff.addView(card().apply { addView(brand(24f)) }, LinearLayout.LayoutParams(0, -2, 1f))
+            handoff.addView(text(if (handoff.layoutDirection == View.LAYOUT_DIRECTION_RTL) "←" else "→", 27f, color = TUNGSTEN).apply {
+                gravity = Gravity.CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(42), -2))
+            handoff.addView(card().apply {
+                addView(ImageView(context).apply {
+                    setImageBitmap(thumbnails.getOrPut(example.icon) { decode(example.icon, 2) })
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }, LinearLayout.LayoutParams(dp(38), dp(38)).apply { marginEnd = dp(10) })
+                addView(column(Gravity.START,
+                    text(example.name, 16f, bold = true),
+                    text(R.string.whats_new_example_player, 11f, color = TEXT_2),
+                ), LinearLayout.LayoutParams(0, -2, 1f))
+            }, LinearLayout.LayoutParams(0, -2, 1.15f))
+        }
+
+        val neutral = 0xFF34271F.toInt()
+        fun show(change: Change) {
+            val title = change.title
+            titleView.text = title.ifEmpty { change.text }
+            titleView.textSize = if (change.image != null) 34f else 40f
+            val artPath = change.image ?: change.detailImage
+            val bitmap = artPath?.let { path ->
+                heroCache.get(path) ?: decode(path, if (change.image != null && metrics.widthPixels <= 1280) 2 else 1)
+                    ?.also { heroCache.put(path, it) }
+            }
+            hero = change.image != null && bitmap != null
+            val accent = if (hero) {
+                change.image?.let { path -> thumbnails.getOrPut(path) { decode(path, 8) } }
+                    ?.let { samplePixels(it, 12, 8) }?.let(::filmGlow)
+            } else null
+            val ambient = accent?.let { color ->
+                Color.rgb((Color.red(color) + 112) / 4, (Color.green(color) + 82) / 4, (Color.blue(color) + 66) / 4)
+            } ?: neutral
+            root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(ambient, 0xFF140F0D.toInt()))
+            left.setPadding(0, dp(if (hero) 8 else if (bitmap != null || change.player != null) 32 else 56), 0, dp(4))
             picture.setImageBitmap(bitmap)
-            picture.visibility = if (bitmap != null) View.VISIBLE else View.GONE
-            cardText.text = title
+            picture.requestLayout()
+            frame.visibility = if (bitmap == null) View.GONE else View.VISIBLE
+            renderHandoff(change.player)
+            val copy = if (title.isEmpty()) "" else changeLine(change.summary)
+            summary.text = copy
+            caption.text = copy
+            summary.visibility = if (hero || copy.isEmpty()) View.GONE else View.VISIBLE
+            caption.visibility = if (hero && copy.isNotEmpty()) View.VISIBLE else View.GONE
+            val path = change.settingsPath
+            pathView.visibility = if (path == null) View.GONE else View.VISIBLE
+            if (path != null) {
+                val steps = path.split(" → ")
+                pathView.text = changeLine(steps.dropLast(1).joinToString("  ›  ", postfix = "  ›  ") + "**" + steps.last() + "**")
+            }
+            detailScroll.scrollTo(0, 0)
         }
 
         var first: View? = null
-        fun section(name: String) = list.addView(caps(name, TEXT_3).apply { setPadding(dp(10), dp(14), 0, dp(4)) })
-        fun row(change: Change, label: String, thumb: Boolean) {
+        var shown: View? = null
+        fun section(name: String) {
+            if (list.childCount > 0) list.addView(View(this).apply { setBackgroundColor(0x40DFB886) },
+                LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); marginStart = dp(6); marginEnd = dp(6) })
+            list.addView(text(name.uppercase(), 10f, bold = true, color = TEXT_2).apply {
+                letterSpacing = 0.09f
+                setPadding(dp(7), dp(8), dp(7), dp(4))
+            })
+        }
+
+        fun row(change: Change, highlighted: Boolean) {
+            val icon = change.player?.icon
+            val thumbnailPath = icon ?: change.image
+            val thumbnail = thumbnailPath?.takeIf { highlighted }?.let { path ->
+                thumbnails.getOrPut(path) { decode(path, if (icon != null) 2 else 8) }
+            }
             val row = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 isFocusable = true
-                setPadding(dp(10), dp(if (thumb) 5 else 7), dp(10), dp(if (thumb) 5 else 7))
+                minimumHeight = dp(if (highlighted) 35 else 27)
+                setPadding(dp(7), dp(4), dp(7), dp(4))
             }
-            change.image?.takeIf { thumb }?.let { pictureFor(it, 8) }?.let { image ->
-                row.addView(android.widget.ImageView(this).apply {
-                    setImageBitmap(image)
-                    scaleType = android.widget.ImageView.ScaleType.FIT_XY
-                    outlineProvider = object : android.view.ViewOutlineProvider() {
-                        override fun getOutline(view: View, outline: android.graphics.Outline) =
-                            outline.setRoundRect(0, 0, view.width, view.height, dp(4).toFloat())
-                    }
+            if (thumbnail != null) {
+                row.addView(ImageView(this).apply {
+                    setImageBitmap(thumbnail)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    background = rounded(0xFF241B16.toInt(), 3)
                     clipToOutline = true
-                }, LinearLayout.LayoutParams(dp(64), dp(36)).apply { marginEnd = dp(12) })
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                }, LinearLayout.LayoutParams(dp(41), dp(23)).apply { marginEnd = dp(8) })
             }
-            val name = text(change.title.ifEmpty { change.text }, BODY, color = TEXT_2).apply {
-                maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-            }
+            val name = text(change.title.ifEmpty { change.text }, 13f, color = TEXT_2)
             row.addView(name, LinearLayout.LayoutParams(0, -2, 1f))
-            row.rowFocus(8) { has ->
-                name.setTextColor(if (has) TEXT else TEXT_2)
-                if (has) show(change, label)
+            val selected = panel(6, 0xFF48372A.toInt(), 0xFF423228.toInt(), 0xCFF3D9B1.toInt())
+            fun activate() {
+                if (shown != row) {
+                    shown?.background = null
+                    shown = row
+                    row.background = selected
+                    show(change)
+                }
             }
-            row.setOnClickListener { show(change, label) }
-            list.addView(row, LinearLayout.LayoutParams(-1, -2))
+            row.setOnFocusChangeListener { _, focused ->
+                name.setTextColor(if (focused) TEXT else TEXT_2)
+                if (focused) activate()
+            }
+            row.setOnClickListener { activate() }
+            list.addView(row, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(2) })
             if (first == null) first = row
         }
 
-        if (highlights.size < changes.size) section(highlightsName)
-        highlights.forEachIndexed { i, change -> row(change, "$highlightsName  ·  ${i + 1} / ${highlights.size}", thumb = true) }
+        section(highlightsName)
+        highlights.forEach { change -> row(change, true) }
         var group: String? = null
-        rest.forEach { change ->
+        changes.filter { it !in highlights }.forEach { change ->
             val name = change.group ?: getString(R.string.whats_new_group)
             if (name != group) { group = name; section(name) }
-            row(change, name, thumb = false)
+            row(change, false)
         }
-        val opening = highlights.firstOrNull() ?: changes.first()
-        show(opening, if (highlights.isNotEmpty()) "$highlightsName  ·  1 / ${highlights.size}"
-            else opening.group ?: getString(R.string.whats_new_group))
 
         dialog.setContentView(root)
+        dialog.show()
         dialog.window?.apply {
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
             setLayout(-1, -1)
         }
-        dialog.show()
         first?.requestFocus()
     }
 
@@ -1146,7 +1268,6 @@ abstract class Screen : Activity() {
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
         const val ICON_BUTTON_H = 38
-        const val WHATS_NEW_FRAME_W = 560 // dp: a 16:9 TV screenshot at its 1120 px width
         const val CHIP_H = 24 // the mocks' 46–48 px chips
         const val CARD_GROW = 1.06f
         const val GRID_GROW = 1.05f
@@ -1219,14 +1340,29 @@ abstract class Screen : Activity() {
 }
 
 /** One changelog entry and the "### " heading it sits under (New, Easier to use, Fixes), null above the first. */
-internal class Change(val group: String?, val text: String, val spotlight: Boolean = false, val image: String? = null) {
+internal class Change(
+    val group: String?,
+    val text: String,
+    val spotlight: Boolean = false,
+    val image: String? = null,
+    val detailImage: String? = null,
+    val player: PlayerExample? = null,
+) {
     /** The bold lead-in title from **Title.**, without markdown marks or trailing period. */
     val title: String get() = Regex("""\*\*(.+?)\*\*""").find(text)?.groupValues?.get(1)?.trimEnd('.').orEmpty()
 
     /** The description after the bold lead-in title, keeping markdown marks for changeLine(). */
     val description: String get() = text.replaceFirst(Regex("""^\s*-\s*"""), "")
         .replaceFirst(Regex("""^\s*\*\*(.+?)\*\*\.?\s*"""), "").trim()
+
+    private val path get() = changeSettingsPath.find(description)
+    val settingsPath: String? get() = path?.groupValues?.get(1)
+    val summary: String get() = path?.let { description.substring(0, it.range.first).trimEnd() } ?: description
 }
+
+internal data class PlayerExample(val name: String, val icon: String)
+
+private val changeSettingsPath = Regex("""(?:^|(?<=\.)\s+)\*\*((?:Settings|Audio & subtitles) → [^*]+)\*\*\.?$""")
 
 /** Spotlight markers set the short first view. Older changelogs fall back to their first seven entries. */
 internal fun showcaseHighlights(changes: List<Change>): List<Change> =
@@ -1239,14 +1375,26 @@ internal fun changesFor(changelog: String, version: String): List<Change> {
     var group: String? = null
     var spotlight = false
     var image: String? = null
+    var detailImage: String? = null
+    var player: PlayerExample? = null
     val marker = Regex("""^<!--\s*Spotlight\s*(?::\s*(\S+))?\s*-->$""")
+    val detailMarker = Regex("""^<!--\s*Detail:\s*(\S+)\s*-->$""")
+    val playerMarker = Regex("""^<!--\s*Player:\s*(.+?)\s+(\S+)\s*-->$""")
     return lines.drop(start + 1).takeWhile { !it.startsWith("## ") }.mapNotNull { line ->
         val spot = marker.find(line.trim())
+        val detail = detailMarker.find(line.trim())
+        val example = playerMarker.find(line.trim())
         when {
-            line.startsWith("### ") -> { group = line.removePrefix("### ").trim(); spotlight = false; image = null; null }
+            line.startsWith("### ") -> {
+                group = line.removePrefix("### ").trim()
+                spotlight = false; image = null; detailImage = null; player = null
+                null
+            }
             spot != null -> { spotlight = true; image = spot.groupValues[1].ifEmpty { null }; null }
-            line.startsWith("- ") -> Change(group, line.removePrefix("- ").trim(), spotlight, image)
-                .also { spotlight = false; image = null }
+            detail != null -> { detailImage = detail.groupValues[1]; null }
+            example != null -> { player = PlayerExample(example.groupValues[1], example.groupValues[2]); null }
+            line.startsWith("- ") -> Change(group, line.removePrefix("- ").trim(), spotlight, image, detailImage, player)
+                .also { spotlight = false; image = null; detailImage = null; player = null }
             else -> null
         }
     }
