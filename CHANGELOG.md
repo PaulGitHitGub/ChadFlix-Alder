@@ -16,7 +16,7 @@ Write each entry the way you would advertise it to a viewer on the sofa:
 Put changes that are not released under `## Unreleased`. Before each release, read all of `## Unreleased` again and rewrite
 each entry that does not follow these rules. Then rename that heading to the version number.
 
-## Unreleased
+## 1.4
 
 ### New
 
