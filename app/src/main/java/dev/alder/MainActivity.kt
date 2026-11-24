@@ -821,6 +821,7 @@ class MainActivity : Screen() {
         super.onResume()
         searching = false
         // Back from Search (or it never showed): the magnifier shows its own focus again.
+        endPill()
         if (searchFrom != null) { searchFrom = null; if (search != null) styleNav() }
         if (!::profile.isInitialized) return
         startFps()
@@ -873,6 +874,9 @@ class MainActivity : Screen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // ponytail: PillLag timing log (Left onto the magnifier → Search's first pill frame), remove once measured.
+        if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN && header.findFocus() != null)
+            android.util.Log.d("PillLag", "Home Left ${SystemClock.uptimeMillis()} (pressed ${event.downTime})")
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
             else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false); showInfo() } // where the hold ends
@@ -1030,6 +1034,7 @@ class MainActivity : Screen() {
         }
         updateDot = dot
         val avatarBox = FrameLayout(this).apply {
+            avatarSlot = this
             clipChildren = false
             clipToPadding = false
             addView(avatar, FrameLayout.LayoutParams(dp(30), dp(30)))
@@ -1059,6 +1064,7 @@ class MainActivity : Screen() {
             // remote came from (or the open page's) ([SearchPill]); meanwhile that one stays lit here, so it never jumps.
             setOnFocusChangeListener { _, has ->
                 searchFrom = if (has) navLeft.takeIf { SystemClock.uptimeMillis() - navLeftAt < 200 } ?: page else null
+                if (has && !searching) startPill() else if (!has && !searching) endPill()
                 styleNav()
                 main.removeCallbacks(openSearch)
                 if (has) main.post(openSearch)
@@ -1180,7 +1186,43 @@ class MainActivity : Screen() {
     private var jump = false // OK on a page's name: go down into its rows once they're in
     private val openSearch = Runnable {
         if (search?.isFocused == true && hasWindowFocus()) startSearch()
-        else if (searchFrom != null) { searchFrom = null; styleNav() } // it didn't open: the magnifier shows its focus
+        else if (searchFrom != null) { searchFrom = null; endPill(); styleNav() } // it didn't open: the magnifier shows its focus
+    }
+    private lateinit var avatarSlot: View
+    private var launchPill: SearchPill? = null // Search's pill, started here the moment the remote lands on the magnifier
+    private var pillStartedAt = 0L // uptime ms, handed to Search so its pill carries on from there
+
+    /**
+     * The magnifier has the remote: Search's opening move starts here at once, on this bar, while Search starts behind it
+     * (its own first frame carries on from the same moment, [PILL_START]). Only once Search's capsule has been seen
+     * ([savedCapsule]); before that, Search starts the move itself.
+     */
+    private fun startPill() {
+        pillStartedAt = 0L
+        val target = savedCapsule(this) ?: return
+        val from = pillFrom() ?: return
+        val slot = search ?: return
+        if (!animationsOn()) return
+        val pill = launchPill ?: SearchPill(this, header, null, null, null, slot, avatarSlot) { navItems.values.filter { it.isShown } }
+            .also { header.addView(it, 0, FrameLayout.LayoutParams(-1, -1)); launchPill = it }
+        pill.capsuleOnScreen = target
+        pill.arrive(from, null)
+        slot.imageAlpha = 0 // the pill draws the magnifier while it shrinks away
+        pillStartedAt = SystemClock.uptimeMillis()
+    }
+
+    /** Home again: its copy of the pill goes, the names and the magnifier draw themselves. */
+    private fun endPill() {
+        if (pillStartedAt == 0L && launchPill == null) return
+        launchPill?.reset()
+        pillStartedAt = 0L
+        search?.imageAlpha = 255
+    }
+
+    /** The lit page's name on screen (left, top, right, bottom px): where Search's pill starts. */
+    private fun pillFrom() = navItems[searchFrom]?.takeIf { it.isShown }?.let { v ->
+        val at = IntArray(2).also(v::getLocationOnScreen)
+        intArrayOf(at[0], at[1], at[0] + v.width, at[1] + v.height)
     }
     private var searching = false // Search is opening: OK or another landing before it shows starts nothing more
     private var searchFrom: Page? = null // the page whose pill Search opens from, kept lit here until it's open
@@ -1191,11 +1233,11 @@ class MainActivity : Screen() {
     private fun startSearch() {
         if (searching) return
         searching = true
-        val from = navItems[searchFrom]?.takeIf { it.isShown }?.let { v ->
-            val at = IntArray(2).also(v::getLocationOnScreen)
-            intArrayOf(at[0], at[1], at[0] + v.width, at[1] + v.height)
-        }
-        startActivity(Intent(this, SearchActivity::class.java).apply { from?.let { putExtra(HOME_PILL, it) } })
+        val from = pillFrom()
+        startActivity(Intent(this, SearchActivity::class.java).apply {
+            from?.let { putExtra(HOME_PILL, it) }
+            if (pillStartedAt > 0) putExtra(PILL_START, pillStartedAt)
+        })
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
     private val switchPage = Runnable { if (pending != page && navItems[pending]?.isFocused == true) { jump = false; showPage(pending) } }
@@ -1224,10 +1266,11 @@ class MainActivity : Screen() {
     private fun styleNav() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
+        val pill = pillStartedAt > 0 // Search's pill is moving on this bar ([startPill]): it draws the pill and colours the names
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
-            item.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
-            item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
+            item.background = if (pill) null else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
+            if (!pill) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
         }
         search?.let {

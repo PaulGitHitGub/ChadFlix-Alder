@@ -156,6 +156,7 @@ class SearchActivity : ExploreScreen() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("PillLag", "Search onCreate start ${SystemClock.uptimeMillis()}") // ponytail: remove once measured
         super.onCreate(savedInstanceState)
         val key = authKey ?: return finish()
         val width = resources.displayMetrics.widthPixels / resources.displayMetrics.density
@@ -192,7 +193,6 @@ class SearchActivity : ExploreScreen() {
         keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }
         attachCapsule()
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
-        showRecent()
         results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
         resultsScroll = object : ScrollView(this) {
             override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
@@ -261,7 +261,16 @@ class SearchActivity : ExploreScreen() {
         toggleKeys(false)
         // The remote starts on Voice, in the top bar where the Search tab was.
         (voice ?: keyboardButton).let { start -> start.post { start.requestFocus() } }
-        search(false)
+        // The first frame is only the top bar and its pill (the page is hidden under it): the catalogue and the recent
+        // searches start once it's drawn, so the pill moves as soon as the page opens.
+        root.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                root.viewTreeObserver.removeOnPreDrawListener(this)
+                root.post { if (!isDestroyed) { showRecent(); if (searched == null) search(false) } }
+                return true
+            }
+        })
+        Log.d("PillLag", "Search onCreate end ${SystemClock.uptimeMillis()}")
     }
 
     /**
@@ -328,9 +337,12 @@ class SearchActivity : ExploreScreen() {
             // pill where Home's was (or on the magnifier): it opens from there.
             if (!arrived && capsule.width > 0) {
                 arrived = true
-                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton })
+                // Home may have started the move on its own bar the moment the remote landed: carry on from there.
+                val startedAt = intent.getLongExtra(PILL_START, 0L)
+                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton }, startedAt)
+                val gone = if (startedAt > 0) (SystemClock.uptimeMillis() - startedAt).coerceAtLeast(0) else 0L
                 // The page (hidden since onCreate) comes in as the pill lands; the old one is gone at once.
-                pageViews.forEach { it.animate().alpha(1f).setStartDelay(PAGE_IN_AT).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
+                pageViews.forEach { it.animate().alpha(1f).setStartDelay((PAGE_IN_AT - gone).coerceAtLeast(0)).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
             }
         }
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }

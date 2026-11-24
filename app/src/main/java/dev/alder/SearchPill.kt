@@ -26,8 +26,17 @@ import android.widget.TextView
 /** Search's intent extra: Home's pill as Search opens (screen px: left, top, right, bottom), for the pill to open from. */
 internal const val HOME_PILL = "homePill"
 
+/** Search's intent extra: when Home started the pill (uptime ms), for Search to carry on from there, not start again. */
+internal const val PILL_START = "pillStart"
+
 /** Animators run (Remove animations off); before API 26 they always do, ending at once when the scale is 0. */
 internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
+
+/** Where Search's capsule last was (screen px: left, top, right, bottom), for Home to throw its pill there; null: never yet. */
+internal fun savedCapsule(c: Context): IntArray? = c.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE).getString("capsule", null)
+    ?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 4 }?.toIntArray()
+
+private const val PILL_PREFS = "searchPill"
 
 /**
  * The Search page's top-bar pill, the designer's variant 1 "Slingshot" (pill-anim-20261124/README.md): one view, behind
@@ -47,9 +56,9 @@ internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAni
 internal class SearchPill(
     context: Context,
     private val bar: View, // the top bar: focus in it but not on a name or the capsule (the avatar, the gear) dims the capsule
-    private val capsule: ViewGroup, // Voice and Keyboard, invisible, for focus and places
+    private val capsule: View?, // Voice and Keyboard, invisible, for focus and places; null on Home ([capsuleOnScreen])
     private val voice: ViewGroup?,
-    private val keyboard: ViewGroup,
+    private val keyboard: ViewGroup?,
     private val slot: View, // the magnifier tab's room
     private val avatar: View, // the pill never draws over it, even overshooting
     private val names: () -> List<TextView>, // the pages' names, coloured by whether the pill covers them
@@ -62,6 +71,9 @@ internal class SearchPill(
     private var animate = true
     private var started = false // nothing is drawn or moved before [arrive]
     var listening = false // Voice's mic goes red
+    /** Home: no capsule of its own; the pill opens towards where Search's was ([savedCapsule]), Search carrying on. */
+    var capsuleOnScreen: IntArray? = null
+    private var drawnOnce = false // ponytail: PillLag timing log, remove once measured
 
     // The state: the white pill, its squash; the black pill, its alpha, scale and squash; the magnifier; each item's
     // icon (alpha, scale) and words (alpha, sideways offset); and whether the capsule is lit (white) or faint.
@@ -99,12 +111,28 @@ internal class SearchPill(
     }
 
     private fun measure() {
-        rectOf(slot, slotR); rectOf(capsule, capR); rectOf(keyboard, keyR)
+        rectOf(slot, slotR)
+        keyboard?.let { rectOf(it, keyR) }
         voice?.let { rectOf(it, voiceR) }
+        val cap = capsule
+        if (cap != null) { rectOf(cap, capR); remember(cap) }
+        else capsuleOnScreen?.let { s ->
+            getLocationOnScreen(here)
+            capR.set(s[0] - here[0].toFloat(), s[1] - here[1].toFloat(), s[2] - here[0].toFloat(), s[3] - here[1].toFloat())
+        }
         floor = rectOf(avatar, box).right + dp(4f)
         nameViews = names()
         nameMids = FloatArray(nameViews.size) { rectOf(nameViews[it], box).centerX() }
-        (keyboard.getChildAt(1) as TextView).let { words.textSize = it.textSize; words.typeface = it.typeface }
+        ((keyboard ?: voice)?.getChildAt(1) as? TextView)?.let { words.textSize = it.textSize; words.typeface = it.typeface }
+    }
+
+    /** Search's capsule on screen, kept for Home's next start ([savedCapsule]) when it moved. */
+    private fun remember(cap: View) {
+        if (cap.width == 0) return
+        cap.getLocationOnScreen(there)
+        val now = "${there[0]},${there[1]},${there[0] + cap.width},${there[1] + cap.height}"
+        val prefs = context.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString("capsule", null) != now) prefs.edit().putString("capsule", now).apply()
     }
 
     private fun rectFor(v: View) = when (v) { voice -> voiceR; keyboard -> keyR; else -> rectOf(v) }
@@ -126,6 +154,7 @@ internal class SearchPill(
 
     override fun onDraw(canvas: Canvas) {
         if (!started) return
+        if (!drawnOnce) { drawnOnce = true; android.util.Log.d("PillLag", "${context.javaClass.simpleName} pill first draw ${android.os.SystemClock.uptimeMillis()}") }
         recolorNames()
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
@@ -167,7 +196,7 @@ internal class SearchPill(
 
     private fun items(canvas: Canvas, color: Int, mic: Ink, keys: Ink) {
         voice?.let { item(canvas, it, voiceR, mic.tint(if (listening) HomeStyle.LIST_RED else color), color, vIconA, vIconS, vWordsA, vWordsX) }
-        item(canvas, keyboard, keyR, keys.tint(color), color, kIconA, kIconS, kWordsA, kWordsX)
+        keyboard?.let { item(canvas, it, keyR, keys.tint(color), color, kIconA, kIconS, kWordsA, kWordsX) }
     }
 
     private fun item(canvas: Canvas, item: ViewGroup, r: RectF, icon: Drawable, color: Int,
@@ -233,6 +262,9 @@ internal class SearchPill(
     /** The page is going: nothing runs on after it. */
     fun stop() { running?.cancel(); running = null }
 
+    /** Home again: the pill it started is gone (Search took over, or never opened). */
+    fun reset() { stop(); started = false; drawnOnce = false; invalidate() }
+
     /** [p] from [from] to [to] after [delay] ms over [ms]; with animations off, or already there, it lands at once. */
     private fun tween(p: F, from: Float, to: Float, delay: Long, ms: Long, curve: TimeInterpolator) {
         if (!animate || from == to) return p.put(this, to)
@@ -255,9 +287,10 @@ internal class SearchPill(
     /**
      * The page opens, called as the bar is first laid out (before its first frame is drawn): the pill starts on Home's
      * ([fromOnScreen], the open or focused page's name there, in screen px) or on the magnifier, and opens into the
-     * capsule with the black pill on [focus].
+     * capsule with the black pill on [focus]. [startedAt] (uptime ms): when Home started the same move on its own bar,
+     * so this one carries on from there instead of starting again.
      */
-    fun arrive(fromOnScreen: IntArray?, focus: View?) {
+    fun arrive(fromOnScreen: IntArray?, focus: View?, startedAt: Long = 0L) {
         started = true
         measure()
         if (fromOnScreen != null && fromOnScreen.size == 4) {
@@ -271,6 +304,9 @@ internal class SearchPill(
         mode = Mode.NAME
         on = null
         open(focus ?: voice ?: keyboard)
+        if (startedAt > 0 && Build.VERSION.SDK_INT >= 26) running?.let {
+            it.currentPlayTime = (android.os.SystemClock.uptimeMillis() - startedAt).coerceIn(0L, it.totalDuration - 1)
+        }
     }
 
     /** The remote moved to [v]: the pill follows it. */
