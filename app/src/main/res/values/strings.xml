@@ -271,7 +271,7 @@
     <string name="player_no_other_app">No other video player is on this TV. ChadFlix plays the video.</string>
     <string name="clear_dialogue_setting_hint">Lifts voices above music and loud effects when using TV speakers.</string>
     <string name="dubbed">Dubbed releases</string>
-    <string name="dubbed_hint">Original first puts dubbed releases last. My language first uses Alder’s player to check the audio before automatic playback. You can still choose any source.</string>
+    <string name="dubbed_hint">Original first puts dubbed releases last. My language first uses ChadFlix’s player to check the audio before automatic playback. You can still choose any source.</string>
     <string name="dubbed_original">Original first</string>
     <string name="dubbed_mine">My language first</string>
     <string name="subs_default">Subtitles by default</string>
@@ -297,7 +297,7 @@
     <string name="audio_language">Audio language</string>
     <string name="audio_language_hint">The dub to start with when a file has several. Changeable while watching.</string>
     <string name="audio_fallback">Fallback audio language</string>
-    <string name="audio_fallback_hint">With My language first, Alder tries your chosen language, this fallback, then English. Select Off to use only your chosen language.</string>
+    <string name="audio_fallback_hint">With My language first, ChadFlix tries your chosen language, this fallback, then English. Select Off to use only your chosen language.</string>
     <string name="subtitle_language">Subtitle language</string>
     <string name="subtitle_language_hint">Which subtitles start with the video, and which come first in the list while watching.</string>
     <string name="my_addons">My add-ons</string>
