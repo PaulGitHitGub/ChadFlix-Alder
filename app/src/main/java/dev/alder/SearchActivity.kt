@@ -69,11 +69,11 @@ internal fun voiceErrorName(code: Int): String = when (code) {
 internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = answers.filterNotNull().flatten()
 
 /** ChadFlix search: Voice Search and the keyboard on the left, Alder's Movies and Shows rows of home posters on the right. */
-class SearchActivity : Screen() {
+class SearchActivity : ExploreScreen() {
     private lateinit var input: EditText // the header's words: the typed query, or "Popular Titles" while it's empty
     private lateinit var recentBox: LinearLayout
-    private lateinit var results: LinearLayout
-    private lateinit var resultsScroll: ScrollView
+    override lateinit var results: LinearLayout
+    override lateinit var resultsScroll: ScrollView
     private lateinit var keyboard: LinearLayout
     private lateinit var headerBar: View
     private lateinit var nav: LinearLayout
@@ -102,6 +102,38 @@ class SearchActivity : Screen() {
     private var userMovedFocus = false
     private val searchTasks = mutableListOf<Future<*>>()
     private val typed = Runnable { search(false) }
+
+    private lateinit var keyboardButton: View
+    private var lookupMode: String? = null
+    private var savedTitleQuery = ""
+
+    override fun refreshCatalogue() {
+        if (lookupMode == null) {
+            cancelVoice()
+            setHeader("")
+            main.removeCallbacks(typed)
+            search(false)
+        }
+    }
+
+    override fun lookup(facet: String?, restoreTitle: Boolean) {
+        cancelVoice()
+        if (lookupMode == null) savedTitleQuery = input.text.toString()
+        lookupMode = facet
+        setHeader(if (facet == null && restoreTitle) savedTitleQuery else "")
+        main.removeCallbacks(typed)
+        toggleKeys(facet != null)
+        search(false)
+    }
+
+    private fun toggleKeys(open: Boolean) {
+        keyboard.visibility = if (open) View.VISIBLE else View.GONE
+        recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
+        panelScroll.visibility = if (open) View.GONE else View.VISIBLE
+        voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else keyboardButton.id
+        lastKeyboardFocus = if (open) firstKey else keyboardButton
+        (if (open) firstKey else peopleButton)?.requestFocus()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,11 +174,23 @@ class SearchActivity : Screen() {
                 imageTintList = ColorStateList.valueOf(HomeStyle.WHITE)
             }, LinearLayout.LayoutParams(dp(12), dp(12)))
             addView(input, LinearLayout.LayoutParams(0, -2, 1f))
+            summary = text("",HomeStyle.INFO,color=HomeStyle.PLOT).apply {
+                isSingleLine=true; maxWidth=dp(270); ellipsize=TextUtils.TruncateAt.END
+            }
+            addView(summary)
         }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(QUERY_TOP) })
 
         keyboard = column(Gravity.START)
         buildKeyboard()
-        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(KEYS_W), dp(KEY_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(104) }) }
+        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(KEYS_W), dp(KEY_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(66) }) }
+        keyboardButton = pill(R.string.ex_keyboard).apply {
+            id = View.generateViewId()
+            setOnClickListener { toggleKeys(true) }
+        }
+        root.addView(keyboardButton,FrameLayout.LayoutParams(dp(KEYS_W),dp(29)).apply { leftMargin=dp(KEYS_X); topMargin=dp(100) })
+        root.addView(buildPanel(),FrameLayout.LayoutParams(dp(KEYS_W),dp((height-145).toInt())).apply {
+            leftMargin=dp(KEYS_X); topMargin=dp(135)
+        })
         root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(148) })
 
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
@@ -170,6 +214,14 @@ class SearchActivity : Screen() {
         setContentView(root)
         root.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
             userMovedFocus = true
+            if (lookupMode != null && results.hasFocus()) currentFocus?.let { focused ->
+                val area = Rect()
+                focused.getDrawingRect(area)
+                results.offsetDescendantRectToMyCoords(focused,area)
+                if (area.top < resultsScroll.scrollY) resultsScroll.scrollTo(0,area.top)
+                else if (area.bottom > resultsScroll.scrollY+resultsScroll.height)
+                    resultsScroll.scrollTo(0,area.bottom-resultsScroll.height)
+            }
             styleNav()
             lastKey?.let { key ->
                 if (!key.hasFocus()) updateKeyStyle(key, false)
@@ -194,6 +246,7 @@ class SearchActivity : Screen() {
                 }
                 updateClear()
                 if (quiet) return
+                invalidateCatalogue()
                 ++request
                 searchTasks.forEach { it.cancel(true) }
                 searchTasks.clear()
@@ -208,9 +261,10 @@ class SearchActivity : Screen() {
         }
         // Our keyboard only: the Android one never opens.
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        clear?.let { root.addView(it, FrameLayout.LayoutParams(dp(KEYS_W), dp(KEY_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(104 - KEY_H - 12) }) }
+        clear?.let { root.addView(it, FrameLayout.LayoutParams(dp(95), dp(KEY_H)).apply { topMargin = dp(QUERY_TOP); leftMargin = resources.displayMetrics.widthPixels - dp(122) }) }
         updateClear()
-        (voice ?: firstKey)?.let { it.post { it.requestFocus() } }
+        toggleKeys(false)
+        peopleButton.post { peopleButton.requestFocus() }
         search(false)
     }
 
@@ -292,7 +346,7 @@ class SearchActivity : Screen() {
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
             isFocusable = true
-            setOnClickListener { (lastKeyboardFocus ?: firstKey)?.requestFocus() }
+            setOnClickListener { peopleButton.requestFocus() }
         }
         nav.addView(searchTab, LinearLayout.LayoutParams(dp(44), -1))
         updateNavTabs()
@@ -462,6 +516,7 @@ class SearchActivity : Screen() {
     private fun updateClear() {
         val c = clear ?: return
         val show = (beforeVoice ?: input.text.toString()).isNotEmpty()
+        input.setPadding(dp(12),0,if (show) dp(95) else 0,0)
         if (!show && c.hasFocus()) (voice ?: firstKey)?.requestFocus()
         if (!show && lastKeyboardFocus === c) lastKeyboardFocus = voice ?: firstKey
         c.visibility = if (show) View.VISIBLE else View.GONE
@@ -657,11 +712,19 @@ class SearchActivity : Screen() {
             val focus = currentFocus
             // Back while listening cancels it and keeps the page.
             if (event.keyCode == KeyEvent.KEYCODE_BACK && listening) { cancelVoice(); return true }
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && keyboard.visibility == View.VISIBLE) {
+                if (lookupMode != null) lookup(null) else { toggleKeys(false); keyboardButton.requestFocus() }
+                return true
+            }
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus()) {
+                peopleButton.requestFocus()
+                return true
+            }
             if (event.keyCode == KeyEvent.KEYCODE_BACK &&
                 (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus() || input.hasFocus())) {
                 if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys && lookupMode == null && input.text.isNotBlank()) {
                 // Still loading (nothing to land on): stay put rather than let Android's search jump to the gear.
                 (firstResult ?: resultsAction)?.requestFocus()
                 return true
@@ -746,8 +809,7 @@ class SearchActivity : Screen() {
                 row.addView(chipView, LinearLayout.LayoutParams(-2, dp(24)).apply { if (row.childCount > 0) marginStart = gap })
                 used += gap + w
         }
-        recentBox.addView(text(R.string.search_hold_to_remove, HomeStyle.INFO, color = HomeStyle.PLOT),
-            LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+
         if (restoreFocus) (firstChip ?: lastKeyboardFocus ?: firstKey)?.requestFocus()
     }
 
@@ -809,37 +871,21 @@ class SearchActivity : Screen() {
         cards.clear()
         rendered = null
         resultsScroll.scrollTo(0, 0)
+        clearGrid()
+        val mode = lookupMode
+        input.hint = when(mode) {
+            "person" -> getString(R.string.ex_people)
+            "collection" -> getString(R.string.ex_franchise)
+            else -> heading
+        }
+        summary.visibility = if (mode==null && query.isEmpty()) View.VISIBLE else View.GONE
+        if (mode != null) {
+            findChoices(mode,query)
+            return
+        }
         showLoading()
         if (query.isEmpty()) {
-            background({
-                val addons = Stremio.savedAddons(authKey.orEmpty()).orEmpty().ifEmpty { Stremio.addons(authKey.orEmpty()) }
-                val catalogs = addons.flatMap { it.catalogs }
-                    .filter { it.type == "movie" || it.type == "series" }
-                // Popular or trending first, then any other; one that fails or comes back empty gives way to the next.
-                var lastError: Throwable? = null
-                val found = catalogs.sortedByDescending { it.name.contains("popular", true) || it.name.contains("trending", true) }
-                    .take(4).asSequence()
-                    .map { c ->
-                        runCatching { c.addon.savedCatalog(c)?.takeIf { it.isNotEmpty() } ?: c.addon.catalog(c) }
-                            .onFailure { lastError = it }
-                            .getOrDefault(emptyList())
-                            .filterNot { isAddonMessage(it.name) }.take(PER_TYPE)
-                    }
-                    .firstOrNull { it.isNotEmpty() }.orEmpty()
-                if (found.isEmpty() && lastError != null) throw lastError!!
-                found
-            }) { answer ->
-                if (token != request) return@background
-                val error = answer.exceptionOrNull()
-                if (error != null) FailureLog.record(FailureLog.Operation.SEARCH, failureOf(error))
-                val titles = answer.getOrNull().orEmpty()
-                if (titles.isEmpty()) {
-                    results.removeAllViews()
-                    val msg = error?.let { failureMessage(R.string.search_popular_unavailable, failureOf(it)) }
-                        ?: getString(R.string.search_popular_unavailable)
-                    showFailed(msg) { search(false) }
-                } else render(linkedMapOf(getString(R.string.search_popular_titles) to titles), "", false)
-            }
+            catalogue()
             return
         }
         background({ Stremio.savedAddons(authKey.orEmpty()) ?: Stremio.addons(authKey.orEmpty()) }) { loaded ->
@@ -900,6 +946,8 @@ class SearchActivity : Screen() {
     }
 
     override fun onDestroy() {
+        clearGrid()
+        main.removeCallbacks(typed)
         main.removeCallbacks(restoreHeader)
         runCatching { recognizer?.destroy() }
         recognizer = null
@@ -1027,7 +1075,7 @@ class SearchActivity : Screen() {
 
     private companion object {
         const val RECENT = 4
-        const val RESULTS_X = 298 // dp: the header and the rows start here, right of the keyboard
+        const val RESULTS_X = 256 // dp: the header and the rows start here, right of the keyboard
         // ChadFlix: tighter gaps, so the Shows row ends inside the TV's safe area (27 dp from the bottom); poster size kept.
         const val QUERY_TOP = 58 // dp: the search line (was 66)
         const val RESULTS_TOP = 90 // dp: the rows (was 104)

@@ -183,6 +183,20 @@ object Tmdb {
         return Page(titles, answer.optInt("total_results"), page >= answer.optInt("total_pages"))
     }
 
+    internal fun exploreRequest(path: String, params: Map<String, String> = emptyMap(), cache: Boolean = false): JSONObject {
+        val query = (mapOf("language" to language, "api_key" to KEY) + params).entries.joinToString("&") {
+            it.key + "=" + java.net.URLEncoder.encode(it.value, "UTF-8")
+        }
+        val url = "$BASE/$path?$query"
+        val saved = if (cache) Http.savedAnswer(url, maxAgeMs = 24 * 3600_000L) else null
+        return JSONObject(saved ?: Http.get(url, keep = cache, timeoutMs = 6000, strict = true))
+    }
+
+    internal fun exploreDiscover(q: DiscoverQuery, page: Int): JSONObject {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+        return JSONObject(Http.get(discoverUrl(q, page, region, language, today, KEY), timeoutMs = 6000, strict = true))
+    }
+
     private const val SERVICES = 14
 
     /**
@@ -351,7 +365,8 @@ object Tmdb {
 
 /** Discover's filters: [type] is movie, series or anime; [decade] a year like 2010 (0: before 1980); [year] an exact year; [sort] popular, top or new. */
 data class DiscoverQuery(val type: String = "movie", val genre: Int? = null, val decade: Int? = null,
-                         val service: Int? = null, val sort: String = "popular", val year: Int? = null) {
+                         val service: Int? = null, val sort: String = "popular", val year: Int? = null,
+                         val filters: Map<String, String> = emptyMap()) {
     val media get() = if (type == "movie") "movie" else "tv"
 }
 
@@ -368,13 +383,18 @@ internal fun discoverUrl(q: DiscoverQuery, page: Int, region: String, language: 
         q.decade != null -> { params["$date.gte"] = "${q.decade}-01-01"; params["$date.lte"] = "${q.decade + 9}-12-31" }
     }
     if (q.service != null) { params["with_watch_providers"] = "${q.service}"; params["watch_region"] = region }
+    params.putAll(q.filters)
     when (q.sort) {
         "top" -> { params["sort_by"] = "vote_average.desc"; params["vote_count.gte"] = "300" }
         "new" -> {
-            params["sort_by"] = "$date.desc"; params["vote_count.gte"] = "20"
+            params["sort_by"] = "$date.desc"; params["vote_count.gte"] = params["vote_count.gte"] ?: "20"
             val lte = params["$date.lte"]
             if (lte == null || lte > today) params["$date.lte"] = today // not yet out: nothing to play
         }
+        "old" -> params["sort_by"] = "$date.asc"
+        "votes" -> params["sort_by"] = "vote_count.desc"
+        "az" -> params["sort_by"] = if (movie) "title.asc" else "name.asc"
+        "box" -> params["sort_by"] = "revenue.desc"
         else -> params["sort_by"] = "popularity.desc"
     }
     return "https://api.themoviedb.org/3/discover/${q.media}?" +

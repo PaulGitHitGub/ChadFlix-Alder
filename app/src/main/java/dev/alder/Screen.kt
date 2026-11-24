@@ -946,7 +946,7 @@ abstract class Screen : Activity() {
                          // what Left does, [back] what Back does instead of only closing.
                          right: ((Int) -> (() -> Unit)?)? = null, left: (() -> Unit)? = null, back: (() -> Unit)? = null,
                          header: Boolean = false, // ChadFlix: the title as a heading (centred, larger), not like a line
-                         checkedRows: Set<Int> = emptySet(),
+                         checkedRows: Set<Int> = emptySet(), anchorStartDp: Int? = null,
                          pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
@@ -993,7 +993,11 @@ abstract class Screen : Activity() {
         dialog.window?.apply {
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
             setLayout(dp(widthDp), -2) // a long list of names needs less width
-            setDimAmount(0.6f)
+            setDimAmount(if (anchorStartDp == null) 0.6f else 0.16f)
+            if (anchorStartDp != null) {
+                setGravity(Gravity.LEFT or Gravity.CENTER_VERTICAL)
+                attributes = attributes.apply { x = dp(anchorStartDp) }
+            }
         }
         if (back != null) dialog.setOnCancelListener { back() } // Back cancels; a pick dismisses, which isn't a cancel
         dialog.show()
