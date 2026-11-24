@@ -318,8 +318,47 @@ internal class MediaCardView(
         else shade.alpha = target
     }
 
+    private var watchlistPictures: List<Pair<String, ImageView>>? = null
+
+    /** Give a collection its own face while retaining the rail's focus ring and image lifecycle. */
+    fun showWatchlist(list: Watchlist?, count: String) {
+        face.removeAllViews()
+        face.setBackgroundColor(Screen.CARD_PLACEHOLDER)
+        val pictures = LinearLayout(screen)
+        face.addView(pictures, LayoutParams(-1, -1).apply { bottomMargin = screen.dp(29) })
+        val urls = list?.items.orEmpty().asSequence().mapNotNull { it.background ?: it.poster }.take(2).toList()
+        watchlistPictures = urls.map { url ->
+            val view = ImageView(screen).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+            pictures.addView(view, LinearLayout.LayoutParams(0, -1, 1f))
+            url to view
+        }
+        if (list == null) {
+            face.background = screen.rounded(Screen.CARD_PLACEHOLDER, Screen.CARD_RADIUS).apply {
+                setStroke(screen.dp(1), Screen.TEXT_3, screen.dp(5).toFloat(), screen.dp(3).toFloat())
+            }
+            face.addView(screen.text("+\n$titleName", Screen.BODY, bold = true).apply { gravity = Gravity.CENTER }, LayoutParams(-1, -1))
+        } else {
+            val footer = LinearLayout(screen).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(screen.dp(8), 0, screen.dp(8), 0)
+                addView(screen.text(titleName, Screen.BODY, bold = true).apply {
+                    setSingleLine(); ellipsize = TextUtils.TruncateAt.END
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(screen.text(java.text.NumberFormat.getIntegerInstance().format(list.items.size), Screen.SMALL, color = Screen.TEXT_2))
+            }
+            face.addView(footer, LayoutParams(-1, screen.dp(29), Gravity.BOTTOM))
+            contentDescription = "$titleName, $count"
+        }
+        face.alpha = 1f
+    }
+
     /** On screen (or nearly): show the title until its picture is ready. */
     fun load() {
+        watchlistPictures?.let { pictures ->
+            if (!wanted) pictures.forEach { (url, view) -> Images.load(url, view, widthPx / pictures.size) }
+            wanted = true
+            return
+        }
         wanted = true
         if (needsCardMeta(live, wide, posterUrl, artUrl)) {
             onRequestMeta?.invoke()
@@ -390,6 +429,11 @@ internal class MediaCardView(
 
     /** Far off screen: release decoded drawable. */
     fun unload() {
+        watchlistPictures?.let { pictures ->
+            if (wanted) pictures.forEach { (_, view) -> view.tag = null; view.setImageDrawable(null) }
+            wanted = false
+            return
+        }
         if (!wanted && shownUrl == null && image.drawable == null) return
         wanted = false
         shownUrl = null
@@ -537,7 +581,10 @@ internal class HorizontalCardRail(
             strip.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
                 override fun onPreDraw(): Boolean {
                     strip.viewTreeObserver.removeOnPreDrawListener(this)
-                    if (selected == index) scroller.scrollTo(targetScroll, 0)
+                    if (selected == index) {
+                        val measuredTarget = if (stripW == 0) railTargetScroll(pinAt, stepPx, strip.width, scroller.width) else targetScroll
+                        scroller.scrollTo(measuredTarget, 0)
+                    }
                     return true
                 }
             })

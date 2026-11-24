@@ -78,11 +78,20 @@
     <string name="list_sort">Trier</string>
     <string name="saved_movies">Films enregistrés</string>
     <string name="saved_shows">Séries enregistrées</string>
+    <string name="watchlists">Listes à regarder</string>
+    <string name="new_watchlist">Nouvelle liste</string>
+    <string name="save_to_watchlist">Enregistrer dans une liste</string>
+    <string name="remove_from_watchlist">Retirer de cette liste</string>
+    <string name="watchlist_invalid_name">Saisissez un nom unique et non vide.</string>
+    <string name="watchlist_empty">Maintenez OK sur un film ou une série pour l’ajouter à cette liste.</string>
+    <plurals name="watchlist_count">
+        <item quantity="one">%1$d liste</item>
+        <item quantity="other">%1$d listes</item>
+    </plurals>
     <plurals name="saved_titles">
         <item quantity="one">%1$d titre</item>
         <item quantity="other">%1$d titres</item>
     </plurals>
-    <string name="list_empty">Les titres que vous enregistrez avec + apparaissent ici</string>
     <string name="action_remove_from_list">Retirer de My Alder</string>
     <string name="action_mark_watched">Marquer comme vu</string>
     <string name="list_update_failed">Impossible de mettre à jour My Alder</string>

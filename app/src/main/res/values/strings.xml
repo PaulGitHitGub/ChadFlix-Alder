@@ -79,11 +79,20 @@
     <string name="list_sort">Sort</string>
     <string name="saved_movies">Saved Movies</string>
     <string name="saved_shows">Saved Shows</string>
+    <string name="watchlists">Watchlists</string>
+    <string name="new_watchlist">New Watchlist</string>
+    <string name="save_to_watchlist">Save To Watchlist</string>
+    <string name="remove_from_watchlist">Remove From Watchlist</string>
+    <string name="watchlist_invalid_name">Enter a unique, non-empty name.</string>
+    <string name="watchlist_empty">Hold OK on a movie or show to add it to this watchlist.</string>
+    <plurals name="watchlist_count">
+        <item quantity="one">%1$d list</item>
+        <item quantity="other">%1$d lists</item>
+    </plurals>
     <plurals name="saved_titles">
         <item quantity="one">%1$d title</item>
         <item quantity="other">%1$d titles</item>
     </plurals>
-    <string name="list_empty">Titles you save with + appear here</string>
     <string name="action_remove_from_list">Remove from My Lists</string>
     <string name="action_mark_watched">Mark as watched</string>
     <string name="list_update_failed">Couldn\'t update My Lists</string>

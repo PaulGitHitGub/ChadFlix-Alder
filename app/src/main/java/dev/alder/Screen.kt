@@ -666,6 +666,26 @@ abstract class Screen : Activity() {
         field.requestFocus()
     }
 
+    internal fun editWatchlistName(old: String? = null, first: WatchTitle? = null, done: (String) -> Unit) {
+        val store = Settings.watchlists(this)
+        askText(if (old == null) R.string.new_watchlist else R.string.profiles_rename, R.string.action_ok, initial = old.orEmpty()) { name ->
+            val success = if (old == null) store.create(name, first) else store.rename(old, name)
+            if (success) done(name)
+            else android.widget.Toast.makeText(this, R.string.watchlist_invalid_name, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    internal fun saveToWatchlist(title: WatchTitle, changed: () -> Unit = {}) {
+        val store = Settings.watchlists(this)
+        val lists = store.all()
+        val labels = lists.map { it.name } + ("+ " + getString(R.string.new_watchlist))
+        choose(getString(R.string.save_to_watchlist), labels,
+            checkedRows = lists.indices.filter { lists[it].items.any(title::matches) }.toSet()) { i ->
+            if (i == lists.size) editWatchlistName(first = title) { changed() }
+            else { store.toggle(lists[i].name, title); changed() }
+        }
+    }
+
     private var phoneEntry: PhoneEntry? = null
 
     /**
@@ -926,6 +946,7 @@ abstract class Screen : Activity() {
                          // what Left does, [back] what Back does instead of only closing.
                          right: ((Int) -> (() -> Unit)?)? = null, left: (() -> Unit)? = null, back: (() -> Unit)? = null,
                          header: Boolean = false, // ChadFlix: the title as a heading (centred, larger), not like a line
+                         checkedRows: Set<Int> = emptySet(),
                          pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
@@ -938,7 +959,7 @@ abstract class Screen : Activity() {
             text(label, BODY).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(16), dp(10), dp(16), dp(10))
-                if (i == checked) {
+                if (i == checked || i in checkedRows) {
                     setTextColor(TUNGSTEN)
                     setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_check)?.mutate()?.apply {
                         setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))

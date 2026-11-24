@@ -992,6 +992,12 @@ class SearchActivity : Screen() {
                     .putExtra("type", meta.type).putExtra("id", meta.id).putExtra("name", meta.name)
                     .putExtra("poster", meta.poster).putExtra("background", meta.background))
             }
+            if (meta.type == "movie" || meta.type == "series") setOnLongClickListener {
+                choose(meta.name, listOf(getString(R.string.save_to_watchlist))) {
+                    saveToWatchlist(WatchTitle(meta.id, meta.type, meta.name, meta.poster, meta.background))
+                }
+                true
+            }
             if (firstInRow) setOnKeyListener { _, code, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)
                     (lastKeyboardFocus ?: firstKey)?.requestFocus() == true

@@ -77,11 +77,20 @@
     <string name="list_sort">क्रम</string>
     <string name="saved_movies">सेव की गई फ़िल्में</string>
     <string name="saved_shows">सेव किए गए शो</string>
+    <string name="watchlists">वॉचलिस्ट</string>
+    <string name="new_watchlist">नई वॉचलिस्ट</string>
+    <string name="save_to_watchlist">वॉचलिस्ट में सहेजें</string>
+    <string name="remove_from_watchlist">वॉचलिस्ट से हटाएँ</string>
+    <string name="watchlist_invalid_name">एक अलग नाम दर्ज करें। नाम खाली नहीं हो सकता।</string>
+    <string name="watchlist_empty">इस वॉचलिस्ट में जोड़ने के लिए फ़िल्म या शो पर OK दबाए रखें।</string>
+    <plurals name="watchlist_count">
+        <item quantity="one">%1$d सूची</item>
+        <item quantity="other">%1$d सूचियाँ</item>
+    </plurals>
     <plurals name="saved_titles">
         <item quantity="one">%1$d शीर्षक</item>
         <item quantity="other">%1$d शीर्षक</item>
     </plurals>
-    <string name="list_empty">+ से सहेजे गए टाइटल यहाँ दिखते हैं</string>
     <string name="action_remove_from_list">My Alder से हटाएँ</string>
     <string name="action_mark_watched">देखा गया मार्क करें</string>
     <string name="list_update_failed">My Alder अपडेट नहीं हो सकी</string>

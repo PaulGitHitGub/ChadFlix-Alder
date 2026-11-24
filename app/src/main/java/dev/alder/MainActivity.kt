@@ -272,6 +272,8 @@ class MainActivity : Screen() {
     private val answers = java.util.concurrent.ConcurrentHashMap<String, List<Pair<List<Meta>, Boolean>>>()
     private var genre: String? = null
     private var jumpTo: String? = null // a chip's row that wasn't made yet when OK was pressed
+    private var openedWatchlist: String? = null
+    private var shownWatchlists = emptyList<Watchlist>()
     private var librarySlot: FrameLayout? = null
     private var listBuild = 0
     private lateinit var listShade: View
@@ -407,7 +409,12 @@ class MainActivity : Screen() {
         val finished: Boolean = false,
         var newEpisodeCount: Int = 0,
         val addedAt: String? = null,
+        val collectionCard: Boolean = false,
+        val watchlist: Watchlist? = null,
     ) {
+        val watchTitle get() = WatchTitle(id, type, name, poster, art)
+        val canSave get() = (type == "movie" || type == "series") && !HomeStyle.isTile(id)
+        val cardTag get() = if (collectionCard) "watchlist:${watchlist?.name.orEmpty()}" else "card:$type:$id"
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
         var settled = false // its details are in (or failed): what it has now is all it will get
@@ -677,6 +684,7 @@ class MainActivity : Screen() {
             lastFeaturedHome = featured
             showPage(page)
         } else {
+            if (page == Page.LIBRARY && Settings.watchlists(this).all() != shownWatchlists) redrawLibrary()
             refreshLibrary?.invoke()
             refreshAddons?.invoke()
         }
@@ -886,6 +894,14 @@ class MainActivity : Screen() {
                 return true
             }
             if (!ok) return true
+        }
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && mode == Mode.BROWSE && openedWatchlist != null) {
+            if (event.action == KeyEvent.ACTION_UP) {
+                val tag = "watchlist:$openedWatchlist"
+                openedWatchlist = null
+                redrawLibrary(tag)
+            }
+            return true
         }
         // Back from the rows goes up, not out: to the chips on a page that has them (a genre jump left you deep in
         // the page), else to the open page's name. Back from there leaves as usual.
@@ -1452,6 +1468,7 @@ class MainActivity : Screen() {
 
     /** The focused title: its art across the screen, and logo, facts (and time left) and description top left. */
     private fun showHero(item: Item) {
+        if (item.collectionCard) return clearLibraryHero()
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
@@ -1731,6 +1748,7 @@ class MainActivity : Screen() {
         if (page.polishedRail || p.polishedRail || page.isGrid || p.isGrid) resetArt()
         dimHome(false)
         if (p != page) {
+            openedWatchlist = null
             genre = null // a genre belongs to the page it was picked on
             jumpTo = null
             genreStrip.removeAllViews()
@@ -1842,7 +1860,10 @@ class MainActivity : Screen() {
         if (p == Page.HOME || p == Page.LIBRARY || p.hasGenreShortcuts) { // ChadFlix: Continue Watching tops Movies and Shows too
             val savedLists = p == Page.LIBRARY
             val slot = slot()
-            if (savedLists) librarySlot = slot
+            if (savedLists) {
+                librarySlot = slot
+                if (library.isEmpty()) showLibrary(slot) // local lists remain usable while the library loads or is offline
+            }
             var shown: String? = null // what's on screen, to tell whether the fresh library changed anything
             var fresh = false
             fun show(prepared: HomeLibrary, force: Boolean = false) {
@@ -2125,7 +2146,7 @@ class MainActivity : Screen() {
                         old?.let { it.cards.forEach { card -> card.unload() }; rows.remove(it); slot.removeAllViews() }
                         val restoreIndex = if (focusedTag != null && title == focusedRow?.title &&
                             (focused.isAttachedToWindow || restoreCatalogFocus != null))
-                            items.indexOfFirst { "card:${it.id}" == focusedTag } else -1
+                            items.indexOfFirst { it.cardTag == focusedTag } else -1
                         val initial = maxOf(initialRowCards(p == Page.LIVE), restoreIndex + 1)
                         val made = row(title, items.take(maxOf(initial, old?.items?.size ?: initial)), more, wide = (p == Page.LIVE))
                         slot.addView(made.view)
@@ -2636,29 +2657,68 @@ class MainActivity : Screen() {
     }
 
     private fun showLibrary(slot: FrameLayout, focusTag: Any? = null) {
-        val dates = Library.listDates(this, profile.id)
-        val saved = listTitles().sortedByDescending { dates.getString(it.optString("_id"), null) ?: it.optString("_ctime") }
-        if (saved.isEmpty()) {
-            cancelBrowseHero()
-            heroItem = null
-            browseInfo.alpha = 0f
-            cardUnderline.visibility = View.INVISIBLE
-            resetArt()
-            slot.addView(text(R.string.list_empty, BODY, color = TEXT_2).apply { setPadding(dp(PAD), dp(30), dp(PAD), 0) })
-            if (focusTag != null) navItems[page]?.requestFocus()
-            return
-        }
         val column = column(Gravity.START)
         slot.addView(column)
-        val (movies, shows) = saved.partition { it.optString("type") == "movie" }
-        for ((label, titles) in listOf(R.string.saved_movies to movies, R.string.saved_shows to shows)) {
-            if (titles.isEmpty()) continue
-            val items = titles.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
-            val restore = items.indexOfFirst { "card:${it.id}" == focusTag }
+        shownWatchlists = Settings.watchlists(this).all()
+        val opened = shownWatchlists.find { it.name == openedWatchlist }
+        fun appendRow(title: String, items: List<Item>, count: String, wide: Boolean = false) {
+            val restore = items.indexOfFirst { it.cardTag == focusTag }
             val first = items.take(maxOf(START, restore + 1))
-            column.addView(row(getString(label), first, later(items), subtitle = plural(R.plurals.saved_titles, items.size)).view)
+            column.addView(row(title, first, later(items), wide = wide, subtitle = count).view)
         }
-        if (focusTag != null && slot.findViewWithTag<View>(focusTag)?.requestFocus() != true) firstRow()?.focusFirst()
+        if (opened == null) {
+            openedWatchlist = null
+            val cards = (shownWatchlists + listOf(null)).map { list ->
+                Item(list?.name.orEmpty(), "", list?.name ?: getString(R.string.new_watchlist), null, null, null,
+                    "", emptyList(), null, 0f, false, collectionCard = true, watchlist = list)
+            }
+            appendRow(getString(R.string.watchlists), cards, plural(R.plurals.watchlist_count, shownWatchlists.size), wide = true)
+            val dates = Library.listDates(this, profile.id)
+            val saved = listTitles().sortedByDescending { dates.getString(it.optString("_id"), null) ?: it.optString("_ctime") }
+            val (movies, shows) = saved.partition { it.optString("type") == "movie" }
+            for ((label, titles) in listOf(R.string.saved_movies to movies, R.string.saved_shows to shows)) {
+                if (titles.isEmpty()) continue
+                val items = titles.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
+                appendRow(getString(label), items, plural(R.plurals.saved_titles, items.size))
+            }
+        } else if (opened.items.isNotEmpty()) {
+            val items = opened.items.map { Item(it.id, it.type, it.name, it.poster, it.background, Images.logoFor(it.id),
+                "", emptyList(), null, 0f, false) }
+            appendRow(opened.name, items, plural(R.plurals.saved_titles, items.size))
+        } else {
+            clearLibraryHero()
+            column.setPadding(dp(HomeStyle.INSET), 0, dp(PAD), 0)
+            column.addView(text(opened.name, HomeStyle.ROW_TITLE, bold = true))
+            column.addView(text(R.string.watchlist_empty, BODY, color = TEXT_2))
+        }
+        if (focusTag != null && slot.findViewWithTag<View>(focusTag)?.requestFocus() != true &&
+            firstRow()?.focusFirst() != true) navItems[page]?.requestFocus()
+    }
+
+    private fun clearLibraryHero() {
+        cancelBrowseHero()
+        heroItem = null
+        browseInfo.alpha = 0f
+        cardUnderline.visibility = View.INVISIBLE
+        resetArt()
+    }
+
+    private fun watchlistMenu(list: Watchlist) {
+        val rename = getString(R.string.profiles_rename)
+        val delete = getString(R.string.search_delete)
+        choose(list.name, listOf(rename, delete)) { action ->
+            if (action == 0) editWatchlistName(list.name) { redrawLibrary("watchlist:$it") }
+            else choose(list.name, listOf(getString(R.string.action_cancel), delete)) {
+                if (it == 1) {
+                    Settings.watchlists(this).delete(list.name)
+                    redrawLibrary("watchlist:")
+                }
+            }
+        }
+    }
+
+    private fun saveWatchTitle(item: Item) = saveToWatchlist(item.watchTitle) {
+        if (page == Page.LIBRARY) redrawLibrary(item.cardTag)
     }
 
     private fun libraryFinished(item: JSONObject): Boolean {
@@ -2667,6 +2727,15 @@ class MainActivity : Screen() {
     }
 
     private fun listMenu(item: Item) {
+        openedWatchlist?.let { name ->
+            choose(item.name, listOf(getString(R.string.remove_from_watchlist), getString(R.string.save_to_watchlist))) {
+                if (it == 0) {
+                    Settings.watchlists(this).toggle(name, item.watchTitle)
+                    redrawLibrary(item.cardTag)
+                } else saveWatchTitle(item)
+            }
+            return
+        }
         val original = library.firstOrNull { it.optString("_id") == item.id } ?: return
         val neighbor = rows.firstOrNull { it.view.hasFocus() }?.let { r ->
             (r.cards.getOrNull(r.selected + 1) ?: r.cards.getOrNull(r.selected - 1))?.tag
@@ -2707,7 +2776,9 @@ class MainActivity : Screen() {
                 }
             }
         }
-        choose(item.name, options) { selected ->
+        val choices = if (item.canSave) options + getString(R.string.save_to_watchlist) else options
+        choose(item.name, choices) { selected ->
+            if (selected == options.size) return@choose saveWatchTitle(item)
             if (selected != options.lastIndex) save(false)
             else choose(removeLabel, listOf(getString(R.string.action_cancel), removeLabel), item.name) {
                 if (it == 1) save(true)
@@ -2717,7 +2788,10 @@ class MainActivity : Screen() {
 
     /** Hold OK on a Continue Watching title: choose a source yourself, or take the title off the row. */
     private fun continueMenu(item: Item) {
-        choose(item.name, listOf(getString(R.string.action_choose_source), getString(R.string.action_remove_from_continue))) { selected ->
+        val options = listOfNotNull(getString(R.string.action_choose_source), getString(R.string.action_remove_from_continue),
+            getString(R.string.save_to_watchlist).takeIf { item.canSave })
+        choose(item.name, options) { selected ->
+            if (selected == 2) return@choose saveWatchTitle(item)
             if (selected == 0) return@choose play(item, pick = true)
             val original = library.firstOrNull { it.optString("_id") == item.id } ?: return@choose
             val updated = JSONObject(original.toString())
@@ -2741,6 +2815,7 @@ class MainActivity : Screen() {
         val at = pageRows.indexOf(row.title)
         val actions = listOfNotNull<Pair<String, () -> Unit>>(
             (getString(R.string.action_choose_source) to { play(item, pick = true) }).takeIf { !HomeStyle.isTile(item.id) },
+            (getString(R.string.save_to_watchlist) to { saveWatchTitle(item) }).takeIf { item.canSave },
             (getString(R.string.row_move_up) to { moveRow(row.title, -1) }).takeIf { at > 0 },
             (getString(R.string.row_move_down) to { moveRow(row.title, 1) }).takeIf { at >= 0 && at < pageRows.lastIndex },
             (getString(R.string.action_hide_row, HomeStyle.rowName(this, row.title)) to {
@@ -2958,8 +3033,9 @@ class MainActivity : Screen() {
      */
     private inner class Row(val title: String, first: List<Item>, private var more: ((Int) -> List<Item>)?, val wide: Boolean = false,
                             val grid: Boolean = false, val continueRow: Boolean = false, subtitle: String? = null) {
+        private val collections = first.firstOrNull()?.collectionCard == true
         private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
-        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (wide) WIDE_H else CARD_H)
+        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (collections) WIDE_W * 2 / 3 else if (wide) WIDE_H else CARD_H)
         val homeRow = !wide && !grid // ChadFlix: Netflix's row: posters, the focused one widened, pinned left
         private val polishedRail = page.polishedRail
         private val gap = if (grid) LIST_GAP else HomeStyle.CARD_GAP
@@ -2970,14 +3046,14 @@ class MainActivity : Screen() {
         var active = false
         var loaded = false
 
-        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow) HomeStyle.INSET else PAD)
+        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow || collections) HomeStyle.INSET else PAD)
         val rail = HorizontalCardRail(
             screen = this@MainActivity,
             cardGapPx = dp(gap),
             paddingStartPx = inset,
             paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
             paddingEndPx = inset,
-            paddingBottomPx = if (grid) dp(GRID_ROW_BOTTOM) else rowBottom,
+            paddingBottomPx = if (collections) dp(12) else if (grid) dp(GRID_ROW_BOTTOM) else rowBottom,
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
             cullLeft = !homeRow, // the card before the focused one peeks in at the left edge
@@ -3000,7 +3076,7 @@ class MainActivity : Screen() {
         // One line, always: the row band is measured for one, and a second would push the cards off the screen.
         // ChadFlix: a genre row's title names its list, "Action · Trending".
         private val list = subtitle ?: if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
-        private val shownTitle = HomeStyle.titleCase(HomeStyle.rowName(this@MainActivity, title)) // All Genres in the app's language
+        private val shownTitle = if (openedWatchlist != null && page == Page.LIBRARY) title else HomeStyle.titleCase(HomeStyle.rowName(this@MainActivity, title)) // All Genres in the app's language
         private val quietTitle = list?.let { HomeStyle.rowTitle(shownTitle, it, if (subtitle != null) TEXT_2 else null) }
         private val litTitle = if (subtitle != null) quietTitle else list?.let { HomeStyle.rowTitle(shownTitle, it, HomeStyle.LIST_RED) }
         private val heading = text(shownTitle, HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
@@ -3012,7 +3088,7 @@ class MainActivity : Screen() {
             alpha = QUIET
             if (grid) visibility = View.GONE
         }
-        val view: View = column(Gravity.START, heading, scroller).apply { if (wide) setPadding(0, dp(CARD_H - WIDE_H), 0, 0) }
+        val view: View = column(Gravity.START, heading, scroller).apply { if (wide && !collections) setPadding(0, dp(CARD_H - WIDE_H), 0, 0) }
 
         // ChadFlix: a genre row starts with its Showing tile: Up and Down land on the first title after it, and while the
         // remote is on the tile or that first title the row doesn't scroll, so the tile stays in view.
@@ -3042,14 +3118,28 @@ class MainActivity : Screen() {
             live = item.live,
             settled = item.settled,
             liftShadow = !page.hasGenreShortcuts,
-            home = homeRow,
+            home = homeRow || collections,
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
-            if (HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
+            if (!collections && HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
             dim(grid || !active, animate = false)
             payload = item
-            tag = "card:${item.id}"
+            tag = item.cardTag
+            if (item.collectionCard) {
+                val list = item.watchlist
+                showWatchlist(list, plural(R.plurals.saved_titles, list?.items?.size ?: 0))
+                setOnFocusChanged { has -> if (has) { focus(index); clearLibraryHero() } }
+                setOnClickListener {
+                    if (list == null) editWatchlistName { redrawLibrary("watchlist:$it") }
+                    else {
+                        openedWatchlist = list.name
+                        redrawLibrary(list.items.firstOrNull()?.let { "card:${it.type}:${it.id}" } ?: "empty")
+                    }
+                }
+                if (list != null) setOnLongClickListener { watchlistMenu(list); true }
+                return@apply
+            }
             onRequestMeta = { fill(item) }
             item.onFill += {
                 setNewEpisodes(item.newEpisodeCount)
@@ -3215,8 +3305,8 @@ class MainActivity : Screen() {
             val from = items.size
             background({ more(from) }) { result ->
                 fetching = false
-                val known = items.map { it.id }.toSet()
-                val fresh = result.getOrElse { return@background }.filter { it.id !in known } // a failed page can be asked again
+                val known = items.map { it.cardTag }.toSet()
+                val fresh = result.getOrElse { return@background }.filter { it.cardTag !in known } // a failed page can be asked again
                 if (fresh.isEmpty()) { this.more = null; return@background }
                 for (item in fresh) {
                     val card = makeCard(item, items.size)
@@ -3240,7 +3330,7 @@ class MainActivity : Screen() {
 
     /** Art, logo and facts the catalog didn't send, fetched once per title from the meta addon. */
     private fun fill(item: Item) {
-        if (item.filled || HomeStyle.isTile(item.id)) return // ChadFlix: the Showing tile has no details to fetch
+        if (item.filled || item.collectionCard || HomeStyle.isTile(item.id)) return // ChadFlix: the Showing tile has no details to fetch
         item.filled = true
         if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
             metas[item.id]?.let { applyMeta(item, it); return }
