@@ -310,9 +310,8 @@ class DetailsActivity : Screen() {
             showArt(pageArt(m))
             richCast = m.castMembers
             certificate = m.certification ?: certificate
-            val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
             if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(m)
-            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
+            if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) buildGuide(m.videos)
             if (!similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
             if (!certificateRequested && certificate == null && m.id.startsWith("tt")) {
@@ -612,7 +611,14 @@ class DetailsActivity : Screen() {
             addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
+        fun keepRightFocus(view: View) {
+            view.id = View.generateViewId()
+            view.nextFocusRightId = view.id
+        }
+        val rightmostIcon = if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) 0 else buttonRow.childCount - 1
+        keepRightFocus(buttonRow.getChildAt(rightmostIcon))
         fun addAction(action: TextView, gap: Int) {
+            keepRightFocus(action)
             stack.addView(action, LinearLayout.LayoutParams(dp(280), -2).apply { topMargin = dp(gap) })
         }
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
@@ -639,9 +645,12 @@ class DetailsActivity : Screen() {
         }
     }
 
+    private fun seasonCountLabel(count: Int): String? = if (count > 0)
+        HomeStyle.titleCase(resources.getQuantityString(R.plurals.seasons, count, count)) else null
+
     private fun buildMetadataRow(m: Meta, detailed: Boolean): LinearLayout {
         val seasonCount = if (hasEpisodes(type, m.videos)) {
-            m.videos.map { it.season }.filter { it > 0 }.distinct().size.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.seasons, it, it) }
+            seasonCountLabel(m.videos.map { it.season }.distinct().count { it > 0 })
         } else null
         val genreText = if (detailed) {
             m.genres.take(3).joinToString(" / ").ifEmpty { null }
@@ -732,6 +741,9 @@ class DetailsActivity : Screen() {
     // ---------- glass and episode guide ----------
 
     private fun buildGuide(videos: List<Video>) {
+        // Rebuilding an open guide should keep the viewer on the same season and episode.
+        val browsingSeason = selectedSeason.takeIf { guideOpen }
+        val browsingEpisode = if (guideOpen && !seasonStrip.hasFocus()) guideRows.selectedItem as? Video else null
         if (::guide.isInitialized) root.removeView(guide)
         guideOpen = false
         val x = dp(PAD)
@@ -755,7 +767,7 @@ class DetailsActivity : Screen() {
 
         val groups = videos.groupBy { it.season }
         val count = groups.keys.count { it > 0 }
-        guide.addView(text(listOfNotNull(meta?.year, resources.getQuantityString(R.plurals.seasons, count, count)).joinToString(DOT), SMALL, color = TEXT_2),
+        guide.addView(text(listOfNotNull(meta?.year, seasonCountLabel(count)).joinToString(DOT), SMALL, color = TEXT_2),
             FrameLayout.LayoutParams(railWidth, -2).apply { marginStart = x; topMargin = dp(80) })
         seasonStrip = column(Gravity.START)
         guide.addView(ScrollView(this).apply {
@@ -799,7 +811,8 @@ class DetailsActivity : Screen() {
         guide.addView(guideRows, FrameLayout.LayoutParams(-1, -1).apply {
             marginStart = rightX; marginEnd = x; topMargin = dp(72); bottomMargin = dp(24)
         })
-        selectedSeason = playTarget(meta)?.second?.season ?: videos.first().season
+        selectedSeason = browsingEpisode?.let { selected -> videos.firstOrNull { it.id == selected.id }?.season }
+            ?: browsingSeason?.takeIf { it in groups } ?: playTarget(meta)?.second?.season ?: videos.first().season
         seasonButtons = groups.mapValues { (season, episodes) ->
             val row = titleAction(seasonName(season))
             val number = text(resources.getQuantityString(R.plurals.guide_episodes, episodes.size, episodes.size), SMALL)
@@ -834,6 +847,10 @@ class DetailsActivity : Screen() {
         }
         root.addView(guide, FrameLayout.LayoutParams(-1, -1))
         fillGuide()
+        if (browsingSeason != null) {
+            showGuide()
+            browsingEpisode?.let { focusGuideEpisode(it.id) }
+        }
     }
 
     private inner class EpisodeCard : LinearLayout(this@DetailsActivity) {
@@ -880,12 +897,13 @@ class DetailsActivity : Screen() {
                     title.text = video.title.ifBlank { getString(R.string.episode_number, video.episode) }
                     val state = item?.optJSONObject("state")?.takeIf { it.text("video_id") == video.id }
                     val duration = state?.optLong("duration") ?: 0L
-                    val length = video.runtime ?: meta?.runtime
+                    val length = video.runtime
                     val minutes = when {
                         duration > 0 -> duration / 60_000
                         else -> length?.toLongOrNull() ?: HomeStyle.runtimeMs(length) / 60_000
                     }
                     runtime.text = if (minutes > 0) getString(R.string.guide_minutes, minutes) else length
+                    runtime.visibility = if (runtime.text.isNullOrBlank()) View.GONE else View.VISIBLE
                     story.text = video.overview
                     val mark = when {
                         !isEpisodeAired(video.released) -> airDay(video.released)?.let { getString(R.string.airs_on, it) }
@@ -959,15 +977,17 @@ class DetailsActivity : Screen() {
         }
     }
 
+    private fun focusGuideEpisode(id: String) {
+        val position = (0 until guideRows.count).firstOrNull { (guideRows.getItemAtPosition(it) as Video).id == id }
+        guideRows.requestFocus()
+        if (position != null) guideRows.setSelection(position)
+    }
+
     private fun refreshAfterEdit(focusEpisodeId: String? = null, focusSeason: Int? = null) {
         fillGuide()
         if (anyOverlayOpen()) heroNeedsRefresh = true else meta?.let(::showHero)
         if (focusEpisodeId != null) {
-            val position = (0 until guideRows.count).firstOrNull { (guideRows.getItemAtPosition(it) as Video).id == focusEpisodeId }
-            if (position != null) {
-                guideRows.requestFocus()
-                guideRows.setSelection(position)
-            }
+            focusGuideEpisode(focusEpisodeId)
         } else if (focusSeason != null) {
             seasonButtons[focusSeason]?.requestFocus()
         }
@@ -1800,7 +1820,6 @@ class DetailsActivity : Screen() {
         background({ runCatching { Stremio.library(key, listOf(metaId)).firstOrNull() }.getOrNull()
             ?: Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId } }) { result ->
             item = result.getOrNull() ?: item
-            val wasGuide = guideOpen
             if (shouldCloseInfoOnRestart(infoOpen, filmographyOpen)) {
                 root.removeView(infoOverlay)
                 infoOpen = false
@@ -1813,7 +1832,6 @@ class DetailsActivity : Screen() {
                 showHero(meta)
             }
             meta?.videos?.takeIf { episodic && it.isNotEmpty() }?.let(::buildGuide)
-            if (wasGuide) showGuide()
         }
     }
 
