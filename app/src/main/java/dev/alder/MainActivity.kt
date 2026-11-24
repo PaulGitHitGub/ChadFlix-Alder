@@ -2696,10 +2696,12 @@ class MainActivity : Screen() {
             }
             appendRow(getString(R.string.watchlists), cards, plural(R.plurals.watchlist_count, shownWatchlists.size), wide = true)
             for (type in listOf("movie", "series")) {
+                val titles = savedTitles(type)
+                if (titles.isEmpty()) continue
                 val filter = savedFilter(type)
                 val host = FrameLayout(this)
                 column.addView(host)
-                showSavedRow(host, type, filter, focusTag)
+                showSavedRow(host, type, filter, focusTag, titles)
                 if (filter.genre != null || filter.year != null || filter.decade != null) fillListDetails(type)
             }
         } else if (opened.items.isNotEmpty()) {
@@ -2726,10 +2728,11 @@ class MainActivity : Screen() {
 
     private fun savedTitles(type: String) = listTitles().filter { (it.optString("type") == "movie") == (type == "movie") }
 
-    private fun showSavedRow(host: FrameLayout, type: String, filter: SavedFilter, focusTag: Any?): Row {
+    private fun showSavedRow(host: FrameLayout, type: String, filter: SavedFilter, focusTag: Any?,
+                             titles: List<JSONObject> = savedTitles(type)): Row {
         val dates = Library.listDates(this, profile.id)
         fun sortDate(title: JSONObject) = dates.getString(title.optString("_id"), null) ?: title.optString("_ctime")
-        val all = savedTitles(type).filter { title ->
+        val all = titles.filter { title ->
             val meta = metas[title.optString("_id")]
             (filter.genre == null || meta?.genres?.contains(filter.genre) == true) &&
                 (filter.year == null || inYear(meta?.year, filter.year)) && (filter.decade == null || inDecade(meta?.year, filter.decade))
@@ -2758,11 +2761,11 @@ class MainActivity : Screen() {
         val old = rows.find { it.items.firstOrNull()?.id == HomeStyle.tileId("saved:$type") } ?: return
         val host = old.view.parent as? FrameLayout ?: return
         val tag = if (focusTile) old.items.first().cardTag else old.view.findFocus()?.tag
+        val row = showSavedRow(host, type, filter, tag)
+        if (tag != null) (row.view.findViewWithTag<View>(tag) ?: row.cards.first()).requestFocus()
         rows.remove(old)
         old.cards.forEach { it.unload() }
         host.removeView(old.view)
-        val row = showSavedRow(host, type, filter, tag)
-        if (tag != null) (row.view.findViewWithTag<View>(tag) ?: row.cards.first()).requestFocus()
     }
 
     // Genre and year use the original My Lists disk/remote metadata lookup. Start it for the requested
@@ -2818,8 +2821,11 @@ class MainActivity : Screen() {
             savedShowingMenu(type, line)
         }
         fun subMenu(line: Int, focusedLabel: String? = null) {
-            val genres = if (line == 0) savedTitles(type).flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
-                .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } else emptyList()
+            val genres = if (line == 0) {
+                val known = savedTitles(type).flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
+                    .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
+                if (filter.genre != null && filter.genre !in known) known + filter.genre else known
+            } else emptyList()
             val choices = if (line == 0) listOf(getString(R.string.filter_all)) + genres else years.map { it.first }
             val checked = if (line == 0) genres.indexOf(filter.genre) + 1 else yearIndex
             val name = getString(if (line == 0) R.string.discover_genre else R.string.discover_year)

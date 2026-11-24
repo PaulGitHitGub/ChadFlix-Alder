@@ -429,24 +429,28 @@ internal object HomeStyle {
      * no mark), 0 another row (blank).
      */
     fun dressTile(screen: Screen, card: MediaCardView, label: String, list: String, compact: Boolean = false): (Int) -> Unit {
-        val pad = px(screen, if (compact) 6f else 12f).toInt()
+        val pad = px(screen, if (compact) 4f else 12f).toInt()
         card.contentDescription = "$label $list"
         val words = LinearLayout(screen).apply {
             orientation = LinearLayout.VERTICAL
             addView(screen.text(label.uppercase(), if (compact) 9f else 10.5f, bold = true, color = LABEL_GREY).apply { letterSpacing = 0.08f })
-            addView(screen.text(list, if (compact) 12f else 15f, bold = true, color = WHITE).apply {
+            addView(screen.text(list, if (compact) 11f else 15f, bold = true, color = WHITE).apply {
                 maxLines = 2
                 if (compact) {
                     ellipsize = android.text.TextUtils.TruncateAt.END
                     val width = (card.widthPx - 2 * pad).toFloat()
-                    // Keep the year visible on the second line even when the genre needs the whole first line.
+                    breakStrategy = android.text.Layout.BREAK_STRATEGY_SIMPLE
+                    hyphenationFrequency = android.text.Layout.HYPHENATION_FREQUENCY_NONE
+                    val words = list.split(' ')
+                    if (words.any { paint.measureText(it) > width }) textSize = 10f
+                    fun fit(line: String) = android.text.TextUtils.ellipsize(line, paint, width, ellipsize)
+                    // Keep each active filter on screen, and never wrap the tail of an oversized word onto line two.
                     if (" · " in list && paint.measureText(list) > width) {
-                        val genre = android.text.TextUtils.ellipsize(list.substringBeforeLast(" · "), paint, width, ellipsize)
-                        text = "$genre\n${list.substringAfterLast(" · ")}"
-                    }
+                        text = "${fit(list.substringBeforeLast(" · "))}\n${fit(list.substringAfterLast(" · "))}"
+                    } else if (words.any { paint.measureText(it) > width }) text = words.joinToString(" ") { fit(it) }
                 }
             },
-                LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(screen, 2f).toInt() })
+                LinearLayout.LayoutParams(if (compact) -1 else -2, -2).apply { topMargin = px(screen, 2f).toInt() })
             visibility = View.INVISIBLE
         }
         val name = words.getChildAt(1) as TextView
