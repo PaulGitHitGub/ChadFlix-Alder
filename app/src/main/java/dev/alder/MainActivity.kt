@@ -635,15 +635,8 @@ class MainActivity : Screen() {
         }
     }
 
-    /**
-     * Shows' and Movies' rows read from disk into memory ahead, so the first switch to them builds at once too; and My
-     * List's first three rows of posters fetched, so its grid doesn't open dark on the left while they download.
-     */
+    /** Warm the Movies and Shows catalog rows and their first pictures before the viewer switches tabs. */
     private fun warmPages() = background({
-        Stremio.savedLibrary(profile.authKey).orEmpty()
-            .filter { !it.optBoolean("removed") && !isLiveType(it.optString("type")) }
-            .sortedByDescending { it.optString("_ctime") }.take(LIST_COLUMNS * 3)
-            .forEach { it.text("poster")?.let { url -> Images.prefetch(url, (libraryPosterWidth() * CARD_GROW).toInt()) } }
         val catalogs = Stremio.savedAddons(profile.authKey).orEmpty().flatMap { it.catalogs }
         for (p in listOf(Page.SHOWS, Page.MOVIES)) {
             val shelves = catalogs.mapNotNull { c -> shelf(c)?.takeIf { it.page == p }?.let { c to it } }.sortedBy { it.second.rank }
@@ -907,7 +900,7 @@ class MainActivity : Screen() {
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && header.hasFocus()) {
                 if (warning()?.requestFocus() == true) return true
                 pageChip()?.requestFocus()?.let { if (it) return true }
-                if ((page.isCatalog || page == Page.LIBRARY) && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
+                if (page.isCatalog && genreStrip.visibility != View.VISIBLE && firstRow()?.focusFirst() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN && genreStrip.hasFocus()) {
                 (lastOrTitle()?.takeIf { it.isAttachedToWindow && it.isShown } ?: firstRow()?.cards?.firstOrNull())
@@ -1578,11 +1571,13 @@ class MainActivity : Screen() {
         val genre = meta?.genres?.firstOrNull() ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
         val length = if (hasEpisodes(item.type, meta?.videos)) seasonCount(item, meta) else meta?.runtime
         // A show in progress describes its next episode, so the line names that episode rather than the show.
-        val code = episodeLabel(item)
+        val episode = episode(item)
+        val continuing = item.resumeAt > 0 || (item.nextEpisodePending && isEpisodeAired(episode?.released))
+        val code = if (page == Page.LIBRARY && (!continuing || item.type == "other")) null else episodeLabel(item)
         val factsList = mutableListOf<String>()
         // ChadFlix: "Drama • 2014 • 1h 41m • PG-13", with Continue Watching's time left (its card only has the bar).
         val left = item.timeLeft ?: HomeStyle.runtimeMs(meta?.runtime).takeIf { item.resumeAt in 1L until it }?.let { timeLeft(it, item.resumeAt) }
-        if (code != null) factsList += listOfNotNull(code, episode(item)?.title?.takeIf { it.isNotEmpty() }, left)
+        if (code != null) factsList += listOfNotNull(code, episode?.title?.takeIf { it.isNotEmpty() }, left)
         // No "Movie"/"Series" (the tab says it). A film's time left goes in brackets after its runtime, "1h 59m (1h 56m
         // left)"; otherwise (a show's seasons, no runtime) it's its own item, "3 Seasons • 40m left".
         else {
@@ -1600,7 +1595,7 @@ class MainActivity : Screen() {
         val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
         heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
         // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
-        heroAbout.text = episode(item)?.overview?.takeIf { it.isNotBlank() } ?: item.about
+        heroAbout.text = episode?.overview?.takeIf { code != null && it.isNotBlank() } ?: item.about
         if (mode == Mode.BROWSE && !page.isBrowse) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS) // ChadFlix: showHero fades home's
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
     }
@@ -3063,6 +3058,9 @@ class MainActivity : Screen() {
                 rate(this, item, fade = true) // its score came with its details (focused card only)
                 if (homeRow && active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
             }
+            // Saved shows need episode metadata for their badges even when their poster is already available.
+            // Bind one page of cards at a time, including later pages, on the same cache and executor as Home.
+            if (page == Page.LIBRARY && item.type != "movie") fill(item)
             // ChadFlix: no length saved and the details weren't in yet: the runtime from them gives the bar.
             if (continueRow && item.progress == 0f && item.resumeAt > 0) {
                 item.onFill += {
