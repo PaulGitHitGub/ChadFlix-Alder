@@ -338,7 +338,7 @@ class SearchActivity : ExploreScreen() {
                 // Home may have started the move on its own bar the moment the remote landed: carry on from there.
                 val gone = intent.getLongExtra(PILL_PLAYED, 0L).coerceAtLeast(0L)
                 topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton }, gone,
-                    chained = intent.getBooleanExtra(PILL_CHAINED, false))
+                    chained = intent.getBooleanExtra(PILL_CHAINED, false), fromSquash = intent.getFloatExtra(PILL_SQUASH, 1f))
                 // The page (hidden since onCreate) comes in as the pill lands; the old one is gone at once.
                 pageViews.forEach { it.animate().alpha(1f).setStartDelay((PAGE_IN_AT - gone).coerceAtLeast(0)).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
             }

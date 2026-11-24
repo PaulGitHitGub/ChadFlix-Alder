@@ -15,6 +15,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.os.Build
+import android.os.SystemClock
 import android.text.TextPaint
 import android.util.Property
 import android.view.View
@@ -32,6 +33,9 @@ internal const val PILL_PLAYED = "pillPlayed"
 
 /** Search's intent extra: Home's pill was still gliding between names when the slingshot started (a held Left). */
 internal const val PILL_CHAINED = "pillChained"
+
+/** Search's intent extra: how thin Home's pill was when the slingshot started (mid-Taffy), so Search's starts the same. */
+internal const val PILL_SQUASH = "pillSquash"
 
 /** Animators run (Remove animations off); before API 26 they always do, ending at once when the scale is 0. */
 internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
@@ -174,6 +178,12 @@ internal class SearchPill(
     override fun onDraw(canvas: Canvas) {
         if (!started) return
         recolorNames()
+        // Home: the open page's grey pill while the white one is on another name, under it as the white streak passes.
+        openName?.let { name ->
+            rectOf(name, box)
+            fill.color = HomeStyle.OPEN_TAB
+            canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, fill)
+        }
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
         if (pillR - left > 1f) {
@@ -295,11 +305,21 @@ internal class SearchPill(
         running?.cancel()
         running = null
         parts.clear()
+        edgesFor = 0L
         animate = animationsOn()
         measure()
     }
 
+    /**
+     * An edge (the pill's left or right) is still moving: only then is a press "chained" (the README's held remote), not
+     * while just the squash or the height settles after the edges have landed.
+     */
+    private val edgesMoving get() = running?.isRunning == true && SystemClock.uptimeMillis() < edgesUntil
+    private var edgesUntil = 0L // uptime ms the running move's edges land
+    private var edgesFor = 0L // ms into the move the edges being planned land
+
     private fun play() {
+        edgesUntil = SystemClock.uptimeMillis() + edgesFor - pendingSeek
         if (parts.isEmpty()) return invalidate()
         val set = AnimatorSet().apply { playTogether(parts.toList()) }
         parts.clear()
@@ -320,7 +340,7 @@ internal class SearchPill(
     private var pendingSeek = 0L
 
     /** The page is going: nothing runs on after it. */
-    fun stop() { running?.cancel(); running = null }
+    fun stop() { running?.cancel(); running = null; edgesUntil = 0L }
 
     /**
      * Home is starting Search: its pill holds still where it was last drawn (the shared main thread is about to be busy
@@ -330,15 +350,14 @@ internal class SearchPill(
         val set = running ?: return 0L
         val played = if (Build.VERSION.SDK_INT >= 24) set.currentPlayTime else 0L
         set.pause()
+        edgesUntil = 0L
         return played
     }
-
-    /** Home again: the pill it started is gone (Search took over, or never opened). */
-    fun reset() { stop(); started = false; invalidate() }
 
     /** [p] from [from] to [to] after [delay] ms over [ms]; with animations off, or already there, it lands at once. */
     private fun tween(p: F, from: Float, to: Float, delay: Long, ms: Long, curve: TimeInterpolator) {
         if (!animate || from == to) return p.put(this, to)
+        if (p === PILL_L || p === PILL_R) edgesFor = maxOf(edgesFor, delay + ms)
         parts += ObjectAnimator.ofFloat(this, p, from, to).apply { startDelay = delay; duration = ms; interpolator = curve }
     }
 
@@ -361,16 +380,17 @@ internal class SearchPill(
      * capsule with the black pill on [focus]. [played] (ms): how far Home's own copy of the move had got when it froze
      * ([freeze]), so this one carries on from what Home last drew instead of starting again.
      */
-    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L, chained: Boolean = false) {
+    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L, chained: Boolean = false, fromSquash: Float = 1f) {
         // Home's own pill already on (or gliding between) its names: the slingshot carries on from where it is.
         val live = started && fromOnScreen == null && mode == Mode.NAME
-        handChained = chained || (live && running?.isRunning == true)
+        handChained = chained || (live && edgesMoving)
         started = true
         measure()
         if (fromOnScreen != null && fromOnScreen.size == 4) {
             getLocationOnScreen(here)
             pillL = fromOnScreen[0] - here[0].toFloat(); pillT = fromOnScreen[1] - here[1].toFloat()
             pillR = fromOnScreen[2] - here[0].toFloat(); pillB = fromOnScreen[3] - here[1].toFloat()
+            squash = fromSquash // Home's pill was thinning mid-move: no step in its thickness at the hand-over
         } else if (!live) { pillL = slotR.left; pillR = slotR.right; pillT = slotR.top; pillB = slotR.bottom }
         if (!live) { glyphA = 1f; glyphS = 1f }
         blackA = 0f
@@ -405,7 +425,12 @@ internal class SearchPill(
     }
 
     val isStarted get() = started
-    val isMoving get() = running?.isRunning == true
+    val isMoving get() = edgesMoving
+
+    /** Home: the open page's name, given its grey pill (today's look) while the white pill is elsewhere; null: none. */
+    var openName: View? = null
+        set(v) { if (field !== v) { field = v; invalidate() } }
+    val squashNow get() = squash // the live thinning, for Search to carry on without a step
 
     /** Where the pill is now (screen px: left, top, right, bottom), for Search to carry on from. */
     fun pillOnScreen(): IntArray {
@@ -452,7 +477,7 @@ internal class SearchPill(
         }
         // From a page's name (or Home's pill): the slingshot. From a pill still gliding between names (a held Left), the
         // stretch just carries on: no 50 ms delay, both edges on the cruising curve (tab-anim README, Taffy hand-over).
-        val chained = handChained || running?.isRunning == true
+        val chained = handChained || edgesMoving
         mode = Mode.OPEN
         on = item
         begin()
@@ -530,7 +555,7 @@ internal class SearchPill(
     /** Onto a page's name: from the capsule the mirrored slingshot (right edge first); between names the Taffy. */
     private fun toName(name: View) {
         if (mode == Mode.NAME && on === name) return invalidate()
-        val chained = running?.isRunning == true // a press while the pill is still moving (a held remote)
+        val chained = edgesMoving // a press while an edge is still moving (a held remote)
         begin()
         val t = rectOf(name)
         if (mode == Mode.OPEN) {
@@ -582,9 +607,9 @@ internal class SearchPill(
         dip(SQUASH, if (names > 1) 0.93f else 0.95f, 0, 70, 140)
     }
 
-    /** A chained move's duration: the distance left at the held-remote speed (1.3 px/ms at 1080p), within [min]..[max]. */
+    /** A chained move's duration: the distance left at the held-remote speed (1.3 px/ms on a 1920 px wide screen). */
     private fun cruise(distance: Float, min: Long, max: Long) =
-        (Math.abs(distance) / (1.3f * resources.displayMetrics.density / 2f)).toLong().coerceIn(min, max)
+        (Math.abs(distance) / (1.3f * resources.displayMetrics.widthPixels / 1920f)).toLong().coerceIn(min, max)
 
     /** The places moved (the capsule widened for "Listening…", the names changed): at rest, the pill follows at once. */
     fun relayout() {

@@ -820,9 +820,11 @@ class MainActivity : Screen() {
     override fun onResume() {
         super.onResume()
         searching = false
-        // Back from Search (or it never showed): the pill rests on its name again.
+        // Back from Search (or it never showed): the pill rests at once where the remote is (the magnifier, still focused).
+        val opening = searchFrom
+        searchFrom = null
         endPill(instant = true)
-        if (searchFrom != null) { searchFrom = null; if (search != null) styleNav() }
+        if (opening != null && search != null) styleNav()
         if (!::profile.isInitialized) return
         startFps()
         // ChadFlix: Settings › Ratings may have changed: the focused card's badge follows (no score hides it).
@@ -1115,7 +1117,9 @@ class MainActivity : Screen() {
         setPadding(dp(16), dp(5), dp(16), dp(5))
         setOnFocusChangeListener { _, has ->
             if (!has) { navLeft = p; navLeftAt = SystemClock.uptimeMillis() } // Search's pill may start here
-            styleNav()
+            // Losing focus, the bar is restyled once the new focus is known: a name or the magnifier restyles it itself,
+            // so a Left onto the magnifier never first sends the pill towards the open page.
+            if (has) styleNav() else main.post { styleNav() }
             main.removeCallbacks(switchPage)
             if (has && p != page) { pending = p; main.postDelayed(switchPage, SWITCH_WAIT) }
         }
@@ -1212,12 +1216,14 @@ class MainActivity : Screen() {
         // is told so it carries on the same way.
         pillFromRect = pill.pillOnScreen()
         pillChained = pill.isMoving
+        pillFromSquash = pill.squashNow
         pill.capsuleOnScreen = target
         pill.arrive(null, null)
         pillStartedAt = SystemClock.uptimeMillis()
     }
     private var pillFromRect: IntArray? = null
     private var pillChained = false
+    private var pillFromSquash = 1f
 
     /** Home again: the pill leaves Search's move; back from Search ([instant]) it rests on its name at once, else glides back. */
     private fun endPill(instant: Boolean = false) {
@@ -1227,8 +1233,13 @@ class MainActivity : Screen() {
         styleNav()
     }
 
-    /** The name the pill belongs on: the focused one, the one Search is opening from, else the open page's. */
-    private fun navTarget(): TextView? = navItems.values.firstOrNull { it.isFocused } ?: navItems[searchFrom] ?: navItems[page]?.takeIf { it.isShown }
+    /**
+     * Where the pill belongs: the focused name; the magnifier while it has the remote and Search isn't opening (Back from
+     * Search, or it didn't open); the name Search is opening from; else the open page's.
+     */
+    private fun navTarget(): View? = navItems.values.firstOrNull { it.isFocused }
+        ?: search?.takeIf { it.isFocused && searchFrom == null && pillStartedAt == 0L }
+        ?: navItems[searchFrom] ?: navItems[page]?.takeIf { it.isShown }
 
     /** White while the remote is on a name or below the bar; faint while it's on the avatar or the gear. */
     private fun navLit(target: View) = header.findFocus() == null || target.isFocused || searchFrom != null
@@ -1255,6 +1266,7 @@ class MainActivity : Screen() {
             from?.let { putExtra(HOME_PILL, it) }
             if (played > 0) putExtra(PILL_PLAYED, played)
             if (pillStartedAt > 0 && pillChained) putExtra(PILL_CHAINED, true)
+            if (pillStartedAt > 0) putExtra(PILL_SQUASH, pillFromSquash)
         })
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
@@ -1288,10 +1300,12 @@ class MainActivity : Screen() {
         // the words it covers, instead of each name's own white pill and the grey one left on the open page.
         val pill = launchPill?.takeIf { it.isStarted }
         val pillOn = if (pill != null && pillStartedAt == 0L) navTarget() else null
+        // With the moving pill, the open page keeps today's grey pill while the white one is elsewhere, drawn by the pill
+        // under the white one (so the white streak passes over it, not under a grey veil).
+        pill?.openName = navItems[page]?.takeIf { pillOn != null && it !== pillOn && it.isShown }
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
-            // With the moving pill, the open page keeps today's grey pill while the white one is on another name.
-            item.background = if (pill != null) (if (p == page && pillOn != null && pillOn !== item) HomeStyle.pill(HomeStyle.OPEN_TAB) else null)
+            item.background = if (pill != null) null
                 else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
             if (pill == null) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
