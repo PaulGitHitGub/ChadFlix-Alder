@@ -631,7 +631,7 @@ abstract class ExploreScreen : Screen() {
         val r = HomeStyle.ringOut(this)
 
         val dim = View(this).apply { setBackgroundColor(POP_DIM); alpha = 0f }
-        popLayer.addView(dim, FrameLayout.LayoutParams(-1, maxOf(popLayer.height, top + h + r)))
+        popLayer.addView(dim, FrameLayout.LayoutParams(-1, -1))
         val holder = FrameLayout(this).apply { clipChildren = false }
         val pop = FrameLayout(this).apply {
             background = GradientDrawable().apply { setColor(POP_FILL); cornerRadius = HomeStyle.CARD_RADIUS * resources.displayMetrics.density }
@@ -729,10 +729,16 @@ abstract class ExploreScreen : Screen() {
                 chip.addView(face, dp(18), dp(18))
                 Images.load(photo?.let { "https://image.tmdb.org/t/p/w185$it" }, face, dp(18))
                 chip.addView(text(person, HomeStyle.INFO, color = HomeStyle.WHITE).apply {
-                    isSingleLine = true; ellipsize = TextUtils.TruncateAt.END; maxWidth = dp(84); setPadding(dp(5), 0, 0, 0)
+                    isSingleLine = true; ellipsize = TextUtils.TruncateAt.END; maxWidth = dp(130); setPadding(dp(5), 0, 0, 0)
                 })
                 chips.addView(chip, LinearLayout.LayoutParams(-2, dp(24)).apply { marginEnd = dp(7) })
             }
+            // Whole names, as the mockup: a chip that doesn't fit is left out rather than squeezed into "Robert Dow…".
+            fun squeezed(): Boolean {
+                val chip = chips.getChildAt(chips.childCount - 1) as LinearLayout
+                return ((chip.getChildAt(chip.childCount - 1) as TextView).layout?.getEllipsisCount(0) ?: 0) > 0
+            }
+            chips.post { while (chips.childCount > 1 && squeezed()) chips.removeViewAt(chips.childCount - 1) }
             val id = d.optJSONObject("external_ids")?.text("imdb_id") ?: return@background scores.removeAllViews()
             val key = Settings.mdblistKey(this)
             background({

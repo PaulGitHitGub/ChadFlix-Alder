@@ -133,6 +133,7 @@ class SearchActivity : ExploreScreen() {
         keyboard.visibility = if (open) View.VISIBLE else View.GONE
         recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
         panelScroll.visibility = if (open) View.GONE else View.VISIBLE
+        keyboardButton.visibility = if (open) View.GONE else View.VISIBLE // its keys are showing: only Voice Search above them
         voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else keyboardButton.id
         lastKeyboardFocus = if (open) firstKey else keyboardButton
         (if (open) firstKey else peopleButton)?.requestFocus()
@@ -188,10 +189,10 @@ class SearchActivity : ExploreScreen() {
         root.addView(buildPanel(),FrameLayout.LayoutParams(dp(PANEL_W),dp((height - PANEL_TOP - SAFE_BOTTOM).toInt())).apply {
             leftMargin=dp(KEYS_X); topMargin=dp(PANEL_TOP)
         })
-        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(PANEL_TOP) })
+        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP) })
 
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
-        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(PANEL_TOP + 7 * KEY_H + 8) })
+        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP + 7 * KEY_H + 8) })
         showRecent()
 
         results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
@@ -1108,6 +1109,7 @@ class SearchActivity : ExploreScreen() {
         const val ACTION_GAP = 2
         const val ACTION_PAD = 17 // their icons line up with the panel rows' words (8 + 9 dp inside the panel)
         const val PANEL_TOP = 130
+        const val KEYS_TOP = 104 // the keys take Keyboard Search's place under Voice Search (A2)
         const val SAFE_BOTTOM = 27 // the TV's safe area at the bottom
         const val KEY_W = 33
         const val KEY_H = 32
