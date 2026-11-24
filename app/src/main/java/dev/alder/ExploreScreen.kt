@@ -24,7 +24,10 @@ abstract class ExploreScreen : Screen() {
     private var query = ExploreQuery()
     protected lateinit var peopleButton: View
     private lateinit var filterBar: View
+    private lateinit var barRow: LinearLayout // the bar's pills, inside [filterBar]
+    private lateinit var headingControls: View // Clear All Filters and Sort
     private lateinit var infoPanel: View
+    private var unseen: Meta? = null // focused while the info panel was hidden: shown once it's back
     protected lateinit var sortControl: TextView
     private lateinit var headingField: EditText
     private var upFromSort = View.NO_ID // the top bar, when there's no filter bar over Sort
@@ -47,6 +50,7 @@ abstract class ExploreScreen : Screen() {
     private lateinit var infoLogo: ImageView
     private lateinit var infoCert: TextView
     private lateinit var infoFacts: TextView
+    private lateinit var infoGenres: TextView
     private lateinit var infoScores: LinearLayout
     private lateinit var infoOverview: TextView
     private lateinit var infoCast: TextView
@@ -73,10 +77,32 @@ abstract class ExploreScreen : Screen() {
     private fun sorts() = query.sortOptions().map { (key, words) -> Pick(key, HomeStyle.titleCase(getString(words))) }
     private fun sortLabel() = sorts().let { all -> (all.firstOrNull { it.key == query.sort } ?: all.first()).label }
 
-    /** The heading's sort drop-down, "Sort: Popular ⌄": OK opens the reliable sorts under it; Down goes to the posters. */
-    protected fun buildSortControl(field: EditText, topBar: View): TextView {
+    /**
+     * The heading's controls at its right: Clear All Filters while any is set (here, so the filter bar fits in one row),
+     * then the sort drop-down, "Sort: Popular ⌄", whose OK opens the reliable sorts under it. Down goes to the posters.
+     */
+    protected fun buildSortControl(field: EditText, topBar: View): View {
         headingField = field
         upFromSort = topBar.id
+        clearFilters = text(R.string.ex_clear_filters, SMALL, color = TEXT).apply {
+            id = View.generateViewId()
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setPadding(dp(12),0,dp(12),0)
+            isFocusable = true
+            nextFocusLeftId = id // not into the heading's words
+            fun style(on: Boolean) {
+                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else outlined(0, GLASS_EDGE)
+                setTextColor(if (on) HomeStyle.BLACK else TEXT)
+            }
+            style(false)
+            setOnFocusChangeListener { _, has -> style(has) }
+            setOnClickListener {
+                sortControl.requestFocus() // this pill goes once nothing is set
+                change(ExploreQuery(type=query.type, sort=query.sort))
+            }
+            setOnKeyListener(downToPosters)
+        }
         sortControl = text("", SMALL).apply {
             id = View.generateViewId()
             isFocusable = true
@@ -88,7 +114,6 @@ abstract class ExploreScreen : Screen() {
                 setBounds(0, 0, dp(10), dp(10))
             }, null)
             compoundDrawablePadding = dp(6)
-            nextFocusLeftId = id // not into the heading's words
             nextFocusRightId = id
             setOnClickListener { sortPicker() }
             setOnFocusChangeListener { _, has ->
@@ -98,8 +123,14 @@ abstract class ExploreScreen : Screen() {
             }
             setOnKeyListener(downToPosters)
         }
+        clearFilters.nextFocusRightId = sortControl.id
         styleSort()
-        return sortControl
+        headingControls = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(clearFilters, LinearLayout.LayoutParams(-2, -1).apply { marginEnd = dp(BAR_GAP) })
+            addView(sortControl, LinearLayout.LayoutParams(-2, -1))
+        }
+        return headingControls
     }
 
     /** Down from the filter bar or Sort: the first row's poster under it (or the first, once the first page comes). */
@@ -139,7 +170,7 @@ abstract class ExploreScreen : Screen() {
     }
 
     private fun colorHeading(highlight: Boolean) {
-        if (sortControl.visibility != View.VISIBLE) return
+        if (headingControls.visibility != View.VISIBLE) return
         val words = SpannableString(heading)
         val sort = sortLabel()
         val start = words.toString().lastIndexOf(sort)
@@ -149,7 +180,8 @@ abstract class ExploreScreen : Screen() {
 
     /**
      * The filter bar over the posters (Neon's Approach A): Movies | Shows, then a pill per filter in [Facet]'s order
-     * showing its value ("Genre Horror + Comedy"), and Clear All Filters while any is set. It scrolls sideways if long.
+     * showing its value ("Genre Horror + Comedy"). It fits its width ([fitBar]); only a language too long for even
+     * cut values scrolls sideways.
      */
     protected fun buildFilterBar(): View {
         val bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -158,11 +190,11 @@ abstract class ExploreScreen : Screen() {
             setPadding(dp(3),dp(3),dp(3),dp(3))
         }
         listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows).forEach { (type, name) ->
-            val b = text(name, SMALL).apply {
+            val b = text(name, HomeStyle.INFO).apply {
                 gravity = Gravity.CENTER
                 isFocusable = true
                 includeFontPadding = false
-                setPadding(dp(12),0,dp(12),0)
+                setPadding(dp(10),0,dp(10),0)
                 setOnKeyListener(downToPosters)
                 setOnFocusChangeListener { _, _ -> styleTypes() }
                 setOnClickListener {
@@ -179,31 +211,25 @@ abstract class ExploreScreen : Screen() {
         }
         bar.addView(types, LinearLayout.LayoutParams(-2,dp(BAR_H)))
         Facet.values().forEach { f ->
-            val icon = if (f == Facet.PEOPLE) R.drawable.ic_person else 0
-            val key = text(title(f), SMALL).apply {
+            val key = text(title(f), HomeStyle.INFO).apply {
                 isSingleLine = true
                 includeFontPadding = false
-                if (icon != 0) {
-                    setCompoundDrawablesRelative(getDrawable(icon)?.mutate()?.apply { setBounds(0,0,dp(11),dp(11)) }, null, null, null)
-                    compoundDrawablePadding = dp(5)
-                }
             }
-            val label = text("", SMALL, bold = true).apply {
+            val label = text("", HomeStyle.INFO, bold = true).apply {
                 isSingleLine = true
                 includeFontPadding = false
                 ellipsize = TextUtils.TruncateAt.END
-                maxWidth = dp(VALUE_MAX)
             }
             val chevron = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_down) }
             val chip = LinearLayout(this).apply {
                 id = View.generateViewId()
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(12),0,dp(10),0)
+                setPadding(dp(10),0,dp(8),0)
                 isFocusable = true
                 addView(key)
-                addView(label, LinearLayout.LayoutParams(-2,-2).apply { marginStart = dp(5) })
-                addView(chevron, LinearLayout.LayoutParams(dp(10),dp(10)).apply { marginStart = dp(5) })
-                setOnFocusChangeListener { _, _ -> styleRow(f) }
+                addView(label, LinearLayout.LayoutParams(-2,-2).apply { marginStart = dp(4) })
+                addView(chevron, LinearLayout.LayoutParams(dp(9),dp(9)).apply { marginStart = dp(4) })
+                setOnFocusChangeListener { _, _ -> downWhileLoading = false; styleRow(f) }
                 setOnClickListener { open(f) }
                 setOnKeyListener(downToPosters)
             }
@@ -211,31 +237,33 @@ abstract class ExploreScreen : Screen() {
             rows[f] = Row(chip, key, label, chevron)
             if (f == Facet.PEOPLE) peopleButton = chip
         }
-        clearFilters = text(R.string.ex_clear_filters, SMALL, color = TEXT).apply {
-            id = View.generateViewId()
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            setPadding(dp(12),0,dp(12),0)
-            isFocusable = true
-            fun style(on: Boolean) {
-                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else outlined(0, GLASS_EDGE)
-                setTextColor(if (on) HomeStyle.BLACK else TEXT)
-            }
-            style(false)
-            setOnFocusChangeListener { _, has -> style(has) }
-            setOnClickListener {
-                rows.values.first().view.requestFocus() // this pill goes once nothing is set
-                change(ExploreQuery(type=query.type, sort=query.sort))
-            }
-            setOnKeyListener(downToPosters)
-        }
-        bar.addView(clearFilters, LinearLayout.LayoutParams(-2,dp(BAR_H)).apply { marginStart = dp(BAR_GAP) })
+        barRow = bar
         filterBar = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(bar)
+            addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+                if (right - left != oldRight - oldLeft) post { fitBar() }
+            }
         }
         updatePanel()
         return filterBar
+    }
+
+    /**
+     * The whole bar in its width: when the values don't fit, the longest are cut to one width (ending in "…"), never
+     * shorter than [VALUE_MIN].
+     */
+    private fun fitBar() {
+        val room = filterBar.width
+        if (room == 0) return
+        val values = rows.values.map { it.value }
+        values.forEach { it.maxWidth = Int.MAX_VALUE }
+        val any = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        barRow.measure(any, any)
+        val natural = values.map { it.measuredWidth }
+        var cap = natural.maxOrNull() ?: return
+        while (barRow.measuredWidth - natural.sumOf { it - minOf(it, cap) } > room && cap > dp(VALUE_MIN)) cap -= dp(2)
+        values.forEach { it.maxWidth = cap }
     }
 
     private fun outlined(fill: Int, edge: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = 999f; setStroke(dp(1), edge) }
@@ -248,7 +276,6 @@ abstract class ExploreScreen : Screen() {
         r.view.background = when { on -> HomeStyle.pill(HomeStyle.WHITE); lit -> outlined(CHOSEN_FILL, CHOSEN_EDGE); else -> outlined(SEGMENT, GLASS_EDGE) }
         val name = when { on -> FOCUSED_VALUE; lit -> CHOSEN_NAME; else -> HomeStyle.LABEL_GREY }
         r.key.setTextColor(name)
-        r.key.compoundDrawablesRelative[0]?.setTint(name)
         r.value.setTextColor(when { on -> HomeStyle.BLACK; lit -> TUNGSTEN; else -> HomeStyle.WHITE })
         r.chevron.imageTintList = ColorStateList.valueOf(name)
     }
@@ -259,15 +286,19 @@ abstract class ExploreScreen : Screen() {
      */
     protected fun showCatalogueControls(bar: Boolean, panel: Boolean) {
         filterBar.visibility = if (bar) View.VISIBLE else View.GONE
-        sortControl.visibility = filterBar.visibility
+        headingControls.visibility = filterBar.visibility
         infoPanel.visibility = if (panel) View.VISIBLE else View.GONE
+        if (panel) unseen?.let(::showInfo)
         linkSort()
     }
 
-    /** Up from Sort: the bar's last pill, not the Settings gear straight above; with no bar, the top bar. */
+    /**
+     * Up from Sort: the bar's last pill, not the Settings gear straight above; with no bar, the top bar. Left: Clear
+     * All Filters while it shows.
+     */
     private fun linkSort() {
-        sortControl.nextFocusUpId = if (filterBar.visibility != View.VISIBLE) upFromSort
-            else (if (clearFilters.visibility == View.VISIBLE) clearFilters else rows.values.last().view).id
+        sortControl.nextFocusUpId = if (filterBar.visibility != View.VISIBLE) upFromSort else rows.values.last().view.id
+        sortControl.nextFocusLeftId = (if (clearFilters.visibility == View.VISIBLE) clearFilters else sortControl).id
     }
 
     /** The catalogue's first poster, for Right from Keyboard Search. */
@@ -291,6 +322,7 @@ abstract class ExploreScreen : Screen() {
         styleSort()
         colorHeading(sortControl.hasFocus())
         linkSort()
+        filterBar.post { fitBar() }
     }
 
     private fun active(f: Facet) = query.without(f) != query &&
@@ -629,7 +661,7 @@ abstract class ExploreScreen : Screen() {
 
     /**
      * The focused poster's title page in brief, left of the grid (Neon's B5 side panel, for one title): its art fading
-     * into the panel, logo or name, year · genres · length with the certificate, ratings, overview and cast. What TMDb's
+     * into the panel, logo or name, certificate · year · length, genres, ratings, overview and cast. What TMDb's
      * discover answer holds shows at once; the rest comes after a rest on the poster, into fixed-size slots.
      */
     protected fun buildInfoPanel(): View {
@@ -638,6 +670,8 @@ abstract class ExploreScreen : Screen() {
         infoLogo = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(INFO_LOGO_W); maxHeight = dp(INFO_TITLE_H) }
         infoCert = tag("", HomeStyle.WHITE).apply { visibility = View.GONE }
         infoFacts = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
+        // Genres on a line of their own, so "Science Fiction" isn't cut by the year and length.
+        infoGenres = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
         infoScores = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         infoOverview = text("", SMALL, color = OVERVIEW).apply {
             ellipsize = TextUtils.TruncateAt.END
@@ -658,7 +692,8 @@ abstract class ExploreScreen : Screen() {
                 addView(infoCert, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(7) })
                 addView(infoFacts)
             }, LinearLayout.LayoutParams(-1, dp(20)).apply { topMargin = dp(7) })
-            addView(infoScores, LinearLayout.LayoutParams(-1, dp(16)).apply { topMargin = dp(6) })
+            addView(infoGenres, LinearLayout.LayoutParams(-1, dp(18)).apply { topMargin = dp(2) })
+            addView(infoScores, LinearLayout.LayoutParams(-1, dp(18)).apply { topMargin = dp(6) })
             addView(infoOverview, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(10) })
             addView(infoCast, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             visibility = View.INVISIBLE
@@ -678,6 +713,9 @@ abstract class ExploreScreen : Screen() {
 
     /** [meta] in the info panel: what the discover answer holds now, the rest after a rest on it ([HomeStyle.WASH_WAIT]). */
     private fun showInfo(meta: Meta) {
+        // Hidden (the keys have the left column): no art or lookups for it until it's back.
+        if (infoPanel.visibility != View.VISIBLE) { unseen = meta; return }
+        unseen = null
         if (shown === meta) return
         pending?.let(main::removeCallbacks)
         shown = meta
@@ -687,7 +725,8 @@ abstract class ExploreScreen : Screen() {
         infoName.text = meta.name
         infoName.visibility = View.VISIBLE
         infoCert.visibility = View.GONE
-        infoFacts.text = listOfNotNull(meta.year, *meta.genres.take(2).toTypedArray()).joinToString(DOT)
+        infoFacts.text = meta.year.orEmpty()
+        infoGenres.text = meta.genres.take(2).joinToString(DOT)
         infoScores.removeAllViews()
         repeat(2) {
             infoScores.addView(View(this).apply { background = rounded(PLACEHOLDER, 4) },
@@ -701,6 +740,7 @@ abstract class ExploreScreen : Screen() {
     /** Nothing for the info panel: no matches, or the first page failed. */
     private fun clearInfo() {
         shown = null
+        unseen = null
         infoBody.visibility = View.INVISIBLE
         Images.load(null, infoArt, 0)
     }
@@ -721,10 +761,10 @@ abstract class ExploreScreen : Screen() {
             val duration = if (meta.type=="movie") d.optInt("runtime").takeIf { it>0 }?.let { runtime("$it min") } // "2h 06m", as the title page
                 else d.optInt("number_of_seasons").takeIf { it>0 }?.let { resources.getQuantityString(R.plurals.seasons,it,it) }
             certificate?.let { infoCert.text = it; infoCert.visibility = View.VISIBLE }
-            infoFacts.text = (listOfNotNull(meta.year)+d.optJSONArray("genres").objects().take(2).map { it.optString("name") }+listOfNotNull(duration)).joinToString(DOT)
-            // The person the catalogue is filtered by first, then the top-billed cast.
-            val names = (listOfNotNull(query.person?.name) +
-                d.optJSONObject("credits")?.optJSONArray("cast").objects().mapNotNull { it.text("name") }).distinct().take(3)
+            infoFacts.text = listOfNotNull(meta.year, duration).joinToString(DOT)
+            infoGenres.text = d.optJSONArray("genres").objects().take(2).joinToString(DOT) { it.optString("name") }
+            // Only the top-billed cast: a director chosen in Directors & Cast isn't cast.
+            val names = d.optJSONObject("credits")?.optJSONArray("cast").objects().mapNotNull { it.text("name") }.take(3)
             if (names.isNotEmpty()) {
                 val label = getString(R.string.details_cast)
                 infoCast.text = SpannableString("$label  ${names.joinToString(", ")}").apply {
@@ -746,7 +786,7 @@ abstract class ExploreScreen : Screen() {
             }) {
                 if (shown !== meta) return@background
                 infoScores.removeAllViews()
-                addRatingLogos(infoScores,it.getOrNull().orEmpty())
+                addRatingLogos(infoScores,it.getOrNull().orEmpty(),gap = 9) // all three, whole, in the panel's width
             }
         }
     }
@@ -841,28 +881,29 @@ abstract class ExploreScreen : Screen() {
     }
 
     private companion object {
-        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the left column at 33 from the left and 196 wide; five
-        // 128 dp posters with 10 dp gutters, 9 dp between rows; the grid stops 33 dp from the right edge.
+        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the left column at 33 from the left and 208 wide; five
+        // ~126 dp posters with 10 dp gutters, 9 dp between rows; the grid stops 33 dp from the right edge.
         const val GRID_GAP = 10
         const val GRID_ROW_GAP = 9
         const val GRID_RIGHT = 33
         const val COLUMNS = 5
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
         const val BAR_H = 28 // the filter bar's pills (Neon A's 54 px, Voice Search's height)
-        const val BAR_GAP = 6
-        const val VALUE_MAX = 130 // a pill's value past this ends in "…"
+        const val BAR_GAP = 5
+        const val VALUE_MIN = 40 // the shortest a pill's value is cut to so the bar fits
         const val PICKER_W = 220 // the lists hanging under a pill or Sort
         const val GENRE_W = 260
         const val EDGE = 33 // a list never comes nearer the screen's sides
         const val DROP = 6 // between a pill and its list
-        // The info panel (B5 at half size): 16:9 art over the panel's 196 dp, the title rising 20 dp into its fade.
-        const val INFO_ART_W = 196
-        const val INFO_ART_H = 110
+        // The info panel (B5 at half size: 208 dp, as the reference's share of the width): 16:9 art over it, the title
+        // rising 20 dp into its fade.
+        const val INFO_ART_W = 208
+        const val INFO_ART_H = 117
         const val INFO_FADE_H = 70
         const val INFO_OVERLAP = 20
         const val INFO_TITLE_H = 44
         const val INFO_PAD = 12
-        const val INFO_LOGO_W = 172
+        const val INFO_LOGO_W = 184
         const val RESOLVING_ALPHA = 0.6f // a poster waiting for its title page
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6

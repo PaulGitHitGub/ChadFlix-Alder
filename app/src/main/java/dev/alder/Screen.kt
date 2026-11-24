@@ -621,7 +621,7 @@ abstract class Screen : Activity() {
      * [ratings] as white logos, each with its score, into [row] (the title page): "IMDb" box, tomato, three dots.
      * Logos as tall as the letters (13 dp), 5 dp from logo to score, 12 dp between pairs.
      */
-    protected fun addRatingLogos(row: LinearLayout, ratings: List<Pair<String, String>>, firstGap: Int = 0) =
+    protected fun addRatingLogos(row: LinearLayout, ratings: List<Pair<String, String>>, firstGap: Int = 0, gap: Int = 12) =
         ratings.forEachIndexed { i, (source, value) ->
             val (logo, width) = when (source) {
                 ROTTEN -> R.drawable.ic_rating_tomato to 14
@@ -629,7 +629,7 @@ abstract class Screen : Activity() {
                 else -> R.drawable.ic_rating_imdb to 27
             }
             row.addView(ImageView(this).apply { setImageResource(logo) },
-                LinearLayout.LayoutParams(dp(width), dp(13)).apply { marginStart = dp(if (i == 0) firstGap else 12) })
+                LinearLayout.LayoutParams(dp(width), dp(13)).apply { marginStart = dp(if (i == 0) firstGap else gap) })
             row.addView(text(value, SMALL, color = TEXT_2).onArt(), wrap().apply { marginStart = dp(5) })
         }
 

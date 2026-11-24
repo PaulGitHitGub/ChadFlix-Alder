@@ -141,7 +141,7 @@ internal object ExploreCatalogue {
         return Page(titles, answer.optInt("total_results"), page >= minOf(500, answer.optInt("total_pages")))
     }
 
-    /** A title's details for the preview and OK: IMDb id, cast, certificate. Its logo comes by IMDb id (Images.logoFor). */
+    /** A title's details for the info panel and OK: IMDb id, cast, certificate. Its logo comes by IMDb id (Images.logoFor). */
     fun details(meta: Meta): JSONObject {
         val media = if (meta.type == "movie") "movie" else "tv"
         val cert = if (media == "movie") "release_dates" else "content_ratings"

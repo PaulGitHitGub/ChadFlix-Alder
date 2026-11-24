@@ -129,7 +129,8 @@ class SearchActivity : ExploreScreen() {
         search(false)
     }
 
-    private fun toggleKeys(open: Boolean) {
+    /** Opens or closes the keys, putting the remote on [to] if given. */
+    private fun toggleKeys(open: Boolean, to: View? = null) {
         keyboard.visibility = if (open) View.VISIBLE else View.GONE
         recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
         keyboardButton.visibility = if (open) View.GONE else View.VISIBLE // its keys are showing: only Voice Search above them
@@ -137,7 +138,7 @@ class SearchActivity : ExploreScreen() {
         lastKeyboardFocus = if (open) firstKey else keyboardButton
         updateHeading()
         // Closing the keys: back to Directors & Cast after the people picker, else (typed words, no bar) Voice Search.
-        (if (open) firstKey else peopleButton.takeIf { it.isShown } ?: voice ?: keyboardButton)?.requestFocus()
+        (to ?: if (open) firstKey else peopleButton.takeIf { it.isShown } ?: voice ?: keyboardButton)?.requestFocus()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -466,14 +467,11 @@ class SearchActivity : ExploreScreen() {
                 v.nextFocusDownId = if (r < rows.lastIndex) rows[r + 1][c].id else (if (c < 3) space else delete).id
             }
         }
-        firstRow = rows[0]
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
         voice?.nextFocusUpId = input.id
     }
-
-    private var firstRow = emptyList<View>()
 
     /**
      * Voice Search and Keyboard Search: an icon and words, as wide as the panel, with no box until focused, when they
@@ -511,7 +509,9 @@ class SearchActivity : ExploreScreen() {
      * heading only names the catalogue, so the remote doesn't stop on it; with typed words it's Voice Search's Up.
      */
     private fun updateHeading() {
-        val catalogue = lookupMode == null && input.text.isBlank() && !listening
+        // While voice has the header (listening, "Didn't catch that"), the query before it decides: nothing moves
+        // until real words come.
+        val catalogue = lookupMode == null && (beforeVoice ?: input.text.toString()).isBlank()
         showCatalogueControls(bar = catalogue, panel = catalogue && keyboard.visibility != View.VISIBLE)
         if (catalogue && input.hasFocus()) (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).requestFocus()
         input.isFocusable = !catalogue
@@ -723,8 +723,14 @@ class SearchActivity : ExploreScreen() {
                     lookupMode != null -> lookup(null)
                     // Back on the keys first clears what's typed, then closes them.
                     input.text.isNotEmpty() && !resultsScroll.hasFocus() -> clearQuery()
-                    else -> { toggleKeys(false); keyboardButton.requestFocus() }
+                    else -> toggleKeys(false, keyboardButton)
                 }
+                return true
+            }
+            // Back with words found (a voice search: the keys are closed): the catalogue again, before Back leaves.
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && lookupMode == null && input.text.isNotEmpty()) {
+                (voice ?: keyboardButton).requestFocus()
+                clearQuery()
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus()) {
@@ -843,7 +849,7 @@ class SearchActivity : ExploreScreen() {
         val clearBtn = pill(R.string.search_clear).apply {
             setOnClickListener {
                 // Focus first, onto something showing: after a voice search the keys are hidden.
-                (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: peopleButton).requestFocus()
+                (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).requestFocus()
                 clearQuery()
             }
             setOnKeyListener { _, code, event ->
@@ -1085,14 +1091,14 @@ class SearchActivity : ExploreScreen() {
 
     private companion object {
         const val RECENT = 4
-        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the left column 196 wide at 33 from the left edge, the
+        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the left column 208 wide at 33 from the left edge, the
         // filter bar, heading and posters 18 dp right of it, the bar level with Voice Search.
-        const val RESULTS_X = 247 // the bar, the heading and the rows start here, right of the left column
+        const val RESULTS_X = 259 // the bar, the heading and the rows start here, 18 dp right of the left column
         const val BAR_BELOW = 8 // the filter bar to the heading
         const val QUERY_H = 28 // the heading line
         const val ROW_GAP = 12 // dp: a row's caption to the next row's title (was 16)
         const val KEYS_X = 33
-        const val PANEL_W = 196
+        const val PANEL_W = 208 // the info panel, as the owner's reference (B5) is wide
         const val VOICE_TOP = 66 // Voice Search, then Keyboard Search, above the info panel
         const val ACTION_H = 28
         const val ACTION_GAP = 2
