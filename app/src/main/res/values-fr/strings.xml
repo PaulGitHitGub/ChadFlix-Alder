@@ -590,8 +590,6 @@
     <string name="ex_match">Correspondance</string>
     <string name="ex_or">ou</string>
     <string name="ex_old">Plus Anciens</string>
-    <string name="ex_votes">Plus De Votes</string>
-    <string name="ex_box">Box-office</string>
     <string name="ex_before">Avant 1970</string>
     <string name="ex_range">Période Personnalisée</string>
     <string name="ex_from">De</string>
@@ -602,9 +600,9 @@
     <string name="ex_role">Tous Les Rôles</string>
     <string name="ex_popular">Populaires En Ce Moment</string>
     <string name="ex_remove">Retirer %1$s</string>
-    <string name="ex_filters">Filtres</string>
     <string name="ex_order">Ordre De Sortie</string>
     <string name="ex_unavailable">Titre Indisponible</string>
     <string name="ex_clear_filters">Effacer Tous Les Filtres</string>
-    <string name="ex_most_voted">%1$s avec le plus de votes</string>
+    <string name="showing_most_watched">Les Plus Regardés</string>
+    <string name="showing_blockbusters">Succès au Box-office</string>
 </resources>

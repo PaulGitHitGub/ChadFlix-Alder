@@ -611,8 +611,6 @@
     <string name="ex_match">تطابق</string>
     <string name="ex_or">أو</string>
     <string name="ex_old">الأقدم</string>
-    <string name="ex_votes">الأكثر تصويتًا</string>
-    <string name="ex_box">شباك التذاكر</string>
     <string name="ex_before">قبل 1970</string>
     <string name="ex_range">نطاق مخصص</string>
     <string name="ex_from">من</string>
@@ -623,9 +621,9 @@
     <string name="ex_role">أي دور</string>
     <string name="ex_popular">الرائج الآن</string>
     <string name="ex_remove">إزالة %1$s</string>
-    <string name="ex_filters">الفلاتر</string>
     <string name="ex_order">ترتيب الإصدار</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
-    <string name="ex_most_voted">%1$s الأكثر تصويتًا</string>
+    <string name="showing_most_watched">الأكثر مشاهدة</string>
+    <string name="showing_blockbusters">الأعلى إيرادًا</string>
 </resources>

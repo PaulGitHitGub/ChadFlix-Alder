@@ -2,6 +2,9 @@ package dev.alder
 
 import android.content.Intent
 import android.graphics.Color
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.view.KeyEvent
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -20,7 +23,12 @@ abstract class ExploreScreen : Screen() {
     protected lateinit var panel: LinearLayout
     protected lateinit var peopleButton: View
     protected lateinit var panelScroll: ScrollView
-    protected lateinit var summary: TextView
+    protected lateinit var sortStrip: LinearLayout
+    private lateinit var headingField: EditText
+    private val quickSorts = listOf("popular", "top", "new")
+    private val sortChips = mutableListOf<TextView>()
+    private var downWhileLoading = false
+    private var firstPageLoading = false
     private val labels = mutableMapOf<Facet, TextView>()
     private lateinit var clearFilters: View
     private val typeButtons = mutableListOf<TextView>()
@@ -36,8 +44,7 @@ abstract class ExploreScreen : Screen() {
         query.collection?.let { return it.label + DOT + sort }
         val type = getString(if (query.movie) R.string.tab_movies else R.string.tab_shows)
         return when {
-            query.sort=="az" -> "$type $sort"
-            query.sort=="votes" -> getString(R.string.ex_most_voted,type)
+            query.sort=="box" -> type + DOT + sort
             Locale.getDefault().language != "en" -> type + DOT + sort
             else -> "$sort $type"
         }
@@ -51,6 +58,73 @@ abstract class ExploreScreen : Screen() {
         Facet.SORT -> query.choices[f]?.label ?: getString(if (query.collection==null) R.string.discover_sort_popular else R.string.ex_order)
         else -> query.choices[f]?.label
     } ?: getString(R.string.filter_all)
+
+    protected fun buildSortStrip(field: EditText, topBar: View): LinearLayout {
+        headingField = field
+        sortStrip = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(caps(R.string.list_sort).apply { setPadding(0,0,dp(5),0) })
+        }
+        val choices = options(Facet.SORT)
+        for (key in quickSorts + "more") {
+            val pick = choices.find { it.key == key }
+            val chip = text(pick?.label ?: getString(R.string.menu_more), SMALL, bold = true).apply {
+                id = View.generateViewId()
+                isFocusable = true
+                isSingleLine = true
+                gravity = Gravity.CENTER
+                setPadding(dp(8),0,dp(8),0)
+                nextFocusUpId = topBar.id
+                setOnClickListener { if (pick == null) open(Facet.SORT) else applySort(pick) }
+                setOnFocusChangeListener { _, has ->
+                    downWhileLoading = false
+                    styleSortChip(this, key)
+                    colorHeading(has)
+                }
+                setOnKeyListener { _, code, event ->
+                    if (code != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) false
+                    else catalogueCards.firstOrNull()?.requestFocus() ?: firstPageLoading.also { downWhileLoading = it }
+                }
+            }
+            sortStrip.addView(chip,LinearLayout.LayoutParams(-2,-1))
+            sortChips += chip
+        }
+        sortChips.forEachIndexed { i, chip ->
+            chip.nextFocusLeftId = sortChips[maxOf(0,i-1)].id
+            chip.nextFocusRightId = sortChips[minOf(sortChips.lastIndex,i+1)].id
+        }
+        return sortStrip
+    }
+
+    private fun applySort(pick: Pick) {
+        if (query.sort == pick.key && sortStrip.visibility == View.VISIBLE) return
+        query = query.copy(choices = query.choices + (Facet.SORT to pick))
+        refreshCatalogue()
+    }
+
+    private fun activeChip() = quickSorts.indexOf(query.sort).takeIf { it >= 0 } ?: quickSorts.size
+
+    private fun styleSortChip(chip: TextView, key: String) {
+        val extra = key == "more"
+        val selected = if (extra) query.sort !in quickSorts else query.sort == key
+        if (extra) chip.text = (if (selected) value(Facet.SORT) else getString(R.string.menu_more)) + " ▾"
+        chip.background = when {
+            chip.hasFocus() -> HomeStyle.pill(HomeStyle.WHITE)
+            selected -> HomeStyle.pill(HomeStyle.OPEN_TAB)
+            else -> null
+        }
+        chip.setTextColor(if (chip.hasFocus()) HomeStyle.BLACK else HomeStyle.WHITE)
+        chip.isSelected = selected
+    }
+
+    private fun colorHeading(highlight: Boolean) {
+        if (sortStrip.visibility != View.VISIBLE) return
+        val words = SpannableString(heading)
+        val sort = value(Facet.SORT)
+        val start = words.toString().lastIndexOf(sort)
+        if (highlight && start >= 0) words.setSpan(ForegroundColorSpan(HomeStyle.LIST_RED),start,start+sort.length,0)
+        headingField.hint = words
+    }
 
     protected fun buildPanel(): ScrollView {
         panel = column(Gravity.START).apply {
@@ -90,6 +164,7 @@ abstract class ExploreScreen : Screen() {
                 addView(key)
                 addView(label, LinearLayout.LayoutParams(0,-1,1f).apply { marginStart = dp(5) })
                 rowFocus(8, also = { on ->
+                    if (f == Facet.SORT) colorHeading(on)
                     if (on) background = rounded(Color.WHITE,8)
                     key.setTextColor(if (on) Color.BLACK else Color.WHITE)
                     label.setTextColor(if (on) Color.BLACK else HomeStyle.PLOT)
@@ -129,8 +204,8 @@ abstract class ExploreScreen : Screen() {
             row.isFocusable = enabled
             row.alpha = if (enabled) 1f else .38f
         }
-        if (::summary.isInitialized) summary.text = Facet.values().filter { active(it) }.joinToString(DOT) { value(it) }
-            .ifBlank { getString(R.string.ex_filters) + " · " + getString(R.string.filter_all) }
+        sortChips.forEachIndexed { i, chip -> styleSortChip(chip,quickSorts.getOrNull(i) ?: "more") }
+        colorHeading(sortStrip.hasFocus() || (labels[Facet.SORT]?.parent as? View)?.hasFocus() == true)
     }
 
     private fun active(f: Facet) = query.without(f) != query && f != Facet.SORT &&
@@ -159,14 +234,17 @@ abstract class ExploreScreen : Screen() {
                     }, { toastFailure() })
                 }
             }
+            Facet.SORT -> {
+                val sorts = options(f)
+                chooseNear(title(f), sorts.map { it.label }, sorts.indexOfFirst { it.key == query.sort }) { applySort(sorts[it]) }
+            }
             Facet.YEAR -> years()
             Facet.FRANCHISE -> lookup("collection")
             else -> {
                 val options = options(f)
-                val all = f != Facet.SORT
-                chooseNear(title(f), (if (all) listOf(getString(R.string.filter_all)) else emptyList()) + options.map { it.label },
-                    if (all) options.indexOfFirst { it.key == query.choices[f]?.key }+1 else options.indexOfFirst { it.key == query.sort }) { index ->
-                    val option = options.getOrNull(index - if (all) 1 else 0)
+                chooseNear(title(f), listOf(getString(R.string.filter_all)) + options.map { it.label },
+                    options.indexOfFirst { it.key == query.choices[f]?.key }+1) { index ->
+                    val option = options.getOrNull(index - 1)
                     change(if (option == null) query.without(f) else query.copy(choices = query.choices + (f to option)))
                 }
             }
@@ -218,11 +296,7 @@ abstract class ExploreScreen : Screen() {
     }
 
     private fun options(f: Facet): List<Pick> = when(f) {
-        Facet.SORT -> (listOf("popular" to R.string.discover_sort_popular,"top" to R.string.discover_sort_top,
-            "new" to R.string.discover_sort_new,"old" to R.string.ex_old,"votes" to R.string.ex_votes,"az" to R.string.list_sort_name) +
-            if (query.movie && query.collection == null) listOf("box" to R.string.ex_box) else emptyList()).let { sorts ->
-                if (query.collection == null) sorts else listOf("release" to R.string.ex_order) + sorts.filterNot { it.first == "old" }
-            }.map { Pick(it.first,HomeStyle.titleCase(getString(it.second))) }
+        Facet.SORT -> query.sortOptions().map { (key, words) -> Pick(key,HomeStyle.titleCase(getString(words))) }
         Facet.RATING -> listOf("6","7","7.5","8").map { Pick(it,"$it+") }
         Facet.STUDIO -> if (query.movie) listOf(Pick("41077","A24"),Pick("420","Marvel Studios"),Pick("3","Pixar"),
             Pick("2","Walt Disney Pictures"),Pick("174","Warner Bros."),Pick("33","Universal Pictures"),Pick("4","Paramount Pictures"),
@@ -239,6 +313,8 @@ abstract class ExploreScreen : Screen() {
     }
 
     protected fun invalidateCatalogue() {
+        downWhileLoading = false
+        firstPageLoading = false
         generation++
         main.removeCallbacks(delayed)
         closePreview()
@@ -261,6 +337,7 @@ abstract class ExploreScreen : Screen() {
     }
 
     protected fun catalogue() {
+        firstPageLoading = true
         val g = generation
         val q = query
         updatePanel()
@@ -281,7 +358,6 @@ abstract class ExploreScreen : Screen() {
                 result.fold({ page ->
                     done = page.last
                     next++
-                    if (next == 2 && page.count >= 0) summary.append(" · " + java.text.NumberFormat.getIntegerInstance().format(page.count))
                     val before = seen.size
                     page.titles.forEach { json ->
                         val meta = discoverMeta(json,"tmdb:${json.getInt("id")}",q.movie,names)
@@ -293,6 +369,7 @@ abstract class ExploreScreen : Screen() {
                         val card = MediaCardView(this,meta.name,meta.poster,null,widthPx = width,heightPx = width*3/2,
                             dimAlpha = 0f,fadeIn = false,home = true)
                         val bandIndex = catalogueCards.size / 5
+                        if (bandIndex == 0) card.nextFocusUpId = sortChips[activeChip()].id
                         catalogueCards += card
                         band.addView(card,LinearLayout.LayoutParams(width,width*3/2).apply { setMargins(dp(3),dp(4),dp(3),dp(4)) })
                         card.setOnFocusChanged { has ->
@@ -325,9 +402,16 @@ abstract class ExploreScreen : Screen() {
                         card.setOnLongClickListener { choose(meta.name,listOf(getString(R.string.save_to_watchlist))) { resolve(true) }; true }
                         if (kotlin.math.abs(bandIndex-maxOf(loadedBand,0)) <= 2) card.load()
                     }
+                    if (seen.isNotEmpty() || done) {
+                        firstPageLoading = false
+                        if (downWhileLoading && sortStrip.hasFocus()) catalogueCards.firstOrNull()?.requestFocus()
+                        downWhileLoading = false
+                    }
                     if (before == seen.size && !done) more()
                     else if (seen.isEmpty()) emptySuggestions(g,q)
                 }, {
+                    firstPageLoading = false
+                    downWhileLoading = false
                     results.addView(failed(getString(R.string.search_popular_unavailable)) { refreshCatalogue() })
                 })
             }

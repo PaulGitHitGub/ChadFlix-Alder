@@ -587,8 +587,6 @@
     <string name="ex_match">Übereinstimmung</string>
     <string name="ex_or">oder</string>
     <string name="ex_old">Älteste</string>
-    <string name="ex_votes">Meiste Stimmen</string>
-    <string name="ex_box">Einspielergebnis</string>
     <string name="ex_before">Vor 1970</string>
     <string name="ex_range">Eigener Zeitraum</string>
     <string name="ex_from">Von</string>
@@ -599,9 +597,9 @@
     <string name="ex_role">Alle Rollen</string>
     <string name="ex_popular">Jetzt Beliebt</string>
     <string name="ex_remove">%1$s entfernen</string>
-    <string name="ex_filters">Filter</string>
     <string name="ex_order">Erscheinungsfolge</string>
     <string name="ex_unavailable">Titel Nicht Verfügbar</string>
     <string name="ex_clear_filters">Alle Filter Löschen</string>
-    <string name="ex_most_voted">%1$s mit den meisten Stimmen</string>
+    <string name="showing_most_watched">Meistgesehen</string>
+    <string name="showing_blockbusters">Blockbuster</string>
 </resources>

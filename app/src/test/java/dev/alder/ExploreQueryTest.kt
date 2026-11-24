@@ -33,6 +33,19 @@ class ExploreQueryTest {
         assertEquals("release",ExploreQuery(collection=Pick("10","Star Wars")).sort)
     }
 
+    @Test fun reliableSortsFollowCatalogueType() {
+        val movies = ExploreQuery()
+        val shows = movies.copy(type = "series")
+        val moviesList = listOf("popular","top","new","old","votes","box")
+        assertEquals(moviesList,movies.sortOptions().map { it.first })
+        assertEquals(moviesList.dropLast(1),shows.sortOptions().map { it.first })
+        val collection = movies.copy(collection=Pick("10","Star Wars"))
+        assertEquals(listOf("release","popular","top","new","votes"),collection.sortOptions().map { it.first })
+        val oldest = mapOf(Facet.SORT to Pick("old","Oldest"))
+        assertEquals("1000",movies.copy(choices=oldest).discover().filters["vote_count.gte"])
+        assertEquals("100",shows.copy(choices=oldest).discover().filters["vote_count.gte"])
+    }
+
     @Test fun clearingFranchiseRestoresEveryPausedFilterAndSort() {
         val q = ExploreQuery(genres=genres, any=true, choices=mapOf(Facet.SORT to Pick("votes","Most Votes")))
         assertEquals(q,q.copy(collection=Pick("10","Star Wars")).without(Facet.FRANCHISE))

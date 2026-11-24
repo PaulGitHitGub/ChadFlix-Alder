@@ -393,7 +393,6 @@ internal fun discoverUrl(q: DiscoverQuery, page: Int, region: String, language: 
         }
         "old" -> params["sort_by"] = "$date.asc"
         "votes" -> params["sort_by"] = "vote_count.desc"
-        "az" -> params["sort_by"] = if (movie) "title.asc" else "name.asc"
         "box" -> params["sort_by"] = "revenue.desc"
         else -> params["sort_by"] = "popularity.desc"
     }

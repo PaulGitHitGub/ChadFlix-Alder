@@ -587,8 +587,6 @@
     <string name="ex_match">मिलान</string>
     <string name="ex_or">या</string>
     <string name="ex_old">सबसे पुराने</string>
-    <string name="ex_votes">सर्वाधिक वोट</string>
-    <string name="ex_box">बॉक्स ऑफ़िस</string>
     <string name="ex_before">1970 से पहले</string>
     <string name="ex_range">अपनी सीमा</string>
     <string name="ex_from">से</string>
@@ -599,9 +597,9 @@
     <string name="ex_role">कोई भी भूमिका</string>
     <string name="ex_popular">अभी लोकप्रिय</string>
     <string name="ex_remove">%1$s हटाएँ</string>
-    <string name="ex_filters">फ़िल्टर</string>
     <string name="ex_order">रिलीज़ क्रम</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
-    <string name="ex_most_voted">सर्वाधिक वोट वाले %1$s</string>
+    <string name="showing_most_watched">सर्वाधिक देखे गए</string>
+    <string name="showing_blockbusters">ब्लॉकबस्टर</string>
 </resources>

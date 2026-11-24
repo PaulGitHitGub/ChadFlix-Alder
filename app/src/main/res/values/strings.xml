@@ -128,8 +128,8 @@
     <string name="showing_trending" translatable="false">Trending</string>
     <string name="showing_new_releases" translatable="false">New Releases</string>
     <string name="showing_new_series" translatable="false">New Series</string>
-    <string name="showing_blockbusters" translatable="false">Blockbusters</string>
-    <string name="showing_most_watched" translatable="false">Most Watched</string>
+    <string name="showing_blockbusters">Blockbusters</string>
+    <string name="showing_most_watched">Most Watched</string>
     <string name="showing_top_rated" translatable="false">Top Rated</string>
     <string name="showing_complete" translatable="false">Complete Series</string>
     <string name="showing_airing" translatable="false">Currently Airing</string>
@@ -615,8 +615,6 @@
     <string name="ex_match">Match</string>
     <string name="ex_or">or</string>
     <string name="ex_old">Oldest</string>
-    <string name="ex_votes">Most Votes</string>
-    <string name="ex_box">Box Office</string>
     <string name="ex_before">Before 1970</string>
     <string name="ex_range">Custom Range</string>
     <string name="ex_from">From</string>
@@ -627,9 +625,7 @@
     <string name="ex_role">Any Role</string>
     <string name="ex_popular">Popular Now</string>
     <string name="ex_remove">Remove %1$s</string>
-    <string name="ex_filters">Filters</string>
     <string name="ex_order">Release Order</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
-    <string name="ex_most_voted">Most Voted %1$s</string>
 </resources>

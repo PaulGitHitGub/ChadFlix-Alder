@@ -19,6 +19,16 @@ internal data class ExploreQuery(
     val media get() = if (movie) "movie" else "tv"
     val sort get() = choices[Facet.SORT]?.key ?: if (collection == null) "popular" else "release"
 
+    fun sortOptions() = buildList {
+        if (collection != null) add("release" to R.string.ex_order)
+        add("popular" to R.string.discover_sort_popular)
+        add("top" to R.string.discover_sort_top)
+        add("new" to R.string.discover_sort_new)
+        if (collection == null) add("old" to R.string.ex_old)
+        add("votes" to R.string.showing_most_watched)
+        if (movie && collection == null) add("box" to R.string.showing_blockbusters)
+    }
+
     fun without(f: Facet) = when (f) {
         Facet.PEOPLE -> copy(person = null)
         Facet.GENRE -> copy(genres = emptyList())
@@ -48,7 +58,7 @@ internal data class ExploreQuery(
             val narrowed = isNotEmpty() || person != null
             val sortFloor = when (sort) {
                 "top" -> if (movie) (if (narrowed) 500 else 3000) else (if (narrowed) 200 else 1000)
-                "old", "az" -> if (movie) 1000 else 100
+                "old" -> if (movie) 1000 else 100
                 else -> 0
             }
             if (sortFloor > 0 && (movie || person == null)) {
@@ -97,7 +107,6 @@ internal object ExploreCatalogue {
         return when (q.sort) {
             "new" -> rows.sortedByDescending { it.optString(date) }
             "release", "old" -> rows.sortedBy { it.text(date) ?: "9999" }
-            "az" -> rows.sortedWith(compareBy(java.text.Collator.getInstance()) { it.optString(if (q.movie) "title" else "name") })
             "votes" -> rows.sortedByDescending { it.optInt("vote_count") }
             "top" -> rows.sortedWith(compareByDescending<JSONObject> { it.optInt("vote_count") >= 100 }
                 .thenByDescending { it.optDouble("vote_average",0.0) })

@@ -590,8 +590,6 @@
     <string name="ex_match">Combinação</string>
     <string name="ex_or">ou</string>
     <string name="ex_old">Mais Antigos</string>
-    <string name="ex_votes">Mais Votos</string>
-    <string name="ex_box">Bilheteria</string>
     <string name="ex_before">Antes De 1970</string>
     <string name="ex_range">Intervalo Personalizado</string>
     <string name="ex_from">De</string>
@@ -602,9 +600,9 @@
     <string name="ex_role">Qualquer Função</string>
     <string name="ex_popular">Em Alta</string>
     <string name="ex_remove">Remover %1$s</string>
-    <string name="ex_filters">Filtros</string>
     <string name="ex_order">Ordem De Lançamento</string>
     <string name="ex_unavailable">Título Indisponível</string>
     <string name="ex_clear_filters">Limpar Todos Os Filtros</string>
-    <string name="ex_most_voted">%1$s com mais votos</string>
+    <string name="showing_most_watched">Mais Assistidos</string>
+    <string name="showing_blockbusters">Sucessos de Bilheteria</string>
 </resources>

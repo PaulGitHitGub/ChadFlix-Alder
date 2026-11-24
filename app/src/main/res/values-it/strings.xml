@@ -590,8 +590,6 @@
     <string name="ex_match">Corrispondenza</string>
     <string name="ex_or">o</string>
     <string name="ex_old">Meno Recenti</string>
-    <string name="ex_votes">Più Voti</string>
-    <string name="ex_box">Incassi</string>
     <string name="ex_before">Prima Del 1970</string>
     <string name="ex_range">Intervallo Personalizzato</string>
     <string name="ex_from">Dal</string>
@@ -602,9 +600,9 @@
     <string name="ex_role">Qualsiasi Ruolo</string>
     <string name="ex_popular">Popolari Ora</string>
     <string name="ex_remove">Rimuovi %1$s</string>
-    <string name="ex_filters">Filtri</string>
     <string name="ex_order">Ordine Di Uscita</string>
     <string name="ex_unavailable">Titolo Non Disponibile</string>
     <string name="ex_clear_filters">Cancella Tutti I Filtri</string>
-    <string name="ex_most_voted">%1$s con più voti</string>
+    <string name="showing_most_watched">Più Visti</string>
+    <string name="showing_blockbusters">Campioni di Incassi</string>
 </resources>

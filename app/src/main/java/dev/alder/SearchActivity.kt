@@ -176,10 +176,7 @@ class SearchActivity : ExploreScreen() {
                 imageTintList = ColorStateList.valueOf(HomeStyle.WHITE)
             }, LinearLayout.LayoutParams(dp(12), dp(12)))
             addView(input, LinearLayout.LayoutParams(0, -2, 1f))
-            summary = text("",HomeStyle.INFO,color=HomeStyle.PLOT).apply {
-                isSingleLine=true; maxWidth=dp(270); ellipsize=TextUtils.TruncateAt.END
-            }
-            addView(summary)
+            addView(buildSortStrip(input,searchTab),LinearLayout.LayoutParams(-2,-1))
         }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(QUERY_TOP) })
 
         keyboard = column(Gravity.START)
@@ -344,6 +341,7 @@ class SearchActivity : ExploreScreen() {
             setPadding(dp(4), dp(4), dp(4), dp(4))
         }
         searchTab = ImageView(this).apply {
+            id = View.generateViewId()
             setImageResource(R.drawable.ic_search)
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
@@ -517,6 +515,7 @@ class SearchActivity : ExploreScreen() {
     /** Clear shows while the query has words; Up from Voice Search (or the keys) goes Clear → query field, Down mirrors. */
     private fun updateClear() {
         val c = clear ?: return
+        sortStrip.visibility = if (lookupMode == null && input.text.isBlank() && !listening) View.VISIBLE else View.GONE
         val show = (beforeVoice ?: input.text.toString()).isNotEmpty()
         input.setPadding(dp(12),0,if (show) dp(95) else 0,0)
         if (!show && c.hasFocus()) (voice ?: firstKey)?.requestFocus()
@@ -880,7 +879,6 @@ class SearchActivity : ExploreScreen() {
             "collection" -> getString(R.string.ex_franchise)
             else -> heading
         }
-        summary.visibility = if (mode==null && query.isEmpty()) View.VISIBLE else View.GONE
         if (mode != null) {
             findChoices(mode,query,enteringLookup || moveFocus)
             enteringLookup = false

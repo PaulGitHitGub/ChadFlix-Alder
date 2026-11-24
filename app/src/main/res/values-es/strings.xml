@@ -590,8 +590,6 @@
     <string name="ex_match">Coincidencia</string>
     <string name="ex_or">o</string>
     <string name="ex_old">Más Antiguos</string>
-    <string name="ex_votes">Más Votos</string>
-    <string name="ex_box">Taquilla</string>
     <string name="ex_before">Antes De 1970</string>
     <string name="ex_range">Intervalo Personalizado</string>
     <string name="ex_from">Desde</string>
@@ -602,9 +600,9 @@
     <string name="ex_role">Cualquier Función</string>
     <string name="ex_popular">Popular Ahora</string>
     <string name="ex_remove">Quitar %1$s</string>
-    <string name="ex_filters">Filtros</string>
     <string name="ex_order">Orden De Estreno</string>
     <string name="ex_unavailable">Título No Disponible</string>
     <string name="ex_clear_filters">Borrar Todos Los Filtros</string>
-    <string name="ex_most_voted">%1$s con más votos</string>
+    <string name="showing_most_watched">Más Vistos</string>
+    <string name="showing_blockbusters">Éxitos de Taquilla</string>
 </resources>
