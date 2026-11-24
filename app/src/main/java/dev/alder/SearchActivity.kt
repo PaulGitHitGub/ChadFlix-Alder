@@ -299,20 +299,21 @@ class SearchActivity : ExploreScreen() {
     }
 
     /**
-     * The top bar's Search tab, on this page one white capsule holding Voice and Keyboard (owner's placement B). Its
+     * The top bar's Search tab, on this page one white capsule holding Keyboard | Voice (owner's placement B). Its
      * right edge stays where the magnifier's ended, so Movies, Shows and the rest don't move; [tabSlot] keeps the
      * magnifier's room in the bar. Focus is a black pill inside it. Voice has the remote on arrival, Up from the
-     * controls row comes back to it, Left from Voice is the avatar and Right from Keyboard is the first page's name.
-     * The capsule's views are invisible focus targets: [SearchPill], behind the names, draws the pills and Voice |
-     * Keyboard and moves them (the designer's "Slingshot"), starting from Home's pill ([HOME_PILL]) or the magnifier.
+     * controls row comes back to it, Right from Voice is the first page's name, Left from Keyboard the avatar.
+     * The capsule's views are invisible focus targets: [SearchPill], behind the names, draws the pills and Keyboard |
+     * Voice and moves them (the designer's "Slingshot"), starting from Home's pill ([HOME_PILL]) or the magnifier.
      */
     private fun attachCapsule() {
         capsule = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(2), dp(2), dp(2), dp(2))
             alpha = 0f // drawn by the pill
-            voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
+            // Owner: Keyboard | Voice, Voice next to the pages' names (where the pill arrives from them).
             addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4)))
+            voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
         }
         topPill = SearchPill(this, headerBar, capsule, voice as? LinearLayout, keyboardButton, tabSlot, avatar.parent as View) {
             (1 until nav.childCount).mapNotNull { nav.getChildAt(it) as? TextView }
@@ -335,16 +336,20 @@ class SearchActivity : ExploreScreen() {
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
         capsule.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() } // "Listening…" widens Voice
         bar.addView(capsule, FrameLayout.LayoutParams(-2, dp(CAPSULE_H), Gravity.START or Gravity.CENTER_VERTICAL))
-        voice?.nextFocusLeftId = avatar.id
-        if (voice == null) keyboardButton.nextFocusLeftId = avatar.id
+        keyboardButton.nextFocusLeftId = avatar.id
+        voice?.nextFocusLeftId = keyboardButton.id
+        voice?.let { keyboardButton.nextFocusRightId = it.id }
         linkCapsule()
     }
 
-    /** Right from Keyboard: the first page's name; Left from it, Voice (the names are rebuilt as the add-ons' types arrive). */
+    /**
+     * Right from the capsule's right end (Voice) to the first page's name, Left from that name back to it (the names are
+     * rebuilt as the add-ons' types arrive).
+     */
     private fun linkCapsule() {
         if (!::capsule.isInitialized) return
         val first = nav.getChildAt(1) ?: return
-        keyboardButton.nextFocusRightId = first.id
+        (voice ?: keyboardButton).nextFocusRightId = first.id
         first.nextFocusLeftId = (voice ?: keyboardButton).id
     }
 
@@ -1170,7 +1175,7 @@ class SearchActivity : ExploreScreen() {
         const val KEYS_X = 33
         const val ACTION_H = 28 // the controls row's pills
         const val ACTION_PAD = 12 // Voice's and Keyboard's sides inside their focus pill
-        const val CAPSULE_H = 30 // the top bar's Voice | Keyboard capsule, as tall as a page's name focused
+        const val CAPSULE_H = 30 // the top bar's Keyboard | Voice capsule, as tall as a page's name focused
         const val PAGE_IN_AT = 180L // ms: the page fades in as the pill's left edge settles (the README's page dip)
         const val PAGE_IN_MS = 70L
         const val KEY_W = 33

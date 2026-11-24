@@ -31,14 +31,14 @@ internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAni
 
 /**
  * The Search page's top-bar pill, the designer's variant 1 "Slingshot" (pill-anim-20261124/README.md): one view, behind
- * the pages' names, draws the white pill, the black focus pill and Voice | Keyboard from about 25 floats, each moved by
+ * the pages' names, draws the white pill, the black focus pill and Keyboard | Voice from about 25 floats, each moved by
  * an [ObjectAnimator] whose setter only invalidates (nothing is laid out). The real Voice and Keyboard views stay in the
  * invisible [capsule] as focus targets and give the places, measured once per move ([measure]), not per frame.
  *
  * - Opening (from a page's name, from Home's pill [arrive]s at, or in place from the magnifier): the left edge is thrown
  *   to the capsule's left end with an overshoot, the right edge follows 50 ms later, the pill thins as it stretches, the
- *   magnifier shrinks away under it, and the black pill pops out of the left end and grows over Voice, the icons and
- *   words popping in after it (400 ms).
+ *   magnifier shrinks away under it, and the black pill pops out of the focused item's outer end (Voice's right, next to
+ *   the names) and grows over it, the icons and words popping in after it (400 ms).
  * - Closing onto a page's name: the mirror, right edge first (300 ms). Between names the pill glides, its leading edge
  *   first. Voice ↔ Keyboard: the black pill's leading edge first, 30 ms ahead, with a small squash (190 ms).
  * - Every move drives every float to its rest from the live value (a float already there costs nothing), so a new move
@@ -322,17 +322,24 @@ internal class SearchPill(
         if (item != null) {
             val r = rectFor(item)
             blackT = r.top; blackB = r.bottom
-            if (blackA < 0.05f) { blackL = r.left; blackR = r.left + r.height() }
+            // A circle at the item's outer end (Voice's right, next to the names the pill came from), growing over it.
+            if (blackA < 0.05f) {
+                if (r.centerX() > capR.centerX()) { blackR = r.right; blackL = r.right - r.height() }
+                else { blackL = r.left; blackR = r.left + r.height() }
+            }
             go(BLACK_L, r.left, 150, 240, O2)
             go(BLACK_R, r.right, 150, 240, O2)
             tween(BLACK_A, blackA, 1f, 150, 1, LIN)
             tween(BLACK_S, if (blackA < 0.05f) 0.55f else blackS, 1f, 150, 200, POP)
         } else go(BLACK_A, 0f, 0, 80, LIN)
         go(BLACK_SY, 1f, 0, 120, OUT)
-        popIn(V_ICON_A, V_ICON_S, V_WORDS_A, V_WORDS_X, -dp(5f), 200, 230)
-        popIn(K_ICON_A, K_ICON_S, K_WORDS_A, K_WORDS_X, dp(7f), 230, 260)
+        popIn(V_ICON_A, V_ICON_S, V_WORDS_A, V_WORDS_X, shift(voiceR), 200, 230)
+        popIn(K_ICON_A, K_ICON_S, K_WORDS_A, K_WORDS_X, shift(keyR), 230, 260)
         play()
     }
+
+    /** Words slide in from their own side: the left item's from the left (5 dp), the right one's from the right (7 dp). */
+    private fun shift(r: RectF) = if (r.centerX() < capR.centerX()) -dp(5f) else dp(7f)
 
     /**
      * The open capsule's rest, from wherever an interrupted move left things (each float already there costs nothing);
@@ -348,8 +355,8 @@ internal class SearchPill(
         go(GLYPH_S, 0.6f, 0, 110, OUT)
         if (blackS) go(BLACK_S, 1f, 0, 200, POP)
         if (blackSy) go(BLACK_SY, 1f, 0, 120, OUT)
-        popIn(V_ICON_A, V_ICON_S, V_WORDS_A, V_WORDS_X, -dp(5f), 0, 30)
-        popIn(K_ICON_A, K_ICON_S, K_WORDS_A, K_WORDS_X, dp(7f), 30, 60)
+        popIn(V_ICON_A, V_ICON_S, V_WORDS_A, V_WORDS_X, shift(voiceR), 0, 30)
+        popIn(K_ICON_A, K_ICON_S, K_WORDS_A, K_WORDS_X, shift(keyR), 30, 60)
     }
 
     /** An item's icon pops in, its words slide in a beat later from [shift] px. */
