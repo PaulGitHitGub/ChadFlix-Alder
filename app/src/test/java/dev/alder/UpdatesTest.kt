@@ -25,6 +25,7 @@ class UpdatesTest {
         assertTrue(newerVersion("1.3.1-chadflix.1", "1.3.1"))
         assertTrue(newerVersion("1.4", "1.3.9-chadflix.7"))
         assertTrue(newerVersion("1.4-chadflix.1", "1.3.1-chadflix.2")) // the Alder 1.4 merge updates the installed release
+        assertTrue(newerVersion("1.4-chadflix.2", "1.4-chadflix.1"))
         assertFalse(newerVersion("1.3.1-chadflix.2", "1.3.2-chadflix.1"))
         assertFalse(newerVersion("1.3.1-chadflix.2", "1.3.1-chadflix.2"))
         assertFalse(newerVersion("1.3-chadflix.1", "1.3.0-chadflix.1"))

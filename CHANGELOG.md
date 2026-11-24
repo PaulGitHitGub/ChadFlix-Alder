@@ -17,6 +17,20 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 each entry that does not follow these rules. Then rename that heading to the version number.
 
 <!-- ChadFlix: give each release its own section here, named as versionName. Do not rename Unreleased: it is Alder's. -->
+## 1.4-chadflix.2
+
+### New
+<!-- Spotlight -->
+- **Watchlists.** Make your own lists in **My Lists**. Select **New Watchlist** and give it a name. To add a movie or show, hold **OK** on it and select **Save To Watchlist**. Each profile has its own lists on this TV.
+<!-- Spotlight -->
+- **New title page.** Movies and shows show the logo, details, cast and a column of buttons: **Play**, **More Episodes** and **More Like This**.
+<!-- Spotlight -->
+- **More Episodes.** On a show, select **More Episodes**. The seasons are on the left. Each episode shows its picture, name and story on the right.
+
+### Easier to use
+- **Simpler My Lists.** **My Lists** shows **Saved Movies** and **Saved Shows** in rows. The filters are gone.
+- **Settings with OK.** In **Settings**, press **OK** or **Right** to change a value. Press **Left** to go back to the menu.
+
 ## 1.4-chadflix.1
 
 ### New
