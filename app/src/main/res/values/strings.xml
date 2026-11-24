@@ -416,7 +416,6 @@
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
     <string name="search_voice">Voice Search</string>
     <string name="search_listening">Listening…</string>
-    <string name="search_clear_pill">Clear</string>
     <string name="search_voice_missed">Didn\'t catch that</string>
     <string name="search_delete">Delete</string>
     <string name="search_unavailable">Search is unavailable right now.</string>
@@ -601,10 +600,9 @@
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. ChadFlix will try to sync it again.</string>
     <string name="library_load_failed">Couldn\'t load your Stremio library</string>
-    <string name="ex_people">People</string>
+    <string name="ex_people">Directors &amp; Cast</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Network</string>
-    <string name="ex_country">Country</string>
     <string name="ex_keyboard">Keyboard Search</string>
     <string name="ex_any">Any</string>
     <string name="ex_match">Match</string>

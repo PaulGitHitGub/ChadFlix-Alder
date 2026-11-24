@@ -385,7 +385,6 @@
     <string name="search_popular_unavailable">Los títulos populares no están disponibles.</string>
     <string name="search_voice">Búsqueda por voz</string>
     <string name="search_listening">Escuchando…</string>
-    <string name="search_clear_pill">Borrar todo</string>
     <string name="search_voice_missed">No lo he entendido</string>
     <string name="search_delete">Borrar</string>
     <string name="search_unavailable">La búsqueda no está disponible ahora.</string>
@@ -576,10 +575,9 @@
     <string name="audio_fallback_hint">Con Mi idioma primero, Alder prueba tu idioma, este idioma alternativo y luego inglés. Selecciona Desactivado para usar solo tu idioma.</string>
     <string name="failure_preferred_audio">no hay ninguna pista de audio compatible en tu idioma preferido</string>
     <string name="failure_advice_preferred_audio">Elige una fuente con tu idioma de audio.</string>
-    <string name="ex_people">Personas</string>
+    <string name="ex_people">Dirección y reparto</string>
     <string name="ex_studio">Estudio</string>
     <string name="ex_network">Cadena</string>
-    <string name="ex_country">País</string>
     <string name="ex_keyboard">Buscar Con Teclado</string>
     <string name="ex_any">Cualquiera</string>
     <string name="ex_match">Coincidencia</string>

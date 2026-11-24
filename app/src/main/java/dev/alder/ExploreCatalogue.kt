@@ -4,18 +4,18 @@ import org.json.JSONObject
 
 internal data class Pick(val key: String, val label: String)
 internal data class Person(val id: Int, val name: String, val role: String, val photo: String?)
+/** The filter panel's rows, top to bottom. Sort isn't one: it lives on the results heading. */
 internal enum class Facet(val title: Int) {
-    PEOPLE(R.string.ex_people), GENRE(R.string.discover_genre), YEAR(R.string.discover_year),
-    SORT(R.string.list_sort), STUDIO(R.string.ex_studio), LANGUAGE(R.string.group_language), COUNTRY(R.string.ex_country)
+    GENRE(R.string.discover_genre), YEAR(R.string.discover_year), PEOPLE(R.string.ex_people),
+    STUDIO(R.string.ex_studio), LANGUAGE(R.string.group_language)
 }
 
 internal data class ExploreQuery(
     val type: String = "movie", val genres: List<Pick> = emptyList(), val any: Boolean = false,
-    val person: Person? = null, val choices: Map<Facet, Pick> = emptyMap()
+    val person: Person? = null, val choices: Map<Facet, Pick> = emptyMap(), val sort: String = "popular"
 ) {
     val movie get() = type == "movie"
     val media get() = if (movie) "movie" else "tv"
-    val sort get() = choices[Facet.SORT]?.key ?: "popular"
 
     fun sortOptions() = buildList {
         add("popular" to R.string.discover_sort_popular)
@@ -42,7 +42,6 @@ internal data class ExploreQuery(
             }
             choices[Facet.STUDIO]?.let { put(if (movie) "with_companies" else "with_networks", it.key) }
             choices[Facet.LANGUAGE]?.let { put("with_original_language", it.key) }
-            choices[Facet.COUNTRY]?.let { put("with_origin_country", it.key) }
             val narrowed = isNotEmpty() || person != null
             val sortFloor = when (sort) {
                 "top" -> if (movie) (if (narrowed) 500 else 3000) else (if (narrowed) 200 else 1000)
@@ -128,8 +127,7 @@ internal object ExploreCatalogue {
                 val date = it.optString("first_air_date")
                 (q.genres.isEmpty() || if (q.any) q.genres.any { g -> g.key in genres } else q.genres.all { g -> g.key in genres }) &&
                     date >= params["first_air_date.gte"].orEmpty() && date <= (params["first_air_date.lte"] ?: "9999") &&
-                    (params["with_original_language"]?.equals(it.text("original_language")) != false) &&
-                    (params["with_origin_country"]?.let { c -> c in it.optJSONArray("origin_country").strings() } != false)
+                    (params["with_original_language"]?.equals(it.text("original_language")) != false)
             }
             val sorted = localOrder(rows,q)
             return Page(sorted.drop((page-1)*20).take(20), sorted.size, page*20 >= sorted.size)

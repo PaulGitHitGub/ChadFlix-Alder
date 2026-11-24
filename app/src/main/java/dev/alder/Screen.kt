@@ -946,7 +946,9 @@ abstract class Screen : Activity() {
                          // what Left does, [back] what Back does instead of only closing.
                          right: ((Int) -> (() -> Unit)?)? = null, left: (() -> Unit)? = null, back: (() -> Unit)? = null,
                          header: Boolean = false, // ChadFlix: the title as a heading (centred, larger), not like a line
-                         checkedRows: Set<Int> = emptySet(), anchorStartDp: Int? = null,
+                         // ChadFlix: [anchorStartDp] puts the list that far from the left, centred top to bottom unless
+                         // [anchorTopDp] hangs it from that height (a drop-down).
+                         checkedRows: Set<Int> = emptySet(), anchorStartDp: Int? = null, anchorTopDp: Int? = null,
                          // ChadFlix: [extra] sits under the title; [stay] keeps the list open on a pick (ticking several),
                          // and [shown] gets the rows to re-tick in place.
                          extra: View? = null, stay: Boolean = false, shown: (List<TextView>) -> Unit = {},
@@ -994,8 +996,8 @@ abstract class Screen : Activity() {
             setLayout(dp(widthDp), -2) // a long list of names needs less width
             setDimAmount(if (anchorStartDp == null) 0.6f else 0.16f)
             if (anchorStartDp != null) {
-                setGravity(Gravity.LEFT or Gravity.CENTER_VERTICAL)
-                attributes = attributes.apply { x = dp(anchorStartDp) }
+                setGravity(Gravity.LEFT or if (anchorTopDp == null) Gravity.CENTER_VERTICAL else Gravity.TOP)
+                attributes = attributes.apply { x = dp(anchorStartDp); y = dp(anchorTopDp ?: 0) }
             }
         }
         if (back != null) dialog.setOnCancelListener { back() } // Back cancels; a pick dismisses, which isn't a cancel

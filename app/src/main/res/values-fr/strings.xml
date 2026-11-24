@@ -385,7 +385,6 @@
     <string name="search_popular_unavailable">Les titres populaires sont indisponibles.</string>
     <string name="search_voice">Recherche vocale</string>
     <string name="search_listening">Écoute…</string>
-    <string name="search_clear_pill">Tout effacer</string>
     <string name="search_voice_missed">Je n\'ai pas compris</string>
     <string name="search_delete">Effacer</string>
     <string name="search_unavailable">La recherche est indisponible pour le moment.</string>
@@ -576,10 +575,9 @@
     <string name="audio_fallback_hint">Avec Ma langue d’abord, Alder essaie votre langue, cette langue de secours, puis l’anglais. Sélectionnez Désactivé pour utiliser uniquement votre langue.</string>
     <string name="failure_preferred_audio">aucune piste audio prise en charge dans votre langue préférée</string>
     <string name="failure_advice_preferred_audio">Choisissez une source avec votre langue audio.</string>
-    <string name="ex_people">Personnes</string>
+    <string name="ex_people">Réalisation et casting</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Chaîne</string>
-    <string name="ex_country">Pays</string>
     <string name="ex_keyboard">Recherche Au Clavier</string>
     <string name="ex_any">Au Moins Un</string>
     <string name="ex_match">Correspondance</string>

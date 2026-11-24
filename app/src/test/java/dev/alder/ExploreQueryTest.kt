@@ -12,7 +12,7 @@ class ExploreQueryTest {
         assertEquals("35|27", q.copy(any = true).discover().filters["with_genres"])
         assertEquals("1632|35", q.discover().filters["with_companies"])
         assertEquals("1632|35", q.copy(type = "series").discover().filters["with_networks"])
-        val newest = q.copy(choices = q.choices + (Facet.SORT to Pick("new", "Newest"))).discover()
+        val newest = q.copy(sort = "new").discover()
         assertNull(newest.filters["vote_count.gte"])
     }
 
@@ -25,7 +25,7 @@ class ExploreQueryTest {
     }
 
     @Test fun sortFloorsFollowTheEffectiveCatalogue() {
-        val top = ExploreQuery(choices=mapOf(Facet.SORT to Pick("top","Top Rated")))
+        val top = ExploreQuery(sort = "top")
         assertEquals("3000",top.discover().filters["vote_count.gte"])
         assertEquals("500",top.copy(genres=genres).discover().filters["vote_count.gte"])
         assertEquals("1000",top.copy(type="series").discover().filters["vote_count.gte"])
@@ -39,14 +39,13 @@ class ExploreQueryTest {
         val moviesList = listOf("popular","top","new","old","votes","box")
         assertEquals(moviesList,movies.sortOptions().map { it.first })
         assertEquals(moviesList.dropLast(1),shows.sortOptions().map { it.first })
-        val oldest = mapOf(Facet.SORT to Pick("old","Oldest"))
-        assertEquals("1000",movies.copy(choices=oldest).discover().filters["vote_count.gte"])
-        assertEquals("100",shows.copy(choices=oldest).discover().filters["vote_count.gte"])
+        assertEquals("1000",movies.copy(sort="old").discover().filters["vote_count.gte"])
+        assertEquals("100",shows.copy(sort="old").discover().filters["vote_count.gte"])
     }
 
     @Test fun removingAFilterKeepsTheOthersAndTheSort() {
-        val q = ExploreQuery(genres=genres, any=true, choices=mapOf(Facet.SORT to Pick("votes","Most Votes"),
-            Facet.LANGUAGE to Pick("ko","Korean")))
+        val q = ExploreQuery(genres=genres, any=true, sort="votes",
+            choices=mapOf(Facet.LANGUAGE to Pick("ko","Korean")))
         assertEquals("votes",q.without(Facet.GENRE).sort)
         assertEquals(q.copy(genres=emptyList()),q.without(Facet.GENRE))
         assertNull(q.without(Facet.LANGUAGE).discover().filters["with_original_language"])

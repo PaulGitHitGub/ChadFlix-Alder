@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.graphics.Paint
 import android.os.Bundle
+import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognitionService
 import android.speech.RecognizerIntent
@@ -80,7 +81,7 @@ class SearchActivity : ExploreScreen() {
     private lateinit var nav: LinearLayout
     private lateinit var searchTab: ImageView
     private var voice: View? = null
-    private var clear: View? = null // above Voice Search while the query has words
+    private var shownAt: Long? = null // when the page first had the remote (uptime ms)
     private var styleVoice: () -> Unit = {}
     private var recognizer: SpeechRecognizer? = null // ChadFlix: in-app listening, no Google overlay
     private var recognizerService: ComponentName? = null // null: the TV's default speech service
@@ -174,7 +175,7 @@ class SearchActivity : ExploreScreen() {
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(input, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(buildSortStrip(input,searchTab),LinearLayout.LayoutParams(-2,-1))
+            addView(buildSortControl(input, searchTab), LinearLayout.LayoutParams(-2, dp(24)))
         }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(QUERY_TOP) })
 
         keyboard = column(Gravity.START)
@@ -234,7 +235,7 @@ class SearchActivity : ExploreScreen() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 if (!quiet) {
-                    // Real words (typing, a recent chip, Clear, Delete): voice gives way, so a late result
+                    // Real words (typing, a recent chip, Delete): voice gives way, so a late result
                     // or the "Didn't catch that" restore never overwrites them.
                     if (listening) {
                         Log.i(VOICE_TAG, "cancel: typed")
@@ -245,7 +246,7 @@ class SearchActivity : ExploreScreen() {
                     main.removeCallbacks(restoreHeader)
                     beforeVoice = null
                 }
-                updateClear()
+                updateHeading()
                 if (quiet) return
                 invalidateCatalogue()
                 ++request
@@ -262,11 +263,16 @@ class SearchActivity : ExploreScreen() {
         }
         // Our keyboard only: the Android one never opens.
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
-        clear?.let { root.addView(it, FrameLayout.LayoutParams(dp(95), dp(KEY_H)).apply { topMargin = dp(QUERY_TOP); leftMargin = resources.displayMetrics.widthPixels - dp(122) }) }
-        updateClear()
+        updateHeading()
         toggleKeys(false)
-        peopleButton.post { peopleButton.requestFocus() }
+        // The remote starts on Voice Search, the top of the left column.
+        (voice ?: keyboardButton).let { start -> start.post { start.requestFocus() } }
         search(false)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && shownAt == null) shownAt = SystemClock.uptimeMillis()
     }
 
     override fun onResume() {
@@ -348,9 +354,9 @@ class SearchActivity : ExploreScreen() {
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
             isFocusable = true
-            // Down to the open left column: the keys while typing (the panel is hidden then), else People.
+            // Down to the open left column: the keys while typing, else Voice Search, as on arrival.
             setOnClickListener {
-                (if (keyboard.visibility == View.VISIBLE) lastKeyboardFocus ?: firstKey else peopleButton)?.requestFocus()
+                (if (keyboard.visibility == View.VISIBLE) lastKeyboardFocus ?: firstKey else voice ?: keyboardButton)?.requestFocus()
             }
         }
         nav.addView(searchTab, LinearLayout.LayoutParams(dp(44), -1))
@@ -435,6 +441,7 @@ class SearchActivity : ExploreScreen() {
         val last = keyRow()
         val space = key(getString(R.string.search_space), last, 3, false) { append(" ") }
         val delete = key(getString(R.string.search_delete), last, 3, true) { delete() }
+        delete.setOnLongClickListener { clearQuery(); true } // hold Delete: the whole query
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             val (view, style) = sideAction(R.drawable.ic_mic, getString(R.string.search_voice),
@@ -454,16 +461,6 @@ class SearchActivity : ExploreScreen() {
             voice = view
             rightEdgeKeys += view
         }
-        // ChadFlix: Clear, in Voice Search's style, beside the heading while the query has words.
-        clear = sideAction(R.drawable.ic_close, getString(R.string.search_clear_pill), focused = { v -> lastKeyboardFocus = v }) {
-            cancelVoice()
-            (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: peopleButton).requestFocus()
-            input.setText("")
-            main.removeCallbacks(typed)
-            search(false)
-        }.first.apply { visibility = View.GONE }
-        rightEdgeKeys += clear!!
-
         rows.forEachIndexed { r, keys ->
             keys.forEachIndexed { c, v ->
                 v.nextFocusUpId = if (r > 0) rows[r - 1][c].id else voice?.id ?: input.id
@@ -474,8 +471,7 @@ class SearchActivity : ExploreScreen() {
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
-        clear?.nextFocusUpId = input.id
-        clear?.nextFocusDownId = (voice ?: rows[0][0]).id
+        voice?.nextFocusUpId = input.id
     }
 
     private var firstRow = emptyList<View>()
@@ -511,20 +507,19 @@ class SearchActivity : ExploreScreen() {
         return view to ::style
     }
 
-    /** Clear shows while the query has words; Up from Voice Search (or the keys) goes Clear → query field, Down mirrors. */
-    private fun updateClear() {
-        val c = clear ?: return
-        sortStrip.visibility = if (lookupMode == null && input.text.isBlank() && !listening) View.VISIBLE else View.GONE
-        val show = (beforeVoice ?: input.text.toString()).isNotEmpty()
-        input.setPadding(0,0,if (show) dp(95) else 0,0)
-        if (!show && c.hasFocus()) (voice ?: firstKey)?.requestFocus()
-        if (!show && lastKeyboardFocus === c) lastKeyboardFocus = voice ?: firstKey
-        c.visibility = if (show) View.VISIBLE else View.GONE
-        val above = if (show) c.id else input.id
-        voice?.nextFocusUpId = above
-        if (voice == null) firstRow.forEach { it.nextFocusUpId = above }
+    /** Sort shows over the catalogue only; Down from the heading's words goes to the top of the left column. */
+    private fun updateHeading() {
+        sortControl.visibility = if (lookupMode == null && input.text.isBlank() && !listening) View.VISIBLE else View.GONE
         // Never into the keys while they're hidden (no speech recognizer: no Voice Search above them).
-        input.nextFocusDownId = if (show) c.id else (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).id
+        input.nextFocusDownId = (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).id
+    }
+
+    /** No words (hold Delete, Back on the keys, Clear Search): the catalogue again; the remote stays where it is. */
+    private fun clearQuery() {
+        cancelVoice()
+        input.setText("")
+        main.removeCallbacks(typed)
+        search(false)
     }
 
     /** The header's words without searching them: voice's partial words, "Didn't catch that", the query back again. */
@@ -571,7 +566,7 @@ class SearchActivity : ExploreScreen() {
         heardSpeech = false
         listening = true
         styleVoice()
-        updateClear()
+        updateHeading()
         Log.i(VOICE_TAG, "startListening (" + (recognizerService?.flattenToShortString() ?: "default service") + ")")
         runCatching {
             r.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -709,12 +704,21 @@ class SearchActivity : ExploreScreen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // The OK that opened Search (the top bar also opens it on a rest) does nothing here: a press begun before the
+        // page had the remote, or in its first moment, would otherwise start Voice Search or open a picker.
+        val opened = shownAt
+        if (event.keyCode in OK_KEYS && (opened == null || event.downTime < opened + ARRIVAL_GRACE)) return true
         if (event.action == KeyEvent.ACTION_DOWN) {
             val focus = currentFocus
             // Back while listening cancels it and keeps the page.
             if (event.keyCode == KeyEvent.KEYCODE_BACK && listening) { cancelVoice(); return true }
             if (event.keyCode == KeyEvent.KEYCODE_BACK && keyboard.visibility == View.VISIBLE) {
-                if (lookupMode != null) lookup(null) else { toggleKeys(false); keyboardButton.requestFocus() }
+                when {
+                    lookupMode != null -> lookup(null)
+                    // Back on the keys first clears what's typed, then closes them.
+                    input.text.isNotEmpty() && !resultsScroll.hasFocus() -> clearQuery()
+                    else -> { toggleKeys(false); keyboardButton.requestFocus() }
+                }
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus()) {
@@ -829,9 +833,7 @@ class SearchActivity : ExploreScreen() {
             setOnClickListener {
                 // Focus first, onto something showing: after a voice search the keys are hidden.
                 (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: peopleButton).requestFocus()
-                input.setText("")
-                main.removeCallbacks(typed)
-                search(false)
+                clearQuery()
             }
             setOnKeyListener { _, code, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)
@@ -1096,6 +1098,8 @@ class SearchActivity : ExploreScreen() {
         const val MIC_REQUEST = 102
         const val MISSED_SHOWN = 2000L
         const val VOICE_TAG = "ChadFlixVoice"
+        const val ARRIVAL_GRACE = 500L // ms after the page first has the remote in which OK is ignored
+        val OK_KEYS = setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER)
         const val KATNISS = "com.google.android.katniss"
         // Insufficient permissions, server, client, server disconnected (API 31): the binding itself failed.
         val RETRY_ERRORS = setOf(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_CLIENT, 11)

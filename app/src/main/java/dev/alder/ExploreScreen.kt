@@ -28,10 +28,8 @@ abstract class ExploreScreen : Screen() {
     protected lateinit var panel: LinearLayout
     protected lateinit var peopleButton: View
     protected lateinit var panelScroll: ScrollView
-    protected lateinit var sortStrip: LinearLayout
+    protected lateinit var sortControl: TextView
     private lateinit var headingField: EditText
-    private val quickSorts = listOf("popular", "top", "new")
-    private val sortChips = mutableListOf<TextView>()
     private var downWhileLoading = false
     private var firstPageLoading = false
     private class Row(val view: LinearLayout, val key: TextView, val value: TextView, val chevron: ImageView)
@@ -50,7 +48,7 @@ abstract class ExploreScreen : Screen() {
     private val medium by lazy { text("", SMALL).typeface }
     private val semiBold by lazy { text("", SMALL, bold = true).typeface }
     protected val heading: String get() {
-        val sort = value(Facet.SORT)
+        val sort = sortLabel()
         val type = getString(if (query.movie) R.string.tab_movies else R.string.tab_shows)
         return when {
             query.sort=="box" -> type + DOT + sort
@@ -63,83 +61,75 @@ abstract class ExploreScreen : Screen() {
     private fun value(f: Facet): String = when (f) {
         Facet.PEOPLE -> query.person?.name
         Facet.GENRE -> query.genres.joinToString(if (query.any) " ${getString(R.string.ex_or)} " else " + ") { it.label }.ifEmpty { null }
-        Facet.SORT -> query.choices[f]?.label ?: getString(R.string.discover_sort_popular)
         else -> query.choices[f]?.label
     } ?: getString(R.string.filter_all)
 
-    /** The heading's sort chips (the chosen "Heading Strip"): Popular, Top Rated, Newest, then More for the rest. */
-    protected fun buildSortStrip(field: EditText, topBar: View): LinearLayout {
+    private fun sorts() = query.sortOptions().map { (key, words) -> Pick(key, HomeStyle.titleCase(getString(words))) }
+    private fun sortLabel() = sorts().let { all -> (all.firstOrNull { it.key == query.sort } ?: all.first()).label }
+
+    /** The heading's sort drop-down, "Sort: Popular ⌄": OK opens the reliable sorts under it; Down goes to the posters. */
+    protected fun buildSortControl(field: EditText, topBar: View): TextView {
         headingField = field
-        sortStrip = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(caps(R.string.list_sort, HomeStyle.LABEL_GREY).apply { textSize = 10.5f; setPadding(0,0,dp(6),0) })
-        }
-        val choices = options(Facet.SORT)
-        for (key in quickSorts + "more") {
-            val pick = choices.find { it.key == key }
-            if (pick == null) sortStrip.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) },
-                LinearLayout.LayoutParams(dp(1), dp(16)).apply { marginStart = dp(5); marginEnd = dp(5) })
-            val chip = text(pick?.label ?: getString(R.string.menu_more), SMALL).apply {
-                id = View.generateViewId()
-                isFocusable = true
-                isSingleLine = true
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                setPadding(dp(12),0,dp(12),0)
-                if (pick == null) {
-                    setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_chevron_down)?.mutate()?.apply {
-                        setBounds(0, 0, dp(10), dp(10))
-                    }, null)
-                    compoundDrawablePadding = dp(4)
-                }
-                nextFocusUpId = topBar.id
-                setOnClickListener { if (pick == null) open(Facet.SORT) else applySort(pick) }
-                setOnFocusChangeListener { _, has ->
-                    downWhileLoading = false
-                    styleSortChip(this, key)
-                    colorHeading(has)
-                }
-                setOnKeyListener { _, code, event ->
-                    if (code != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) false
-                    else catalogueCards.firstOrNull()?.requestFocus() ?: firstPageLoading.also { downWhileLoading = it }
-                }
+        sortControl = text("", SMALL).apply {
+            id = View.generateViewId()
+            isFocusable = true
+            isSingleLine = true
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setPadding(dp(12),0,dp(11),0)
+            setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_chevron_down)?.mutate()?.apply {
+                setBounds(0, 0, dp(10), dp(10))
+            }, null)
+            compoundDrawablePadding = dp(6)
+            nextFocusUpId = topBar.id
+            nextFocusLeftId = id // not into the heading's words
+            nextFocusRightId = id
+            setOnClickListener { sortPicker() }
+            setOnFocusChangeListener { _, has ->
+                downWhileLoading = false
+                styleSort()
+                colorHeading(has)
             }
-            sortStrip.addView(chip,LinearLayout.LayoutParams(-2,dp(24)))
-            sortChips += chip
+            setOnKeyListener { _, code, event ->
+                if (code != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) false
+                else catalogueCards.firstOrNull()?.requestFocus() ?: firstPageLoading.also { downWhileLoading = it }
+            }
         }
-        sortChips.forEachIndexed { i, chip ->
-            chip.nextFocusLeftId = sortChips[maxOf(0,i-1)].id
-            chip.nextFocusRightId = sortChips[minOf(sortChips.lastIndex,i+1)].id
-        }
-        return sortStrip
+        styleSort()
+        return sortControl
+    }
+
+    /** The sorts as a list hanging under the control, its right edge on the control's; a pick restarts the catalogue. */
+    private fun sortPicker() {
+        val sorts = sorts()
+        val at = IntArray(2).also(sortControl::getLocationOnScreen)
+        val density = resources.displayMetrics.density
+        choose(getString(R.string.list_sort), sorts.map { it.label }, checked = sorts.indexOfFirst { it.key == query.sort },
+            widthDp = SORT_W, anchorStartDp = ((at[0] + sortControl.width) / density).toInt() - SORT_W,
+            anchorTopDp = ((at[1] + sortControl.height) / density).toInt() + SORT_DROP) { applySort(sorts[it]) }
     }
 
     private fun applySort(pick: Pick) {
-        if (query.sort == pick.key && sortStrip.visibility == View.VISIBLE) return
-        query = query.copy(choices = query.choices + (Facet.SORT to pick))
+        if (query.sort == pick.key) return
+        query = query.copy(sort = pick.key)
         refreshCatalogue()
     }
 
-    private fun activeChip() = quickSorts.indexOf(query.sort).takeIf { it >= 0 } ?: quickSorts.size
-
-    private fun styleSortChip(chip: TextView, key: String) {
-        val extra = key == "more"
-        val selected = if (extra) query.sort !in quickSorts else query.sort == key
-        if (extra) chip.text = if (selected) value(Facet.SORT) else getString(R.string.menu_more)
-        chip.pillState(chip.hasFocus(), selected)
-        chip.isSelected = selected
+    private fun styleSort() {
+        sortControl.text = getString(R.string.list_sort) + ": " + sortLabel()
+        sortControl.pillState(sortControl.hasFocus(), selected = true)
     }
 
     private fun colorHeading(highlight: Boolean) {
-        if (sortStrip.visibility != View.VISIBLE) return
+        if (sortControl.visibility != View.VISIBLE) return
         val words = SpannableString(heading)
-        val sort = value(Facet.SORT)
+        val sort = sortLabel()
         val start = words.toString().lastIndexOf(sort)
         if (highlight && start >= 0) words.setSpan(ForegroundColorSpan(HomeStyle.LIST_RED),start,start+sort.length,0)
         headingField.hint = words
     }
 
-    /** The filter panel (Neon's B1): Movies | Shows, People, then the filters under a hairline. */
+    /** The filter panel (Neon's B1): Movies | Shows, then the filters in [Facet]'s order. */
     protected fun buildPanel(): ScrollView {
         panel = column(Gravity.START).apply { setPadding(dp(8),dp(8),dp(8),dp(8)) }
         val types = LinearLayout(this).apply {
@@ -156,9 +146,8 @@ abstract class ExploreScreen : Screen() {
                     if (query.type != type) {
                         genreNames = emptyMap()
                         val validGenres = HomeStyle.genres(type=="movie").map { it.first.toString() }.toSet()
-                        val choices = query.choices - Facet.STUDIO
                         change(query.copy(type=type, genres=query.genres.filter { it.key in validGenres },
-                            choices=if (query.sort=="box") choices-Facet.SORT else choices))
+                            choices=query.choices - Facet.STUDIO, sort=if (query.sort=="box") "popular" else query.sort))
                     }
                 }
             }
@@ -167,8 +156,6 @@ abstract class ExploreScreen : Screen() {
         }
         panel.addView(types, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(8) })
         Facet.values().forEach { f ->
-            if (f == Facet.GENRE) panel.addView(View(this).apply { setBackgroundColor(DIVIDER) },
-                LinearLayout.LayoutParams(-1, 1).apply { setMargins(dp(6),dp(5),dp(6),dp(5)) })
             val icon = if (f == Facet.PEOPLE) R.drawable.ic_person else 0
             val key = text(title(f), HomeStyle.INFO, color = TEXT).apply {
                 isSingleLine = true
@@ -190,10 +177,7 @@ abstract class ExploreScreen : Screen() {
                 addView(key)
                 addView(label, LinearLayout.LayoutParams(0,-2,1f).apply { marginStart = dp(8) })
                 addView(chevron, LinearLayout.LayoutParams(dp(9),dp(9)).apply { marginStart = dp(3) })
-                setOnFocusChangeListener { _, on ->
-                    if (f == Facet.SORT) colorHeading(on)
-                    styleRow(f)
-                }
+                setOnFocusChangeListener { _, _ -> styleRow(f) }
                 setOnClickListener { open(f) }
             }
             panel.addView(row, -1, dp(30))
@@ -211,7 +195,7 @@ abstract class ExploreScreen : Screen() {
             setOnFocusChangeListener { _, has -> style(has) }
             setOnClickListener {
                 peopleButton.requestFocus()
-                change(ExploreQuery(type=query.type, choices=query.choices.filterKeys { it==Facet.SORT }))
+                change(ExploreQuery(type=query.type, sort=query.sort))
             }
         }
         panel.addView(clearFilters, LinearLayout.LayoutParams(-1,dp(28)).apply { topMargin = dp(8) })
@@ -229,7 +213,7 @@ abstract class ExploreScreen : Screen() {
     private fun styleRow(f: Facet) {
         val r = rows[f] ?: return
         val on = r.view.isFocused
-        val lit = active(f) || (f == Facet.SORT && query.choices[Facet.SORT] != null)
+        val lit = active(f)
         r.view.background = if (on) rounded(HomeStyle.WHITE, 8) else null
         r.key.setTextColor(if (on) HomeStyle.BLACK else TEXT)
         r.key.typeface = if (on) semiBold else medium
@@ -254,11 +238,11 @@ abstract class ExploreScreen : Screen() {
             r.view.alpha = if (enabled) 1f else .38f
             styleRow(f)
         }
-        sortChips.forEachIndexed { i, chip -> styleSortChip(chip,quickSorts.getOrNull(i) ?: "more") }
-        colorHeading(sortStrip.hasFocus() || rows[Facet.SORT]?.view?.hasFocus() == true)
+        styleSort()
+        colorHeading(sortControl.hasFocus())
     }
 
-    private fun active(f: Facet) = query.without(f) != query && f != Facet.SORT &&
+    private fun active(f: Facet) = query.without(f) != query &&
         !(query.person != null && !query.movie && f == Facet.STUDIO)
 
     private fun change(q: ExploreQuery) {
@@ -268,8 +252,9 @@ abstract class ExploreScreen : Screen() {
         main.postDelayed(delayed, 300)
     }
 
-    private fun chooseNear(name: String, options: List<String>, checked: Int = -1, pick: (Int)->Unit) =
-        choose(name, options, checked = checked, widthDp = 220, anchorStartDp = PICKER_X, pick = pick)
+    private fun chooseNear(name: String, options: List<String>, checked: Int = -1, back: (() -> Unit)? = null,
+                           right: ((Int) -> (() -> Unit)?)? = null, pick: (Int)->Unit) =
+        choose(name, options, checked = checked, widthDp = 220, anchorStartDp = PICKER_X, right = right, back = back, pick = pick)
 
     private fun open(f: Facet) {
         when(f) {
@@ -283,10 +268,6 @@ abstract class ExploreScreen : Screen() {
                         genrePicker(list)
                     }, { toastFailure(R.string.search_unavailable) })
                 }
-            }
-            Facet.SORT -> {
-                val sorts = options(f)
-                chooseNear(title(f), sorts.map { it.label }, sorts.indexOfFirst { it.key == query.sort }) { applySort(sorts[it]) }
             }
             Facet.YEAR -> years()
             else -> {
@@ -351,46 +332,58 @@ abstract class ExploreScreen : Screen() {
         typeface = if (focused || selected) semiBold else medium
     }
 
-    private fun years() {
+    /** The Year picker; [at]: the row the remote starts on, when Back comes out of one of its lists. */
+    private fun years(at: Int? = null) {
         val now = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         val decades = (now/10*10 downTo 1970 step 10).toList()
         fun set(low: Int?, high: Int, label: String) = change(query.copy(choices = query.choices +
             (Facet.YEAR to Pick("${low ?: ""}:$high",label))))
-        fun singles(name: String, decade: Int, low: Int = decade, done: (Int) -> Unit) {
+        // Back steps out one list at a time: a decade's years to its decades, To to From, From to the Year list.
+        fun singles(name: String, decade: Int, low: Int = decade, back: () -> Unit, done: (Int) -> Unit) {
             val list = (minOf(now,decade+9) downTo maxOf(decade,low)).toList()
-            chooseNear(name,list.map(Int::toString)) { done(list[it]) }
+            chooseNear(name,list.map(Int::toString),back = back) { done(list[it]) }
         }
         // Custom Range: decades first (OK takes the decade's first or last year, Right opens its years), not ~125 rows.
-        fun yearFrom(name: String, low: Int, end: Boolean, done: (Int) -> Unit) {
+        fun yearFrom(name: String, low: Int, end: Boolean, back: () -> Unit, done: (Int) -> Unit) {
             val tens = (now/10*10 downTo low/10*10 step 10).toList()
-            choose(name, tens.map { "${it}–${it+9}  ›" }, widthDp = 220, anchorStartDp = PICKER_X,
-                right = { i -> { singles(name, tens[i], low, done) } }) { i ->
+            chooseNear(name, tens.map { "${it}–${it+9}  ›" }, back = back,
+                right = { i -> { singles(name, tens[i], low, back = { yearFrom(name, low, end, back, done) }, done) } }) { i ->
                 done(if (end) minOf(now, tens[i]+9) else maxOf(low, tens[i]))
             }
         }
+        fun range() {
+            yearFrom(getString(R.string.ex_from), 1900, end = false, back = { years(decades.size+2) }) { a ->
+                yearFrom(getString(R.string.ex_to), a, end = true, back = { range() }) { b -> set(a,b,"$a–$b") }
+            }
+        }
+        // The choice in use is ticked, All too when there's none (as Genre's): one year ticks its decade, a range Custom Range.
+        val chosen = query.choices[Facet.YEAR]?.key?.split(":")
+        val checked = when {
+            chosen == null -> 0
+            chosen[0].isEmpty() -> decades.size+1
+            else -> (decades.indexOfFirst { d -> chosen == listOf("$d","${d+9}") ||
+                (chosen[0] == chosen[1] && chosen[0].toInt()/10*10 == d) } + 1).takeIf { it > 0 } ?: decades.size+2
+        }
         choose(title(Facet.YEAR),listOf(getString(R.string.filter_all)) + decades.map { "${it}–${it+9}  ›" } +
-            listOf(getString(R.string.ex_before),getString(R.string.ex_range)),widthDp = 220,anchorStartDp = PICKER_X,
-            right = { i -> decades.getOrNull(i-1)?.let { d -> { singles(title(Facet.YEAR), d) { set(it,it,it.toString()) } } } }) { i ->
+            listOf(getString(R.string.ex_before),getString(R.string.ex_range)),checked = checked,focus = at ?: checked,
+            widthDp = 220,anchorStartDp = PICKER_X,
+            right = { i -> decades.getOrNull(i-1)?.let { d -> { singles(title(Facet.YEAR), d, back = { years(i) }) { set(it,it,it.toString()) } } } }) { i ->
             when(i) {
                 0 -> change(query.without(Facet.YEAR))
                 decades.size+1 -> set(null,1969,getString(R.string.ex_before))
-                decades.size+2 -> yearFrom(getString(R.string.ex_from), 1900, end = false) { a ->
-                    yearFrom(getString(R.string.ex_to), a, end = true) { b -> set(a,b,"$a–$b") }
-                }
+                decades.size+2 -> range()
                 else -> decades[i-1].let { set(it,it+9,"$it–${it+9}") }
             }
         }
     }
 
     private fun options(f: Facet): List<Pick> = when(f) {
-        Facet.SORT -> query.sortOptions().map { (key, words) -> Pick(key,HomeStyle.titleCase(getString(words))) }
         // TMDb: 1632 is Lionsgate (The Hunger Games, John Wick), 35 the older "Lions Gate Films"; either matches.
         Facet.STUDIO -> if (query.movie) listOf(Pick("41077","A24"),Pick("420","Marvel Studios"),Pick("3","Pixar"),
             Pick("2","Walt Disney Pictures"),Pick("174","Warner Bros."),Pick("33","Universal Pictures"),Pick("4","Paramount Pictures"),
             Pick("521","DreamWorks Animation"),Pick("10342","Studio Ghibli"),Pick("1632|35","Lionsgate"),Pick("3172","Blumhouse"))
             else HomeStyle.platforms.map { Pick(it.networks,it.name) }
         Facet.LANGUAGE -> listOf("en","ko","ja","es","fr","hi","de","it","pt","ar","zh").map { Pick(it,Locale.forLanguageTag(it).displayLanguage) }
-        Facet.COUNTRY -> listOf("US","GB","KR","JP","IN","FR","ES","DE","IT","BR","CA","AU","CN").map { Pick(it,Locale.Builder().setRegion(it).build().displayCountry) }
         else -> emptyList()
     }
 
@@ -468,7 +461,7 @@ abstract class ExploreScreen : Screen() {
                         val card = MediaCardView(this,meta.name,meta.poster,null,widthPx = width,heightPx = width*3/2,
                             dimAlpha = 0f,fadeIn = false,home = true)
                         val bandIndex = catalogueCards.size / 5
-                        if (bandIndex == 0) card.nextFocusUpId = sortChips[activeChip()].id
+                        if (bandIndex == 0) card.nextFocusUpId = sortControl.id
                         catalogueCards += card
                         // The first column keeps RING_ROOM/2 at its left, inside the scroller's clip, for the ring.
                         band.addView(card,LinearLayout.LayoutParams(width,width*3/2).apply { marginStart = if (column > 0) gap else dp(RING_ROOM / 2) })
@@ -516,7 +509,7 @@ abstract class ExploreScreen : Screen() {
                     }
                     if (seen.isNotEmpty() || done) {
                         firstPageLoading = false
-                        if (downWhileLoading && sortStrip.hasFocus()) catalogueCards.firstOrNull()?.requestFocus()
+                        if (downWhileLoading && sortControl.hasFocus()) catalogueCards.firstOrNull()?.requestFocus()
                         downWhileLoading = false
                     }
                     if (before == seen.size && !done) more()
@@ -829,6 +822,8 @@ abstract class ExploreScreen : Screen() {
         const val GRID_RIGHT = 33
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
         const val PICKER_X = 241 // a picker opens 12 dp right of the panel
+        const val SORT_W = 220 // the sort drop-down, as wide as the panel's pickers
+        const val SORT_DROP = 6 // dp between the sort control and its list
         const val RESOLVING_ALPHA = 0.6f // a poster waiting for its title page
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
@@ -837,7 +832,6 @@ abstract class ExploreScreen : Screen() {
         const val PANEL_FILL = 0xFF15120F.toInt()
         const val PANEL_EDGE = 0x29FFF0DC
         const val SEGMENT = 0x12FFFFFF
-        const val DIVIDER = 0x1CFFF0DC
         const val FOCUSED_VALUE = 0xAD000000.toInt()
         const val POP_FILL = 0xFF13110F.toInt()
         const val POP_DIM = 0x8C000000.toInt()

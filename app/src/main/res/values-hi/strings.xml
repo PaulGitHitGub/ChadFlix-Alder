@@ -384,7 +384,6 @@
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
     <string name="search_voice">वॉइस खोज</string>
     <string name="search_listening">सुन रहे हैं…</string>
-    <string name="search_clear_pill">साफ़ करें</string>
     <string name="search_voice_missed">समझ नहीं आया</string>
     <string name="search_delete">मिटाएं</string>
     <string name="search_unavailable">अभी खोज उपलब्ध नहीं है।</string>
@@ -573,10 +572,9 @@
     <string name="audio_fallback_hint">पहले मेरी भाषा में Alder पहले आपकी चुनी हुई भाषा, फिर यह वैकल्पिक भाषा और फिर अंग्रेज़ी आज़माता है। केवल अपनी चुनी हुई भाषा के लिए बंद चुनें।</string>
     <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
     <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
-    <string name="ex_people">लोग</string>
+    <string name="ex_people">निर्देशक और कलाकार</string>
     <string name="ex_studio">स्टूडियो</string>
     <string name="ex_network">नेटवर्क</string>
-    <string name="ex_country">देश</string>
     <string name="ex_keyboard">कीबोर्ड से खोजें</string>
     <string name="ex_any">कोई भी</string>
     <string name="ex_match">मिलान</string>
