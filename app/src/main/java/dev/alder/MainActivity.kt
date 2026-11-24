@@ -418,6 +418,7 @@ class MainActivity : Screen() {
         val addedAt: String? = null,
         val collectionCard: Boolean = false,
         val watchlist: Watchlist? = null,
+        val showRowRating: Boolean = true,
     ) {
         val watchTitle get() = WatchTitle(id, type, name, poster, art)
         val canSave get() = (type == "movie" || type == "series") && !HomeStyle.isTile(id)
@@ -1493,10 +1494,7 @@ class MainActivity : Screen() {
         if (item.collectionCard || (page == Page.LIBRARY && HomeStyle.isTile(item.id))) return clearLibraryHero()
         val changed = heroItem !== item
         heroItem = item
-        if (page == Page.LIBRARY) {
-            scheduleRatings(item, metas[item.id])
-            return
-        }
+        if (page == Page.LIBRARY) return
         if (page.isGrid) {
             // The year sits in the facts line below the title, with the genre, seasons and ratings.
             showHeroTitle(item, item.name, null)
@@ -1643,6 +1641,7 @@ class MainActivity : Screen() {
         // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
         main.removeCallbacks(ratingsTask)
         if (ratingsItem !== item) heroRatings.removeAllViews() // another title's ratings go at once; the same title's stay
+        if (!item.showRowRating) return
         ratingsTask = Runnable { if (heroItem === item) showRatings(item, meta) }
         if (page.isBrowse) main.postDelayed(ratingsTask, HOME_HERO_WAIT) else ratingsTask.run()
     }
@@ -3658,6 +3657,7 @@ class MainActivity : Screen() {
             finished = libraryFinished(item),
             newEpisodeCount = newEpisodeCount(id, metas[id], item),
             addedAt = addedAt,
+            showRowRating = false, // Saved titles and Continue Watching use libraryItem; catalog copies keep their badge.
         )
     }
 
