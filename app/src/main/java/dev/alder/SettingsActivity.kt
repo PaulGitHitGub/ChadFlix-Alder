@@ -1126,8 +1126,7 @@ class SettingsActivity : Screen() {
             refresh.forEach { it() }
         }
         val row = settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
-            if (isSwitch) select(nextSettingIndex(current(), c.values.size, 1))
-            else choose(c.label, c.values.map { it.second }, checked = current(), pick = ::select)
+            select(nextSettingIndex(current(), c.values.size, 1))
         }
         row.tag = c.key
         row.clickOnRight()
@@ -1161,11 +1160,9 @@ class SettingsActivity : Screen() {
         val label = getString(R.string.source_choice)
         settingRow(label, value, getString(R.string.source_choice_hint),
             focus = { value.setTextColor(if (it) TUNGSTEN else TEXT_2) }) {
-            choose(label, PRESETS.map { getString(it.first) }, checked = current()) { i ->
-                if (i == current()) return@choose
-                PRESETS[i].second.forEach { (key, v) -> store(choice(key), v) }
-                refresh.forEach { it() }
-            }
+            val next = nextSettingIndex(current(), PRESETS.size, 1)
+            PRESETS[next].second.forEach { (key, v) -> store(choice(key), v) }
+            refresh.forEach { it() }
         }.clickOnRight()
         refresh += ::draw
         draw()
