@@ -680,7 +680,6 @@ class MainActivity : Screen() {
     // the library's rows are redrawn, so the remote stays where it was on the rest of the page.
     override fun onRestart() {
         super.onRestart()
-        if (searchFrom != null) { searchFrom = null; styleNav() } // back from Search: the magnifier shows its own focus again
         val featured = Settings.featuredHome(this)
         val hiddenRows = Settings.hiddenRows(this)
         val hiddenRowsChanged = hiddenRows != lastHiddenRows || HomeStyle.signature(this, page.label) != lastHomeRows
@@ -820,6 +819,9 @@ class MainActivity : Screen() {
 
     override fun onResume() {
         super.onResume()
+        searching = false
+        // Back from Search (or it never showed): the magnifier shows its own focus again.
+        if (searchFrom != null) { searchFrom = null; if (search != null) styleNav() }
         if (!::profile.isInitialized) return
         startFps()
         // ChadFlix: Settings › Ratings may have changed: the focused card's badge follows (no score hides it).
@@ -1176,13 +1178,19 @@ class MainActivity : Screen() {
 
     private var pending = Page.HOME
     private var jump = false // OK on a page's name: go down into its rows once they're in
-    private val openSearch = Runnable { if (search?.isFocused == true && hasWindowFocus()) startSearch() }
+    private val openSearch = Runnable {
+        if (search?.isFocused == true && hasWindowFocus()) startSearch()
+        else if (searchFrom != null) { searchFrom = null; styleNav() } // it didn't open: the magnifier shows its focus
+    }
+    private var searching = false // Search is opening: OK or another landing before it shows starts nothing more
     private var searchFrom: Page? = null // the page whose pill Search opens from, kept lit here until it's open
     private var navLeft: Page? = null // the page name the remote last left, and when
     private var navLeftAt = 0L
 
     /** Search, its pill starting on this one (screen px), with no screen change: the pill carries it ([SearchPill]). */
     private fun startSearch() {
+        if (searching) return
+        searching = true
         val from = navItems[searchFrom]?.takeIf { it.isShown }?.let { v ->
             val at = IntArray(2).also(v::getLocationOnScreen)
             intArrayOf(at[0], at[1], at[0] + v.width, at[1] + v.height)

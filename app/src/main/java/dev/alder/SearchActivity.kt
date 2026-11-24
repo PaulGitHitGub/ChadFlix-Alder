@@ -204,6 +204,7 @@ class SearchActivity : ExploreScreen() {
         }
         arrangePage(root, sort, dp((width - RESULTS_X).toInt()))
         upFromControls((voice ?: keyboardButton).id) // Up from the controls row: Voice, straight up in the top bar
+        if (animationsOn()) pageViews.forEach { it.alpha = 0f } // shown as the top bar's pill lands ([attachCapsule])
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(root)
         root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
@@ -313,7 +314,7 @@ class SearchActivity : ExploreScreen() {
             voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
             addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4)))
         }
-        topPill = SearchPill(this, headerBar, capsule, voice as? LinearLayout, keyboardButton, tabSlot) {
+        topPill = SearchPill(this, headerBar, capsule, voice as? LinearLayout, keyboardButton, tabSlot, avatar.parent as View) {
             (1 until nav.childCount).mapNotNull { nav.getChildAt(it) as? TextView }
         }
         val bar = headerBar as FrameLayout
@@ -322,16 +323,13 @@ class SearchActivity : ExploreScreen() {
         val place = {
             capsule.x = maxOf(nav.left + tabSlot.right - capsule.width, (avatar.parent as View).right + dp(8)).toFloat()
             topPill.relayout()
-            // The first time everything has its place: the pill opens from where Home's was (or the magnifier).
+            // The first time everything has its place, in this same layout pass, so the first frame drawn already has the
+            // pill where Home's was (or on the magnifier): it opens from there.
             if (!arrived && capsule.width > 0) {
                 arrived = true
-                topPill.post {
-                    topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton })
-                    if (android.os.Build.VERSION.SDK_INT < 26 || android.animation.ValueAnimator.areAnimatorsEnabled()) pageViews.forEach { v ->
-                        v.alpha = 0f // the page comes in as the pill lands (its old one is gone at once)
-                        v.animate().alpha(1f).setStartDelay(PAGE_IN_AT).setDuration(PAGE_IN_MS).start()
-                    }
-                }
+                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton })
+                // The page (hidden since onCreate) comes in as the pill lands; the old one is gone at once.
+                pageViews.forEach { it.animate().alpha(1f).setStartDelay(PAGE_IN_AT).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
             }
         }
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
@@ -1035,6 +1033,8 @@ class SearchActivity : ExploreScreen() {
     }
 
     override fun onDestroy() {
+        if (::topPill.isInitialized) topPill.stop() // nothing animates on after the page has gone
+        pageViews.forEach { it.animate().cancel() }
         clearGrid()
         main.removeCallbacks(typed)
         main.removeCallbacks(restoreHeader)
