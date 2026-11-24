@@ -2,7 +2,6 @@ package dev.alder
 
 import android.content.Intent
 import android.content.res.ColorStateList
-import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.text.SpannableString
 import android.text.TextUtils
@@ -16,20 +15,19 @@ import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** The catalogue and its filter panel live in Search's results area. */
+/** Search's catalogue: its filter bar over the posters, Sort on the heading, the focused title's info panel at the left. */
 abstract class ExploreScreen : Screen() {
     protected abstract val results: LinearLayout
     protected abstract val resultsScroll: ScrollView
-    /** Holds [results] and, over them, the resting poster's pop-out; it scrolls with them. */
-    protected abstract val popLayer: FrameLayout
     protected abstract fun lookup(facet: String?, restoreTitle: Boolean = true)
     protected abstract fun refreshCatalogue()
     private var query = ExploreQuery()
-    protected lateinit var panel: LinearLayout
     protected lateinit var peopleButton: View
-    protected lateinit var panelScroll: ScrollView
+    private lateinit var filterBar: View
+    private lateinit var infoPanel: View
     protected lateinit var sortControl: TextView
     private lateinit var headingField: EditText
+    private var upFromSort = View.NO_ID // the top bar, when there's no filter bar over Sort
     private var downWhileLoading = false
     private var firstPageLoading = false
     private class Row(val view: LinearLayout, val key: TextView, val value: TextView, val chevron: ImageView)
@@ -41,9 +39,17 @@ abstract class ExploreScreen : Screen() {
     @Volatile private var generation = 0
     private val catalogueCards = mutableListOf<MediaCardView>()
     private val popularTitles = mutableMapOf<Boolean, List<JSONObject>>() // the unfiltered catalogue's first page, by movie
-    @Volatile private var preview: View? = null // read off the main thread by the preview's rating lookups
-    private var previewDim: View? = null
-    private var pending: Runnable? = null
+    @Volatile private var shown: Meta? = null // the info panel's title; read off the main thread by its rating lookups
+    private var pending: Runnable? = null // the info panel's lookups, after a rest on the poster
+    private lateinit var infoBody: View
+    private lateinit var infoArt: ImageView
+    private lateinit var infoName: TextView
+    private lateinit var infoLogo: ImageView
+    private lateinit var infoCert: TextView
+    private lateinit var infoFacts: TextView
+    private lateinit var infoScores: LinearLayout
+    private lateinit var infoOverview: TextView
+    private lateinit var infoCast: TextView
     private var delayed = Runnable { refreshCatalogue() }
     private val medium by lazy { text("", SMALL).typeface }
     private val semiBold by lazy { text("", SMALL, bold = true).typeface }
@@ -70,6 +76,7 @@ abstract class ExploreScreen : Screen() {
     /** The heading's sort drop-down, "Sort: Popular ⌄": OK opens the reliable sorts under it; Down goes to the posters. */
     protected fun buildSortControl(field: EditText, topBar: View): TextView {
         headingField = field
+        upFromSort = topBar.id
         sortControl = text("", SMALL).apply {
             id = View.generateViewId()
             isFocusable = true
@@ -81,7 +88,6 @@ abstract class ExploreScreen : Screen() {
                 setBounds(0, 0, dp(10), dp(10))
             }, null)
             compoundDrawablePadding = dp(6)
-            nextFocusUpId = topBar.id
             nextFocusLeftId = id // not into the heading's words
             nextFocusRightId = id
             setOnClickListener { sortPicker() }
@@ -90,23 +96,35 @@ abstract class ExploreScreen : Screen() {
                 styleSort()
                 colorHeading(has)
             }
-            setOnKeyListener { _, code, event ->
-                if (code != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) false
-                else catalogueCards.firstOrNull()?.requestFocus() ?: firstPageLoading.also { downWhileLoading = it }
-            }
+            setOnKeyListener(downToPosters)
         }
         styleSort()
         return sortControl
     }
 
+    /** Down from the filter bar or Sort: the first row's poster under it (or the first, once the first page comes). */
+    private val downToPosters = View.OnKeyListener { v, code, event ->
+        if (code != KeyEvent.KEYCODE_DPAD_DOWN || event.action != KeyEvent.ACTION_DOWN) return@OnKeyListener false
+        val middle = { view: View -> IntArray(2).also(view::getLocationOnScreen)[0] + view.width / 2 }
+        catalogueCards.take(COLUMNS).minByOrNull { kotlin.math.abs(middle(it) - middle(v)) }?.requestFocus()
+            ?: firstPageLoading.also { downWhileLoading = it }
+    }
+
+    /** Where a list hangs under [v] (dp from the left and top): its start on [v]'s, or its end with [alignEnd]. */
+    private fun under(v: View, widthDp: Int, alignEnd: Boolean = false): Pair<Int, Int> {
+        val at = IntArray(2).also(v::getLocationOnScreen)
+        val density = resources.displayMetrics.density
+        val start = (if (alignEnd) (at[0] + v.width) / density - widthDp else at[0] / density).toInt()
+        return start.coerceIn(EDGE, (resources.displayMetrics.widthPixels / density).toInt() - EDGE - widthDp) to
+            ((at[1] + v.height) / density).toInt() + DROP
+    }
+
     /** The sorts as a list hanging under the control, its right edge on the control's; a pick restarts the catalogue. */
     private fun sortPicker() {
         val sorts = sorts()
-        val at = IntArray(2).also(sortControl::getLocationOnScreen)
-        val density = resources.displayMetrics.density
+        val (x, y) = under(sortControl, PICKER_W, alignEnd = true)
         choose(getString(R.string.list_sort), sorts.map { it.label }, checked = sorts.indexOfFirst { it.key == query.sort },
-            widthDp = SORT_W, anchorStartDp = ((at[0] + sortControl.width) / density).toInt() - SORT_W,
-            anchorTopDp = ((at[1] + sortControl.height) / density).toInt() + SORT_DROP) { applySort(sorts[it]) }
+            widthDp = PICKER_W, anchorStartDp = x, anchorTopDp = y) { applySort(sorts[it]) }
     }
 
     private fun applySort(pick: Pick) {
@@ -129,18 +147,23 @@ abstract class ExploreScreen : Screen() {
         headingField.hint = words
     }
 
-    /** The filter panel (Neon's B1): Movies | Shows, then the filters in [Facet]'s order. */
-    protected fun buildPanel(): ScrollView {
-        panel = column(Gravity.START).apply { setPadding(dp(8),dp(8),dp(8),dp(8)) }
+    /**
+     * The filter bar over the posters (Neon's Approach A): Movies | Shows, then a pill per filter in [Facet]'s order
+     * showing its value ("Genre Horror + Comedy"), and Clear All Filters while any is set. It scrolls sideways if long.
+     */
+    protected fun buildFilterBar(): View {
+        val bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val types = LinearLayout(this).apply {
-            background = GradientDrawable().apply { setColor(SEGMENT); cornerRadius = 999f; setStroke(1, GLASS_EDGE) }
+            background = outlined(SEGMENT, GLASS_EDGE)
             setPadding(dp(3),dp(3),dp(3),dp(3))
         }
         listOf("movie" to R.string.tab_movies, "series" to R.string.tab_shows).forEach { (type, name) ->
-            val b = text(name, HomeStyle.INFO).apply {
+            val b = text(name, SMALL).apply {
                 gravity = Gravity.CENTER
                 isFocusable = true
                 includeFontPadding = false
+                setPadding(dp(12),0,dp(12),0)
+                setOnKeyListener(downToPosters)
                 setOnFocusChangeListener { _, _ -> styleTypes() }
                 setOnClickListener {
                     if (query.type != type) {
@@ -152,76 +175,103 @@ abstract class ExploreScreen : Screen() {
                 }
             }
             typeButtons += b
-            types.addView(b, LinearLayout.LayoutParams(0,dp(22),1f))
+            types.addView(b, LinearLayout.LayoutParams(-2,dp(BAR_H - 6)))
         }
-        panel.addView(types, LinearLayout.LayoutParams(-1,-2).apply { bottomMargin = dp(8) })
+        bar.addView(types, LinearLayout.LayoutParams(-2,dp(BAR_H)))
         Facet.values().forEach { f ->
             val icon = if (f == Facet.PEOPLE) R.drawable.ic_person else 0
-            val key = text(title(f), HomeStyle.INFO, color = TEXT).apply {
+            val key = text(title(f), SMALL).apply {
                 isSingleLine = true
+                includeFontPadding = false
                 if (icon != 0) {
                     setCompoundDrawablesRelative(getDrawable(icon)?.mutate()?.apply { setBounds(0,0,dp(11),dp(11)) }, null, null, null)
-                    compoundDrawablePadding = dp(6)
+                    compoundDrawablePadding = dp(5)
                 }
             }
-            val label = text("", PANEL_VALUE, color = HomeStyle.LABEL_GREY).apply {
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            val label = text("", SMALL, bold = true).apply {
                 isSingleLine = true
+                includeFontPadding = false
                 ellipsize = TextUtils.TruncateAt.END
+                maxWidth = dp(VALUE_MAX)
             }
-            val chevron = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_end) }
-            val row = LinearLayout(this).apply {
+            val chevron = ImageView(this).apply { setImageResource(R.drawable.ic_chevron_down) }
+            val chip = LinearLayout(this).apply {
+                id = View.generateViewId()
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(9),0,dp(7),0)
+                setPadding(dp(12),0,dp(10),0)
                 isFocusable = true
                 addView(key)
-                addView(label, LinearLayout.LayoutParams(0,-2,1f).apply { marginStart = dp(8) })
-                addView(chevron, LinearLayout.LayoutParams(dp(9),dp(9)).apply { marginStart = dp(3) })
+                addView(label, LinearLayout.LayoutParams(-2,-2).apply { marginStart = dp(5) })
+                addView(chevron, LinearLayout.LayoutParams(dp(10),dp(10)).apply { marginStart = dp(5) })
                 setOnFocusChangeListener { _, _ -> styleRow(f) }
                 setOnClickListener { open(f) }
+                setOnKeyListener(downToPosters)
             }
-            panel.addView(row, -1, dp(30))
-            rows[f] = Row(row, key, label, chevron)
-            if (f == Facet.PEOPLE) peopleButton = row
+            bar.addView(chip, LinearLayout.LayoutParams(-2,dp(BAR_H)).apply { marginStart = dp(BAR_GAP) })
+            rows[f] = Row(chip, key, label, chevron)
+            if (f == Facet.PEOPLE) peopleButton = chip
         }
-        clearFilters = text(R.string.ex_clear_filters, HomeStyle.INFO, color = TEXT).apply {
+        clearFilters = text(R.string.ex_clear_filters, SMALL, color = TEXT).apply {
+            id = View.generateViewId()
             gravity = Gravity.CENTER
+            includeFontPadding = false
+            setPadding(dp(12),0,dp(12),0)
             isFocusable = true
             fun style(on: Boolean) {
-                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else GradientDrawable().apply { cornerRadius = 999f; setStroke(dp(1), GLASS_EDGE) }
+                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else outlined(0, GLASS_EDGE)
                 setTextColor(if (on) HomeStyle.BLACK else TEXT)
             }
             style(false)
             setOnFocusChangeListener { _, has -> style(has) }
             setOnClickListener {
-                peopleButton.requestFocus()
+                rows.values.first().view.requestFocus() // this pill goes once nothing is set
                 change(ExploreQuery(type=query.type, sort=query.sort))
             }
+            setOnKeyListener(downToPosters)
         }
-        panel.addView(clearFilters, LinearLayout.LayoutParams(-1,dp(28)).apply { topMargin = dp(8) })
+        bar.addView(clearFilters, LinearLayout.LayoutParams(-2,dp(BAR_H)).apply { marginStart = dp(BAR_GAP) })
+        filterBar = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(bar)
+        }
         updatePanel()
-        return ScrollView(this).apply {
-            isVerticalScrollBarEnabled = false
-            isFillViewport = true
-            // A quiet rounded surface on the black page, not frosted glass: a warm near-black and a hairline edge.
-            background = GradientDrawable().apply { setColor(PANEL_FILL); cornerRadius = dp(13).toFloat(); setStroke(1, PANEL_EDGE) }
-            addView(panel)
-        }.also { panelScroll = it }
+        return filterBar
     }
 
-    /** A panel row: a white rounded row while focused; a chosen value in tungsten. */
+    private fun outlined(fill: Int, edge: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = 999f; setStroke(dp(1), edge) }
+
+    /** A filter pill: white while focused; a chosen value in tungsten on a warm tint; else a grey name and a white value. */
     private fun styleRow(f: Facet) {
         val r = rows[f] ?: return
         val on = r.view.isFocused
         val lit = active(f)
-        r.view.background = if (on) rounded(HomeStyle.WHITE, 8) else null
-        r.key.setTextColor(if (on) HomeStyle.BLACK else TEXT)
-        r.key.typeface = if (on) semiBold else medium
-        r.key.compoundDrawablesRelative[0]?.setTint(if (on) HomeStyle.BLACK else TEXT)
-        r.value.setTextColor(when { on -> FOCUSED_VALUE; lit -> TUNGSTEN; else -> HomeStyle.LABEL_GREY })
-        r.value.typeface = if (on || lit) semiBold else medium
-        r.chevron.imageTintList = ColorStateList.valueOf(if (on) FOCUSED_VALUE else HomeStyle.LABEL_GREY)
+        r.view.background = when { on -> HomeStyle.pill(HomeStyle.WHITE); lit -> outlined(CHOSEN_FILL, CHOSEN_EDGE); else -> outlined(SEGMENT, GLASS_EDGE) }
+        val name = when { on -> FOCUSED_VALUE; lit -> CHOSEN_NAME; else -> HomeStyle.LABEL_GREY }
+        r.key.setTextColor(name)
+        r.key.compoundDrawablesRelative[0]?.setTint(name)
+        r.value.setTextColor(when { on -> HomeStyle.BLACK; lit -> TUNGSTEN; else -> HomeStyle.WHITE })
+        r.chevron.imageTintList = ColorStateList.valueOf(name)
     }
+
+    /**
+     * The bar and Sort go with the catalogue (not typed words or the people picker); the info panel too, unless the
+     * keys have the left column.
+     */
+    protected fun showCatalogueControls(bar: Boolean, panel: Boolean) {
+        filterBar.visibility = if (bar) View.VISIBLE else View.GONE
+        sortControl.visibility = filterBar.visibility
+        infoPanel.visibility = if (panel) View.VISIBLE else View.GONE
+        linkSort()
+    }
+
+    /** Up from Sort: the bar's last pill, not the Settings gear straight above; with no bar, the top bar. */
+    private fun linkSort() {
+        sortControl.nextFocusUpId = if (filterBar.visibility != View.VISIBLE) upFromSort
+            else (if (clearFilters.visibility == View.VISIBLE) clearFilters else rows.values.last().view).id
+    }
+
+    /** The catalogue's first poster, for Right from Keyboard Search. */
+    protected fun firstPoster(): View? = catalogueCards.firstOrNull()
 
     private fun styleTypes() = typeButtons.forEachIndexed { i, b -> b.pillState(b.isFocused, (i==0) == query.movie) }
 
@@ -240,6 +290,7 @@ abstract class ExploreScreen : Screen() {
         }
         styleSort()
         colorHeading(sortControl.hasFocus())
+        linkSort()
     }
 
     private fun active(f: Facet) = query.without(f) != query &&
@@ -252,9 +303,13 @@ abstract class ExploreScreen : Screen() {
         main.postDelayed(delayed, 300)
     }
 
-    private fun chooseNear(name: String, options: List<String>, checked: Int = -1, back: (() -> Unit)? = null,
-                           right: ((Int) -> (() -> Unit)?)? = null, pick: (Int)->Unit) =
-        choose(name, options, checked = checked, widthDp = 220, anchorStartDp = PICKER_X, right = right, back = back, pick = pick)
+    /** [f]'s list, hanging under its pill. */
+    private fun chooseNear(f: Facet, options: List<String>, checked: Int = -1, focus: Int = maxOf(checked, 0), name: String = title(f),
+                           widthDp: Int = PICKER_W, back: (() -> Unit)? = null, right: ((Int) -> (() -> Unit)?)? = null, pick: (Int)->Unit) {
+        val (x, y) = under(rows.getValue(f).view, widthDp)
+        choose(name, options, checked = checked, focus = focus, widthDp = widthDp, anchorStartDp = x, anchorTopDp = y,
+            right = right, back = back, pick = pick)
+    }
 
     private fun open(f: Facet) {
         when(f) {
@@ -272,7 +327,7 @@ abstract class ExploreScreen : Screen() {
             Facet.YEAR -> years()
             else -> {
                 val options = options(f)
-                chooseNear(title(f), listOf(getString(R.string.filter_all)) + options.map { it.label },
+                chooseNear(f, listOf(getString(R.string.filter_all)) + options.map { it.label },
                     options.indexOfFirst { it.key == query.choices[f]?.key }+1) { index ->
                     val option = options.getOrNull(index - 1)
                     change(if (option == null) query.without(f) else query.copy(choices = query.choices + (f to option)))
@@ -282,8 +337,8 @@ abstract class ExploreScreen : Screen() {
     }
 
     /**
-     * The Genre picker beside the panel (A3): Match All | Any, then the genres with ticks. It stays open while genres
-     * are ticked, changing its rows in place, and the results beside it update live.
+     * The Genre picker under its pill (A3): Match All | Any, then the genres with ticks. It stays open while genres
+     * are ticked, changing its rows in place, and the results behind it update live.
      */
     private fun genrePicker(list: List<Pair<Int,String>>) {
         fun ticked(i: Int) = if (i == 0) query.genres.isEmpty() else query.genres.any { it.key == list[i - 1].first.toString() }
@@ -310,7 +365,8 @@ abstract class ExploreScreen : Screen() {
         }
         // Opens on the first ticked genre, so flipping a pair to Any or adding one is a few presses away.
         val names = listOf(getString(R.string.filter_all)) + list.map { it.second }
-        choose(title(Facet.GENRE), names, header = true, widthDp = 260, anchorStartDp = PICKER_X, extra = match, stay = true,
+        val (x, y) = under(this.rows.getValue(Facet.GENRE).view, GENRE_W)
+        choose(title(Facet.GENRE), names, header = true, widthDp = GENRE_W, anchorStartDp = x, anchorTopDp = y, extra = match, stay = true,
             focus = names.indices.firstOrNull { it > 0 && ticked(it) } ?: 0, checkedRows = names.indices.filter(::ticked).toSet(),
             shown = { rows = it; refresh() }) { i ->
             val pick = list.getOrNull(i - 1)?.let { Pick(it.first.toString(), it.second) }
@@ -341,12 +397,12 @@ abstract class ExploreScreen : Screen() {
         // Back steps out one list at a time: a decade's years to its decades, To to From, From to the Year list.
         fun singles(name: String, decade: Int, low: Int = decade, back: () -> Unit, done: (Int) -> Unit) {
             val list = (minOf(now,decade+9) downTo maxOf(decade,low)).toList()
-            chooseNear(name,list.map(Int::toString),back = back) { done(list[it]) }
+            chooseNear(Facet.YEAR,list.map(Int::toString),name = name,back = back) { done(list[it]) }
         }
         // Custom Range: decades first (OK takes the decade's first or last year, Right opens its years), not ~125 rows.
         fun yearFrom(name: String, low: Int, end: Boolean, back: () -> Unit, done: (Int) -> Unit) {
             val tens = (now/10*10 downTo low/10*10 step 10).toList()
-            chooseNear(name, tens.map { "${it}–${it+9}  ›" }, back = back,
+            chooseNear(Facet.YEAR, tens.map { "${it}–${it+9}  ›" }, name = name, back = back,
                 right = { i -> { singles(name, tens[i], low, back = { yearFrom(name, low, end, back, done) }, done) } }) { i ->
                 done(if (end) minOf(now, tens[i]+9) else maxOf(low, tens[i]))
             }
@@ -364,9 +420,8 @@ abstract class ExploreScreen : Screen() {
             else -> (decades.indexOfFirst { d -> chosen == listOf("$d","${d+9}") ||
                 (chosen[0] == chosen[1] && chosen[0].toInt()/10*10 == d) } + 1).takeIf { it > 0 } ?: decades.size+2
         }
-        choose(title(Facet.YEAR),listOf(getString(R.string.filter_all)) + decades.map { "${it}–${it+9}  ›" } +
-            listOf(getString(R.string.ex_before),getString(R.string.ex_range)),checked = checked,focus = at ?: checked,
-            widthDp = 220,anchorStartDp = PICKER_X,
+        chooseNear(Facet.YEAR,listOf(getString(R.string.filter_all)) + decades.map { "${it}–${it+9}  ›" } +
+            listOf(getString(R.string.ex_before),getString(R.string.ex_range)),checked,focus = at ?: checked,
             right = { i -> decades.getOrNull(i-1)?.let { d -> { singles(title(Facet.YEAR), d, back = { years(i) }) { set(it,it,it.toString()) } } } }) { i ->
             when(i) {
                 0 -> change(query.without(Facet.YEAR))
@@ -392,15 +447,9 @@ abstract class ExploreScreen : Screen() {
         firstPageLoading = false
         generation++
         main.removeCallbacks(delayed)
-        closePreview()
-    }
-
-    private fun closePreview() {
         pending?.let(main::removeCallbacks)
         pending = null
-        listOfNotNull(preview, previewDim).forEach { it.animate().cancel(); popLayer.removeView(it) }
-        preview = null
-        previewDim = null
+        shown = null // a new catalogue's first title fills the info panel afresh
     }
 
     /** A title's page or save couldn't be reached ([words] for a list that couldn't load: People, Genre). */
@@ -413,7 +462,7 @@ abstract class ExploreScreen : Screen() {
         loadedBand = -1
     }
 
-    /** The grid's width: the results area less the page's right margin, as the panel's left. */
+    /** The grid's width: the results area less the page's right margin, as the left column's left. */
     private val gridWidth get() = resultsScroll.layoutParams.width - dp(GRID_RIGHT)
 
     protected fun catalogue() {
@@ -462,12 +511,13 @@ abstract class ExploreScreen : Screen() {
                             dimAlpha = 0f,fadeIn = false,home = true)
                         val bandIndex = catalogueCards.size / 5
                         if (bandIndex == 0) card.nextFocusUpId = sortControl.id
+                        if (catalogueCards.isEmpty()) showInfo(meta) // until a poster has the remote: the first result
                         catalogueCards += card
                         // The first column keeps RING_ROOM/2 at its left, inside the scroller's clip, for the ring.
                         band.addView(card,LinearLayout.LayoutParams(width,width*3/2).apply { marginStart = if (column > 0) gap else dp(RING_ROOM / 2) })
                         card.setOnFocusChanged { has ->
                             if (has) {
-                                closePreview()
+                                showInfo(meta)
                                 if (bandIndex != loadedBand) {
                                     val previous = loadedBand
                                     loadedBand = bandIndex
@@ -477,22 +527,19 @@ abstract class ExploreScreen : Screen() {
                                     for (i in maxOf(0,bandIndex-2)*5 until minOf(catalogueCards.size,(bandIndex+3)*5)) catalogueCards[i].load()
                                 }
                                 band.post { if (card.hasFocus()) resultsScroll.scrollTo(0,(band.top - dp(RING_ROOM)).coerceAtLeast(0)) }
-                                pending = Runnable { if (card.hasFocus() && hasWindowFocus() && g == generation) popOut(card,column,meta) }
-                                    .also { main.postDelayed(it,HomeStyle.WASH_WAIT) }
                                 if (results.indexOfChild(band) >= results.childCount-2) more()
-                            } else closePreview()
+                            }
                         }
                         var resolving = false
                         fun resolve(save: Boolean) {
-                            // One lookup at a time (a second OK opened the title page twice); the poster, or its
-                            // preview, dims while the IMDb id is found (up to 6 s on a cold cache).
+                            // One lookup at a time (a second OK opened the title page twice); the poster dims while
+                            // the IMDb id is found (up to 6 s on a cold cache).
                             if (resolving) return
                             resolving = true
-                            (preview ?: card).alpha = RESOLVING_ALPHA
+                            card.alpha = RESOLVING_ALPHA
                             background({ ExploreCatalogue.details(meta).optJSONObject("external_ids")?.text("imdb_id") }) { answer ->
                                 resolving = false
                                 card.alpha = 1f
-                                preview?.alpha = 1f
                                 if (generation != g) return@background
                                 // Save comes from the hold-OK menu, whose window gives focus back late: only opening the
                                 // title page waits for the remote to still be on this poster.
@@ -509,7 +556,7 @@ abstract class ExploreScreen : Screen() {
                     }
                     if (seen.isNotEmpty() || done) {
                         firstPageLoading = false
-                        if (downWhileLoading && sortControl.hasFocus()) catalogueCards.firstOrNull()?.requestFocus()
+                        if (downWhileLoading && (sortControl.hasFocus() || filterBar.hasFocus())) catalogueCards.firstOrNull()?.requestFocus()
                         downWhileLoading = false
                     }
                     if (before == seen.size && !done) more()
@@ -517,8 +564,9 @@ abstract class ExploreScreen : Screen() {
                 }, {
                     firstPageLoading = false
                     downWhileLoading = false
+                    if (catalogueCards.isEmpty()) clearInfo()
                     // One card for a failed page, whichever page. Retry on a later page asks for that page again and
-                    // keeps the viewer's place; on the first it rebuilds the results, so the remote waits on People.
+                    // keeps the viewer's place; on the first it rebuilds the results, so the remote waits in the bar.
                     if (failure == null) failure = failed(getString(R.string.search_popular_unavailable)) {
                         if (next == 1) { peopleButton.requestFocus(); refreshCatalogue() }
                         else { catalogueCards.lastOrNull()?.requestFocus(); more() }
@@ -551,6 +599,7 @@ abstract class ExploreScreen : Screen() {
     }
 
     private fun emptySuggestions(g: Int,q: ExploreQuery) {
+        clearInfo()
         results.addView(text(R.string.discover_empty,BODY,color = HomeStyle.WHITE),
             LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(10); bottomMargin = dp(10) })
         val alternatives = Facet.values().filter(::active).map { getString(R.string.search_remove_query,title(it)) to q.without(it) } +
@@ -579,148 +628,125 @@ abstract class ExploreScreen : Screen() {
     }
 
     /**
-     * The Showing Wall preview (B6): resting on a poster grows it into a small title page over its neighbours, three
-     * posters wide and two rows tall, with the home ring around it; the rest of the grid dims and nothing moves. What
-     * TMDb's discover answer holds shows at once; ratings and cast keep fixed-size placeholders until they come (B7).
+     * The focused poster's title page in brief, left of the grid (Neon's B5 side panel, for one title): its art fading
+     * into the panel, logo or name, year · genres · length with the certificate, ratings, overview and cast. What TMDb's
+     * discover answer holds shows at once; the rest comes after a rest on the poster, into fixed-size slots.
      */
-    private fun popOut(card: MediaCardView, column: Int, meta: Meta) {
-        closePreview()
-        val w = card.width * 3 + dp(GRID_GAP) * 2
-        val h = card.height * 2 + dp(GRID_ROW_GAP)
-        val spot = Rect(0, 0, card.width, card.height)
-        popLayer.offsetDescendantRectToMyCoords(card, spot)
-        val rightward = column <= 2
-        val downward = spot.top - resultsScroll.scrollY + h <= resultsScroll.height
-        val left = if (rightward) spot.left else spot.right - w
-        val top = if (downward) spot.top else spot.bottom - h
-        val r = HomeStyle.ringOut(this)
-
-        val dim = View(this).apply { setBackgroundColor(POP_DIM); alpha = 0f }
-        popLayer.addView(dim, FrameLayout.LayoutParams(-1, -1))
-        val holder = FrameLayout(this).apply { clipChildren = false }
-        val pop = FrameLayout(this).apply {
-            background = GradientDrawable().apply { setColor(POP_FILL); cornerRadius = HomeStyle.CARD_RADIUS * resources.displayMetrics.density }
+    protected fun buildInfoPanel(): View {
+        infoArt = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
+        infoName = text("", BODY + 1f, bold = true, color = HomeStyle.WHITE).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
+        infoLogo = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(INFO_LOGO_W); maxHeight = dp(INFO_TITLE_H) }
+        infoCert = tag("", HomeStyle.WHITE).apply { visibility = View.GONE }
+        infoFacts = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
+        infoScores = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        infoOverview = text("", SMALL, color = OVERVIEW).apply {
+            ellipsize = TextUtils.TruncateAt.END
+            // As many whole lines as its slot holds, the last ending in "…".
+            addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
+                if (bottom - top != oldBottom - oldTop) maxLines = ((bottom - top) / lineHeight).coerceAtLeast(1)
+            }
+        }
+        infoCast = text("", SMALL, color = TEXT_2).apply { setLines(2); gravity = Gravity.BOTTOM; ellipsize = TextUtils.TruncateAt.END }
+        infoBody = column(Gravity.START).apply {
+            setPadding(dp(INFO_PAD), 0, dp(INFO_PAD), dp(INFO_PAD))
+            addView(FrameLayout(this@ExploreScreen).apply {
+                addView(infoName, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.START))
+                addView(infoLogo, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
+            }, LinearLayout.LayoutParams(-1, dp(INFO_TITLE_H)))
+            addView(LinearLayout(this@ExploreScreen).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(infoCert, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(7) })
+                addView(infoFacts)
+            }, LinearLayout.LayoutParams(-1, dp(20)).apply { topMargin = dp(7) })
+            addView(infoScores, LinearLayout.LayoutParams(-1, dp(16)).apply { topMargin = dp(6) })
+            addView(infoOverview, LinearLayout.LayoutParams(-1, 0, 1f).apply { topMargin = dp(10) })
+            addView(infoCast, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            visibility = View.INVISIBLE
+        }
+        return FrameLayout(this).apply {
+            // The filter panel's quiet surface it replaces: a warm near-black and a hairline edge; the art clipped to it.
+            background = GradientDrawable().apply { setColor(PANEL_FILL); cornerRadius = dp(13).toFloat(); setStroke(1, PANEL_EDGE) }
             outlineProvider = ViewOutlineProvider.BACKGROUND
             clipToOutline = true
-        }
-        holder.addView(pop, FrameLayout.LayoutParams(w, h).apply { setMargins(r, r, r, r) })
-        holder.addView(HomeStyle.ring(this).apply { visibility = View.VISIBLE }, FrameLayout.LayoutParams(w + 2 * r, h + 2 * r))
-        popLayer.addView(holder, FrameLayout.LayoutParams(w + 2 * r, h + 2 * r).apply { leftMargin = left - r; topMargin = top - r })
+            addView(infoArt, FrameLayout.LayoutParams(-1, dp(INFO_ART_H)))
+            addView(View(this@ExploreScreen).apply {
+                background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(PANEL_FILL and 0x00FFFFFF, PANEL_FILL))
+            }, FrameLayout.LayoutParams(-1, dp(INFO_FADE_H)).apply { topMargin = dp(INFO_ART_H - INFO_FADE_H) })
+            addView(infoBody, FrameLayout.LayoutParams(-1, -1).apply { topMargin = dp(INFO_ART_H - INFO_OVERLAP) })
+        }.also { infoPanel = it }
+    }
 
-        val artH = (h * 0.62f).toInt()
-        val art = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
-        pop.addView(art, FrameLayout.LayoutParams(-1, artH))
-        Images.load(meta.background?.replace("/w1280/", "/w780/"), art, w)
-        val fadeH = (artH * 0.6f).toInt()
-        pop.addView(View(this).apply {
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(POP_FILL and 0x00FFFFFF, POP_FILL))
-        }, FrameLayout.LayoutParams(-1, fadeH).apply { topMargin = artH - fadeH })
-
-        val info = column(Gravity.START).apply { setPadding(dp(19), 0, dp(19), dp(16)) }
-        pop.addView(info, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
-        val titleSlot = FrameLayout(this)
-        val name = text(meta.name, BODY + 5f, bold = true, color = HomeStyle.WHITE).apply {
-            isSingleLine = true; ellipsize = TextUtils.TruncateAt.END
-        }
-        titleSlot.addView(name, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.START))
-        info.addView(titleSlot, LinearLayout.LayoutParams(-1, dp(46)))
-        val factsRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        val facts = text(listOfNotNull(meta.year, *meta.genres.take(2).toTypedArray()).joinToString(DOT), SMALL, color = HomeStyle.WHITE)
-            .apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
-        factsRow.addView(facts)
-        info.addView(factsRow, LinearLayout.LayoutParams(-1, dp(22)).apply { topMargin = dp(8) })
-        val scores = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+    /** [meta] in the info panel: what the discover answer holds now, the rest after a rest on it ([HomeStyle.WASH_WAIT]). */
+    private fun showInfo(meta: Meta) {
+        if (shown === meta) return
+        pending?.let(main::removeCallbacks)
+        shown = meta
+        infoBody.visibility = View.VISIBLE
+        Images.load(meta.background?.replace("/w1280/", "/w780/"), infoArt, dp(INFO_ART_W))
+        Images.load(null, infoLogo, 0) // and a late logo for the title before is dropped
+        infoName.text = meta.name
+        infoName.visibility = View.VISIBLE
+        infoCert.visibility = View.GONE
+        infoFacts.text = listOfNotNull(meta.year, *meta.genres.take(2).toTypedArray()).joinToString(DOT)
+        infoScores.removeAllViews()
         repeat(2) {
-            scores.addView(View(this).apply { background = rounded(PLACEHOLDER, 4) },
-                LinearLayout.LayoutParams(dp(56), dp(14)).apply { marginEnd = dp(10) })
+            infoScores.addView(View(this).apply { background = rounded(PLACEHOLDER, 4) },
+                LinearLayout.LayoutParams(dp(48), dp(12)).apply { marginEnd = dp(10) })
         }
-        info.addView(scores, LinearLayout.LayoutParams(-1, dp(18)).apply { topMargin = dp(6) })
-        info.addView(text(meta.description.orEmpty(), SMALL, color = OVERVIEW).apply {
-            setLines(3); ellipsize = TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        val chips = LinearLayout(this)
-        repeat(3) {
-            chips.addView(View(this).apply { background = HomeStyle.pill(PLACEHOLDER) },
-                LinearLayout.LayoutParams(dp(104), dp(24)).apply { marginEnd = dp(7) })
-        }
-        info.addView(chips, LinearLayout.LayoutParams(-1, dp(24)).apply { topMargin = dp(10) })
+        infoOverview.text = meta.description.orEmpty()
+        infoCast.text = ""
+        pending = Runnable { if (shown === meta) infoDetails(meta) }.also { main.postDelayed(it, HomeStyle.WASH_WAIT) }
+    }
 
-        // The poster grows from where it sits: the pop-out starts at the card's size, pinned at its corner.
-        holder.pivotX = (if (rightward) r else w + r).toFloat()
-        holder.pivotY = (if (downward) r else h + r).toFloat()
-        holder.scaleX = card.width.toFloat() / w
-        holder.scaleY = card.height.toFloat() / h
-        holder.enter().scaleX(1f).scaleY(1f).start()
-        dim.enter().alpha(1f).start()
-        preview = holder
-        previewDim = dim
+    /** Nothing for the info panel: no matches, or the first page failed. */
+    private fun clearInfo() {
+        shown = null
+        infoBody.visibility = View.INVISIBLE
+        Images.load(null, infoArt, 0)
+    }
 
+    /** The info panel's logo, certificate, length, cast and ratings; each answer is dropped once another title has the panel. */
+    private fun infoDetails(meta: Meta) {
         background({ ExploreCatalogue.details(meta) }) { answer ->
-            if (preview !== holder) return@background
-            val d = answer.getOrNull() ?: return@background
+            if (shown !== meta) return@background
+            val d = answer.getOrNull() ?: return@background infoScores.removeAllViews()
             val id = d.optJSONObject("external_ids")?.text("imdb_id")
             // The logo as the title page shows it (metahub, by IMDb id); the name stays when there is none.
             id?.let(Images::logoFor)?.let { logo ->
-                val image = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(250); maxHeight = dp(46) }
-                titleSlot.addView(image, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-                Images.load(logo, image, dp(250), done = { name.visibility = View.INVISIBLE })
+                Images.load(logo, infoLogo, dp(INFO_LOGO_W), done = { infoName.visibility = View.INVISIBLE })
             }
             val certificate = if (meta.type=="movie") d.optJSONObject("release_dates")?.optJSONArray("results").objects()
                 .firstOrNull { it.text("iso_3166_1")=="US" }?.optJSONArray("release_dates").objects().firstNotNullOfOrNull { it.text("certification") }
                 else d.optJSONObject("content_ratings")?.optJSONArray("results").objects().firstOrNull { it.text("iso_3166_1")=="US" }?.text("rating")
             val duration = if (meta.type=="movie") d.optInt("runtime").takeIf { it>0 }?.let { runtime("$it min") } // "2h 06m", as the title page
                 else d.optInt("number_of_seasons").takeIf { it>0 }?.let { resources.getQuantityString(R.plurals.seasons,it,it) }
-            certificate?.let { factsRow.addView(tag(it, HomeStyle.WHITE), 0, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }) }
-            facts.text = (listOfNotNull(meta.year)+d.optJSONArray("genres").objects().take(2).map { it.optString("name") }+listOfNotNull(duration)).joinToString(DOT)
-            val filtered = query.person
-            val people = listOfNotNull(filtered?.let { it.name to it.photo }) +
-                d.optJSONObject("credits")?.optJSONArray("cast").objects().mapNotNull { member ->
-                    member.text("name")?.let { it to member.text("profile_path") }
+            certificate?.let { infoCert.text = it; infoCert.visibility = View.VISIBLE }
+            infoFacts.text = (listOfNotNull(meta.year)+d.optJSONArray("genres").objects().take(2).map { it.optString("name") }+listOfNotNull(duration)).joinToString(DOT)
+            // The person the catalogue is filtered by first, then the top-billed cast.
+            val names = (listOfNotNull(query.person?.name) +
+                d.optJSONObject("credits")?.optJSONArray("cast").objects().mapNotNull { it.text("name") }).distinct().take(3)
+            if (names.isNotEmpty()) {
+                val label = getString(R.string.details_cast)
+                infoCast.text = SpannableString("$label  ${names.joinToString(", ")}").apply {
+                    setSpan(ForegroundColorSpan(TEXT_3), 0, label.length, 0)
                 }
-            chips.removeAllViews()
-            people.distinctBy { it.first }.take(3).forEachIndexed { i, (person, photo) ->
-                val chip = LinearLayout(this).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    background = GradientDrawable().apply {
-                        setColor(PLACEHOLDER); cornerRadius = 999f
-                        if (i == 0 && filtered != null) setStroke(dp(1), HomeStyle.WHITE)
-                    }
-                    setPadding(dp(3), 0, dp(10), 0)
-                }
-                val face = ImageView(this).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    background = rounded(PLACEHOLDER, 9)
-                    clipToOutline = true
-                }
-                chip.addView(face, dp(18), dp(18))
-                Images.load(photo?.let { "https://image.tmdb.org/t/p/w185$it" }, face, dp(18))
-                chip.addView(text(person, HomeStyle.INFO, color = HomeStyle.WHITE).apply {
-                    isSingleLine = true; ellipsize = TextUtils.TruncateAt.END; maxWidth = dp(130); setPadding(dp(5), 0, 0, 0)
-                })
-                chips.addView(chip, LinearLayout.LayoutParams(-2, dp(24)).apply { marginEnd = dp(7) })
             }
-            // Whole names, as the mockup: a chip that doesn't fit is left out rather than squeezed into "Robert Dow…".
-            fun squeezed(): Boolean {
-                val chip = chips.getChildAt(chips.childCount - 1) as LinearLayout
-                return ((chip.getChildAt(chip.childCount - 1) as TextView).layout?.getEllipsisCount(0) ?: 0) > 0
-            }
-            chips.post { while (chips.childCount > 1 && squeezed()) chips.removeViewAt(chips.childCount - 1) }
-            if (id == null) return@background scores.removeAllViews()
+            if (id == null) return@background infoScores.removeAllViews()
             val key = Settings.mdblistKey(this)
             background({
                 // Each lookup waits on the shared pool: stop as soon as the remote has moved to another poster.
                 val ratings = mdbRatings(id,key,meta.type).orEmpty()
-                val imdb = if (preview !== holder) null else Stremio.savedAddons(authKey.orEmpty()).orEmpty().firstNotNullOfOrNull { addon ->
+                val imdb = if (shown !== meta) null else Stremio.savedAddons(authKey.orEmpty()).orEmpty().firstNotNullOfOrNull { addon ->
                     addon.savedMeta(meta.type,id)?.rating
-                } ?: if (preview !== holder) null else runCatching {
+                } ?: if (shown !== meta) null else runCatching {
                     JSONObject(Http.get("https://v3-cinemeta.strem.io/meta/${meta.type}/$id.json",timeoutMs=5000))
                         .optJSONObject("meta")?.text("imdbRating")
                 }.getOrNull()
                 shownRatings("both",imdb,ratings["letterboxd"],ratings["tomatoes"])
             }) {
-                if (preview !== holder) return@background
-                scores.removeAllViews()
-                addRatingLogos(scores,it.getOrNull().orEmpty())
+                if (shown !== meta) return@background
+                infoScores.removeAllViews()
+                addRatingLogos(infoScores,it.getOrNull().orEmpty())
             }
         }
     }
@@ -815,26 +841,40 @@ abstract class ExploreScreen : Screen() {
     }
 
     private companion object {
-        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the panel at 33 from the left and 196 wide; five 128 dp
-        // posters with 10 dp gutters, 9 dp between rows; the grid stops 33 dp from the right edge, as the panel does.
+        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the left column at 33 from the left and 196 wide; five
+        // 128 dp posters with 10 dp gutters, 9 dp between rows; the grid stops 33 dp from the right edge.
         const val GRID_GAP = 10
         const val GRID_ROW_GAP = 9
         const val GRID_RIGHT = 33
+        const val COLUMNS = 5
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
-        const val PICKER_X = 241 // a picker opens 12 dp right of the panel
-        const val SORT_W = 220 // the sort drop-down, as wide as the panel's pickers
-        const val SORT_DROP = 6 // dp between the sort control and its list
+        const val BAR_H = 28 // the filter bar's pills (Neon A's 54 px, Voice Search's height)
+        const val BAR_GAP = 6
+        const val VALUE_MAX = 130 // a pill's value past this ends in "…"
+        const val PICKER_W = 220 // the lists hanging under a pill or Sort
+        const val GENRE_W = 260
+        const val EDGE = 33 // a list never comes nearer the screen's sides
+        const val DROP = 6 // between a pill and its list
+        // The info panel (B5 at half size): 16:9 art over the panel's 196 dp, the title rising 20 dp into its fade.
+        const val INFO_ART_W = 196
+        const val INFO_ART_H = 110
+        const val INFO_FADE_H = 70
+        const val INFO_OVERLAP = 20
+        const val INFO_TITLE_H = 44
+        const val INFO_PAD = 12
+        const val INFO_LOGO_W = 172
         const val RESOLVING_ALPHA = 0.6f // a poster waiting for its title page
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
         const val FACE = 72
-        const val PANEL_VALUE = 11f // sp, a filter's value: a step under its name
         const val PANEL_FILL = 0xFF15120F.toInt()
         const val PANEL_EDGE = 0x29FFF0DC
         const val SEGMENT = 0x12FFFFFF
         const val FOCUSED_VALUE = 0xAD000000.toInt()
-        const val POP_FILL = 0xFF13110F.toInt()
-        const val POP_DIM = 0x8C000000.toInt()
+        // A chosen filter's pill (Neon A's .fpill.active): a warm tint, a tungsten edge, its name in faded tungsten.
+        const val CHOSEN_FILL = 0x24F3D9B1
+        const val CHOSEN_EDGE = 0x61F3D9B1
+        const val CHOSEN_NAME = 0xB8F3D9B1.toInt()
         const val PLACEHOLDER = 0x14FFFFFF
         const val OVERVIEW = 0xFFD4CFC7.toInt()
     }
