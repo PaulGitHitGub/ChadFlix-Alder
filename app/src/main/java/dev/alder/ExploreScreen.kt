@@ -42,7 +42,8 @@ abstract class ExploreScreen : Screen() {
     private var loadedBand = -1
     @Volatile private var generation = 0
     private val catalogueCards = mutableListOf<MediaCardView>()
-    private var preview: View? = null
+    private val popularTitles = mutableMapOf<Boolean, List<JSONObject>>() // the unfiltered catalogue's first page, by movie
+    @Volatile private var preview: View? = null // read off the main thread by the preview's rating lookups
     private var previewDim: View? = null
     private var pending: Runnable? = null
     private var delayed = Runnable { refreshCatalogue() }
@@ -124,17 +125,8 @@ abstract class ExploreScreen : Screen() {
     private fun styleSortChip(chip: TextView, key: String) {
         val extra = key == "more"
         val selected = if (extra) query.sort !in quickSorts else query.sort == key
-        val focused = chip.hasFocus()
         if (extra) chip.text = if (selected) value(Facet.SORT) else getString(R.string.menu_more)
-        chip.background = when {
-            focused -> HomeStyle.pill(HomeStyle.WHITE)
-            selected -> HomeStyle.pill(HomeStyle.OPEN_TAB)
-            else -> null
-        }
-        val color = when { focused -> HomeStyle.BLACK; selected -> HomeStyle.WHITE; else -> TEXT_2 }
-        chip.setTextColor(color)
-        chip.typeface = if (focused || selected) semiBold else medium
-        chip.compoundDrawablesRelative[2]?.setTint(color)
+        chip.pillState(chip.hasFocus(), selected)
         chip.isSelected = selected
     }
 
@@ -247,12 +239,7 @@ abstract class ExploreScreen : Screen() {
         r.chevron.imageTintList = ColorStateList.valueOf(if (on) FOCUSED_VALUE else HomeStyle.LABEL_GREY)
     }
 
-    private fun styleTypes() = typeButtons.forEachIndexed { i, b ->
-        val selected = (i==0) == query.movie
-        b.background = when { b.isFocused -> HomeStyle.pill(HomeStyle.WHITE); selected -> HomeStyle.pill(HomeStyle.OPEN_TAB); else -> null }
-        b.setTextColor(when { b.isFocused -> HomeStyle.BLACK; selected -> HomeStyle.WHITE; else -> TEXT_2 })
-        b.typeface = if (selected || b.isFocused) semiBold else medium
-    }
+    private fun styleTypes() = typeButtons.forEachIndexed { i, b -> b.pillState(b.isFocused, (i==0) == query.movie) }
 
     private fun updatePanel() {
         clearFilters.visibility = if (Facet.values().any(::active)) View.VISIBLE else View.GONE
@@ -294,7 +281,7 @@ abstract class ExploreScreen : Screen() {
                     if (query.media == media && hasWindowFocus()) answer.fold({ list ->
                         genreNames = list.toMap()
                         genrePicker(list)
-                    }, { toastFailure() })
+                    }, { toastFailure(R.string.search_unavailable) })
                 }
             }
             Facet.SORT -> {
@@ -318,35 +305,18 @@ abstract class ExploreScreen : Screen() {
      * are ticked, changing its rows in place, and the results beside it update live.
      */
     private fun genrePicker(list: List<Pair<Int,String>>) {
-        val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
-        val body = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(12)) }
-        body.addView(text(title(Facet.GENRE), BODY + 1.5f, bold = true, color = HomeStyle.WHITE).apply { gravity = Gravity.CENTER },
-            LinearLayout.LayoutParams(-1, -2))
-        val summary = text("", SMALL, color = TUNGSTEN).apply {
-            gravity = Gravity.CENTER; isSingleLine = true; ellipsize = TextUtils.TruncateAt.END
-        }
-        body.addView(summary, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2); bottomMargin = dp(8) })
+        fun ticked(i: Int) = if (i == 0) query.genres.isEmpty() else query.genres.any { it.key == list[i - 1].first.toString() }
         val all = text(R.string.filter_all, SMALL).apply { gravity = Gravity.CENTER; setPadding(dp(11), 0, dp(11), 0) }
         val any = text(R.string.ex_any, SMALL).apply { gravity = Gravity.CENTER; setPadding(dp(11), 0, dp(11), 0) }
-        var genreRows = emptyList<TextView>()
+        var rows = emptyList<TextView>()
         fun refresh() {
-            summary.text = if (query.genres.isEmpty()) "" else value(Facet.GENRE)
-            listOf(all to !query.any, any to query.any).forEach { (t, on) ->
-                t.background = if (on) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
-                t.setTextColor(if (on) HomeStyle.WHITE else TEXT_2)
-                t.typeface = if (on) semiBold else medium
-            }
-            genreRows.forEachIndexed { i, row ->
-                val ticked = if (i == 0) query.genres.isEmpty() else query.genres.any { it.key == list[i - 1].first.toString() }
-                row.setTextColor(if (ticked) TUNGSTEN else TEXT)
-                row.setCompoundDrawablesRelative(null, null, if (!ticked) null else getDrawable(R.drawable.ic_check)?.mutate()?.apply {
-                    setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))
-                }, null)
-            }
+            all.pillState(focused = false, selected = !query.any)
+            any.pillState(focused = false, selected = query.any)
+            rows.forEachIndexed { i, row -> row.tick(ticked(i)) }
         }
         val match = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), 0, dp(8), 0)
+            setPadding(dp(16), dp(8), dp(8), dp(8))
             addView(text(R.string.ex_match, BODY), LinearLayout.LayoutParams(0, -2, 1f))
             addView(LinearLayout(this@ExploreScreen).apply {
                 background = HomeStyle.pill(SEGMENT)
@@ -357,49 +327,28 @@ abstract class ExploreScreen : Screen() {
             rowFocus()
             setOnClickListener { change(query.copy(any = !query.any)); refresh() }
         }
-        body.addView(match, LinearLayout.LayoutParams(-1, dp(38)))
-        body.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) }, LinearLayout.LayoutParams(-1, 1).apply { setMargins(dp(16), dp(6), dp(16), dp(6)) })
-        val names = listOf(getString(R.string.filter_all)) + list.map { it.second }
-        genreRows = names.mapIndexed { i, label ->
-            text(label, BODY).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(10), dp(16), dp(10))
-                rowFocus()
-                setOnClickListener {
-                    val pick = list.getOrNull(i - 1)?.let { Pick(it.first.toString(), it.second) }
-                    change(when {
-                        pick == null -> query.without(Facet.GENRE)
-                        pick in query.genres -> query.copy(genres = query.genres - pick)
-                        else -> query.copy(genres = query.genres + pick)
-                    })
-                    refresh()
-                }
-                body.addView(this, LinearLayout.LayoutParams(-1, -2))
-            }
-        }
-        refresh()
-        val maxHeight = resources.displayMetrics.heightPixels - dp(PICKER_Y) - dp(27)
-        dialog.setContentView(object : ScrollView(this) {
-            override fun onMeasure(w: Int, h: Int) = super.onMeasure(w, MeasureSpec.makeMeasureSpec(maxHeight, MeasureSpec.AT_MOST))
-        }.apply {
-            isVerticalScrollBarEnabled = false
-            isVerticalFadingEdgeEnabled = true
-            setFadingEdgeLength(dp(44))
-            background = glassOver(this, 16, shade = FROST_READING)
-            addView(body)
-        })
-        dialog.window?.apply {
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
-            setLayout(dp(260), -2)
-            setDimAmount(PICKER_DIM)
-            setGravity(Gravity.LEFT or Gravity.TOP)
-            attributes = attributes.apply { x = dp(PICKER_X); y = dp(PICKER_Y) }
-        }
-        dialog.show()
         // Opens on the first ticked genre, so flipping a pair to Any or adding one is a few presses away.
-        (list.indexOfFirst { g -> query.genres.any { it.key == g.first.toString() } }.takeIf { it >= 0 }?.let { genreRows[it + 1] }
-            ?: genreRows[0]).requestFocus()
-        lastChoose = dialog
+        val names = listOf(getString(R.string.filter_all)) + list.map { it.second }
+        choose(title(Facet.GENRE), names, header = true, widthDp = 260, anchorStartDp = PICKER_X, extra = match, stay = true,
+            focus = names.indices.firstOrNull { it > 0 && ticked(it) } ?: 0, checkedRows = names.indices.filter(::ticked).toSet(),
+            shown = { rows = it; refresh() }) { i ->
+            val pick = list.getOrNull(i - 1)?.let { Pick(it.first.toString(), it.second) }
+            change(when {
+                pick == null -> query.without(Facet.GENRE)
+                pick in query.genres -> query.copy(genres = query.genres - pick)
+                else -> query.copy(genres = query.genres + pick)
+            })
+            refresh()
+        }
+    }
+
+    /** The app's pill states for chips and segments: white while focused, a faint pill when chosen, else bare words. */
+    private fun TextView.pillState(focused: Boolean, selected: Boolean) {
+        background = when { focused -> HomeStyle.pill(HomeStyle.WHITE); selected -> HomeStyle.pill(HomeStyle.OPEN_TAB); else -> null }
+        val color = when { focused -> HomeStyle.BLACK; selected -> HomeStyle.WHITE; else -> TEXT_2 }
+        setTextColor(color)
+        compoundDrawablesRelative[2]?.setTint(color)
+        typeface = if (focused || selected) semiBold else medium
     }
 
     private fun years() {
@@ -407,22 +356,26 @@ abstract class ExploreScreen : Screen() {
         val decades = (now/10*10 downTo 1970 step 10).toList()
         fun set(low: Int?, high: Int, label: String) = change(query.copy(choices = query.choices +
             (Facet.YEAR to Pick("${low ?: ""}:$high",label))))
-        fun singles(decade: Int) {
-            val list = (minOf(now,decade+9) downTo decade).toList()
-            chooseNear(title(Facet.YEAR),list.map(Int::toString)) { set(list[it],list[it],list[it].toString()) }
+        fun singles(name: String, decade: Int, low: Int = decade, done: (Int) -> Unit) {
+            val list = (minOf(now,decade+9) downTo maxOf(decade,low)).toList()
+            chooseNear(name,list.map(Int::toString)) { done(list[it]) }
+        }
+        // Custom Range: decades first (OK takes the decade's first or last year, Right opens its years), not ~125 rows.
+        fun yearFrom(name: String, low: Int, end: Boolean, done: (Int) -> Unit) {
+            val tens = (now/10*10 downTo low/10*10 step 10).toList()
+            choose(name, tens.map { "${it}–${it+9}  ›" }, widthDp = 220, anchorStartDp = PICKER_X,
+                right = { i -> { singles(name, tens[i], low, done) } }) { i ->
+                done(if (end) minOf(now, tens[i]+9) else maxOf(low, tens[i]))
+            }
         }
         choose(title(Facet.YEAR),listOf(getString(R.string.filter_all)) + decades.map { "${it}–${it+9}  ›" } +
             listOf(getString(R.string.ex_before),getString(R.string.ex_range)),widthDp = 220,anchorStartDp = PICKER_X,
-            right = { i -> decades.getOrNull(i-1)?.let { { singles(it) } } }) { i ->
+            right = { i -> decades.getOrNull(i-1)?.let { d -> { singles(title(Facet.YEAR), d) { set(it,it,it.toString()) } } } }) { i ->
             when(i) {
                 0 -> change(query.without(Facet.YEAR))
                 decades.size+1 -> set(null,1969,getString(R.string.ex_before))
-                decades.size+2 -> {
-                    val from = (now downTo 1900).toList()
-                    chooseNear(getString(R.string.ex_from),from.map(Int::toString)) { a ->
-                        val to = (now downTo from[a]).toList()
-                        chooseNear(getString(R.string.ex_to),to.map(Int::toString)) { b -> set(from[a],to[b],"${from[a]}–${to[b]}") }
-                    }
+                decades.size+2 -> yearFrom(getString(R.string.ex_from), 1900, end = false) { a ->
+                    yearFrom(getString(R.string.ex_to), a, end = true) { b -> set(a,b,"$a–$b") }
                 }
                 else -> decades[i-1].let { set(it,it+9,"$it–${it+9}") }
             }
@@ -457,7 +410,8 @@ abstract class ExploreScreen : Screen() {
         previewDim = null
     }
 
-    private fun toastFailure() = Toast.makeText(this,R.string.ex_unavailable,Toast.LENGTH_SHORT).show()
+    /** A title's page or save couldn't be reached ([words] for a list that couldn't load: People, Genre). */
+    private fun toastFailure(words: Int = R.string.ex_unavailable) = Toast.makeText(this,words,Toast.LENGTH_SHORT).show()
 
     protected fun clearGrid() {
         invalidateCatalogue()
@@ -478,6 +432,7 @@ abstract class ExploreScreen : Screen() {
         var next = 1
         var done = false
         var loading = false
+        var failure: View? = null
         var row: LinearLayout? = null
         val gap = dp(GRID_GAP)
         val width = ((gridWidth - 4 * gap) / 5).coerceAtLeast(dp(48))
@@ -490,6 +445,9 @@ abstract class ExploreScreen : Screen() {
                 if (next == 1) results.removeAllViews()
                 val names = genreNames.ifEmpty { if (Locale.getDefault().language == "en") HomeStyle.genres(q.movie).toMap() else emptyMap() }
                 result.fold({ page ->
+                    failure?.let(results::removeView)
+                    failure = null
+                    if (next == 1 && q == ExploreQuery(type = q.type)) popularTitles[q.movie] = page.titles // for Popular Now
                     done = page.last
                     next++
                     val before = seen.size
@@ -531,8 +489,17 @@ abstract class ExploreScreen : Screen() {
                                 if (results.indexOfChild(band) >= results.childCount-2) more()
                             } else closePreview()
                         }
+                        var resolving = false
                         fun resolve(save: Boolean) {
+                            // One lookup at a time (a second OK opened the title page twice); the poster, or its
+                            // preview, dims while the IMDb id is found (up to 6 s on a cold cache).
+                            if (resolving) return
+                            resolving = true
+                            (preview ?: card).alpha = RESOLVING_ALPHA
                             background({ ExploreCatalogue.details(meta).optJSONObject("external_ids")?.text("imdb_id") }) { answer ->
+                                resolving = false
+                                card.alpha = 1f
+                                preview?.alpha = 1f
                                 if (generation != g) return@background
                                 // Save comes from the hold-OK menu, whose window gives focus back late: only opening the
                                 // title page waits for the remote to still be on this poster.
@@ -557,8 +524,12 @@ abstract class ExploreScreen : Screen() {
                 }, {
                     firstPageLoading = false
                     downWhileLoading = false
-                    // Retry rebuilds the results under the button: the remote waits on People, not the avatar.
-                    results.addView(failed(getString(R.string.search_popular_unavailable)) { peopleButton.requestFocus(); refreshCatalogue() })
+                    // One card for a failed page, whichever page. Retry on a later page asks for that page again and
+                    // keeps the viewer's place; on the first it rebuilds the results, so the remote waits on People.
+                    if (failure == null) failure = failed(getString(R.string.search_popular_unavailable)) {
+                        if (next == 1) { peopleButton.requestFocus(); refreshCatalogue() }
+                        else { catalogueCards.lastOrNull()?.requestFocus(); more() }
+                    }.also { results.addView(it) }
                 })
             }
         }
@@ -589,23 +560,24 @@ abstract class ExploreScreen : Screen() {
     private fun emptySuggestions(g: Int,q: ExploreQuery) {
         results.addView(text(R.string.discover_empty,BODY,color = HomeStyle.WHITE),
             LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(10); bottomMargin = dp(10) })
-        val alternatives = Facet.values().filter(::active).map { getString(R.string.ex_remove,title(it)) to q.without(it) } +
+        val alternatives = Facet.values().filter(::active).map { getString(R.string.search_remove_query,title(it)) to q.without(it) } +
             if (!q.any && q.genres.size>1) listOf(getString(R.string.ex_match)+" · "+getString(R.string.ex_any) to q.copy(any=true)) else emptyList()
         alternatives.forEach { (name,alternative) ->
             background({
                 var page = ExploreCatalogue.page(alternative,1)
-                if (page.count >= 0) page.count else {
+                // Director/writer lists have no total: count at most a few pages and say "+" past them.
+                if (page.count >= 0) page.count to false else {
                     var n = 1
                     var count = page.titles.size
-                    while (!page.last && generation == g) {
+                    while (!page.last && n < COUNT_PAGES && generation == g) {
                         page = ExploreCatalogue.page(alternative,++n)
                         count += page.titles.size
                     }
-                    count
+                    count to !page.last
                 }
             }) { answer ->
-                if (g == generation) answer.getOrNull()?.takeIf { it>0 }?.let { count ->
-                    results.addView(listRow(name, String.format(Locale.getDefault(), "%,d", count)).apply {
+                if (g == generation) answer.getOrNull()?.takeIf { it.first>0 }?.let { (count, more) ->
+                    results.addView(listRow(name, String.format(Locale.getDefault(), "%,d", count) + if (more) "+" else "").apply {
                         setOnClickListener { peopleButton.requestFocus(); change(alternative) }
                     }, LinearLayout.LayoutParams(dp(380), dp(30)).apply { bottomMargin = dp(4) })
                 }
@@ -693,16 +665,17 @@ abstract class ExploreScreen : Screen() {
         background({ ExploreCatalogue.details(meta) }) { answer ->
             if (preview !== holder) return@background
             val d = answer.getOrNull() ?: return@background
-            val logo = d.optJSONObject("images")?.optJSONArray("logos").objects().firstNotNullOfOrNull { it.text("file_path") }
-            if (logo != null) {
+            val id = d.optJSONObject("external_ids")?.text("imdb_id")
+            // The logo as the title page shows it (metahub, by IMDb id); the name stays when there is none.
+            id?.let(Images::logoFor)?.let { logo ->
                 val image = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(250); maxHeight = dp(46) }
                 titleSlot.addView(image, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START))
-                Images.load("https://image.tmdb.org/t/p/w500$logo", image, dp(250), done = { name.visibility = View.INVISIBLE })
+                Images.load(logo, image, dp(250), done = { name.visibility = View.INVISIBLE })
             }
             val certificate = if (meta.type=="movie") d.optJSONObject("release_dates")?.optJSONArray("results").objects()
                 .firstOrNull { it.text("iso_3166_1")=="US" }?.optJSONArray("release_dates").objects().firstNotNullOfOrNull { it.text("certification") }
                 else d.optJSONObject("content_ratings")?.optJSONArray("results").objects().firstOrNull { it.text("iso_3166_1")=="US" }?.text("rating")
-            val duration = if (meta.type=="movie") d.optInt("runtime").takeIf { it>0 }?.let { getString(R.string.info_runtime_minutes,it) }
+            val duration = if (meta.type=="movie") d.optInt("runtime").takeIf { it>0 }?.let { runtime("$it min") } // "2h 06m", as the title page
                 else d.optInt("number_of_seasons").takeIf { it>0 }?.let { resources.getQuantityString(R.plurals.seasons,it,it) }
             certificate?.let { factsRow.addView(tag(it, HomeStyle.WHITE), 0, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) }) }
             facts.text = (listOfNotNull(meta.year)+d.optJSONArray("genres").objects().take(2).map { it.optString("name") }+listOfNotNull(duration)).joinToString(DOT)
@@ -739,13 +712,14 @@ abstract class ExploreScreen : Screen() {
                 return ((chip.getChildAt(chip.childCount - 1) as TextView).layout?.getEllipsisCount(0) ?: 0) > 0
             }
             chips.post { while (chips.childCount > 1 && squeezed()) chips.removeViewAt(chips.childCount - 1) }
-            val id = d.optJSONObject("external_ids")?.text("imdb_id") ?: return@background scores.removeAllViews()
+            if (id == null) return@background scores.removeAllViews()
             val key = Settings.mdblistKey(this)
             background({
+                // Each lookup waits on the shared pool: stop as soon as the remote has moved to another poster.
                 val ratings = mdbRatings(id,key,meta.type).orEmpty()
-                val imdb = Stremio.savedAddons(authKey.orEmpty()).orEmpty().firstNotNullOfOrNull { addon ->
+                val imdb = if (preview !== holder) null else Stremio.savedAddons(authKey.orEmpty()).orEmpty().firstNotNullOfOrNull { addon ->
                     addon.savedMeta(meta.type,id)?.rating
-                } ?: runCatching {
+                } ?: if (preview !== holder) null else runCatching {
                     JSONObject(Http.get("https://v3-cinemeta.strem.io/meta/${meta.type}/$id.json",timeoutMs=5000))
                         .optJSONObject("meta")?.text("imdbRating")
                 }.getOrNull()
@@ -841,8 +815,9 @@ abstract class ExploreScreen : Screen() {
         }
         if (words.isEmpty()) faces(getString(R.string.search_recent),recentPeople())
         val movie = query.movie
-        background({ if (words.isBlank()) ExploreCatalogue.popularPeople(movie) else ExploreCatalogue.people(words) }) {
-            if (g==generation) it.fold({ found -> faces(if (words.isBlank()) getString(R.string.ex_popular) else words,found) },{toastFailure()})
+        val loaded = popularTitles[movie]
+        background({ if (words.isBlank()) ExploreCatalogue.popularPeople(movie, loaded) else ExploreCatalogue.people(words) }) {
+            if (g==generation) it.fold({ found -> faces(if (words.isBlank()) getString(R.string.ex_popular) else words,found) },{toastFailure(R.string.search_unavailable)})
         }
     }
 
@@ -854,8 +829,8 @@ abstract class ExploreScreen : Screen() {
         const val GRID_RIGHT = 33
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
         const val PICKER_X = 241 // a picker opens 12 dp right of the panel
-        const val PICKER_Y = 88
-        const val PICKER_DIM = 0.32f // the results beside a picker stay readable while they update
+        const val RESOLVING_ALPHA = 0.6f // a poster waiting for its title page
+        const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
         const val FACE = 72
         const val PANEL_VALUE = 11f // sp, a filter's value: a step under its name

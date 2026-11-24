@@ -49,9 +49,7 @@ internal data class ExploreQuery(
                 "old" -> if (movie) 1000 else 100
                 else -> 0
             }
-            if (sortFloor > 0 && (movie || person == null)) {
-                put("vote_count.gte", maxOf(sortFloor,get("vote_count.gte")?.toInt() ?: 0).toString())
-            }
+            if (sortFloor > 0 && (movie || person == null)) put("vote_count.gte", sortFloor.toString())
             if (movie && person != null) put(when(person.role) {
                 "actor" -> "with_cast"
                 "any" -> "with_people"
@@ -66,7 +64,7 @@ internal object ExploreCatalogue {
     data class Page(val titles: List<JSONObject>, val count: Int, val last: Boolean)
 
     fun people(query: String): List<Person> {
-        val list = Tmdb.exploreRequest("search/person", mapOf("query" to query), cache = true).optJSONArray("results").objects()
+        val list = Tmdb.exploreRequest("search/person", mapOf("query" to query)).optJSONArray("results").objects()
         return list.sortedByDescending { it.optDouble("popularity", 0.0) }.map {
             Person(it.getInt("id"), it.getString("name"), when(it.text("known_for_department")) {
                 "Acting" -> "actor"; "Writing" -> "writer"; "Directing" -> "director"; else -> "any"
@@ -76,30 +74,28 @@ internal object ExploreCatalogue {
 
     /**
      * Popular Now: the top-billed cast (and a film's director) of the catalogue's current popular titles, in the titles'
-     * order. TMDb's own trending people led with names few viewers know. Credits are cached for a day.
+     * order. TMDb's own trending people led with names few viewers know. [loaded]: the catalogue's own first page of
+     * those titles, when it has one, so only the credits are asked (on Tmdb's pool, cached for a day).
      */
-    fun popularPeople(movie: Boolean): List<Person> {
+    fun popularPeople(movie: Boolean, loaded: List<JSONObject>?): List<Person> {
         val media = if (movie) "movie" else "tv"
-        val titles = Tmdb.exploreDiscover(ExploreQuery(type = if (movie) "movie" else "series").discover(), 1)
-            .optJSONArray("results").objects().take(POPULAR_TITLES)
-        val pool = java.util.concurrent.Executors.newFixedThreadPool(POPULAR_TITLES / 2)
-        try {
-            val credits = titles.map { t -> pool.submit<JSONObject?> {
-                runCatching { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits", cache = true) }.getOrNull()
-            } }.map { runCatching { it.get() }.getOrNull() }
-            return credits.filterNotNull().flatMap { c ->
-                c.optJSONArray("cast").objects().take(2).map { Person(it.getInt("id"), it.getString("name"), "actor", it.text("profile_path")) } +
-                    c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1)
-                        .map { Person(it.getInt("id"), it.getString("name"), "director", it.text("profile_path")) }
-            }.filter { it.photo != null }.distinctBy { it.id }.take(18)
-        } finally { pool.shutdown() }
+        val titles = (loaded ?: Tmdb.discoverPage(ExploreQuery(type = if (movie) "movie" else "series").discover(), 1)
+            .optJSONArray("results").objects()).take(POPULAR_TITLES)
+        val credits = Tmdb.pool.invokeAll(titles.map { t -> java.util.concurrent.Callable {
+            runCatching { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits") }.getOrNull()
+        } }).map { runCatching { it.get() }.getOrNull() }
+        return credits.filterNotNull().flatMap { c ->
+            c.optJSONArray("cast").objects().take(2).map { Person(it.getInt("id"), it.getString("name"), "actor", it.text("profile_path")) } +
+                c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1)
+                    .map { Person(it.getInt("id"), it.getString("name"), "director", it.text("profile_path")) }
+        }.filter { it.photo != null }.distinctBy { it.id }.take(18)
     }
 
     private const val POPULAR_TITLES = 12
 
     private fun credits(q: ExploreQuery): List<JSONObject> {
         val person = requireNotNull(q.person)
-        val data = Tmdb.exploreRequest("person/${person.id}/${q.media}_credits", cache = true)
+        val data = Tmdb.exploreRequest("person/${person.id}/${q.media}_credits")
         val cast = if (person.role in listOf("actor", "any")) data.optJSONArray("cast").objects() else emptyList()
         val crew = data.optJSONArray("crew").objects().filter {
             when(person.role) {
@@ -132,14 +128,13 @@ internal object ExploreCatalogue {
                 val date = it.optString("first_air_date")
                 (q.genres.isEmpty() || if (q.any) q.genres.any { g -> g.key in genres } else q.genres.all { g -> g.key in genres }) &&
                     date >= params["first_air_date.gte"].orEmpty() && date <= (params["first_air_date.lte"] ?: "9999") &&
-                    it.optInt("vote_count") >= (params["vote_count.gte"]?.toInt() ?: 0) &&
                     (params["with_original_language"]?.equals(it.text("original_language")) != false) &&
                     (params["with_origin_country"]?.let { c -> c in it.optJSONArray("origin_country").strings() } != false)
             }
             val sorted = localOrder(rows,q)
             return Page(sorted.drop((page-1)*20).take(20), sorted.size, page*20 >= sorted.size)
         }
-        val answer = Tmdb.exploreDiscover(q.discover(), page)
+        val answer = Tmdb.discoverPage(q.discover(), page)
         val titles = answer.optJSONArray("results").objects()
         if (q.movie && q.person?.role in listOf("director", "writer")) {
             val ids = credits(q).map { it.getInt("id") }.toSet()
@@ -148,11 +143,10 @@ internal object ExploreCatalogue {
         return Page(titles, answer.optInt("total_results"), page >= minOf(500, answer.optInt("total_pages")))
     }
 
+    /** A title's details for the preview and OK: IMDb id, cast, certificate. Its logo comes by IMDb id (Images.logoFor). */
     fun details(meta: Meta): JSONObject {
         val media = if (meta.type == "movie") "movie" else "tv"
         val cert = if (media == "movie") "release_dates" else "content_ratings"
-        return Tmdb.exploreRequest("$media/${meta.id.substringAfter(':')}", mapOf(
-            "append_to_response" to "external_ids,images,credits,$cert",
-            "include_image_language" to "${java.util.Locale.getDefault().language},en,null"), cache = true)
+        return Tmdb.exploreRequest("$media/${meta.id.substringAfter(':')}", mapOf("append_to_response" to "external_ids,credits,$cert"))
     }
 }

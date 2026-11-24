@@ -70,7 +70,7 @@ internal fun <T> searchAnswersInAddonOrder(answers: Array<List<T>?>): List<T> = 
 
 /** ChadFlix search: Voice Search and the keyboard on the left, Alder's Movies and Shows rows of home posters on the right. */
 class SearchActivity : ExploreScreen() {
-    private lateinit var input: EditText // the header's words: the typed query, or "Popular Titles" while it's empty
+    private lateinit var input: EditText // the header's words: the typed query, or the catalogue's name as a hint
     private lateinit var recentBox: LinearLayout
     override lateinit var results: LinearLayout
     override lateinit var resultsScroll: ScrollView
@@ -152,7 +152,6 @@ class SearchActivity : ExploreScreen() {
         // The heading right of the panel, over the posters' left edge (the chosen Heading Strip): the catalogue's name,
         // or what's typed.
         input = EditText(this).apply {
-            hint = getString(R.string.search_popular_titles)
             setHintTextColor(HomeStyle.WHITE)
             setTextColor(HomeStyle.WHITE)
             textSize = HomeStyle.ROW_TITLE
@@ -455,36 +454,14 @@ class SearchActivity : ExploreScreen() {
             voice = view
             rightEdgeKeys += view
         }
-        // ChadFlix: Clear, in Voice Search's style, above it while the query has words.
-        val clearIcon = ImageView(this).apply { setImageResource(R.drawable.ic_close) }
-        val clearLabel = text(getString(R.string.search_clear_pill), SMALL, bold = true)
-        clear = LinearLayout(this).apply {
-            id = View.generateViewId()
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(14), 0, dp(14), 0)
-            isFocusable = true
-            visibility = View.GONE
-            contentDescription = getString(R.string.search_clear_pill)
-            fun style(has: Boolean) {
-                background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
-                clearIcon.imageTintList = ColorStateList.valueOf(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
-                clearLabel.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
-            }
-            style(false)
-            setOnFocusChangeListener { v, has ->
-                if (has) lastKeyboardFocus = v
-                style(has)
-            }
-            setOnClickListener {
-                cancelVoice()
-                (voice ?: firstKey)?.requestFocus()
-                input.setText("")
-                main.removeCallbacks(typed)
-                search(false)
-            }
-            addView(clearIcon, LinearLayout.LayoutParams(dp(16), dp(16)))
-            addView(clearLabel, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
-        }
+        // ChadFlix: Clear, in Voice Search's style, beside the heading while the query has words.
+        clear = sideAction(R.drawable.ic_close, getString(R.string.search_clear_pill), focused = { v -> lastKeyboardFocus = v }) {
+            cancelVoice()
+            (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: peopleButton).requestFocus()
+            input.setText("")
+            main.removeCallbacks(typed)
+            search(false)
+        }.first.apply { visibility = View.GONE }
         rightEdgeKeys += clear!!
 
         rows.forEachIndexed { r, keys ->
@@ -744,8 +721,8 @@ class SearchActivity : ExploreScreen() {
                 peopleButton.requestFocus()
                 return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_BACK &&
-                (resultsScroll.hasFocus() || recentBox.hasFocus() || headerBar.hasFocus() || input.hasFocus())) {
+            // (The results and the recent chips, shown only with the keys, are handled above.)
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && (headerBar.hasFocus() || input.hasFocus())) {
                 if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys && lookupMode == null && input.text.isNotBlank()) {
@@ -996,8 +973,7 @@ class SearchActivity : ExploreScreen() {
         results.removeAllViews()
         sections.forEach { (label, list) ->
             val group = column(Gravity.START)
-            // Popular has no title of its own: the header above already says "Popular Titles".
-            if (query.isNotEmpty()) group.addView(text(HomeStyle.titleCase(label), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE),
+            group.addView(text(HomeStyle.titleCase(label), HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE),
                 LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(2) })
             val caption = text("", HomeStyle.INFO, bold = true, color = HomeStyle.WHITE).apply {
                 visibility = View.INVISIBLE

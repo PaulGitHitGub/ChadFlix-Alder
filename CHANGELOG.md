@@ -21,6 +21,9 @@ each entry that does not follow these rules. Then rename that heading to the ver
 
 ### New
 <!-- Spotlight -->
+- **Browse everything in Search.** Open **Search** and choose **People**, **Genre**, **Year**, **Studio**, **Language** or **Country** on the left. The movies or shows that match fill the screen.
+- **Your way through Search.** Pick **Popular**, **Top Rated**, **Newest** or **More** above the posters. In **Genre**, set **Match** to **All** or **Any**. Rest on a poster to see its story, ratings and cast. **Voice Search** and **Keyboard Search** sit above the filters.
+<!-- Spotlight -->
 - **Watchlists.** Make your own lists in **My Lists**. Select **New Watchlist** and give it a name. To add a movie or show, hold **OK** on it and select **Save To Watchlist**. Each profile has its own lists on this TV.
 <!-- Spotlight -->
 - **New title page.** Movies and shows show the logo, details, cast and a column of buttons: **Play**, **More Episodes** and **More Like This**.
@@ -32,6 +35,7 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **Filter your saved titles.** The first card in **Saved Movies** and **Saved Shows** is **Showing**. Press **OK** on it to choose a genre, a year or the order.
 - **Cleaner posters.** Posters in **My Lists** and **Continue Watching** no longer show a rating. The title page still does.
 - **Settings with OK.** In **Settings**, press **OK** or **Right** to change a value. Press **Left** to go back to the menu.
+- **Smoother top bar.** **Left** and **Right** move to the next tab you can see, and from the last tab to **Settings** and back.
 
 ## 1.4-chadflix.1
 

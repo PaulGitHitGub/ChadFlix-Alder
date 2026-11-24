@@ -415,7 +415,6 @@ class MainActivity : Screen() {
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
         var newEpisodeCount: Int = 0,
-        val addedAt: String? = null,
         val collectionCard: Boolean = false,
         val watchlist: Watchlist? = null,
         val showRowRating: Boolean = true,
@@ -1625,7 +1624,6 @@ class MainActivity : Screen() {
             val bracket = item.type == "movie" && length != null && left != null
             factsList += listOfNotNull(genre, year, if (bracket) "$length ($left)" else length, meta?.certification, left.takeIf { !bracket })
         }
-        episodeDate(item.addedAt)?.let { factsList += getString(R.string.list_added_on, it) }
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
         scheduleRatings(item, meta)
         val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
@@ -2762,7 +2760,7 @@ class MainActivity : Screen() {
         }
         val label = listOfNotNull(filter.genre, yearLabel).joinToString(" · ").ifEmpty { getString(filter.sort.label) }
         val tile = Item(HomeStyle.tileId("saved:$type"), type, "", null, null, null, "", emptyList(), null, 0f, false)
-        val items = listOf(tile) + ordered.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
+        val items = listOf(tile) + ordered.map { libraryItem(it) }
         val first = items.take(maxOf(START, 1 + items.indexOfFirst { it.cardTag == focusTag }))
         val title = getString(if (type == "movie") R.string.saved_movies else R.string.saved_shows)
         return row(title, first, later(items), subtitle = plural(R.plurals.saved_titles, ordered.size), tileLabel = label)
@@ -3405,7 +3403,7 @@ class MainActivity : Screen() {
          */
         fun rate(card: MediaCardView, item: Item, fade: Boolean) {
             if (compact || continueRow) return
-            if ((!compact && (!homeRow || card.widensBy <= 0)) || item.collectionCard || HomeStyle.isTile(item.id) ||
+            if (!homeRow || card.widensBy <= 0 || item.collectionCard || HomeStyle.isTile(item.id) ||
                 !active || cards.getOrNull(selected) !== card) return
             val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)
                 else R.drawable.ic_rating_imdb to (metas[item.id]?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "))
@@ -3471,7 +3469,7 @@ class MainActivity : Screen() {
                 if (!held) cards[index].expand(true, animate = !entering)
                 if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
-            if (homeRow || (compact && !collections)) {
+            if (homeRow) { // (My Lists' compact rows never show a badge)
                 hideBadge()
                 rate(cards[index], items[index], fade = false)
             }
@@ -3639,7 +3637,7 @@ class MainActivity : Screen() {
         return HomeLibrary(list, continuing, found)
     }
 
-    private fun libraryItem(item: JSONObject, addedAt: String? = null): Item {
+    private fun libraryItem(item: JSONObject): Item {
         val s = item.optJSONObject("state") ?: JSONObject()
         val videoId = Library.savedVideoId(item)
         val id = item.getString("_id")
@@ -3656,7 +3654,6 @@ class MainActivity : Screen() {
             timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
             newEpisodeCount = newEpisodeCount(id, metas[id], item),
-            addedAt = addedAt,
             showRowRating = false, // Saved titles and Continue Watching use libraryItem; catalog copies keep their badge.
         )
     }

@@ -399,7 +399,6 @@
     <string name="search_remove_recent">هل تريد إزالة عملية البحث الأخيرة؟</string>
     <string name="search_remove_query">إزالة %1$s</string>
     <string name="search_popular_unavailable">العناوين الرائجة غير متاحة.</string>
-    <string name="search_popular_titles">العناوين الرائجة</string>
     <string name="search_voice">بحث صوتي</string>
     <string name="search_listening">جارٍ الاستماع…</string>
     <string name="search_clear_pill">مسح</string>
@@ -598,7 +597,6 @@
     <string name="audio_fallback_hint">مع خيار لغتي أولًا، يحاول Alder تشغيل لغتك المفضلة ثم اللغة الاحتياطية ثم الإنجليزية. اختر إيقاف لاستخدام لغتك المفضلة فقط.</string>
     <string name="failure_preferred_audio">لا يوجد مسار صوتي مدعوم بلغتك المفضلة</string>
     <string name="failure_advice_preferred_audio">اختر مصدرًا يوفر لغة الصوت التي تفضلها.</string>
-    <string name="list_added_on">تاريخ الإضافة %1$s</string>
     <string name="ex_people">الأشخاص</string>
     <string name="ex_studio">الاستوديو</string>
     <string name="ex_network">الشبكة</string>
@@ -617,7 +615,6 @@
     <string name="ex_writer">بصفة كاتب</string>
     <string name="ex_role">أي دور</string>
     <string name="ex_popular">الرائج الآن</string>
-    <string name="ex_remove">إزالة %1$s</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
     <string name="showing_most_watched">الأكثر مشاهدة</string>

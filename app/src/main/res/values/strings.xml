@@ -414,7 +414,6 @@
     <string name="search_remove_recent">Remove recent search?</string>
     <string name="search_remove_query">Remove %1$s</string>
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
-    <string name="search_popular_titles">Popular Titles</string>
     <string name="search_voice">Voice Search</string>
     <string name="search_listening">Listening…</string>
     <string name="search_clear_pill">Clear</string>
@@ -602,7 +601,6 @@
     <string name="catalog_incomplete">Some catalogs couldn\'t load</string>
     <string name="progress_saved_on_tv">Progress saved on this TV. ChadFlix will try to sync it again.</string>
     <string name="library_load_failed">Couldn\'t load your Stremio library</string>
-    <string name="list_added_on">Added %1$s</string>
     <string name="ex_people">People</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Network</string>
@@ -621,7 +619,6 @@
     <string name="ex_writer">As Writer</string>
     <string name="ex_role">Any Role</string>
     <string name="ex_popular">Popular Now</string>
-    <string name="ex_remove">Remove %1$s</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
 </resources>

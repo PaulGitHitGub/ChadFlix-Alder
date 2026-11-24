@@ -141,7 +141,7 @@ object Tmdb {
 
     // ---------- Discover: every film and show, by TMDB's discover search ----------
 
-    private val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
+    internal val pool = java.util.concurrent.Executors.newFixedThreadPool(8)
     private val language get() = java.util.Locale.getDefault().toLanguageTag()
     /** The TV's country, for "On Netflix" (streaming services differ by country); TMDB is told nothing else. */
     val region: String get() = java.util.Locale.getDefault().country.ifEmpty { "US" }
@@ -167,8 +167,7 @@ object Tmdb {
      * opens, plays and goes to My List like any other; titles without one are left out.
      */
     fun discover(query: DiscoverQuery, page: Int, genreNames: Map<Int, String>): Page {
-        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
-        val answer = JSONObject(Http.get(discoverUrl(query, page, region, language, today, KEY)))
+        val answer = discoverPage(query, page)
         val found = answer.optJSONArray("results").objects()
         val media = query.media
         // ponytail: one external-ids request per title, 8 at a time, kept on disk; ~20 small requests a page.
@@ -183,16 +182,17 @@ object Tmdb {
         return Page(titles, answer.optInt("total_results"), page >= answer.optInt("total_pages"))
     }
 
-    internal fun exploreRequest(path: String, params: Map<String, String> = emptyMap(), cache: Boolean = false): JSONObject {
+    /** Search's catalogue: TMDB's [path] with [params], kept on disk for a day. */
+    internal fun exploreRequest(path: String, params: Map<String, String> = emptyMap()): JSONObject {
         val query = (mapOf("language" to language, "api_key" to KEY) + params).entries.joinToString("&") {
             it.key + "=" + java.net.URLEncoder.encode(it.value, "UTF-8")
         }
         val url = "$BASE/$path?$query"
-        val saved = if (cache) Http.savedAnswer(url, maxAgeMs = 24 * 3600_000L) else null
-        return JSONObject(saved ?: Http.get(url, keep = cache, timeoutMs = 6000, strict = true))
+        return JSONObject(Http.savedAnswer(url, maxAgeMs = 24 * 3600_000L) ?: Http.get(url, keep = true, timeoutMs = 6000, strict = true))
     }
 
-    internal fun exploreDiscover(q: DiscoverQuery, page: Int): JSONObject {
+    /** One raw page of TMDB's discover for [q], as Discover and Search's catalogue ask it; an error answer throws. */
+    internal fun discoverPage(q: DiscoverQuery, page: Int): JSONObject {
         val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
         return JSONObject(Http.get(discoverUrl(q, page, region, language, today, KEY), timeoutMs = 6000, strict = true))
     }

@@ -382,7 +382,6 @@
     <string name="search_remove_recent">हाल की खोज हटाएँ?</string>
     <string name="search_remove_query">%1$s हटाएँ</string>
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
-    <string name="search_popular_titles">लोकप्रिय शीर्षक</string>
     <string name="search_voice">वॉइस खोज</string>
     <string name="search_listening">सुन रहे हैं…</string>
     <string name="search_clear_pill">साफ़ करें</string>
@@ -574,7 +573,6 @@
     <string name="audio_fallback_hint">पहले मेरी भाषा में Alder पहले आपकी चुनी हुई भाषा, फिर यह वैकल्पिक भाषा और फिर अंग्रेज़ी आज़माता है। केवल अपनी चुनी हुई भाषा के लिए बंद चुनें।</string>
     <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
     <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
-    <string name="list_added_on">%1$s को जोड़ा गया</string>
     <string name="ex_people">लोग</string>
     <string name="ex_studio">स्टूडियो</string>
     <string name="ex_network">नेटवर्क</string>
@@ -593,7 +591,6 @@
     <string name="ex_writer">लेखक के रूप में</string>
     <string name="ex_role">कोई भी भूमिका</string>
     <string name="ex_popular">अभी लोकप्रिय</string>
-    <string name="ex_remove">%1$s हटाएँ</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>

@@ -612,11 +612,7 @@ class DetailsActivity : Screen() {
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
         infoButton.id = View.generateViewId()
-        if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
-            infoButton.nextFocusLeftId = infoButton.id
-        } else {
-            infoButton.nextFocusRightId = infoButton.id
-        }
+        infoButton.nextFocusRightId = infoButton.id // the app is left-to-right in every language (no supportsRtl)
         fun addAction(action: TextView, gap: Int) {
             action.id = View.generateViewId()
             action.nextFocusLeftId = action.id
@@ -792,8 +788,7 @@ class DetailsActivity : Screen() {
             selector = android.graphics.drawable.StateListDrawable().apply {
                 addState(intArrayOf(android.R.attr.state_focused), object : android.graphics.drawable.DrawableWrapper(ring) {
                     override fun onBoundsChange(bounds: android.graphics.Rect) {
-                        val left = if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) bounds.right - dp(EPISODE_WIDTH) else bounds.left
-                        drawable?.setBounds(left, bounds.top, left + dp(EPISODE_WIDTH), bounds.bottom)
+                        drawable?.setBounds(bounds.left, bounds.top, bounds.left + dp(EPISODE_WIDTH), bounds.bottom)
                     }
                 })
             }

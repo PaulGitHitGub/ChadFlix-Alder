@@ -947,6 +947,9 @@ abstract class Screen : Activity() {
                          right: ((Int) -> (() -> Unit)?)? = null, left: (() -> Unit)? = null, back: (() -> Unit)? = null,
                          header: Boolean = false, // ChadFlix: the title as a heading (centred, larger), not like a line
                          checkedRows: Set<Int> = emptySet(), anchorStartDp: Int? = null,
+                         // ChadFlix: [extra] sits under the title; [stay] keeps the list open on a pick (ticking several),
+                         // and [shown] gets the rows to re-tick in place.
+                         extra: View? = null, stay: Boolean = false, shown: (List<TextView>) -> Unit = {},
                          pick: (Int) -> Unit) {
         val dialog = android.app.Dialog(this).apply { requestWindowFeature(android.view.Window.FEATURE_NO_TITLE) }
         val list = column(Gravity.START).apply { setPadding(dp(12), dp(14), dp(12), dp(14)) }
@@ -955,18 +958,14 @@ abstract class Screen : Activity() {
         }).apply { setPadding(dp(16), 0, dp(16), dp(if (header) 16 else 10)) }
         message?.let { words.addView(text(it, SMALL, color = TEXT_2).marginTop(6)) }
         list.addView(words, LinearLayout.LayoutParams(-1, -2))
+        extra?.let { list.addView(it, LinearLayout.LayoutParams(-1, -2)) }
         val rows = items.mapIndexed { i, label ->
             text(label, BODY).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(16), dp(10), dp(16), dp(10))
-                if (i == checked || i in checkedRows) {
-                    setTextColor(TUNGSTEN)
-                    setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_check)?.mutate()?.apply {
-                        setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))
-                    }, null)
-                }
+                if (i == checked || i in checkedRows) tick(true)
                 rowFocus()
-                setOnClickListener { dialog.dismiss(); pick(i) }
+                setOnClickListener { if (!stay) dialog.dismiss(); pick(i) }
                 if (right != null || left != null) setOnKeyListener { _, code, e ->
                     val act = if (e.action != android.view.KeyEvent.ACTION_DOWN) null
                         else if (code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT && right != null) right(i)
@@ -1003,6 +1002,15 @@ abstract class Screen : Activity() {
         dialog.show()
         rows.getOrNull(focus)?.requestFocus()
         lastChoose = dialog
+        shown(rows)
+    }
+
+    /** A [choose] row's tick: the choice in use, in tungsten with a check at its end. */
+    protected fun TextView.tick(on: Boolean) {
+        setTextColor(if (on) TUNGSTEN else TEXT)
+        setCompoundDrawablesRelative(null, null, if (!on) null else getDrawable(R.drawable.ic_check)?.mutate()?.apply {
+            setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))
+        }, null)
     }
 
     /** Highlights come from CHANGELOG.md; the full release notes remain one remote action away. */

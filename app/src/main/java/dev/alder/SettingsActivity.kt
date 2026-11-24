@@ -262,9 +262,10 @@ object Languages {
     val all: List<String> by lazy { common + iso.filter { it !in common && name(it) != it }.sortedBy(::name) }
 }
 
-internal fun nextSettingIndex(current: Int, size: Int, direction: Int): Int {
-    require(size > 0 && direction in -1..1 && direction != 0)
-    return if (current < 0) if (direction < 0) size - 1 else 0 else (current + direction + size) % size
+/** OK or Right steps a setting to its next value, wrapping; a value not in the list (custom) starts at the first. */
+internal fun nextSettingIndex(current: Int, size: Int): Int {
+    require(size > 0)
+    return if (current < 0) 0 else (current + 1) % size
 }
 
 class SettingsActivity : Screen() {
@@ -1127,7 +1128,7 @@ class SettingsActivity : Screen() {
             refresh.forEach { it() }
         }
         val row = settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
-            select(nextSettingIndex(current(), c.values.size, 1))
+            select(nextSettingIndex(current(), c.values.size))
         }
         row.tag = c.key
         row.clickOnRight()
@@ -1161,7 +1162,7 @@ class SettingsActivity : Screen() {
         val label = getString(R.string.source_choice)
         settingRow(label, value, getString(R.string.source_choice_hint),
             focus = { value.setTextColor(if (it) TUNGSTEN else TEXT_2) }) {
-            val next = nextSettingIndex(current(), PRESETS.size, 1)
+            val next = nextSettingIndex(current(), PRESETS.size)
             PRESETS[next].second.forEach { (key, v) -> store(choice(key), v) }
             refresh.forEach { it() }
         }.clickOnRight()

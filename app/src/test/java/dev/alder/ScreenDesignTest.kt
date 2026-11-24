@@ -300,11 +300,10 @@ class ScreenDesignTest {
         assertEquals(false, shouldBlur(false, "tt123:1:1"))
     }
 
-    @Test fun settingsChoicesWrapAndCustomStartsAtTheEndForLeft() {
-        assertEquals(0, nextSettingIndex(-1, 4, 1))
-        assertEquals(3, nextSettingIndex(-1, 4, -1))
-        assertEquals(0, nextSettingIndex(3, 4, 1))
-        assertEquals(3, nextSettingIndex(0, 4, -1))
+    @Test fun settingsChoicesStepForwardWrapAndCustomStartsAtTheFirst() {
+        assertEquals(0, nextSettingIndex(-1, 4))
+        assertEquals(2, nextSettingIndex(1, 4))
+        assertEquals(0, nextSettingIndex(3, 4))
     }
 
     @Test fun searchRanksTitleMatchesAndKeepsTiesInAddonOrder() {

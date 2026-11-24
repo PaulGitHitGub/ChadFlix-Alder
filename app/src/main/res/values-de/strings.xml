@@ -382,7 +382,6 @@
     <string name="search_remove_recent">Letzte Suche entfernen?</string>
     <string name="search_remove_query">%1$s entfernen</string>
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
-    <string name="search_popular_titles">Beliebte Titel</string>
     <string name="search_voice">Sprachsuche</string>
     <string name="search_listening">Ich höre zu…</string>
     <string name="search_clear_pill">Löschen</string>
@@ -574,7 +573,6 @@
     <string name="audio_fallback_hint">Mit Meine Sprache zuerst versucht Alder zuerst deine gewählte Sprache, dann diese Ausweichsprache und dann Englisch. Wähle Aus, um nur deine gewählte Sprache zu verwenden.</string>
     <string name="failure_preferred_audio">keine unterstützte Tonspur in deiner bevorzugten Sprache</string>
     <string name="failure_advice_preferred_audio">Wähle eine Quelle mit deiner Audiosprache.</string>
-    <string name="list_added_on">Hinzugefügt am %1$s</string>
     <string name="ex_people">Personen</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Sender</string>
@@ -593,7 +591,6 @@
     <string name="ex_writer">Als Drehbuchautor</string>
     <string name="ex_role">Alle Rollen</string>
     <string name="ex_popular">Jetzt Beliebt</string>
-    <string name="ex_remove">%1$s entfernen</string>
     <string name="ex_unavailable">Titel Nicht Verfügbar</string>
     <string name="ex_clear_filters">Alle Filter Löschen</string>
     <string name="showing_most_watched">Meistgesehen</string>

@@ -383,7 +383,6 @@
     <string name="search_remove_recent">Retirer la recherche récente ?</string>
     <string name="search_remove_query">Retirer %1$s</string>
     <string name="search_popular_unavailable">Les titres populaires sont indisponibles.</string>
-    <string name="search_popular_titles">Titres populaires</string>
     <string name="search_voice">Recherche vocale</string>
     <string name="search_listening">Écoute…</string>
     <string name="search_clear_pill">Tout effacer</string>
@@ -577,7 +576,6 @@
     <string name="audio_fallback_hint">Avec Ma langue d’abord, Alder essaie votre langue, cette langue de secours, puis l’anglais. Sélectionnez Désactivé pour utiliser uniquement votre langue.</string>
     <string name="failure_preferred_audio">aucune piste audio prise en charge dans votre langue préférée</string>
     <string name="failure_advice_preferred_audio">Choisissez une source avec votre langue audio.</string>
-    <string name="list_added_on">Ajouté le %1$s</string>
     <string name="ex_people">Personnes</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Chaîne</string>
@@ -596,7 +594,6 @@
     <string name="ex_writer">Au Scénario</string>
     <string name="ex_role">Tous Les Rôles</string>
     <string name="ex_popular">Populaires En Ce Moment</string>
-    <string name="ex_remove">Retirer %1$s</string>
     <string name="ex_unavailable">Titre Indisponible</string>
     <string name="ex_clear_filters">Effacer Tous Les Filtres</string>
     <string name="showing_most_watched">Les Plus Regardés</string>
