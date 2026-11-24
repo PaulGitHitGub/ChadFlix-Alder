@@ -827,7 +827,7 @@ class SettingsActivity : Screen() {
     }
 
     /**
-     * Home | Movies | Shows | Services pills, then two columns. On: "Continue Watching · Always First", then the page's rows in their order,
+     * Movies | Shows | Services pills, then two columns. On: "Continue Watching · Always First", then the page's rows in their order,
      * each with a grip. Off: every other row it could show (genres, then add-on rows), A to Z. OK moves a row to the other
      * column (turned on, it goes to the bottom of On); Left / Right switch columns. Hold OK in On: edit mode, every On row
      * wobbles; OK picks one up (red outline) and drops it, Up / Down move it; hold OK again or Back leaves (Back drops a
@@ -836,8 +836,8 @@ class SettingsActivity : Screen() {
     private fun customizeHome() {
         detailRows.addView(text(R.string.customize_home_sub, SMALL, color = TEXT_2),
             LinearLayout.LayoutParams(-1, -2).apply { marginStart = dp(12); bottomMargin = dp(12) })
-        var tab = 0 // 0 Home, 1 Movies, 2 Shows, 3 Services
-        var movie = false
+        var tab = 0 // 0 Movies, 1 Shows, 2 Services
+        var movie = true
         var edit = false
         var picked = -1 // the On row picked up in edit mode
         var onRows = mutableListOf<String>()
@@ -848,7 +848,7 @@ class SettingsActivity : Screen() {
         val still = android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         // Room for a third pill (Services) later: the pills are a list.
-        val tabViews = listOf(R.string.tab_home, R.string.tab_movies, R.string.tab_shows, R.string.tab_services).map { words ->
+        val tabViews = listOf(R.string.tab_movies, R.string.tab_shows, R.string.tab_services).map { words ->
             text(words, BODY, bold = true).apply { id = View.generateViewId(); gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
         }
         fun openPill() = tabViews[tab]
@@ -873,9 +873,8 @@ class SettingsActivity : Screen() {
                     LinearLayout.LayoutParams(0, -2, 1f).apply { if (i == 1) marginStart = dp(8) })
             }
         }
-        fun page() = listOf(HomeStyle.HOME, "Movies", "Shows", HomeStyle.SERVICES)[tab] // the page's label in MainActivity
-        // Home's and Services' rows all start on; on Movies and Shows only the default genres do.
-        fun shown(t: String) = HomeStyle.isOn(HomeStyle.rowsOn(this, page()), t, movie, services = tab == 0 || tab == 3) && t !in Settings.hiddenRows(this)
+        fun page() = listOf("Movies", "Shows", HomeStyle.SERVICES)[tab] // the page's label in MainActivity
+        fun shown(t: String) = HomeStyle.isOn(HomeStyle.rowsOn(this, page()), t, movie, services = tab == 2) && t !in Settings.hiddenRows(this)
         fun save() = HomeStyle.saveRowOrder(this, page(), onRows + offRows)
         fun jiggle() = onViews.forEachIndexed { i, v -> // the visible On rows only; transforms on the render thread, no layout
             val visible = v.bottom > onScroll.scrollY && v.top < onScroll.scrollY + onScroll.height
@@ -988,7 +987,7 @@ class SettingsActivity : Screen() {
             if (refocus) openPill().requestFocus() // focus waits on the panel's own pill while the lists are rebuilt
             stopJiggle()
             onList.removeAllViews(); offList.removeAllViews(); onViews.clear(); offViews.clear(); restyles.clear()
-            if (tab < 3) onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off (not on Services)
+            if (tab < 2) onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off (not on Services)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), 0, dp(14), 0)
                 addView(ImageView(context).apply { setImageResource(R.drawable.ic_lock); imageTintList = ColorStateList.valueOf(0x80FFFFFF.toInt()) },
@@ -1015,7 +1014,7 @@ class SettingsActivity : Screen() {
         onScroll.setOnScrollChangeListener { _, _, _, _, _ -> if (edit) jiggle() }
         tabViews.forEachIndexed { i, t ->
             t.setOnFocusChangeListener { _, has ->
-                if (has && tab != i) { tab = i; movie = i == 1; load() }
+                if (has && tab != i) { tab = i; movie = i == 0; load() }
                 if (has) hint.text = getString(R.string.hint_customize)
                 styleTabs()
             }

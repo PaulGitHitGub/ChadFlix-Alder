@@ -175,7 +175,7 @@ internal object HomeStyle {
 
     fun rowOrder(c: Context, page: String): List<String> =
         runCatching { org.json.JSONArray(prefs(c).getString(key(c, page), "[]")).strings() }.getOrDefault(emptyList())
-            .let { if (page == HOME) homeOrder(it) else it }
+            .let { if (page == "Movies" || page == "Shows") allGenresFirst(it) else it }
 
     /** Moves [title] [by] places among the page's [shown] rows and keeps that order. */
     fun moveRow(c: Context, page: String, shown: List<String>, title: String, by: Int) = saveRowOrder(c, page, movedRow(shown, title, by))
@@ -199,7 +199,7 @@ internal object HomeStyle {
 
     fun genres(movie: Boolean) = if (movie) movieGenres else showGenres
 
-    private fun onByDefault(title: String, movie: Boolean) = genres(movie).take(if (movie) 10 else 9).any { it.second == title }
+    private fun onByDefault(title: String, movie: Boolean) = title == ALL_GENRES || genres(movie).take(if (movie) 10 else 9).any { it.second == title }
 
     /** This page's on/off choices by row title; a row never chosen is on only if it's a default genre. */
     fun rowsOn(c: Context, page: String): org.json.JSONObject =
@@ -249,13 +249,14 @@ internal object HomeStyle {
         prefs(c).edit().putString(Settings.profileKey(c, "rowsKnown:$page"), org.json.JSONArray(titles).toString()).apply()
 
     fun knownRows(c: Context, page: String, movie: Boolean): List<String> {
-        val saved = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }.getOrNull()
-        if (page == HOME) return saved ?: listOf(ALL_GENRES) // Home's add-on rows are listed once it's been built
-        val known = saved ?: return if (page == SERVICES) platforms.map { it.name } else genres(movie).map { it.second } + ANIME
-        // The Anime row is listed even before the page has been built with it (it's added after the genres).
-        if (page == SERVICES || ANIME in known) return known
-        val at = known.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
-        return known.take(at) + ANIME + known.drop(at)
+        val known = runCatching { org.json.JSONArray(prefs(c).getString(Settings.profileKey(c, "rowsKnown:$page"), null)!!).strings() }
+            .getOrNull() ?: return if (page == SERVICES) platforms.map { it.name } else listOf(ALL_GENRES) + genres(movie).map { it.second } + ANIME
+        if (page == SERVICES) return known
+        // All Genres and the Anime row are listed even before the page has been built with them (first; after the genres).
+        val all = if (ALL_GENRES in known) known else listOf(ALL_GENRES) + known
+        if (ANIME in all) return all
+        val at = all.indexOfLast { t -> genres(movie).any { it.second == t } } + 1
+        return all.take(at) + ANIME + all.drop(at)
     }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
@@ -264,9 +265,8 @@ internal object HomeStyle {
 
     fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, "$id")}"
 
-    // ---------- the All Genres row (Home): films and shows from every genre, one TMDb list of each, interleaved ----------
+    // ---------- the All Genres row (Movies and Shows, first): the page's type from every genre, on by default ----------
 
-    const val HOME = "Home" // the Home page's label: its rows all start on, as the Services tab's do
     const val ALL = "g" // the All Genres row's Showing key
     /** The All Genres row's title as its on/off, order and hidden choices know it, whatever the app's language. */
     const val ALL_GENRES = "All Genres"
@@ -274,19 +274,10 @@ internal object HomeStyle {
     /** A row's title as the screen shows it: All Genres in the app's language, any other row as it's named. */
     fun rowName(c: Context, title: String): String = dev.alder.rowName(title, c.getString(R.string.row_all_genres))
 
-    /** Its films and shows halves run side by side here, never on [rowPool] (which waits for them). */
-    private val halves: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(2)
-
-    fun allGenresSource(c: Context) = allSource(showing(c, HOME, ALL))
+    fun allGenresSource(c: Context, page: String) = allSource(showing(c, page, ALL))
 
     /** The All Genres row's source for [list]: "tmdb:g:<list>". */
     fun allSource(list: String) = "$TMDB$ALL:$list"
-
-    /** The All Genres row's lists: the films' and the shows' together, each once (New Releases for both). */
-    fun allLists(): List<Pair<String, Int>> = (lists(true) + lists(false)).distinctBy { it.first }
-
-    /** Whether the All Genres row asks for films (true) and shows (false) for [list]: both, or only the one that has it. */
-    fun allMedia(list: String): List<Boolean> = listOf(true, false).filter { m -> lists(m).any { it.first == list } }.ifEmpty { listOf(true, false) }
 
     // ---------- platform rows: what streams on a service (TMDb watch providers, US), off until Customize Home ----------
 
@@ -355,9 +346,9 @@ internal object HomeStyle {
 
     /** A row's Showing key: its TMDb genre id, "p<n>" for a platform row, [ALL] for All Genres; null for any other row. */
     fun rowKey(movie: Boolean, title: String, page: String): String? =
-        if (page == HOME) ALL.takeIf { title == ALL_GENRES }
-        else if (page == SERVICES) platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" } // only there: an
+        if (page == SERVICES) platforms.indexOfFirst { it.name == title }.takeIf { it >= 0 }?.let { "p$it" } // only there: an
         else genres(movie).firstOrNull { it.second == title }?.first?.toString() ?: "a".takeIf { title == ANIME } // add-on "Netflix" row is its own
+            ?: ALL.takeIf { title == ALL_GENRES }
 
     // ---------- the Anime row (Movies and Shows): TMDb Animation in Japanese, a genre and a sort in one query ----------
 
@@ -384,7 +375,6 @@ internal object HomeStyle {
             "top_rated" to R.string.showing_top_rated, "most_watched" to R.string.showing_most_watched,
             ("airing" to R.string.showing_airing).takeIf { !movie }, ("complete" to R.string.showing_complete).takeIf { !movie },
             ("blockbusters" to R.string.showing_blockbusters).takeIf { movie })
-        else if (key == ALL) allLists()
         else if (!key.startsWith("p")) lists(movie)
         else listOfNotNull("trending" to R.string.showing_trending,
             "new" to if (movie) R.string.showing_new_releases else R.string.showing_new_series,
@@ -480,15 +470,8 @@ internal object HomeStyle {
         // No name: the card's own title would draw over the tile's words ([dressTile]).
         val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series").put("name", ""))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-        fun sinceFor(m: Boolean) = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (m) -6 else -12) }.time
-        val since = sinceFor(movie)
+        val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
         val list = parts.getOrElse(1) { "trending" }
-        if (parts[0] == ALL) { // All Genres: a page of films and one of shows (only one for Blockbusters, Complete Series)
-            val (titles, complete) = mixedRow(allMedia(list).map { m ->
-                { Tmdb.discoverRow(m, allParams(m, list, day.format(java.util.Date()), day.format(sinceFor(m))), genres(m).toMap()) }
-            }, halves) { it.id }
-            return listOf(tile) + titles to complete
-        }
         val params = if (parts[0].startsWith("p")) platforms[parts[0].drop(1).toInt()].let { p -> // a platform row
             val head = list.substringBefore('~')
             platformParams(movie, p.providers, p.networks, p.companies, head.removeSuffix("!"), head.endsWith("!"), Tmdb.region,
@@ -497,7 +480,8 @@ internal object HomeStyle {
             val month = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_MONTH, -30) }.time
             animeParams(movie, list.substringBefore('~'), list.substringAfter('~', "").toIntOrNull() ?: 0,
                 day.format(java.util.Date()), day.format(since), day.format(month))
-        } else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
+        } else if (parts[0] == ALL) allParams(movie, list, day.format(java.util.Date()), day.format(since)) // All Genres
+        else genreParams(movie, parts[0].toInt(), list, day.format(java.util.Date()), day.format(since))
         // Exclusives Only: TMDb's network/company filter matches any network a show was ever on (Netflix for The Loud
         // House, Good Mythical Morning, Sesame Street), so each title must also stream on this service alone here.
         val only = parts[0].takeIf { it.startsWith("p") && list.substringBefore('~').endsWith("!") }?.let { platforms[it.drop(1).toInt()] }
@@ -506,10 +490,6 @@ internal object HomeStyle {
         return listOf(tile) + titles to complete
     }
 }
-
-/** [a] and [b] in turn, rank by rank ([a]'s first), each id once: the All Genres row's films and shows. */
-internal fun <T> interleaved(a: List<T>, b: List<T>, id: (T) -> String): List<T> =
-    (0 until maxOf(a.size, b.size)).flatMap { listOfNotNull(a.getOrNull(it), b.getOrNull(it)) }.distinctBy(id)
 
 /**
  * TMDb discover filters for the All Genres row: a genre row's [list] with no genre; shows leave out News, Soap and Talk.
@@ -523,37 +503,11 @@ internal fun allParams(movie: Boolean, list: String, today: String, since: Strin
     return p
 }
 
-/**
- * The All Genres row's titles: each half ([halves], one per type) fetched side by side on [pool], then [interleaved].
- * A half that failed leaves the row incomplete (asked again next time); both failing throws the first failure.
- */
-internal fun <T> mixedRow(halves: List<() -> Pair<List<T>, Boolean>>, pool: java.util.concurrent.ExecutorService,
-                          id: (T) -> String): Pair<List<T>, Boolean> {
-    val futures = halves.map { half -> pool.submit(java.util.concurrent.Callable { half() }) }
-    val got = futures.map { f ->
-        try { Result.success(f.get()) }
-        catch (e: InterruptedException) { // the row's thread was stopped: stop the halves and say so, don't call it a failed fetch
-            futures.forEach { it.cancel(true) }
-            Thread.currentThread().interrupt()
-            throw e
-        }
-        catch (e: java.util.concurrent.ExecutionException) { Result.failure(e.cause ?: e) }
-        catch (e: Exception) { Result.failure(e) }
-    }
-    if (got.all { it.isFailure }) throw got.first().exceptionOrNull()!!
-    val rows = got.mapNotNull { it.getOrNull() }
-    return rows.map { it.first }.reduce { a, b -> interleaved(a, b, id) } to (rows.size == got.size && rows.all { it.second })
-}
-
-/** Home's saved row order, with All Genres first (after Continue Watching) when it was saved before the row existed. */
-internal fun homeOrder(saved: List<String>) = if (saved.isNotEmpty() && HomeStyle.ALL_GENRES !in saved) listOf(HomeStyle.ALL_GENRES) + saved else saved
+/** A Movies or Shows row order, with All Genres first (after Continue Watching) when it was saved before the row existed. */
+internal fun allGenresFirst(saved: List<String>) = if (saved.isNotEmpty() && HomeStyle.ALL_GENRES !in saved) listOf(HomeStyle.ALL_GENRES) + saved else saved
 
 /** A row's title on screen: [ALL_GENRES][HomeStyle.ALL_GENRES] as [allGenres] (the app's language), any other as it is. */
 internal fun rowName(title: String, allGenres: String) = if (title == HomeStyle.ALL_GENRES) allGenres else title
-
-/** Whether a page shows its "no catalogs" words: none of its add-ons has a catalog for it, and on Home, no row is on
- *  either (the All Genres row may be), so the words never sit between Continue Watching and a row. */
-internal fun showsNoCatalogs(home: Boolean, noCatalogs: Boolean, rows: Int) = noCatalogs && (!home || rows == 0)
 
 /** [items] in the [saved] order of their titles; rows it doesn't name (a new add-on's) follow in their own order. */
 internal fun <T> orderedRows(saved: List<String>, items: List<T>, title: (T) -> String): List<T> =
