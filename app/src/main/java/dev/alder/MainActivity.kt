@@ -1061,11 +1061,11 @@ class MainActivity : Screen() {
         // A page opens as soon as the remote rests on its name. OK on Shows or Movies goes to its genres. Live shows only
         // once the profile's add-ons have a live catalog; order and hidden tabs come from Settings › Tabs ([arrangeTabs]).
         Page.fixed.forEach { p -> navItem(p).inNav() }
-        arrangeTabs()
         header.addView(avatarBox, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.START or Gravity.CENTER_VERTICAL))
         header.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         // ChadFlix: a gear for Settings where the clock was.
-        header.addView(ImageView(this).apply {
+        settingsGear = ImageView(this).apply {
+            id = View.generateViewId()
             setImageResource(R.drawable.ic_settings)
             contentDescription = getString(R.string.menu_settings)
             setPadding(dp(12), dp(7), dp(12), dp(7))
@@ -1077,13 +1077,16 @@ class MainActivity : Screen() {
             style(false)
             setOnFocusChangeListener { _, has -> style(has); styleNav() }
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
-        }, FrameLayout.LayoutParams(dp(44), dp(32), Gravity.END or Gravity.CENTER_VERTICAL))
+        }
+        header.addView(settingsGear, FrameLayout.LayoutParams(dp(44), dp(32), Gravity.END or Gravity.CENTER_VERTICAL))
+        arrangeTabs()
         styleNav()
         return header
     }
 
     private var lastAddons: List<Addon> = emptyList()
     private lateinit var navBar: LinearLayout
+    private lateinit var settingsGear: ImageView
 
     /** A page's name in the top bar; OK on it opens it, or goes down into it when it's already open. */
     private fun navItem(p: Page) = text(pageName(p), HomeStyle.TAB_SP).apply {
@@ -1149,6 +1152,12 @@ class MainActivity : Screen() {
         }
         // ChadFlix: Home shows only when it's the start page (Settings › Default tab) or open.
         navItems[Page.HOME]?.visibility = if (page == Page.HOME || Settings.startTab(this) == "home") View.VISIBLE else View.GONE
+        // Cross the gap to Settings within the header, even when a content row offers a nearer card.
+        navBar.findViewById<View>(settingsGear.nextFocusLeftId)?.nextFocusRightId = View.NO_ID
+        val lastIndex = (0 until navBar.childCount).last { navBar.getChildAt(it).visibility == View.VISIBLE }
+        val lastTab = navBar.getChildAt(lastIndex)
+        lastTab.nextFocusRightId = settingsGear.id
+        settingsGear.nextFocusLeftId = lastTab.id
     }
 
     private fun showLiveTab(addons: List<Addon>) {
