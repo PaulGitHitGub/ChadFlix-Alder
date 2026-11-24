@@ -9,6 +9,7 @@
 
   <p>
     <a href="#features"><b>Features</b></a> ·
+    <a href="#before-you-install"><b>Before You Install</b></a> ·
     <a href="#install"><b>Install</b></a>
   </p>
 </div>
@@ -33,7 +34,7 @@ are Alder's own: see [Alder](https://github.com/aradhyas8/Alder).
   </tr>
 </table>
 
-## Before You Install: Stremio and Real-Debrid
+## Before You Install
 
 ChadFlix plays what your Stremio add-ons find. Set these up once, on a computer or phone:
 
@@ -42,7 +43,7 @@ ChadFlix plays what your Stremio add-ons find. Set these up once, on a computer 
    [real-debrid.com/apitoken](https://real-debrid.com/apitoken) and copy your API token.
 3. **Torrentio.** Open [torrentio.strem.fun/configure](https://torrentio.strem.fun/configure). Set **Debrid Provider**
    to Real-Debrid, paste the token into **API Key**, then press **Copy Link**.
-4. **Add it to Stremio.** Sign in at [web.stremio.com](https://web.stremio.com), open **Add-ons**, paste the link into
+4. **Add it to Stremio.** Sign in at [web.stremio.com](https://web.stremio.com), open the add-ons page, paste the link into
    the search box and install it.
 
 Keep that link private: it holds your Real-Debrid token. ChadFlix loads your add-ons when you sign in on the TV.
