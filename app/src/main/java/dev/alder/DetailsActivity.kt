@@ -611,14 +611,16 @@ class DetailsActivity : Screen() {
             addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
-        fun keepRightFocus(view: View) {
-            view.id = View.generateViewId()
-            view.nextFocusRightId = view.id
+        infoButton.id = View.generateViewId()
+        if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
+            infoButton.nextFocusLeftId = infoButton.id
+        } else {
+            infoButton.nextFocusRightId = infoButton.id
         }
-        val rightmostIcon = if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) 0 else buttonRow.childCount - 1
-        keepRightFocus(buttonRow.getChildAt(rightmostIcon))
         fun addAction(action: TextView, gap: Int) {
-            keepRightFocus(action)
+            action.id = View.generateViewId()
+            action.nextFocusLeftId = action.id
+            action.nextFocusRightId = action.id
             stack.addView(action, LinearLayout.LayoutParams(dp(280), -2).apply { topMargin = dp(gap) })
         }
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
