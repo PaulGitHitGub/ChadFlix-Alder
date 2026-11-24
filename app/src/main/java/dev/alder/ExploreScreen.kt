@@ -14,12 +14,13 @@ import org.json.JSONObject
 
 /** Search's places at 1080p (dp, the owner's chosen Marquee mockup's CSS px ÷ 2, in ChadFlix's own sizes). */
 internal object SearchLayout {
-    const val ROW_TOP = 60 // the Voice / Keyboard pill
-    const val KEYS_TOP = 98 // the keys under Voice while typing
+    // Voice and Keyboard are in the top bar (placement B), so the hero starts right under it: 48 dp (96 px) higher.
+    const val ROW_TOP = 60 // while typing: the heading and results
+    const val KEYS_TOP = 66 // while typing: the keys at the left
     const val SIDE = 36 // the hero's words, the controls row and the posters stop this far from the sides (72 px)
     const val COLUMNS = 9 // 92 dp posters
-    const val HERO_H = 282 // the hero (560 px)
-    const val CONTROLS_TOP = 286 // the controls row, under the hero; the posters scroll under it
+    const val HERO_H = 234 // the hero
+    const val CONTROLS_TOP = 238 // the controls row, under the hero; the posters scroll under it
 }
 
 /**
@@ -68,9 +69,8 @@ abstract class ExploreScreen : Screen() {
     private lateinit var infoScores: LinearLayout
     private lateinit var infoOverview: TextView
     private lateinit var infoFaces: LinearLayout // the top-billed cast's faces
-    // The hero, the Voice / Keyboard pill on it, and the picker that takes its place.
+    // The hero, and the picker that takes its place.
     private lateinit var heroFull: View
-    private lateinit var heroPill: View
     private lateinit var pickerHost: FrameLayout
     private var pickerFacet: Facet? = null // the facet whose picker has the hero
     private var pickerBack: (() -> Unit)? = null
@@ -687,11 +687,11 @@ abstract class ExploreScreen : Screen() {
     /**
      * The focused title as the hero across the top: its art fading into the black at the left and bottom, its logo
      * (or name), certificate · year · length · genres, scores and overview at the left, the top-billed cast at the
-     * right, and the Voice / Keyboard [pill] at its top left. It never moves or changes size; a filter's picker takes
-     * its place while open ([heroChoose]). What TMDb's discover answer holds shows at once; the rest comes after a rest
-     * on the poster, into fixed-size slots.
+     * right, under the top bar. It never moves or changes size; a filter's picker takes its place while open
+     * ([heroChoose]). What TMDb's discover answer holds shows at once; the rest comes after a rest on the poster, into
+     * fixed-size slots.
      */
-    protected fun buildHero(pill: View): View {
+    protected fun buildHero(): View {
         infoArt = FadedArt(this, 0.45f, 1f).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0f }
         infoName = text("", HERO_NAME_SP, bold = true, color = HomeStyle.WHITE).apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
         infoLogo = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(HERO_LOGO_W); maxHeight = dp(HERO_TITLE_H) }
@@ -734,11 +734,8 @@ abstract class ExploreScreen : Screen() {
             })
         }
         pickerHost = FrameLayout(this).apply { visibility = View.GONE }
-        heroPill = pill
         return FrameLayout(this).apply {
             addView(heroFull, FrameLayout.LayoutParams(-1, -1))
-            // ponytail: the pill's place is the designer's next round (three proposals); it's one child here to move.
-            addView(pill, FrameLayout.LayoutParams(-2, dp(32)).apply { leftMargin = dp(SearchLayout.SIDE - 2); topMargin = dp(SearchLayout.ROW_TOP - 2) })
             addView(pickerHost, FrameLayout.LayoutParams(-1, -1).apply {
                 leftMargin = dp(SearchLayout.SIDE); rightMargin = dp(SearchLayout.SIDE); topMargin = dp(PICKER_TOP)
             })
@@ -949,12 +946,12 @@ abstract class ExploreScreen : Screen() {
         }
     }
 
-    /** A picker in the hero's place hides the hero and the Voice / Keyboard pill; closed, they're back. */
-    private fun styleHero() {
-        val picking = pickerFacet != null
-        heroFull.enter(PAGE_MS).alpha(if (picking) 0f else 1f).start()
-        heroPill.visibility = if (picking) View.INVISIBLE else View.VISIBLE
-    }
+    /** A picker in the hero's place hides the hero; closed, it's back. */
+    private fun styleHero() = heroFull.enter(PAGE_MS).alpha(if (pickerFacet != null) 0f else 1f).start()
+
+    /** Up from anywhere in the controls row goes to [id] (Voice, in the top bar), not to whatever is straight above. */
+    protected fun upFromControls(id: Int) =
+        (typeButtons + rows.values.map { it.view } + listOf(clearFilters, sortControl)).forEach { it.nextFocusUpId = id }
 
     /** A hero picker's choice: white while focused, a chosen one in tungsten on the chosen filter's tint with its tick. */
     private fun styleTile(t: TextView) {
@@ -1163,17 +1160,17 @@ abstract class ExploreScreen : Screen() {
         const val CAST_FACES = 5
         // The hero: a 28 sp title (or logo), the overview at body size, the cast at its lower right.
         const val HERO_NAME_SP = 28f
-        const val HERO_TITLE_H = 64
-        const val HERO_BODY_TOP = 92 // the title's slot, under the search pill
+        const val HERO_TITLE_H = 60
+        const val HERO_BODY_TOP = 48 // the title's slot, just under the top bar and its capsule
         const val HERO_LOGO_W = 320
         const val HERO_LOGO_AREA = 11700.0 // about 1.3 of the title page's logo (8976 dp², Images.logoSizePx)
         const val HERO_TEXT_W = 430
         const val HERO_OVERVIEW_H = 60 // three lines
         const val HERO_ART_W = 680
         const val HERO_FACE = 54
-        // The pickers in the hero's place: choices in columns of five; faces ten across.
-        const val PICKER_TOP = 54
-        const val PICK_ROWS = 5
+        // The pickers in the hero's place, under the top bar: choices in columns of four; faces ten across.
+        const val PICKER_TOP = 50
+        const val PICK_ROWS = 4
         const val PICK_W = 164
         const val PICK_H = 26
         const val PICK_GAP = 6

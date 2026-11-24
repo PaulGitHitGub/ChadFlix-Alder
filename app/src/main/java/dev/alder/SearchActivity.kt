@@ -81,7 +81,11 @@ class SearchActivity : ExploreScreen() {
     private lateinit var keyboard: LinearLayout
     private lateinit var headerBar: View
     private lateinit var nav: LinearLayout
-    private lateinit var searchTab: ImageView
+    private lateinit var avatar: View
+    private lateinit var tabSlot: View // the magnifier tab's room in the top bar, under the capsule
+    private lateinit var capsule: LinearLayout // Voice and Keyboard in the top bar ([attachCapsule])
+    private var capsuleLit = true // white while the remote is below or on it; faint while elsewhere in the top bar
+    private var styleKeyboard: (Boolean) -> Unit = {}
     private var voice: View? = null
     private var shownAt: Long? = null // when the page first had the remote (uptime ms)
     private var styleVoice: () -> Unit = {}
@@ -142,8 +146,7 @@ class SearchActivity : ExploreScreen() {
     private fun toggleKeys(open: Boolean, to: View? = null) {
         keyboard.visibility = if (open) View.VISIBLE else View.GONE
         recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
-        keyboardButton.visibility = if (open) View.GONE else View.VISIBLE // its keys are showing: only Voice above them
-        // Down from Voice goes by sight (Keyboard is beside it, the controls row below) unless the keys are open.
+        // Down from Voice goes by sight (the controls row below) unless the keys are open under it.
         voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else View.NO_ID
         lastKeyboardFocus = if (open) firstKey else keyboardButton
         updateHeading()
@@ -185,7 +188,11 @@ class SearchActivity : ExploreScreen() {
 
         keyboard = column(Gravity.START)
         buildKeyboard()
-        keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.first
+        sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.let { (view, style) ->
+            keyboardButton = view
+            styleKeyboard = style
+        }
+        attachCapsule()
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
         showRecent()
         results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
@@ -198,6 +205,7 @@ class SearchActivity : ExploreScreen() {
             addView(results)
         }
         arrangePage(root, sort, dp((width - RESULTS_X).toInt()))
+        upFromControls((voice ?: keyboardButton).id) // Up from the controls row: Voice, straight up in the top bar
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(root)
         root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
@@ -252,13 +260,13 @@ class SearchActivity : ExploreScreen() {
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         updateHeading()
         toggleKeys(false)
-        // The remote starts on Voice Search, the top of the left column.
+        // The remote starts on Voice, in the top bar where the Search tab was.
         (voice ?: keyboardButton).let { start -> start.post { start.requestFocus() } }
         search(false)
     }
 
     /**
-     * The page: the hero across the top with the Voice / Keyboard pill on it ([searchPill]), the controls row under it
+     * The page: the hero across the top under the top bar (Voice and Keyboard are in it: [attachCapsule]), the controls row under it
      * and the posters under that, which scroll while the hero and the row stay put. While typing (the keys open, words
      * searched, the people picker) the keys go under Voice and the heading and results right of them ([arrange]); the
      * views here start in that arrangement.
@@ -285,18 +293,40 @@ class SearchActivity : ExploreScreen() {
             addView(headingRow, LinearLayout.LayoutParams(-1, dp(QUERY_H)).apply { marginEnd = dp(KEYS_X) })
             addView(resultsScroll, LinearLayout.LayoutParams(resultsW, 0, 1f))
         }
-        root.addView(buildHero(searchPill()), 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
+        root.addView(buildHero(), 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
         root.addView(resultsColumn, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(SearchLayout.ROW_TOP) })
     }
 
-    /** Voice and Keyboard side by side in one outlined pill (where it sits is [buildHero]'s one line). */
-    private fun searchPill() = LinearLayout(this).apply {
-        gravity = Gravity.CENTER_VERTICAL
-        background = outlined(0x8C000000.toInt())
-        setPadding(dp(2), dp(2), dp(2), dp(2))
-        voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H))) }
-        addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(ACTION_H)))
-        keyboardButton.nextFocusRightId = keyboardButton.id // the pill's end: not up to the Settings gear
+    /**
+     * The top bar's Search tab, on this page one white capsule holding Voice and Keyboard (owner's placement B). Its
+     * right edge stays where the magnifier's ended, so Movies, Shows and the rest don't move; [tabSlot] keeps the
+     * magnifier's room in the bar. Focus is a black pill inside it. Voice has the remote on arrival, Up from the
+     * controls row comes back to it, Left from Voice is the avatar and Right from Keyboard is the first page's name.
+     * ponytail: the magnifier-to-capsule opening animation (the designer's next round) goes here.
+     */
+    private fun attachCapsule() {
+        capsule = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(2), dp(2), dp(2), dp(2))
+            voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
+            addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4)))
+        }
+        val place = { capsule.x = (nav.left + tabSlot.right - capsule.width).toFloat() }
+        nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
+        capsule.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() } // "Listening…" widens Voice
+        (headerBar as FrameLayout).addView(capsule, FrameLayout.LayoutParams(-2, dp(CAPSULE_H), Gravity.START or Gravity.CENTER_VERTICAL))
+        voice?.nextFocusLeftId = avatar.id
+        if (voice == null) keyboardButton.nextFocusLeftId = avatar.id
+        linkCapsule()
+        styleNav()
+    }
+
+    /** Right from Keyboard: the first page's name (the names are rebuilt as the add-ons' types arrive). */
+    private fun linkCapsule() {
+        if (!::capsule.isInitialized) return
+        val first = nav.getChildAt(1) ?: return
+        keyboardButton.nextFocusRightId = first.id
+        first.nextFocusLeftId = keyboardButton.id
     }
 
     /**
@@ -349,7 +379,8 @@ class SearchActivity : ExploreScreen() {
     private fun header(): View {
         val profile = Profiles.active(this)
         val bar = FrameLayout(this).apply { setPadding(dp(PAD), 0, dp(PAD), dp(12)) } // as Home's bar
-        val avatar = text(profile?.name?.take(1)?.uppercase() ?: "A", SMALL, bold = true, color = HomeStyle.WHITE).apply {
+        avatar = text(profile?.name?.take(1)?.uppercase() ?: "A", SMALL, bold = true, color = HomeStyle.WHITE).apply {
+            id = View.generateViewId()
             gravity = Gravity.CENTER
             contentDescription = getString(R.string.nav_profile)
             val rest = rounded(HomeStyle.AVATAR, 20)
@@ -399,18 +430,9 @@ class SearchActivity : ExploreScreen() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(4), dp(4), dp(4), dp(4))
         }
-        searchTab = ImageView(this).apply {
-            id = View.generateViewId()
-            setImageResource(R.drawable.ic_search)
-            contentDescription = getString(R.string.nav_search)
-            setPadding(dp(13), dp(7), dp(13), dp(7))
-            isFocusable = true
-            // Down to the open left column: the keys while typing, else Voice Search, as on arrival.
-            setOnClickListener {
-                (if (keyboard.visibility == View.VISIBLE) lastKeyboardFocus ?: firstKey else voice ?: keyboardButton)?.requestFocus()
-            }
-        }
-        nav.addView(searchTab, LinearLayout.LayoutParams(dp(44), -1))
+        // The magnifier tab's room, kept so the pages' names sit where they do on Home; the capsule covers it.
+        tabSlot = View(this)
+        nav.addView(tabSlot, LinearLayout.LayoutParams(dp(44), -1))
         updateNavTabs()
         background({ Stremio.savedAddons(authKey.orEmpty()).orEmpty().flatMap { a -> a.catalogs.map { it.type } } }) { r ->
             r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = it; updateNavTabs() }
@@ -433,11 +455,13 @@ class SearchActivity : ExploreScreen() {
         return bar
     }
 
-    /** As Home's bar: the open page (Search) keeps a white pill while the remote is below, a faint one while it's elsewhere up here. */
+    /** As Home's bar: the open page (Search) keeps a white pill while the remote is below or on it, a faint one while it's elsewhere up here. */
     private fun styleNav() {
-        val lit = searchTab.isFocused || headerBar.findFocus() == null
-        searchTab.background = HomeStyle.pill(if (lit) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
-        searchTab.setColorFilter(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
+        if (!::capsule.isInitialized) return
+        capsuleLit = capsule.hasFocus() || headerBar.findFocus() == null
+        capsule.background = HomeStyle.pill(if (capsuleLit) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
+        styleVoice()
+        styleKeyboard(keyboardButton.hasFocus())
     }
 
     private fun updateNavTabs() {
@@ -461,6 +485,7 @@ class SearchActivity : ExploreScreen() {
             // A per-type tab ("type:anime") goes to Home's page of that type, which Home names by the type.
             val (page, words) = pages[id] ?: id.removePrefix("type:").let { it to typeTabName(this, it) }
             nav.addView(text(words, HomeStyle.TAB_SP, color = HomeStyle.WHITE).apply {
+                this.id = View.generateViewId() // for the capsule's Right ([linkCapsule])
                 gravity = Gravity.CENTER
                 setPadding(dp(16), dp(5), dp(16), dp(5))
                 isFocusable = true
@@ -481,6 +506,7 @@ class SearchActivity : ExploreScreen() {
             }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
         }
         if (focusedId != null) nav.getChildAt(ids.indexOf(focusedId) + 1).requestFocus()
+        linkCapsule()
     }
 
     /** ChadFlix's keyboard: a-z then 1-0 in six columns, Space and Delete as words under them, Voice Search above. */
@@ -496,7 +522,7 @@ class SearchActivity : ExploreScreen() {
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             val (view, style) = sideAction(R.drawable.ic_mic, getString(R.string.search_voice),
-                iconTint = { has -> if (listening) HomeStyle.LIST_RED else if (has) HomeStyle.BLACK else HomeStyle.WHITE },
+                iconTint = { color -> if (listening) HomeStyle.LIST_RED else color },
                 focused = { v -> lastKeyboardFocus = v }) {
                 // OK while listening: stop and search what was heard so far.
                 if (listening) return@sideAction stopVoice()
@@ -510,7 +536,6 @@ class SearchActivity : ExploreScreen() {
                 style(view.hasFocus())
             }
             voice = view
-            rightEdgeKeys += view
         }
         rows.forEachIndexed { r, keys ->
             keys.forEachIndexed { c, v ->
@@ -521,31 +546,30 @@ class SearchActivity : ExploreScreen() {
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
-        voice?.nextFocusUpId = input.id
     }
 
-    /**
-     * Voice Search and Keyboard Search: an icon and words, as wide as the panel, with no box until focused, when they
-     * take the app's white pill (the top bar's and the keys' focus). Returns the view and its restyle.
-     */
-    private fun sideAction(iconRes: Int, words: String, iconTint: (Boolean) -> Int = { if (it) HomeStyle.BLACK else HomeStyle.WHITE },
+    /** Voice and Keyboard: an icon and words in the top bar's capsule. Returns the view and its restyle. */
+    private fun sideAction(iconRes: Int, words: String, iconTint: (Int) -> Int = { it },
                            focused: (View) -> Unit = {}, click: () -> Unit): Pair<LinearLayout, (Boolean) -> Unit> {
         val icon = ImageView(this).apply { setImageResource(iconRes) }
-        val label = text(words, SMALL, bold = true)
+        val label = text(words, HomeStyle.TAB_SP)
         val view = LinearLayout(this).apply {
             id = View.generateViewId()
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(ACTION_PAD), 0, dp(ACTION_PAD), 0)
             isFocusable = true
             contentDescription = words
-            addView(icon, LinearLayout.LayoutParams(dp(14), dp(14)))
-            addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
+            addView(icon, LinearLayout.LayoutParams(dp(13), dp(13)))
+            addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
             setOnClickListener { click() }
         }
+        // Inside the capsule ([attachCapsule]): focused, a black pill with white words; else black words on the white
+        // capsule, or white on its faint pill while the remote is elsewhere in the top bar.
         fun style(has: Boolean) {
-            view.background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
-            icon.imageTintList = ColorStateList.valueOf(iconTint(has))
-            label.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+            view.background = if (has) HomeStyle.pill(HomeStyle.BLACK) else null
+            val color = if (has || !capsuleLit) HomeStyle.WHITE else HomeStyle.BLACK
+            icon.imageTintList = ColorStateList.valueOf(iconTint(color))
+            label.setTextColor(color)
         }
         style(false)
         view.setOnFocusChangeListener { v, has ->
@@ -557,7 +581,7 @@ class SearchActivity : ExploreScreen() {
 
     /**
      * The hero and the controls row show over the catalogue with the keys closed. While typing the heading names the
-     * catalogue, so the remote doesn't stop on it; with typed words it's Voice's Up.
+     * catalogue, so the remote doesn't stop on it.
      */
     private fun updateHeading() {
         // While voice has the header (listening, "Didn't catch that"), the query before it decides: nothing moves
@@ -567,9 +591,6 @@ class SearchActivity : ExploreScreen() {
         showCatalogueControls(wide)
         if (catalogue && input.hasFocus()) (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).requestFocus()
         input.isFocusable = !catalogue
-        voice?.nextFocusUpId = if (catalogue) View.NO_ID else input.id
-        // Never into the keys while they're hidden (no speech recognizer: no Voice Search above them).
-        input.nextFocusDownId = (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).id
     }
 
     /** No words (hold Delete, Back on the keys, Clear Search): the catalogue again; the remote stays where it is. */
@@ -792,12 +813,11 @@ class SearchActivity : ExploreScreen() {
                 return true
             }
             // (The results and the recent chips, shown only with the keys, are handled above.)
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && (headerBar.hasFocus() || input.hasFocus())) {
-                if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
+            // The top bar's pages and gear, or the heading: Back to Voice (from the capsule itself, Back leaves).
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && ((headerBar.hasFocus() && !capsule.hasFocus()) || input.hasFocus())) {
+                if ((voice ?: keyboardButton).requestFocus()) return true
             }
-            // Keyboard sits beside Voice: Right reaches it first, then the results.
-            val toResults = if (keyboardButton.isShown) focus === keyboardButton || (focus in rightEdgeKeys && focus !== voice) else focus in rightEdgeKeys
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && toResults && lookupMode == null && input.text.isNotBlank()) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys && lookupMode == null && input.text.isNotBlank()) {
                 // Still loading (nothing to land on): stay put rather than let Android's search jump to the gear.
                 (firstResult ?: resultsAction)?.requestFocus()
                 return true
@@ -1147,8 +1167,9 @@ class SearchActivity : ExploreScreen() {
         const val QUERY_H = 28 // the heading line
         const val ROW_GAP = 12 // dp: a row's caption to the next row's title (was 16)
         const val KEYS_X = 33
-        const val ACTION_H = 28 // Voice and Keyboard, and the controls row's pills
-        const val ACTION_PAD = 17
+        const val ACTION_H = 28 // the controls row's pills
+        const val ACTION_PAD = 12 // Voice's and Keyboard's sides inside their focus pill
+        const val CAPSULE_H = 30 // the top bar's Voice | Keyboard capsule, as tall as a page's name focused
         const val KEY_W = 33
         const val KEY_H = 32
         const val KEYS_W = KEY_W * 6
