@@ -59,6 +59,41 @@ class FadedArt(context: Context, private val bottomFrom: Float = 0.45f, private 
     }
 }
 
+/**
+ * A person's picture in a circle (cast faces, Directors & Cast). TMDb's profile pictures are 2:3 portraits with the
+ * head near the top, so a centred crop cut off the forehead: this one fills the circle across the picture's width and
+ * keeps its top, dropping only [TOP_TRIM] of what doesn't fit from above.
+ */
+class FaceView(context: Context) : ImageView(context) {
+    init { scaleType = ScaleType.MATRIX }
+
+    override fun setImageDrawable(drawable: Drawable?) {
+        super.setImageDrawable(drawable)
+        fit()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        fit()
+    }
+
+    private fun fit() {
+        val d = drawable ?: return
+        val dw = d.intrinsicWidth
+        val dh = d.intrinsicHeight
+        if (width == 0 || height == 0 || dw <= 0 || dh <= 0) return
+        val scale = maxOf(width.toFloat() / dw, height.toFloat() / dh)
+        imageMatrix = android.graphics.Matrix().apply {
+            setScale(scale, scale)
+            postTranslate((width - dw * scale) / 2f, -(dh * scale - height) * TOP_TRIM)
+        }
+    }
+
+    private companion object {
+        const val TOP_TRIM = 0.15f // of the overflow: a little air above the hair, the chin still in
+    }
+}
+
 /** Keeps text readable straight on art: a soft dark shadow instead of a panel over the picture. */
 fun TextView.onArt() = apply { setShadowLayer(resources.displayMetrics.density * 8, 0f, resources.displayMetrics.density, 0xCC000000.toInt()) }
 

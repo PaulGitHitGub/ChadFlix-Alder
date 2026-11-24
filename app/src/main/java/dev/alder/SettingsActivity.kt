@@ -144,8 +144,6 @@ object Settings {
     fun showFps(c: Context) = prefs(c).getBoolean("showFps", false)
     /** ChadFlix: Settings › Picture & Sound › Background wash, for this TV: Home's soft wash behind the rows, or black. */
     fun wash(c: Context) = prefs(c).getBoolean("wash", true)
-    /** TEMPORARY (owner's pick): Settings › Picture & Sound › Search Layout. Goes with [SearchLayout] once one is chosen. */
-    internal fun searchLayout(c: Context) = SearchLayout.entries.firstOrNull { it.key == prefs(c).getString(SearchLayout.PREF, null) } ?: SearchLayout.WALL
     fun setClearDialogue(c: Context, on: Boolean) = prefs(c).edit().putBoolean("clearDialogue", on).apply()
     /** "on", "foreign" (only when audio differs or forced), "off". Migrates old Boolean "subtitles". */
     fun subPref(c: Context): String {
@@ -583,11 +581,7 @@ class SettingsActivity : Screen() {
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)
                 choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
-                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
-                // TEMPORARY (owner's pick): delete this row with [SearchLayout] once one layout is chosen.
-                choiceRow(Choice(SearchLayout.PREF, getString(R.string.search_layout), getString(R.string.search_layout_hint),
-                    SearchLayout.entries.map { it.key to getString(it.words) }))
-                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
+                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
             }

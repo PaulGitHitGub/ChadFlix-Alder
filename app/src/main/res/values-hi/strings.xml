@@ -382,7 +382,7 @@
     <string name="search_remove_recent">हाल की खोज हटाएँ?</string>
     <string name="search_remove_query">%1$s हटाएँ</string>
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
-    <string name="search_voice">वॉइस खोज</string>
+    <string name="search_voice">वॉइस</string>
     <string name="search_listening">सुन रहे हैं…</string>
     <string name="search_voice_missed">समझ नहीं आया</string>
     <string name="search_delete">मिटाएं</string>
@@ -575,7 +575,7 @@
     <string name="ex_people">निर्देशक और कलाकार</string>
     <string name="ex_studio">स्टूडियो</string>
     <string name="ex_network">नेटवर्क</string>
-    <string name="ex_keyboard">कीबोर्ड से खोजें</string>
+    <string name="ex_keyboard">कीबोर्ड</string>
     <string name="ex_any">कोई भी</string>
     <string name="ex_match">मिलान</string>
     <string name="ex_or">या</string>
@@ -593,9 +593,4 @@
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>
     <string name="showing_blockbusters">ब्लॉकबस्टर</string>
-    <string name="search_layout">खोज लेआउट</string>
-    <string name="search_layout_hint">खोज पेज कैसे सजा है। एक अस्थायी सेटिंग, जब तक एक चुना न जाए।</string>
-    <string name="search_layout_wall">दीवार</string>
-    <string name="search_layout_marquee">मार्की</string>
-    <string name="search_layout_current">मौजूदा</string>
 </resources>

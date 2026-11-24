@@ -382,7 +382,7 @@
     <string name="search_remove_recent">Letzte Suche entfernen?</string>
     <string name="search_remove_query">%1$s entfernen</string>
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
-    <string name="search_voice">Sprachsuche</string>
+    <string name="search_voice">Sprache</string>
     <string name="search_listening">Ich höre zu…</string>
     <string name="search_voice_missed">Das habe ich nicht verstanden</string>
     <string name="search_delete">Löschen</string>
@@ -575,7 +575,7 @@
     <string name="ex_people">Regie &amp; Besetzung</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Sender</string>
-    <string name="ex_keyboard">Tastatursuche</string>
+    <string name="ex_keyboard">Tastatur</string>
     <string name="ex_any">Beliebig</string>
     <string name="ex_match">Übereinstimmung</string>
     <string name="ex_or">oder</string>
@@ -593,9 +593,4 @@
     <string name="ex_clear_filters">Alle Filter Löschen</string>
     <string name="showing_most_watched">Meistgesehen</string>
     <string name="showing_blockbusters">Blockbuster</string>
-    <string name="search_layout">Suche-Layout</string>
-    <string name="search_layout_hint">Wie die Suchseite aufgebaut ist. Eine vorübergehende Einstellung, bis eines gewählt ist.</string>
-    <string name="search_layout_wall">Wand</string>
-    <string name="search_layout_marquee">Bühne</string>
-    <string name="search_layout_current">Aktuell</string>
 </resources>

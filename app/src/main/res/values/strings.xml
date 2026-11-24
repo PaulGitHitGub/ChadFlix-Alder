@@ -414,7 +414,7 @@
     <string name="search_remove_recent">Remove recent search?</string>
     <string name="search_remove_query">Remove %1$s</string>
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
-    <string name="search_voice">Voice Search</string>
+    <string name="search_voice">Voice</string>
     <string name="search_listening">Listening…</string>
     <string name="search_voice_missed">Didn\'t catch that</string>
     <string name="search_delete">Delete</string>
@@ -603,7 +603,7 @@
     <string name="ex_people">Directors &amp; Cast</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Network</string>
-    <string name="ex_keyboard">Keyboard Search</string>
+    <string name="ex_keyboard">Keyboard</string>
     <string name="ex_any">Any</string>
     <string name="ex_match">Match</string>
     <string name="ex_or">or</string>
@@ -619,10 +619,4 @@
     <string name="ex_popular">Popular Now</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
-    <!-- TEMPORARY: Settings › Picture & Sound › Search Layout, while the owner picks one. -->
-    <string name="search_layout">Search Layout</string>
-    <string name="search_layout_hint">How the Search page is arranged. A temporary setting while one is chosen.</string>
-    <string name="search_layout_wall">Wall</string>
-    <string name="search_layout_marquee">Marquee</string>
-    <string name="search_layout_current">Current</string>
 </resources>

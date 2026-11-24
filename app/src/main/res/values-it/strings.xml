@@ -383,7 +383,7 @@
     <string name="search_remove_recent">Rimuovere la ricerca recente?</string>
     <string name="search_remove_query">Rimuovi %1$s</string>
     <string name="search_popular_unavailable">I titoli popolari non sono disponibili.</string>
-    <string name="search_voice">Ricerca vocale</string>
+    <string name="search_voice">Voce</string>
     <string name="search_listening">In ascolto…</string>
     <string name="search_voice_missed">Non ho capito</string>
     <string name="search_delete">Cancella</string>
@@ -578,7 +578,7 @@
     <string name="ex_people">Regia e cast</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Rete</string>
-    <string name="ex_keyboard">Cerca Con Tastiera</string>
+    <string name="ex_keyboard">Tastiera</string>
     <string name="ex_any">Qualsiasi</string>
     <string name="ex_match">Corrispondenza</string>
     <string name="ex_or">o</string>
@@ -596,9 +596,4 @@
     <string name="ex_clear_filters">Cancella Tutti I Filtri</string>
     <string name="showing_most_watched">Più Visti</string>
     <string name="showing_blockbusters">Campioni di Incassi</string>
-    <string name="search_layout">Layout della Ricerca</string>
-    <string name="search_layout_hint">Come è organizzata la pagina Cerca. Un\'impostazione temporanea finché non se ne sceglie uno.</string>
-    <string name="search_layout_wall">Muro</string>
-    <string name="search_layout_marquee">Insegna</string>
-    <string name="search_layout_current">Attuale</string>
 </resources>

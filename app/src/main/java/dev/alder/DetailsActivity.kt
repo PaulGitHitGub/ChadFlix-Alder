@@ -1202,8 +1202,7 @@ class DetailsActivity : Screen() {
                 avatarFrame.addView(initials, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
 
                 if (!actor.photo.isNullOrBlank()) {
-                    val photoView = ImageView(this@DetailsActivity).apply {
-                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    val photoView = FaceView(this@DetailsActivity).apply { // the head kept, not cut at the forehead
                         visibility = View.GONE
                     }
                     avatarFrame.addView(photoView, FrameLayout.LayoutParams(-1, -1))
@@ -1500,8 +1499,7 @@ class DetailsActivity : Screen() {
                 avatarFrame.addView(initialsText, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
 
                 if (!actor.photo.isNullOrBlank()) {
-                    val photoView = ImageView(this@DetailsActivity).apply {
-                        scaleType = ImageView.ScaleType.CENTER_CROP
+                    val photoView = FaceView(this@DetailsActivity).apply { // the head kept, not cut at the forehead
                         visibility = View.GONE
                     }
                     avatarFrame.addView(photoView, FrameLayout.LayoutParams(-1, -1))
