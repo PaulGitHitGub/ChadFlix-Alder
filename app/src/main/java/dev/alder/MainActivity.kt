@@ -2727,19 +2727,19 @@ class MainActivity : Screen() {
     }
 
     private fun listMenu(item: Item) {
+        val neighbor = rows.firstOrNull { it.view.hasFocus() }?.let { r ->
+            (r.cards.getOrNull(r.selected + 1) ?: r.cards.getOrNull(r.selected - 1))?.tag
+        }
         openedWatchlist?.let { name ->
             choose(item.name, listOf(getString(R.string.remove_from_watchlist), getString(R.string.save_to_watchlist))) {
                 if (it == 0) {
                     Settings.watchlists(this).toggle(name, item.watchTitle)
-                    redrawLibrary(item.cardTag)
+                    redrawLibrary(neighbor ?: item.cardTag)
                 } else saveWatchTitle(item)
             }
             return
         }
         val original = library.firstOrNull { it.optString("_id") == item.id } ?: return
-        val neighbor = rows.firstOrNull { it.view.hasFocus() }?.let { r ->
-            (r.cards.getOrNull(r.selected + 1) ?: r.cards.getOrNull(r.selected - 1))?.tag
-        }
         val removeLabel = getString(R.string.action_remove_from_list)
         val options = (if (item.finished) emptyList() else listOf(getString(R.string.action_mark_watched))) + removeLabel
         fun save(remove: Boolean, previous: Failure? = null) {

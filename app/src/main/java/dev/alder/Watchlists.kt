@@ -14,11 +14,13 @@ internal data class WatchTitle(val id: String, val type: String, val name: Strin
 internal data class Watchlist(val name: String, val items: List<WatchTitle>)
 
 internal class Watchlists(private val prefs: SharedPreferences, private val key: String) {
-    fun all(): List<Watchlist> = JSONArray(prefs.getString(key, "[]")).objects().map { list ->
-        Watchlist(list.getString("name"), list.getJSONArray("items").objects().map {
-            WatchTitle(it.getString("id"), it.getString("type"), it.getString("name"), it.text("poster"), it.text("background"))
-        })
-    }
+    fun all(): List<Watchlist> = runCatching {
+        JSONArray(prefs.getString(key, "[]")).objects().map { list ->
+            Watchlist(list.getString("name"), list.getJSONArray("items").objects().map {
+                WatchTitle(it.getString("id"), it.getString("type"), it.getString("name"), it.text("poster"), it.text("background"))
+            })
+        }
+    }.getOrDefault(emptyList())
 
     private fun save(lists: List<Watchlist>) {
         val json = JSONArray(lists.map {

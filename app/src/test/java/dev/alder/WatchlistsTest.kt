@@ -27,6 +27,17 @@ class WatchlistsTest {
         assertEquals(listOf("Second"), alice.all().map { it.name })
     }
 
+    @Test fun corruptValueRemainsUntilANewListIsSaved() {
+        val key = "watchlists@alice"
+        for (corrupt in listOf("[", """[{"name":"Weekend"}]""")) {
+            prefs.edit().putString(key, corrupt).apply()
+            assertTrue(alice.all().isEmpty())
+            assertEquals(corrupt, prefs.getString(key, null))
+        }
+        assertTrue(alice.create("Weekend", movie))
+        assertEquals(listOf(Watchlist("Weekend", listOf(movie))), alice.all())
+    }
+
     @Test fun forgettingOneProfilePreservesOtherProfilesLists() {
         alice.create("Weekend", movie)
         bob.create("Weekend", show)
