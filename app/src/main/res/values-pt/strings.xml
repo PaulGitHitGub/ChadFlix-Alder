@@ -33,7 +33,8 @@
     <string name="tab_home">Início</string>
     <string name="tab_discover">Descobrir</string>
     <string name="discover_genre">Gênero</string>
-    <string name="discover_year">Década</string>
+    <string name="discover_decade">Década</string>
+    <string name="discover_year">Ano</string>
     <string name="discover_all_genres">Todos os gêneros</string>
     <string name="discover_all_decades">Todas as décadas</string>
     <string name="discover_all_services">Todos os serviços</string>

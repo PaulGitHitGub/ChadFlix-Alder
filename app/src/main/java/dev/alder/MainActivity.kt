@@ -2494,7 +2494,7 @@ class MainActivity : Screen() {
             val all = getString(R.string.filter_all)
             val genreOptions = listOf(all to null) + genres.filter { q.type != "anime" || it.first != ANIMATION }.map { it.second to it.first }
             pick(R.string.discover_genre, R.string.discover_all_genres, genreOptions, q.genre, margin = 24) { q.copy(genre = it as Int?) }
-            pick(R.string.discover_year, R.string.discover_all_decades, decadeOptions(), q.decade to q.year) {
+            pick(R.string.discover_decade, R.string.discover_all_decades, decadeOptions(), q.decade to q.year) {
                 val choice = it as Pair<*, *>
                 q.copy(decade = choice.first as Int?, year = choice.second as Int?)
             }
@@ -2739,12 +2739,13 @@ class MainActivity : Screen() {
             ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
             ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending(::sortDate))
         }
-        val label = filter.genre ?: when {
+        val yearLabel = when {
             filter.year != null -> filter.year.toString()
             filter.decade == 0 -> getString(R.string.discover_before_1980)
             filter.decade != null -> "${filter.decade}s"
-            else -> getString(filter.sort.label)
+            else -> null
         }
+        val label = listOfNotNull(filter.genre, yearLabel).joinToString(" · ").ifEmpty { getString(filter.sort.label) }
         val tile = Item(HomeStyle.tileId("saved:$type"), type, "", null, null, null, "", emptyList(), null, 0f, false)
         val items = listOf(tile) + ordered.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
         val first = items.take(maxOf(START, 1 + items.indexOfFirst { it.cardTag == focusTag }))
@@ -3385,6 +3386,7 @@ class MainActivity : Screen() {
          * it's known. One badge per row moves to the card the remote is on; other cards have none.
          */
         fun rate(card: MediaCardView, item: Item, fade: Boolean) {
+            if ((compact || continueRow) && ratingPick != "letterboxd") return
             if ((!compact && (!homeRow || card.widensBy <= 0)) || item.collectionCard || HomeStyle.isTile(item.id) ||
                 !active || cards.getOrNull(selected) !== card) return
             val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)

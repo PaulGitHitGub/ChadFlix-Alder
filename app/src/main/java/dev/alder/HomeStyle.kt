@@ -436,7 +436,15 @@ internal object HomeStyle {
             addView(screen.text(label.uppercase(), if (compact) 9f else 10.5f, bold = true, color = LABEL_GREY).apply { letterSpacing = 0.08f })
             addView(screen.text(list, if (compact) 12f else 15f, bold = true, color = WHITE).apply {
                 maxLines = 2
-                if (compact) ellipsize = android.text.TextUtils.TruncateAt.END
+                if (compact) {
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    val width = (card.widthPx - 2 * pad).toFloat()
+                    // Keep the year visible on the second line even when the genre needs the whole first line.
+                    if (" · " in list && paint.measureText(list) > width) {
+                        val genre = android.text.TextUtils.ellipsize(list.substringBeforeLast(" · "), paint, width, ellipsize)
+                        text = "$genre\n${list.substringAfterLast(" · ")}"
+                    }
+                }
             },
                 LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(screen, 2f).toInt() })
             visibility = View.INVISIBLE
