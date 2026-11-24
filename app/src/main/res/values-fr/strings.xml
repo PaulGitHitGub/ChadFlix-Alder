@@ -24,20 +24,10 @@
     <string name="whats_new">Nouveautés</string>
     <string name="whats_new_no_notes">Aucune note pour la version %1$s.</string>
     <string name="whats_new_version">Version %1$s</string>
+    <string name="whats_new_preview">Aperçu de la version</string>
+    <string name="whats_new_example_player">Exemple de lecteur externe</string>
     <string name="whats_new_group">Nouveau</string>
-    <plurals name="whats_new_highlights">
-        <item quantity="one">Nouveautés · %1$d temps fort</item>
-        <item quantity="many">Nouveautés · %1$d temps forts</item>
-        <item quantity="other">Nouveautés · %1$d temps forts</item>
-    </plurals>
-    <string name="whats_new_all">Toutes les modifications (%1$d)</string>
     <string name="whats_new_highlights_short">Temps forts</string>
-    <string name="whats_new_back">← Retour aux temps forts</string>
-    <plurals name="whats_new_see_all">
-        <item quantity="one">Voir %1$d modification  →</item>
-        <item quantity="many">Voir les %1$d modifications  →</item>
-        <item quantity="other">Voir les %1$d modifications  →</item>
-    </plurals>
 
     <!-- Home -->
     <string name="tab_home">Accueil</string>
@@ -255,7 +245,7 @@
     <string name="player_no_other_app">Aucun autre lecteur vidéo sur ce téléviseur. Alder lit la vidéo.</string>
     <string name="clear_dialogue_setting_hint">Fait ressortir les voix par-dessus la musique et les effets forts sur les haut-parleurs du téléviseur.</string>
     <string name="dubbed">Versions doublées</string>
-    <string name="dubbed_hint">VO d’abord place les versions doublées en dernier ; Ma langue d’abord utilise la langue audio de ce profil.</string>
+    <string name="dubbed_hint">VO d’abord place les versions doublées en dernier. Ma langue d’abord vérifie la langue audio dans le lecteur Alder avant la lecture automatique. Vous pouvez toujours choisir une source.</string>
     <string name="dubbed_original">VO d’abord</string>
     <string name="dubbed_mine">Ma langue d’abord</string>
     <string name="subs_default">Sous-titres par défaut</string>
@@ -312,6 +302,10 @@
     <string name="ratings_source">Notes</string>
     <string name="ratings_source_hint">Choisit les notes des pages de titres et de l’accueil. Letterboxd ne couvre que les films et demande une clé MDBList. Les séries utilisent toujours IMDb.</string>
     <string name="ratings_both">Les deux</string>
+    <string name="episode_badges">Badges de nouveaux épisodes</string>
+    <string name="episode_badges_hint">Choisit le nombre sur les affiches de séries. Nouvellement diffusés compte les épisodes sortis après votre dernier visionnage. Saison en cours compte les épisodes restants de la saison que vous regardez.</string>
+    <string name="episode_badges_aired">Nouvellement diffusés</string>
+    <string name="episode_badges_season">Saison en cours</string>
     <string name="mdblist_key">Clé MDBList</string>
     <string name="mdblist_key_hint">Votre clé d’API gratuite sur mdblist.com/preferences. Alder l’utilise uniquement pour les notes Letterboxd.</string>
     <string name="key_not_set">Non définie</string>
@@ -359,8 +353,8 @@
     <string name="unhide_row_hint">Sélectionnez une rangée pour la remettre.</string>
     <string name="custom">Personnalisé</string>
     <string name="source_choice">Choix de la source</string>
-    <string name="source_choice_hint">Meilleure image : Blu-ray complet et Dolby Vision d’abord. Équilibré : fichiers plus légers. Démarrage rapide : versions web. Ordre de l’extension : suit l’extension.</string>
-    <string name="preset_addon_order">Ordre de l’extension</string>
+    <string name="source_choice_hint">Meilleure image : Blu-ray complet et Dolby Vision d’abord. Équilibré : fichiers plus légers. Démarrage rapide : versions web. N’importe quelle version : la copie la plus nette, quelle que soit la version.</string>
+    <string name="preset_addon_order">N’importe quelle version</string>
     <string name="preset_best_picture">Meilleure image</string>
     <string name="preset_balanced">Équilibré</string>
     <string name="preset_fast_start">Démarrage rapide</string>
@@ -563,4 +557,10 @@
     <string name="filmography_loading">Recherche de titres…</string>
     <string name="filmography_empty">Aucun autre titre trouvé dans vos catalogues.</string>
     <string name="details_ends_at">Se termine à %1$s</string>
+    <string name="streams_no_preferred_audio">Aucune source ne correspond aux langues choisies pour la lecture automatique. Choisissez une source pour continuer.</string>
+    <string name="audio_fallback">Langue audio de secours</string>
+    <string name="audio_fallback_hint">Avec Ma langue d’abord, Alder essaie votre langue, cette langue de secours, puis l’anglais. Sélectionnez Désactivé pour utiliser uniquement votre langue.</string>
+    <string name="failure_preferred_audio">aucune piste audio prise en charge dans votre langue préférée</string>
+    <string name="failure_advice_preferred_audio">Choisissez une source avec votre langue audio.</string>
+    <string name="list_added_on">Ajouté le %1$s</string>
 </resources>

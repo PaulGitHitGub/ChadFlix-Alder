@@ -41,18 +41,23 @@ internal fun synopsisAtSentence(text: String, limit: Int): String {
     return whole.trimEnd(' ', ',', ';', ':', '-', '.', '!', '?') + "…"
 }
 
-/** "Because you watched Crayon Shin-chan: Pursuit" → "More like Crayon Shin-chan". */
+/** [s] up to [max] letters, cut at a whole word with "…". */
+private fun cap(s: String, max: Int): String {
+    val clean = s.trim()
+    if (clean.length <= max) return clean
+    val cut = clean.take(max).substringBeforeLast(' ', "").trimEnd(' ', ',', ';', ':', '-', '&')
+    return (if (cut.isNotEmpty()) cut else clean.take(max).trimEnd()) + "…"
+}
+
+/**
+ * "Because you watched Crayon Shin-chan: Pursuit" → "More like Crayon Shin-chan". The title is whole: the row heading
+ * ends it with "…" only when it is wider than the hero.
+ */
 internal fun homeRowName(name: String): String {
-    fun cap(s: String, max: Int): String {
-        val clean = s.trim()
-        if (clean.length <= max) return clean
-        val cut = clean.take(max).substringBeforeLast(' ', "").trimEnd()
-        return (if (cut.isNotEmpty()) cut else clean.take(max).trimEnd()) + "…"
-    }
     val prefix = "Because you watched "
     if (!name.startsWith(prefix, ignoreCase = true)) return cap(name, 36)
     val title = name.substring(prefix.length).substringBefore(":").substringBefore(" (").substringBefore(" - ")
-    return "More like ${cap(title, 26)}"
+    return "More like ${title.trim()}"
 }
 
 internal fun seasons(count: Int) = if (count == 1) "1 season" else "$count seasons"
@@ -87,7 +92,7 @@ internal fun shortRowName(name: String, genres: Collection<String> = emptyList()
         n.contains("pick", true) || n.contains("recommend", true) -> "For you"
         n.contains("popular", true) || n.contains("trending", true) -> "Popular"
         n.length <= 18 -> n
-        else -> genres.map(::genreLabel).distinct().filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { n.take(28).trimEnd() }
+        else -> genres.map(::genreLabel).distinct().filter { n.contains(it, true) }.take(2).joinToString(" & ").ifEmpty { cap(n, 28) }
     }
 }
 
@@ -414,6 +419,7 @@ class MainActivity : Screen() {
         val nextEpisodePending: Boolean = false,
         val finished: Boolean = false,
         var newEpisodeCount: Int = 0,
+        val addedAt: String? = null,
     ) {
         val live get() = isLiveType(type) // a channel or event: plays from its card, no title page
         var filled = false
@@ -831,6 +837,12 @@ class MainActivity : Screen() {
         updateDot?.visibility = if (Updates.hasUpdate(this)) View.VISIBLE else View.GONE
         // Back from Settings: the hero shows the ratings picked there (Letterboxd needs a redraw to ask for its score).
         if (mode == Mode.BROWSE) heroItem?.let(::showHero)
+        // Back from Settings: badges follow the rule picked there.
+        rows.forEach { row -> row.cards.forEach { card ->
+            val item = (card.payload as? Item)?.takeIf { it.resume } ?: return@forEach
+            val count = newEpisodeCount(item.id, metas[item.id])
+            if (count != item.newEpisodeCount) { item.newEpisodeCount = count; card.setNewEpisodes(count) }
+        } }
         if (Updates.due(this)) background({ Updates.latest(applicationContext) }) { r ->
             val release = r.getOrNull()?.takeIf { newerVersion(it.version, Updates.mine(this)) } ?: return@background
             updateDot?.visibility = View.VISIBLE
@@ -1464,15 +1476,9 @@ class MainActivity : Screen() {
         val changed = heroItem !== item
         heroItem = item
         if (page.isGrid) {
-            val year = metas[item.id]?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
-            val title = android.text.SpannableString(item.name + year?.let { "$DOT$it" }.orEmpty()).apply {
-                if (year != null) {
-                    val start = item.name.length
-                    setSpan(android.text.style.ForegroundColorSpan(TEXT_2), start, length, 0)
-                    setSpan(android.text.style.RelativeSizeSpan(0.65f), start, length, 0)
-                }
-            }
-            showHeroTitle(item, title, year?.let { "$DOT$it" })
+            // The year sits in the facts line below the title, with the genre, seasons and ratings.
+            showHeroTitle(item, item.name, null)
+            renderGridMetadata(item, requestLetterboxd = !changed && heroTask == null)
             browseInfo.animate().alpha(1f).setDuration(FOCUS_MS).start()
             main.post(::placeCaption)
             if (changed) {
@@ -1481,6 +1487,7 @@ class MainActivity : Screen() {
                 heroTask = Runnable {
                     heroTask = null
                     if (page.isGrid && heroItem === item && !isDestroyed) {
+                        if (item.settled) renderGridMetadata(item, requestLetterboxd = true)
                         fill(item)
                         if (item.settled) showLibraryArt(item)
                     }
@@ -1515,6 +1522,28 @@ class MainActivity : Screen() {
         if (backdropOf(item) != null) showArt(item)
         else if (item.settled) clearArt()
     }
+
+    /** My Alder's and Discover's facts line: year or run, genre, seasons, ratings (and on My Alder, the date added). */
+    private fun renderGridMetadata(item: Item, requestLetterboxd: Boolean) {
+        val meta = metas[item.id]
+        // Before its details arrive, a Discover title shows what the catalog sent (year, genres, IMDb).
+        val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
+        val genre = meta?.genres?.firstOrNull()
+            ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
+        heroFacts.text = listOfNotNull(year, genre, seasonCount(item, meta)).joinToString(DOT)
+        renderHeroRatings(item, meta?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "), requestLetterboxd)
+        episodeDate(item.addedAt)?.let { date ->
+            val gap = if (heroFacts.text.isNotEmpty() || heroRatings.childCount > 0) DOT else ""
+            heroRatings.addView(text(gap + getString(R.string.list_added_on, date), SMALL, color = TEXT_2).onArt().apply {
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    private fun seasonCount(item: Item, meta: Meta?): String? =
+        meta?.videos?.takeIf { hasEpisodes(item.type, it) }?.map { it.season }
+            ?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }?.let { plural(R.plurals.seasons, it) }
 
     private fun cancelBrowseHero() {
         heroTask?.let(main::removeCallbacks)
@@ -1568,9 +1597,7 @@ class MainActivity : Screen() {
         val meta = metas[item.id]
         val year = meta?.year ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == true }
         val genre = meta?.genres?.firstOrNull() ?: item.facts.firstOrNull { it.firstOrNull()?.isDigit() == false && !it.startsWith("IMDb") }?.substringBefore(",")
-        val length = if (hasEpisodes(item.type, meta?.videos)) meta?.videos?.map { it.season }?.filter { it > 0 }?.distinct()?.size?.takeIf { it > 0 }
-            ?.let { plural(R.plurals.seasons, it) }
-            else meta?.runtime
+        val length = if (hasEpisodes(item.type, meta?.videos)) seasonCount(item, meta) else meta?.runtime
         // A show in progress describes its next episode, so the line names that episode rather than the show.
         val code = episodeLabel(item)
         val factsList = mutableListOf<String>()
@@ -1622,6 +1649,25 @@ class MainActivity : Screen() {
         addRatings(heroRatings, ratings)
         HomeStyle.plainRatings(heroRatings)
         ratingsItem = item
+    }
+
+    private fun renderHeroRatings(item: Item, imdb: String?, requestLetterboxd: Boolean = true) {
+        val wantsLetterboxd = Settings.wantsLetterboxd(this, item.type, item.id)
+        val score = if (wantsLetterboxd) knownLetterboxd(item.id) else null
+        if (requestLetterboxd && wantsLetterboxd && score == null) {
+            val key = Settings.mdblistKey(this)
+            background({ letterboxd(item.id, key) }) { r ->
+                if (r.getOrNull() != null && heroItem === item && mode == Mode.BROWSE) showHero(item)
+            }
+        }
+        val gridPage = page.isGrid
+        val ratings = shownRatings(if (gridPage) "both" else Settings.ratings(this), imdb, score)
+        heroRatings.removeAllViews()
+        addRatings(
+            heroRatings, ratings,
+            tagSp = if (gridPage) 9.5f else SMALL,
+            firstGap = if (gridPage && heroFacts.text.isEmpty()) 0 else 10,
+        )
     }
 
     private fun showCaption(item: Item) {
@@ -1717,10 +1763,11 @@ class MainActivity : Screen() {
         }
         page = p
         val grid = p.isGrid
+        val gridTop = GRID_TOP + 40
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
-            topMargin = if (grid) dp(GRID_TOP) else browseRowTop
-            height = if (grid) resources.displayMetrics.heightPixels - dp(GRID_TOP) else browseRowH
+            topMargin = if (grid) dp(gridTop) else browseRowTop
+            height = if (grid) resources.displayMetrics.heightPixels - dp(gridTop) else browseRowH
         }
         content.setPadding(0, 0, 0, if (grid) 0 else browseEndPad)
         // ChadFlix: the last page's info line goes at once. Fading out (~240 ms) it was already moved to the new page's
@@ -1730,7 +1777,7 @@ class MainActivity : Screen() {
         browseInfo.layoutParams = (browseInfo.layoutParams as FrameLayout.LayoutParams).apply {
             leftMargin = dp((if (grid) PAD else HomeStyle.INSET) - FOCUS_ROOM)
             gravity = if (grid) Gravity.TOP else Gravity.BOTTOM
-            topMargin = if (grid) dp(GRID_HERO_TOP) else 0
+            topMargin = if (grid) dp(GRID_HERO_TOP + 12) else 0
             bottomMargin = if (grid) 0 else heroBottom
             width = if (grid) artW - dp(2 * (PAD - FOCUS_ROOM)) else dp(HERO_W + 2 * FOCUS_ROOM)
         }
@@ -1745,13 +1792,17 @@ class MainActivity : Screen() {
         browseInfo.getChildAt(0).layoutParams = LinearLayout.LayoutParams(if (grid) -1 else -2, -2)
         browseInfo.getChildAt(0).visibility = if (grid) View.VISIBLE else View.GONE // ChadFlix: no title on the home pages
         browseInfo.translationX = 0f
-        for (i in 1 until browseInfo.childCount) browseInfo.getChildAt(i).visibility = if (grid) View.GONE else View.VISIBLE
+        browseInfo.getChildAt(1).marginTop(if (grid) 12 else 8)
+        for (i in 1 until browseInfo.childCount) {
+            browseInfo.getChildAt(i).visibility = if (!grid || i == 1) View.VISIBLE else View.GONE
+        }
         heroAbout.maxWidth = if (p == Page.HOME) dp(HOME_SYNOPSIS_W) else if (p.hasGenreShortcuts) dp(HERO_W) else Int.MAX_VALUE
         wideRow = false
         librarySlot = null
         listShade.visibility = if (grid) View.VISIBLE else View.GONE
-        listShade.background = GradientDrawable(GradientDrawable.Orientation.TL_BR,
-            intArrayOf(0xF20E0C0A.toInt(), 0xE6191512.toInt(), 0xF20E0C0A.toInt()))
+        // The focused title's art shows behind its name and details, then darkens fully before the posters start.
+        listShade.background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(0x800E0C0A.toInt(), 0xD90E0C0A.toInt(), 0xF20E0C0A.toInt(), 0xF50E0C0A.toInt()))
         val g = ++generation
         loadMoreSections = null
         restoreCatalogFocus = null
@@ -1873,7 +1924,7 @@ class MainActivity : Screen() {
                 val known = if (grid) emptyMap() else metas.toMap()
                 val knownFetchedAt = if (grid) emptyMap() else metaFetchedAt.toMap()
                 background({
-                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid) }
+                    (Stremio.savedLibrary(key) ?: remembered)?.let { prepareLibrary(it, known, knownFetchedAt, key, grid, offline = true) }
                 }, cacheReads) { r -> if (g == generation && !fresh) r.getOrNull()?.let { show(it) } }
             }
             var libraryRequest = 0
@@ -2422,6 +2473,7 @@ class MainActivity : Screen() {
             val now = System.currentTimeMillis()
             r.getOrNull()?.forEach { (id, resolved) ->
                 cacheMeta(id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[id], now))
+                heroItem?.takeIf { page == Page.LIBRARY && mode == Mode.BROWSE && it.id == id }?.let(::showHero)
                 val count = newEpisodeCount(id, resolved.meta)
                 rows.forEach { row ->
                     row.cards.forEach { card ->
@@ -2719,6 +2771,8 @@ class MainActivity : Screen() {
 
     private fun showLibrary(slot: FrameLayout, focusTag: Any? = null, removedIndex: Int? = null) {
         fillListDetails()
+        val dates = Library.listDates(this, profile.id)
+        fun sortDate(title: JSONObject): String = dates.getString(title.optString("_id"), null) ?: title.optString("_ctime")
         val all = listTitles()
             .filter { listFilter == ListFilter.ALL || (it.optString("type") == "movie") == (listFilter == ListFilter.MOVIES) }
             .filter { t -> listGenre == null || metas[t.optString("_id")]?.genres?.contains(listGenre) == true }
@@ -2727,11 +2781,11 @@ class MainActivity : Screen() {
                 (listYear == null || inYear(y, listYear!!)) && (listDecade == null || inDecade(y, listDecade!!))
             }
         val ordered = when (listSort) {
-            ListSort.RECENT -> all.sortedByDescending { it.optString("_ctime") }
+            ListSort.RECENT -> all.sortedByDescending(::sortDate)
             ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
-            ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending { it.optString("_ctime") })
+            ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending(::sortDate))
         }
-        val items = ordered.map(::libraryItem)
+        val items = ordered.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
         val build = ++listBuild
         if (items.isEmpty()) {
             cancelBrowseHero()
@@ -2810,7 +2864,8 @@ class MainActivity : Screen() {
                 val videos = if (remove) emptyList() else (known ?: runCatching {
                         Stremio.addons(key).let { it.savedMeta(item.type, item.id) ?: it.meta(item.type, item.id) }
                     }.getOrElse { if (item.type == "movie") null else throw it })?.videos.orEmpty()
-                Stremio.editLibrary(key, item.id, JSONObject(original.toString())) { updated ->
+                val dates = if (remove) Library.listDates(this, profile.id) else null
+                Stremio.editLibrary(key, item.id, JSONObject(original.toString()), dates) { updated ->
                     if (remove) Library.setInList(updated, false) else Library.markTitleWatched(updated, videos)
                 }
             }) { result ->
@@ -3370,6 +3425,8 @@ class MainActivity : Screen() {
         if (!item.resume || !isMetaExpired(item.type, metaFetchedAt[item.id], META_REFRESH_MS)) {
             metas[item.id]?.let { applyMeta(item, it); return }
         }
+        // A library series past its 6 h: last time's details show now, so its art doesn't wait on the network.
+        val stale = metas[item.id]?.also { applyMeta(item, it) }
         val key = profile.authKey
         metaPool.execute {
             // Last time's details from disk when fresh; the network for unseen titles or library series past TTL.
@@ -3383,9 +3440,15 @@ class MainActivity : Screen() {
             )
             main.post {
                 if (isDestroyed) return@post
-                if (resolved == null) return@post metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
+                if (resolved == null) return@post if (stale != null) Unit else metas[item.id]?.let { applyMeta(item, it) } ?: settle(item)
                 cacheMeta(item.id, resolved.meta, preservedMetaTimestamp(resolved.fresh, metaFetchedAt[item.id]))
-                applyMeta(item, resolved.meta)
+                if (stale == null) return@post applyMeta(item, resolved.meta)
+                // Already showing: only what a newer copy changes (new episodes), without settling the card again.
+                val count = newEpisodeCount(item.id, resolved.meta)
+                item.facts = facts(resolved.meta)
+                if (item.art == null) item.art = resolved.meta.background
+                if (count != item.newEpisodeCount) { item.newEpisodeCount = count; item.onFill.forEach { it() } }
+                redrawIfShowing(item)
             }
         }
     }
@@ -3406,6 +3469,11 @@ class MainActivity : Screen() {
     private fun settle(item: Item) {
         item.settled = true
         item.onFill.forEach { it() }
+        redrawIfShowing(item)
+    }
+
+    /** The hero or cinema showing [item] picks up its newest details. */
+    private fun redrawIfShowing(item: Item) {
         if (heroItem === item && mode == Mode.BROWSE) showHero(item)
         if (mode == Mode.CINEMA && cinema.getOrNull(cinemaAt) === item) showCinema(cinemaAt)
     }
@@ -3434,10 +3502,12 @@ class MainActivity : Screen() {
         knownFetchedAt: Map<String, Long>,
         key: String,
         grid: Boolean,
+        offline: Boolean = false,
     ): HomeLibrary {
         if (grid) return HomeLibrary(list)
         val addons by lazy { Stremio.savedAddons(key).orEmpty() }
         val remote by lazy { runCatching { Stremio.addons(key) } }
+        val fetch: ((String, String) -> Meta?)? = if (offline) null else { type, id -> remote.getOrThrow().meta(type, id) }
         val found = mutableMapOf<String, MetaResolution>()
         val continuing = Library.continueWatching(list) { item, videoId ->
             val id = item.optString("_id")
@@ -3447,7 +3517,7 @@ class MainActivity : Screen() {
             val meta = freshKnown ?: found[id]?.meta ?: resolveMetaWithOfflineFallback(
                 ttl = ttl,
                 readSaved = { age -> addons.savedMeta(type, id, age) },
-                fetchRemote = { remote.getOrThrow().meta(type, id) },
+                fetchRemote = fetch?.let { f -> { f(type, id) } },
             )?.also { found[id] = it }?.meta ?: known[id]
             val video = meta?.videos?.firstOrNull { it.id == videoId }
             video != null && !isEpisodeAired(video.released)
@@ -3455,7 +3525,7 @@ class MainActivity : Screen() {
         return HomeLibrary(list, continuing, found)
     }
 
-    private fun libraryItem(item: JSONObject): Item {
+    private fun libraryItem(item: JSONObject, addedAt: String? = null): Item {
         val s = item.optJSONObject("state") ?: JSONObject()
         val videoId = Library.savedVideoId(item)
         val id = item.getString("_id")
@@ -3472,12 +3542,13 @@ class MainActivity : Screen() {
             timeLeft = timeLeft(duration, offset), resumeAt = offset, nextEpisodePending = pending,
             finished = libraryFinished(item),
             newEpisodeCount = newEpisodeCount(id, metas[id], item),
+            addedAt = addedAt,
         )
     }
 
     private fun newEpisodeCount(id: String, meta: Meta?, entry: JSONObject? = library.firstOrNull { it.optString("_id") == id }): Int {
         if (meta == null || entry == null) return 0
-        return Library.newEpisodeCount(entry, meta.videos, ::isEpisodeAired)
+        return Library.newEpisodeCount(entry, meta.videos, Settings.episodeBadges(this), ::isEpisodeAired)
     }
 
     /** Resume: straight to the sources for the episode Continue Watching points at; with [pick] (held OK) they're all listed. */
@@ -3774,12 +3845,16 @@ internal fun preservedMetaTimestamp(
     nowMs: Long = System.currentTimeMillis(),
 ): Long = if (fresh) nowMs else previousFetchedAtMs ?: 0L
 
-/** Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. */
+/**
+ * Reads fresh saved meta within [ttl], refreshes online if needed, and falls back to expired cache offline. A null
+ * [fetchRemote] never touches the network: a screen's first draw from disk must not wait on it (a series last
+ * fetched over 6 h ago held Continue on the network at every morning start); the refresh that follows fetches.
+ */
 internal fun resolveMetaWithOfflineFallback(
     ttl: Long?,
     readSaved: (Long?) -> Meta?,
-    fetchRemote: () -> Meta?,
+    fetchRemote: (() -> Meta?)?,
 ): MetaResolution? =
     readSaved(ttl)?.let { MetaResolution(it, fresh = true) }
-        ?: runCatching { fetchRemote() }.getOrNull()?.let { MetaResolution(it, fresh = true) }
+        ?: fetchRemote?.let { runCatching { it() }.getOrNull() }?.let { MetaResolution(it, fresh = true) }
         ?: if (ttl != null) readSaved(null)?.let { MetaResolution(it, fresh = false) } else null

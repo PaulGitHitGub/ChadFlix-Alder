@@ -85,6 +85,8 @@ object Settings {
     fun featuredHome(c: Context) = prefs(c).getBoolean(profileKey(c, "featuredHome"), false)
     /** "imdb", "letterboxd" or "both"; Letterboxd needs [mdblistKey] and covers films only. */
     fun ratings(c: Context) = prefs(c).getString("ratings", "imdb").orEmpty().ifEmpty { "imdb" }
+    /** Series badge rule for [Library.newEpisodeCount]: "aired", "season" or "off". */
+    fun episodeBadges(c: Context) = prefs(c).getString("episodeBadges", "aired").orEmpty().ifEmpty { "aired" }
     fun mdblistKey(c: Context) = prefs(c).getString("mdblistKey", "").orEmpty()
     fun setMdblistKey(c: Context, key: String) = prefs(c).edit().putString("mdblistKey", key.trim()).apply()
     /** Letterboxd is asked for only when it can show: a film, a key, and a pick that includes it. */
@@ -95,7 +97,7 @@ object Settings {
 
     internal fun forgetPrefs(prefs: SharedPreferences, profileId: String) = prefs.edit().apply {
         listOf(
-            "release", "dub", "audioLang", "subLang", "subPref", "hidden", "blurThumbnails",
+            "release", "dub", "audioLang", "audioFallback", "subLang", "subPref", "hidden", "blurThumbnails",
             "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary",
             "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
         ).forEach { remove("$it@$profileId") }
@@ -160,6 +162,8 @@ object Settings {
     /** Two-letter code of the dub to start with: the TV's language unless one is picked. */
     fun audioLanguage(c: Context): String = prefs(c).getString(profileKey(c, "audioLang"), prefs(c).getString("audioLang", ""))
         .orEmpty().ifEmpty { Languages.code(Locale.getDefault().toLanguageTag()) ?: "en" }
+    fun preferredAudio(c: Context, metaId: String?): String = metaId?.let { titleChoice(c, it)?.audio } ?: audioLanguage(c)
+    fun fallbackAudio(c: Context): String = prefs(c).getString(profileKey(c, "audioFallback"), "en").orEmpty()
     /** Two-letter code of the subtitles to start with: the TV's language unless one is picked. */
     fun subtitleLanguage(c: Context): String = prefs(c).getString(profileKey(c, "subLang"), "")
         .orEmpty().ifEmpty { Languages.code(Locale.getDefault().toLanguageTag()) ?: "en" }
@@ -575,6 +579,7 @@ class SettingsActivity : Screen() {
                 choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
                 choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
                 languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
+                languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
             }
             Group.SUBTITLES -> {
@@ -634,6 +639,8 @@ class SettingsActivity : Screen() {
                     listOf(false to off, true to on), perProfile = true))
                 choiceRow(Choice("ratings", getString(R.string.ratings_source), getString(R.string.ratings_source_hint),
                     listOf("imdb" to "IMDb", "letterboxd" to LETTERBOXD, "both" to getString(R.string.ratings_both))))
+                choiceRow(Choice("episodeBadges", getString(R.string.episode_badges), getString(R.string.episode_badges_hint),
+                    listOf("aired" to getString(R.string.episode_badges_aired), "season" to getString(R.string.episode_badges_season), "off" to off)))
                 lateinit var keyValue: TextView
                 fun keyState() = getString(if (Settings.mdblistKey(this).isEmpty()) R.string.key_not_set else R.string.key_set)
                 keyValue = actionRow(getString(R.string.mdblist_key), keyState(), getString(R.string.mdblist_key_hint)) {
@@ -1116,11 +1123,12 @@ class SettingsActivity : Screen() {
     }
 
     /** A language for this profile, picked from a list (too many to step through with Left and Right). */
-    private fun languageRow(key: String, label: String, help: String) {
+    private fun languageRow(key: String, label: String, help: String, emptyLabel: Int = R.string.tv_language) {
         val codes = listOf("") + Languages.all
         // Audio language was once shared by every profile: that pick stands until this profile makes its own.
-        fun current() = prefs.getString(Settings.profileKey(this, key), if (key == "audioLang") prefs.getString(key, "") else "").orEmpty()
-        fun name(code: String) = if (code.isEmpty()) getString(R.string.tv_language) else Languages.name(code)
+        fun current() = if (key == "audioFallback") Settings.fallbackAudio(this)
+            else prefs.getString(Settings.profileKey(this, key), if (key == "audioLang") prefs.getString(key, "") else "").orEmpty()
+        fun name(code: String) = if (code.isEmpty()) getString(emptyLabel) else Languages.name(code)
         val value = text("", BODY, color = TEXT_2)
         fun draw() { value.text = name(current()) + "  ›" }
         settingRow(label, value, help, perProfile = true, focus = { value.setTextColor(if (it) TUNGSTEN else TEXT_2) }) {

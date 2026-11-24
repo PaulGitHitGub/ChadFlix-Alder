@@ -53,6 +53,17 @@ class HomeMetaRefreshTest {
     }
 
     @Test
+    fun diskOnlyPassNeverWaitsOnNetworkAndKeepsStaleCopy() {
+        val got = resolveMetaWithOfflineFallback(
+            ttl = ttlMs,
+            readSaved = { age -> if (age == null) stale else null },
+            fetchRemote = null,
+        )
+        assertEquals("Stale", got?.meta?.name)
+        assertFalse(got!!.fresh) // stays expired, so the network pass after it refreshes
+    }
+
+    @Test
     fun expiredCacheFallsBackToDiskWhenRemoteReturnsNull() {
         val got = resolveMetaWithOfflineFallback(
             ttl = ttlMs,

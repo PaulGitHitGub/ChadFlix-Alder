@@ -1,21 +1,42 @@
 # Changelog
 
-Write every entry in ASD-STE100 Simplified Technical English (STE):
+Write each entry the way you would advertise it to a viewer on the sofa:
 
-- Use only the approved words of the STE dictionary, with their approved meanings. You can also use technical names: Alder, Stremio, add-on, subtitle, and the names that Alder shows on the screen.
-- Write one idea in each sentence. Write 20 words or fewer in an instruction and 25 words or fewer in a description.
-- Use the active voice. Use the simple present tense, or the simple past tense for "Before, …".
-- Do not use words that end in "-ing", except in technical names.
-- Do not use contractions. Write "does not", not "doesn't". Text that Alder shows on the screen stays as it is.
-- Write instructions as commands: "Select **Subtitles**", not "**Subtitles** can be selected".
-- Use one word for one thing. Use the names that Alder shows on the screen.
-- Put each entry under one heading: `### New`, `### Easier to use` or `### Fixes`, in that order. In each group, put the most important entries first.
-- Start an important entry with a short **bold** name. **See all changes** shows all entries under their headings.
-- Put `<!-- Spotlight -->` before a change to show it in the short What's new list. Put the most important spotlight changes first in each group.
+- Lead with what the viewer gets, in their words. Say "Torrentio without Real-Debrid", not "P2P sources".
+- Start each entry with a short **bold** headline, then one or two short sentences. Keep spotlight descriptions under 25 words before any settings path.
+- Use the names that Alder shows on the screen, in **bold**. Say where to find a setting.
+- Put each entry under one heading: `### New`, `### Easier to use` or `### Fixes`, in that order, most important first.
+- Group small fixes by where the viewer sees them: "Small fixes for Google TV: …".
+- Mark at most five entries to show them first in **What's new**. Use `<!-- Spotlight -->` for a text highlight or
+  `<!-- Spotlight: whats-new/name.webp -->` for a full 1920×1080 TV screenshot saved as WebP in
+  `app/src/main/assets/whats-new/`. Add `<!-- Detail: whats-new/name.webp -->` for a smaller illustration or crop.
+  Use `<!-- Player: VLC whats-new/icon.webp -->` to show an example app for external playback.
+  Put a bold settings path at the end of the entry to show it on its own line. Remove old pictures after a release.
 
-Put changes that are not released under `## Unreleased`. Before each release, read all of `## Unreleased` again and rewrite each entry that does not obey these rules. Then rename that heading to the version number.
+Put changes that are not released under `## Unreleased`. Before each release, read all of `## Unreleased` again and rewrite
+each entry that does not follow these rules. Then rename that heading to the version number.
 
 <!-- ChadFlix: give each release its own section here, named as versionName. Do not rename Unreleased: it is Alder's. -->
+## 1.4-chadflix.1
+
+### New
+<!-- Spotlight -->
+- **Alder 1.4 inside.** ChadFlix now has the changes from Alder 1.4. The ChadFlix look, rows and player menus stay the same.
+<!-- Spotlight -->
+- **Titles in your language.** Titles, stories, posters and episode names follow the app language, not only English. Select **Settings → Language → App language**.
+<!-- Spotlight -->
+- **Fallback audio language.** With **My language first**, ChadFlix plays your language, then a second language, then English. To choose the second language or turn it off, select **Settings → Picture & Sound → Fallback audio language**.
+- **New episode badges.** Choose how the **+1** on a series poster counts, or turn it off. Select **Settings → Profile → New episode badges**.
+
+### Easier to use
+- **The sharpest picture first.** When you press **Play**, ChadFlix picks the sharpest copy your TV can show. Your language and quality choices still come first. **Add-on's order** is now called **Any release**.
+- **Faster start.** **Continue Watching** shows at once when ChadFlix opens, and background pictures load faster.
+- **More in My Lists and Discover.** Above the posters, see the year, genre, seasons and ratings of the title you select. Its art shows behind its name.
+- **A new What's New.** What's New fills the screen and shows the highlights first.
+
+### Fixes
+- **Full row names.** **More like** rows show the whole movie name.
+
 ## 1.3.1-chadflix.2
 
 ### New
@@ -41,145 +62,76 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 
 ## Unreleased
 
+## 1.4
+
 ### New
-- **Playback speed.** Select the speed button next to Pause, then select a speed from 0.75× to 2×. Alder keeps the speed for each movie and show, so the next episode plays at the same speed. With Dolby or DTS passthrough, the sound stops for a short time when you change to or from 1×.
-- **New episode badges.** Series posters in **My List** and **Continue Watching** show **+1** or **+2** for new aired episodes after your last watched episode.
+
+- **Movies in your language.** Titles, stories, posters and episode names follow Alder's language, not only English. Select **Settings → Language → App language**.
+<!-- Spotlight: whats-new/p2p.webp -->
+- **Torrentio without Real-Debrid.** Choose a **P2P** source from Torrentio and play it right in Alder, without a debrid account.
+<!-- Spotlight: whats-new/discover.webp -->
+- **Meet the new Discover tab.** Browse movies, shows and anime in **Discover**. Filter by genre, decade or streaming service in your country.
+<!-- Spotlight: whats-new/anime.webp -->
+- **Anime has its own tab.** Open **Anime** when your add-ons offer an anime catalog. Pick a series to browse its seasons and episodes.
+<!-- Spotlight: whats-new/speed.webp -->
+- **Watch at your speed.** Choose 0.75× to 2× in **Playback speed**. Alder remembers your choice for the next episode.
 <!-- Spotlight -->
-- **Discover.** Select **Discover** in the top bar to find any movie or show, not only the titles in your add-on catalogs. Select **Movies**, **Shows** or **Anime**. Then select a genre, a decade, a streaming service in your country, or an order: **Popular**, **Top rated** or **Newest**. More titles come when you go down. Each title opens, plays and goes to **My List** as other titles do. Alder keeps your choice for each profile. Discover uses TMDB. To move or hide the tab, select **Settings → Profile → Tabs**.
-- **Arabic interface.** Select **Settings → Language → App language → العربية**. Alder shows menus, buttons and settings in Arabic.
-<!-- Spotlight -->
-- **P2P sources.** Alder can play torrents from your add-ons without a debrid account. Sources with the **P2P** label are at the end of the source list. When no other source plays, Alder tries a P2P source. Seek, pause and Back work as with other sources. P2P sources are available on Android 7 and later.
-<!-- Spotlight -->
-- **Bigger text and posters.** Select **Settings → Picture & Sound → Text and poster size → Large**. Text, posters, buttons and panels get bigger on every screen. Rows show fewer posters, and Home shows the story only on the title page.
-- **Play in another app.** Select **Settings → Streams → Video player**, then select a video app on your TV, for example VLC or Just Player. Alder opens that app when you select **Play**. Alder still selects the source, the resume point and the subtitle. When you press Back in the other app, Alder saves where you stopped. If you remove that app, Android asks which app to use.
-<!-- Spotlight -->
-- **Anime and other catalogs.** Catalogs of anime, video channels and other types now show. Each type has its own page in the top bar, for example **Anime**. Before, Alder showed only movie, series and live catalogs. Anime with episodes has its episode list, **Next episode** and **Continue**, as a show does. **My List** shows these titles too.
-<!-- Spotlight -->
-- **Picture size.** You can make the picture fill the screen. In the player, select **Audio & subtitles → Sync & Style → Picture**. **Fit** shows all of the picture. **Zoom** fills the screen and cuts the edges. **Stretch** fills the screen and changes the shape. Alder keeps your choice for all videos.
-<!-- Spotlight -->
-- **Letterboxd ratings.** Alder can show the Letterboxd rating of a film next to the IMDb rating, or in its place. Select **Settings → Profile → Ratings**. Letterboxd ratings need a free MDBList key. Select **MDBList key** and scan the code with your phone, then paste the key on the phone. Shows always use IMDb.
-- **Alder website.** The House Lights website shows the TV app, setup steps, and a link to the latest APK.
-- Add an Alder website card image with the app screen and product text.
-<!-- Spotlight -->
-- **Send report.** When Alder stops, it saves the error on your TV. The next time Home opens, Alder asks to send a report. Select **Send report** or **No**. The report has the error, the Alder version and the TV model. It does not have your account details. To send it later, select **Settings → About → Send report**.
+<!-- Player: VLC whats-new/external-icon.webp -->
+- **Use an external player.** Choose a video app installed on this TV. Alder passes it the stream, playback position and selected subtitle. **Settings → Streams → Video player**.
+<!-- Detail: whats-new/sources.webp -->
+- **Find more sources.** Alder checks more add-ons for each title. Slower debrid add-ons have up to 45 seconds to answer.
+- **Fill more of your TV screen.** Choose **Zoom** or **Stretch** to make black bars smaller. **Audio & subtitles → Sync & Style → Picture**.
+- **Read comfortably from the sofa.** Make text, posters and buttons larger across Alder. **Settings → Picture & Sound → Text and poster size → Large**.
+- **Hear lossless surround sound.** Alder can send Dolby TrueHD and DTS-HD to compatible audio equipment. When direct output fails, Alder decodes the same track on the TV.
+- **See Letterboxd scores in Alder.** Show a film’s Letterboxd rating beside IMDb or on its own. Add a free **MDBList key** to use Letterboxd. **Settings → Profile → Ratings**.
+<!-- Detail: whats-new/episodes.webp -->
+- **New episodes at a glance.** A **+1** on a series poster means one episode came out since you last watched. Count aired episodes left in the season or turn badges off. **Settings → Profile → New episode badges**.
+- **Use Alder in Arabic.** Read menus, buttons and settings in Arabic. **Settings → Language → App language → العربية**.
+- **Send a crash report from your TV.** If Alder crashes, you can send a report the next time you open it. The report leaves out your account details.
 
 ### Easier to use
-- **Title page.** Cast chips fit each name and scroll across. Trailer is a small circle button. More Like This uses TMDB when add-ons send none.
-- **My Alder.** **My List** now has the name **My Alder**. It uses the same six-column poster grid, focus marker, dark shade and title logo with year as **Discover**.
-- **My Alder filters.** Filter chips keep focus inside the bar. Empty results with active filters show a **Clear filters** button. The year list now includes recent years and decades on **My Alder** and **Discover**.
-- **Discover.** The title and year show above the posters. Long titles use two lines. Larger posters fill six columns at the center of the screen.
-- **Discover posters.** A short light line marks the poster with focus. That poster is larger and brighter than the other posters.
-- **Discover filters.** Select **All genres**, **All decades** or **All services** to open a list. A light surface shows the filter with focus.
-- **Discover controls.** The row with focus moves to the top as you move down. Posters stay below the title and filters. Press Back to return to the last filter. Press Down to return to the last poster.
-- **Consistent poster cards.** Poster rows and grids share one card design across **Home**, **Movies**, **Shows**, **My List**, **Discover**, **Search**, and title pages. The selected card gets bigger, and the other cards get darker. Cards in progress show a thin progress bar without a dark shade. The title shows while the picture loads and stays when a backdrop replaces a poster. In **Search**, the caption moves with the selected card. Cast photos and names stay aligned. Cast preview labels stay on one line. Screen readers announce progress, watched status and live channels.
-- **Cleaner Home screen.** Home shows each fact once and removes extra button glow and zoom motion. Rows, badges and error cards use even spacing and clear text.
-- **Cleaner player screen.** The player no longer shows extra labels above the title, extra headings in the **Audio & subtitles** menu, or the remote help text in the bottom-right corner. Video and audio badges are darker and easier to read over subtitles. Error messages in the player now use full sentences.
-- **Search finds the main title first.** When you search for "matrix", **The Matrix** now comes before a short film with the name "Matrix". When two titles have the same name, the title with the higher IMDb rating comes first.
-- **Search shows all of your tabs.** The top bar in Search now shows **Live** and the tabs for other catalog types, as Home does.
-- **Discover.** The streaming service filter now has the name **Service**. Before, its name was **On**.
-- **Settings.** **Profile**, **Language** and **Storage** now have icons, as the other groups do.
-- **Errors say what to do.** Error messages now tell you what to do next, for example "Check your internet connection, then try again" or "Update or remove the add-on in Stremio". When Alder knows which add-on or service failed, the message shows its name.
-- **Genre and year in My List.** Select **Genre** or **Year** in **My List** to show only those titles. The first time, Alder gets the details of each title, so the lists can take some seconds to fill.
-- **Lists that open.** On **Discover** and **My List**, the **Genre**, **Year**, **On** and **Sort** buttons show an arrow. A long list stays clear of the screen edges, and the next item always shows when you move down. The item in use shows in the accent colour with a tick. The page name and the title count do not show next to the buttons now. The posters start at the same distance below the buttons on both pages.
-- **Choose your tabs.** Select **Settings → Profile → Tabs**. Select a tab to show it, hide it or move it left or right. This includes the tabs of add-ons, for example **Trakt**. A hidden tab keeps its add-on installed. **Home** is always the first tab. Each profile has its own tabs. **Tabs** replaces the **Movies tab**, **Shows tab** and **Live tab** settings and keeps your choices.
-- **Faster Home.** Alder shows saved rows while it gets new data. When add-ons change, focus returns to the same title if it is still available.
-- **My List.** Two full rows of posters show at once. Move down to see more titles. The title shows while Alder gets the poster.
-- The filters, sort menu and title count show above the posters.
-- **My List art.** A dark picture of the selected title shows behind the posters.
-- Empty poster slots have a dark background while Alder gets the images.
-- Alder asks for confirmation before it removes a title from **My List**.
-- **Movies posters.** A short line marks the selected poster. Alder shows the title while it gets the poster.
-- **Shows.** Select a genre in **Jump to** to go to its shelf. Select **Top** to go to the first shelf.
-- **Shows posters.** The posters are brighter. A short line marks the selected poster. Alder shows the title while it gets the poster.
-- **Continue Watching.** The shelf shows the time left and a progress bar below the selected poster.
-- **Home.** A short line marks the selected poster. Shelf names are larger. Posters fade at the right edge until you reach the last title.
-- The top bar and story text are easier to read over bright art.
-- **Source list as your add-on writes it.** Select **Settings → Streams → Source list → As the add-on writes it**. The source list gets wider and shows the text of each add-on, as Stremio does. If you set a format in AIOStreams, you see that format. **Clean** keeps the short rows of Alder.
-- **More facts in the source list.** The source list shows the size of more sources, the audio as format and channels (for example **DD+ 5.1**), and the number of seeders for P2P sources (**👤 52**). **⏳** after a debrid service shows that the service must download the source before it plays. Below the list, Alder shows the full text that the add-on wrote for the selected source.
-- **Change stream keeps your video.** When you select **Change stream**, the video stops and stays behind the source list. Press Back to continue from the same picture without a new load. Select a different source to play it from the same second.
-<!-- Spotlight -->
-- **Smooth motion.** Screens fade and settle when they open and close. When you select **Play**, the screen dims to black and the video fades up. A title page opens with its picture moving slowly into place. Focus settles with a small bounce. Panels open fast and close faster. To turn off motion, set the TV to **Remove animations** in its accessibility settings.
-- **Gray subtitles.** You can show subtitles in gray. Gray is less bright than white on OLED and Mini LED TVs in a dark room. Select **Settings → Subtitles → Subtitle color → Gray**, or select **Gray** in the player.
-- **Subtitle match.** Alder sends the file name and size of the video to subtitle add-ons. The add-on shows subtitles for that release first, so the timing is correct more frequently.
-- **Alder website.** The site shows the app screens and makes the download and setup steps easy to find.
-- The README has a **Website** badge and a **Downloads** badge with the total number of GitHub release downloads.
+
+- **Home opens in half a second.** **Continue** shows right away, even after a night off, and background pictures come in faster.
+- **The sharpest picture, first.** Press Play and Alder picks the sharpest copy your TV can show, not the first one an add-on lists. Your language and quality choices still come first. The **Add-on's order** choice is now called **Any release**.
+- **See the updated My Alder.** The README shows how title details appear above the posters.
+- **More space in My Alder.** The title and its details have more room below the filters.
+- **Brighter art in My Alder and Discover.** The title you select lights up behind its name, and the posters stay easy to see.
+- **See more in Discover.** Above the posters, see a title's year or run, genre, seasons and ratings, like in **My Alder**.
+- **See more in My Alder.** See a title's year, genre, seasons and ratings. If you add it on this device, see the date too.
+- **See Alder in action.** New pictures in the README show Home, Search, My Alder, and the player on a TV.
+- **A cleaner look from Home to playback.** Browse with consistent poster cards and smoother transitions. See more of the picture behind the player controls.
+- **Find your saved titles in My Alder.** **My Alder** puts your list in a poster grid you can filter by **Genre** or **Year**. Alder asks before removing a title.
+- **Put your favorite tabs first.** Show, hide or reorder tabs, including tabs from your add-ons. **Settings → Profile → Tabs**.
+- **Change streams and keep your place.** **Change stream** leaves the picture visible while you choose. The new stream picks up at the same point.
+- **Compare streams before you press Play.** Check file size, audio format, seeders and debrid status. You can also show the original listing. **Settings → Streams → Source list → As the add-on writes it**.
+- **Get to the right title faster.** **Search** puts closer matches first. Type “Matrix” and **The Matrix** appears ahead of the short film called “Matrix”.
+- **Find subtitles that match your video.** Alder puts matching subtitles first. Choose **Gray** when you want softer text in a dark room.
+- **Keep your place in Movies and Shows.** When you return to a row, the poster you left is still in focus.
+- **Find what’s new in Alder.** The release notes show sharper TV pictures, full titles and settings paths.
+- **Know what to try when a stream fails.** Alder names the add-on or service that failed and suggests a next step.
 
 ### Fixes
-- **Phone text entry.** A slow or idle connection no longer blocks text from your phone. Alder closes the phone page server when you leave the screen.
-- **Crash reports.** Crash reports remove user names and keys before the host name in web addresses. When GitHub search fails, the crash service returns an error instead of a duplicate issue.
-- **Memory use.** Alder drops closed dialogs and error cards from glass effects. TVs on Android 6 and 7 use smaller picture caches. Alder keeps pictures in normal memory when graphics memory fails.
-- **Title page focus and resume.** Alder now uses your saved watch progress when you select **Play** before local progress loads. Before, background updates moved focus on a title page or left old buttons when an open panel closed. When you came back from a related title, buttons also showed behind the panel.
-- **Continue Watching.** Posters now show **+1** or **+2** badges for new aired episodes. Focus moves to the next row or top bar when you remove the last title. Playback keeps your saved library position when no local time exists.
-- **Home and My Alder details.** A cold visit to **My Alder** now loads title details for filters and badges. Home updates series details after six hours online and keeps saved details offline.
-- **Discover and layout.** Rapid filter changes on **Discover** no longer stack error cards or show old results. Press Down from the top bar to reach **Try again**. Long descriptions shrink to one line on large text sizes so they clear the filter bar.
-- **New library titles.** Alder keeps a new title in your library immediately after you save it. Before, a new title did not show for up to 30 seconds.
-- **Watch Next updates.** Alder prepares all art before it changes **Watch Next**, and updates the rows one change at a time. When you change or lock a profile, Alder clears old rows immediately and stops old updates. Before, updates at the same time or after a profile change could show old or locked rows.
-- **Removed profiles.** When you remove a profile, Alder clears its subtitle choice, **Home** art, and **Discover** choices. Before, a new profile could keep old choices from the removed profile.
-- **Title launch requests.** Alder ignores a request from another app to open a title when the title ID is empty or invalid. Before, a bad request could stop Alder.
-- **Source list and audio filter.** Alder now matches Brazilian Portuguese (`pt-BR`) audio and ignores separated subtitle flags after `💬`. Your own stream add-ons now come before shared add-ons. When you pick another source after playback, Alder resumes from your saved position. Source selection stops when you leave the screen.
-- **Player progress on exit.** Alder now saves watch progress as soon as the player closes. When another video app plays a film, Alder sends that progress once.
-- **Playback speed on Live TV.** Alder hides the speed button on **Live** streams. On streams that cannot skip ahead, speed changes no longer restart playback at 0:00.
-- **Track highlight in Audio & subtitles.** When you select a subtitle or audio track and move focus away, the active highlight stays on that track.
-- **Player start after you leave.** Before, if you left Alder while a source loaded, the player opened the source list in the background or timed out too early. Now Alder waits until you return.
-- **Playback state after you leave.** When you return to the player, Alder keeps the playback state from before you left. A paused video stays paused.
-- **Arabic filter bar.** You can move right across **Discover** and **My Alder** filter buttons when Alder shows Arabic.
-- **Watch Next channel logo.** Alder keeps its channel logo on the Android TV home screen.
-- **Profile PIN lock.** Alder asks for the PIN before the profile picker can open a profile that has a PIN.
-- **Offline playback progress.** Alder keeps offline progress until your library loads. Then Alder adds the episodes that you finish to your library. Before, offline progress could replace your library or lose episodes that you finished.
-- **P2P stream cleanup.** Alder stops the P2P stream immediately when you leave the player before the video starts.
-- **Audio language filter.** Source language filters now ignore subtitle languages and `MULTI` releases that name another language. Dutch tags (`NL`, `NLD`, `Nederlands`, `Vlaams`) now count as Dutch audio, and sources show their audio language tag.
-- **Search screen.** Result rows stay in view when you move down, and posters fade at the edge. Back returns to the keyboard first, and old art clears when there are no results.
-- **Shows and Movies.** Add-on errors no longer cut off the first poster row. Genre chips and the **Resume** button now respond to the remote.
-- **Shows and Movies layout.** Story text, the **IMDb** tag, the next-row hint, poster focus and empty poster slots now look cleaner without duplicate facts.
-- **Search posters.** Posters in **Search** no longer go blank when a new add-on answer comes in. The posters on the screen load first. When a poster does not load, Alder tries again, then shows the title name on the card.
-- **Add-ons stay safe.** Before, if you added an add-on while **My add-ons** loaded, Stremio kept only that add-on. Now **Add by URL** shows after the list loads, and Alder saves one change at a time.
-- **An add-on with errors does not empty Home.** Before, one add-on with a broken manifest stopped all rows. Now Alder shows the rows of the other add-ons and keeps the broken add-on in your list.
-- **Title page.** Before, Alder stopped when you pressed a key on a title page that did not load. Before, the page went blank if new details came while the episode list was open.
-- **Fewer source changes.** Before, after two network problems in one video, the third problem made Alder change the source. Now each problem gets two new tries.
-- **Change stream.** Before, a source that you selected in **Change stream** could fail after a live source. Now Alder also selects the audio and the subtitle for the new source again.
-- **Skip intro.** When you go back into an intro, **Skip intro** shows again. Before, it showed only one time in each video.
-- **Skip intro on more MKV files.** Before, Alder did not find the chapters of an MKV file when they were not at the start of the file.
-- **Skip intro on anime.** Anime from AIOMetadata shows **Skip intro** when IntroDB has the times. Before, Alder did not find the intro for episodes with Kitsu or MAL ids.
-- **Subtitles when paused.** Before, the video started when you selected an add-on subtitle while it was paused. Now the video stays paused.
-- **Watch progress from other devices.** Before, if the clock of the TV was fast, the TV could show old progress and write it over newer progress from your phone.
-- **Clear local storage asks for a PIN.** If a profile has a PIN, Alder asks for it before **Settings → Storage → Clear local storage** removes all profiles.
-- **Sign-in.** Before, if you pressed **Back** while Alder examined a new sign-in, Alder still made the profile.
-- **Large subtitle files.** Alder does not open a subtitle file that is larger than 16 MB. Before, a very large file could stop Alder.
-- **Errors that did not show.** Alder now tells you when an actor's titles cannot load, when no app on the TV can play a trailer, and when the add-ons of a shared profile cannot load. **Mark as watched** on a show no longer marks only the show when Alder cannot get its episodes: Alder tells you why and lets you try again.
-- **Catalog errors.** When some catalogs do not load on **Shows** or **Movies**, Alder shows the name of the add-on and the cause, for example "AIOLists couldn't load · it sends a web page, not titles". It tells you to update or remove that add-on in Stremio. Press Down from the top bar to go to **Try again**.
-- **Picture and sound labels in the player.** A wide 4K film now shows **4K**. Before, it showed **1440p**, and a wide 1080p film showed **720p**. When you select a different audio track, the labels show that track. Before, an AAC track could show **ATMOS** from the file name. DTS:X files now show **DTS X**.
-- **Watch progress.** Alder keeps your place on the TV if Stremio does not save it. Alder sends it again when Home opens or during playback.
-- **My List and watched marks.** Alder shows the change after Stremio saves it. If the save fails, select **Try again**.
-- **Error messages.** Alder shows the cause when it can find it. Home and Search show a message if some results are not available.
-- **Crash reports.** Reports include recent error types and the result of each retry that Alder records. The new data has no links or account details.
-- **P2P episodes.** Alder checks the file names in a torrent when the add-on gives no file index. Alder skips a pack if it cannot find one file for the selected episode.
-- **P2P links.** Alder can play sources from add-ons that use `magnet:` or `torrent://` links.
-- **Top bar tabs.** Add-on tab names align with the other tabs and use the correct color as soon as they show. **Search** uses your tab choices. You can change the **Shows**, **Movies** and **My List** tabs when Alder cannot get the add-on list. **Tabs** shows changes to your add-ons.
-- **Lossless audio.** Alder sends TrueHD and DTS-HD to a compatible receiver in **Auto**. If passthrough fails, Alder tries the same track as PCM.
-- **Movies art.** The title and art change together when you stop on a poster.
-- **Shows art.** The title and art change together when you stop on a poster.
-- **Home art.** The title and art change together when you stop on a poster. Pictures that are ready fade directly into each other. Alder shows episode numbers when they are available.
-- **Alder icon on Google TV.** The icon in **Your apps** has a dark background. Before, the icon was white and you could not clearly see the logo.
-- **Resume.** **Continue Watching** and the title page use the same resume point. The title page shows where you stopped.
-- **4K source selection.** If Alder selects 1080p on a 4K TV, select **4K** under **Picture & Sound → Display resolution**. With **Best picture**, Alder gives 4K priority when the other preferences are equal.
-- The caption moves with the selected card when you press Left or Right.
-- **Profile PIN.** Another app cannot open a profile that has a PIN. Alder asks for the PIN first.
-- **Sign-in and backups.** Android does not copy profiles, sign-ins and PINs to a new TV.
-- **Watch progress.** **My List** and the watched marks do not erase your progress from other devices. Alder gets your Stremio library first, then saves the change.
-- **Sound after you leave.** A video does not start again when you go to another app while Alder gets a subtitle or a source. When you come back, the video starts. Before, Alder sometimes went to the next source.
-- **Resume point.** Alder goes to the resume point from your other devices also when a subtitle or the file is slow to start.
-- **Start again from the beginning.** Left and Right during playback do not start some videos again from the beginning. Before, a change to the subtitle timing in a file that cannot skip ahead started the video at 0:00.
-- **Add-on subtitles.** Subtitles from SubDL, OpenSubtitles and other add-ons show correctly. Alder opens zip files and shows letters in all languages correctly, for example Arabic, Polish and Russian. Each subtitle add-on shows its own files in **Audio & subtitles**. Before, files from the first add-on hid the files from other add-ons.
-- **Missing sources.** Alder asks every stream add-on that Stremio asks. Before, Alder did not ask some add-ons, and showed no playable sources. Short videos, for example a 7-minute cartoon, show in the source list. Slow debrid add-ons get 45 seconds to answer, not 20.
-<!-- Spotlight -->
-- **Large files.** Large files, such as 4K remuxes, stop less often to load. On most TVs, Alder now keeps up to 200 MB of the video ready. Before, Alder kept approximately 131 MB, which is only 10 to 17 seconds of a remux. After a stop, Alder waits for 4 seconds of video before it starts again.
-- **Long rows.** Alder releases poster memory for titles far off the screen. Rows stay fast when you move through many titles.
-- **Rows.** Each row on Shows and Movies keeps its own place. Before, a move to the next row went to the same position as in the last row.
-- **Smooth row motion.** Rows move smoothly when you move right fast. Live rows move at the same speed as poster rows. Background art waits until you stop on a title.
-- **Missing sources.** The source list tells you which add-ons gave no sources, and why. Before, Alder told you only when no source was available. An add-on that finds only torrents needs a debrid service.
-- **Backups.** Alder does not put profiles, sign-ins, or PINs in Android backups or device transfers. After a restore to a new TV, sign in to each profile again.
-- **Android 6 and 7.** Alder starts on Android 6 and 7 TVs. Before, Alder closed and the TV showed the home screen.
-- **Start after a downgrade.** Alder starts when you install an older version over a newer one. Before, Alder closed at start and the TV showed the home screen.
+
+- **Full row names.** **More like** rows show the whole movie name, and long row names end with a whole word instead of stopping mid-word.
+- **Keep your audio language.** **My language first** tries your language, then English. Select **Settings → Picture & Sound → Fallback audio language** to try another language before English or turn fallback off.
+- **Keep your watch progress offline.** Alder saves where you stopped on the TV and sends it to Stremio again when it can connect.
+- **Resume from the same spot.** **Continue Watching**, the title page and the player now use the saved position. This also works if you press **Play** before the title page finishes loading.
+- **See Skip intro on more episodes.** The button appears on more anime and MKV videos. It can also reappear when you go back into the intro.
+- **Keep browsing when an add-on fails.** One failed add-on can no longer clear **Home**. Adding an add-on also keeps your existing list intact.
+- **Fewer pauses on large 4K files.** On TVs with enough memory, Alder can keep up to 200 MB of video ready to play.
+- **See why an add-on found no sources.** The source list shows which add-ons came back empty and what happened.
+- **Stay on the same stream through short dropouts.** A brief network interruption gives the current stream a chance to recover.
+- **Load more subtitle files correctly.** Alder handles subtitles from SubDL and OpenSubtitles, subtitles in ZIP files, and Arabic, Polish and Russian text more reliably.
+- **Stay paused when you come back.** A video you paused stays paused when you leave Alder and return.
+- **See the right Watch Next items on Google TV.** The row follows the active profile. Alder also keeps its channel logo and shows a clearer launcher icon.
+- **Open Alder on older TVs again.** Fixed a startup crash on Android 6 and 7 and reduced memory use on older devices.
+- **Get the right 4K label and source.** Wide 4K films show **4K**, and **Best picture** can choose a 4K source even on TVs that report a lower resolution.
+- **Keep locked profiles behind their PIN.** Alder asks for the PIN when you enter a locked profile from the profile picker.
+- **Keep sign-ins tied to this TV.** Android backups exclude Alder profiles, sign-ins and PINs. Sign in again when you move to another TV.
+- **Reopen Alder after switching back to an older build.** Fixed a startup crash when Alder reads a profile saved by a newer build.
+- **Keep Search results steady as add-ons reply.** Visible posters load first. If a poster still fails after a retry, its card shows the title name.
+- **Keep remote focus when the screen updates.** Focus stays on the title page while its details refresh. Removing the last **Continue Watching** poster moves focus to the next row or the top bar.
+- **Keep Discover results in step with your filters.** Fast filter changes show the latest results. Larger text leaves room for the filter bar, and Right works across **Discover** and **My Alder** filters in Arabic.
 
 ## 1.3.1
 

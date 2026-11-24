@@ -33,9 +33,11 @@ internal fun bestAudioFormat(
     formats: List<Format>,
     language: String,
     failed: Set<Format>,
+    requireLanguage: Boolean = false,
     hasLosslessOutput: (Format) -> Boolean
 ): Format? = formats
     .filter { it !in failed && it.label?.contains("commentary", ignoreCase = true) != true }
+    .filter { !requireLanguage || Languages.match(it.language, language) > 0 }
     .maxWithOrNull(compareBy(
         { Languages.match(it.language, language) },
         hasLosslessOutput,
@@ -49,7 +51,7 @@ internal fun bestAudioFormat(
  */
 internal fun preferredAudioFormats(formats: List<Format>, failed: Set<Format>, hasLosslessOutput: (Format) -> Boolean): List<Format> =
     formats.mapNotNull { Languages.code(it.language) }.distinct().mapNotNull { code ->
-        bestAudioFormat(formats, code, failed, hasLosslessOutput)?.takeIf { Languages.match(it.language, code) > 0 }
+        bestAudioFormat(formats, code, failed, requireLanguage = true, hasLosslessOutput = hasLosslessOutput)
     }
 
 /** Whether the audio route can take [Format]s as they are (passthrough), not decoded to PCM. */

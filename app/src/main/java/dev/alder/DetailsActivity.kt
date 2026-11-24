@@ -1,6 +1,7 @@
 package dev.alder
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.TextUtils
@@ -41,20 +42,31 @@ internal fun heroChipCount(allMembers: List<CastMember>): Int {
     else if (names.take(3).sum() <= 44) 3 else 2
 }
 
+private val dayPattern = Regex("\\d{4}-\\d{2}-\\d{2}")
+
+// Made once per thread, not per episode: building them for every episode of every series in Continue held Home's
+// main thread for 1.5 s at start (SimpleDateFormat isn't thread-safe, so not one shared copy).
+private class EpisodeDates {
+    val utcDay = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
+    val utcTime = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+    val localDay = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+}
+private val episodeDates = object : ThreadLocal<EpisodeDates>() { override fun initialValue() = EpisodeDates() }
+
 internal fun isEpisodeAired(released: String?, now: Long = System.currentTimeMillis()): Boolean {
     if (released.isNullOrBlank()) return true
-    val day = released.take(10).takeIf { it.matches(Regex("\\d{4}-\\d{2}-\\d{2}")) } ?: return true
-    val source = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { isLenient = false; timeZone = TimeZone.getTimeZone("UTC") }
-    if (runCatching { source.parse(day) }.getOrNull() == null) return true
+    val day = released.take(10).takeIf { it.matches(dayPattern) } ?: return true
+    val f = episodeDates.get()!!
+    if (runCatching { f.utcDay.parse(day) }.getOrNull() == null) return true
 
     if (released.length >= 19 && released.contains('T')) {
-        val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
-        val full = runCatching { iso.parse(released.take(19)) }.getOrNull()
+        val full = runCatching { f.utcTime.parse(released.take(19)) }.getOrNull()
         if (full != null && full.time <= now) return true
     }
 
-    val localToday = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(now))
-    val utcToday = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(now))
+    f.localDay.timeZone = TimeZone.getDefault()
+    val localToday = f.localDay.format(Date(now))
+    val utcToday = f.utcDay.format(Date(now))
     return day <= localToday || day <= utcToday
 }
 
@@ -338,7 +350,7 @@ class DetailsActivity : Screen() {
             }
         }
         background({
-            (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
+            (Stremio.savedAddons(key) ?: Stremio.addons(key)).savedMeta(type, metaId, episodes = true) to Stremio.savedLibrary(key)?.firstOrNull { it.optString("_id") == metaId }
         }) { result ->
             result.getOrNull()?.let { (saved, libraryItem) ->
                 if (!itemChangedHere && item == null && libraryItem != null) {
@@ -350,7 +362,7 @@ class DetailsActivity : Screen() {
                 if (meta == null) saved?.let(::show)
             }
         }
-        background({ Stremio.addons(key).meta(type, metaId, together = true, reportFailure = true) }) { result ->
+        background({ Stremio.addons(key).meta(type, metaId, together = true, reportFailure = true, episodes = true) }) { result ->
             val fresh = result.getOrNull()
             if (fresh != null) show(fresh)
             else if (meta == null) {
@@ -702,8 +714,10 @@ class DetailsActivity : Screen() {
     }
 
     private fun toggleList() {
+        val profile = Profiles.active(this)?.takeIf { it.authKey == key } ?: return
+        val dates = Library.listDates(this, profile.id)
         val add = !Library.inList(item)
-        editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed) {
+        editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed, listDates = dates) {
             listButton.text = if (add) "✓" else "+"
             val desc = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
             listButton.contentDescription = desc
@@ -925,12 +939,12 @@ class DetailsActivity : Screen() {
     }
 
     private fun editLibrary(change: (JSONObject) -> Unit, title: Int = R.string.library_edit_failed,
-                            previous: Failure? = null, done: () -> Unit) {
+                            previous: Failure? = null, listDates: SharedPreferences? = null, done: () -> Unit) {
         if (savingEdit) return
         savingEdit = true
         val entry = Library.newItem(metaId, type, meta?.name ?: name, meta?.poster ?: poster)
         background({
-            Stremio.editLibrary(key, metaId, entry, change)
+            Stremio.editLibrary(key, metaId, entry, listDates, change)
         }) { result ->
             savingEdit = false
             if (isFinishing) return@background
@@ -943,7 +957,7 @@ class DetailsActivity : Screen() {
                 val failure = failureOf(it)
                 FailureLog.record(FailureLog.Operation.LIBRARY_EDIT, failure)
                 choose(getString(title), listOf(getString(R.string.action_try_again), getString(R.string.action_cancel)),
-                    getString(failure.message)) { choice -> if (choice == 0) editLibrary(change, title, failure, done) }
+                    getString(failure.message)) { choice -> if (choice == 0) editLibrary(change, title, failure, listDates, done) }
             }
         }
     }

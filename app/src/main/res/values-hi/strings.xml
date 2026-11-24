@@ -24,18 +24,10 @@
     <string name="whats_new">नया क्या है</string>
     <string name="whats_new_no_notes">वर्शन %1$s के लिए कोई नोट नहीं है।</string>
     <string name="whats_new_version">वर्शन %1$s</string>
+    <string name="whats_new_preview">रिलीज़ का पूर्वावलोकन</string>
+    <string name="whats_new_example_player">बाहरी प्लेयर का उदाहरण</string>
     <string name="whats_new_group">नया</string>
-    <plurals name="whats_new_highlights">
-        <item quantity="one">नया क्या है · %1$d खास बात</item>
-        <item quantity="other">नया क्या है · %1$d खास बातें</item>
-    </plurals>
-    <string name="whats_new_all">सभी बदलाव (%1$d)</string>
     <string name="whats_new_highlights_short">खास बातें</string>
-    <string name="whats_new_back">← खास बातों पर वापस</string>
-    <plurals name="whats_new_see_all">
-        <item quantity="one">%1$d बदलाव देखें  →</item>
-        <item quantity="other">सभी %1$d बदलाव देखें  →</item>
-    </plurals>
 
     <!-- Home -->
     <string name="tab_home">होम</string>
@@ -252,7 +244,7 @@
     <string name="player_no_other_app">इस टीवी पर कोई दूसरा वीडियो प्लेयर नहीं है। Alder वीडियो चलाता है।</string>
     <string name="clear_dialogue_setting_hint">टीवी स्पीकर पर संगीत और तेज़ इफ़ेक्ट के ऊपर आवाज़ें उभारता है।</string>
     <string name="dubbed">डब रिलीज़</string>
-    <string name="dubbed_hint">पहले मूल भाषा डब रिलीज़ को आख़िर में रखता है; पहले मेरी भाषा इस प्रोफ़ाइल की ऑडियो भाषा का इस्तेमाल करता है।</string>
+    <string name="dubbed_hint">पहले मूल भाषा डब रिलीज़ को आख़िर में रखता है। पहले मेरी भाषा में Alder का प्लेयर अपने आप चलाने से पहले ऑडियो की भाषा जाँचता है। आप अब भी कोई भी स्रोत चुन सकते हैं।</string>
     <string name="dubbed_original">पहले मूल भाषा</string>
     <string name="dubbed_mine">पहले मेरी भाषा</string>
     <string name="subs_default">डिफ़ॉल्ट रूप से सबटाइटल</string>
@@ -309,6 +301,10 @@
     <string name="ratings_source">रेटिंग</string>
     <string name="ratings_source_hint">टाइटल पेज और होम पर रेटिंग चुनें। Letterboxd केवल फ़िल्मों के लिए है और इसके लिए MDBList कुंजी चाहिए। शो हमेशा IMDb दिखाते हैं।</string>
     <string name="ratings_both">दोनों</string>
+    <string name="episode_badges">नए एपिसोड बैज</string>
+    <string name="episode_badges_hint">सीरीज़ पोस्टर पर दिखने वाली संख्या चुनें। नए प्रसारित पिछली बार देखने के बाद आए एपिसोड गिनता है। मौजूदा सीज़न आपके देखे जा रहे सीज़न के बाकी एपिसोड गिनता है।</string>
+    <string name="episode_badges_aired">नए प्रसारित</string>
+    <string name="episode_badges_season">मौजूदा सीज़न</string>
     <string name="mdblist_key">MDBList कुंजी</string>
     <string name="mdblist_key_hint">mdblist.com/preferences से आपकी मुफ़्त API कुंजी। Alder इसका उपयोग केवल Letterboxd रेटिंग के लिए करता है।</string>
     <string name="key_not_set">सेट नहीं</string>
@@ -356,8 +352,8 @@
     <string name="unhide_row_hint">वापस लाने के लिए पंक्ति चुनें।</string>
     <string name="custom">कस्टम</string>
     <string name="source_choice">स्रोत का चुनाव</string>
-    <string name="source_choice_hint">सबसे अच्छी तस्वीर: पहले पूरा Blu-ray और Dolby Vision। संतुलित: छोटी फ़ाइलें। तेज़ शुरुआत: वेब रिलीज़। ऐड-ऑन का क्रम: ऐड-ऑन के हिसाब से।</string>
-    <string name="preset_addon_order">ऐड-ऑन का क्रम</string>
+    <string name="source_choice_hint">सबसे अच्छी तस्वीर: पहले पूरा Blu-ray और Dolby Vision। संतुलित: छोटी फ़ाइलें। तेज़ शुरुआत: वेब रिलीज़। कोई भी रिलीज़: सबसे साफ़ कॉपी, रिलीज़ कोई भी हो।</string>
+    <string name="preset_addon_order">कोई भी रिलीज़</string>
     <string name="preset_best_picture">सबसे अच्छी तस्वीर</string>
     <string name="preset_balanced">संतुलित</string>
     <string name="preset_fast_start">तेज़ शुरुआत</string>
@@ -558,4 +554,10 @@
     <string name="filmography_loading">शीर्षक खोजे जा रहे हैं…</string>
     <string name="filmography_empty">आपके कैटलॉग में कोई अन्य शीर्षक नहीं मिला।</string>
     <string name="details_ends_at">%1$s बजे समाप्त</string>
+    <string name="streams_no_preferred_audio">कोई भी स्रोत अपने आप चलाने के लिए चुनी गई भाषाओं से मेल नहीं खाता। जारी रखने के लिए कोई स्रोत चुनें।</string>
+    <string name="audio_fallback">वैकल्पिक ऑडियो भाषा</string>
+    <string name="audio_fallback_hint">पहले मेरी भाषा में Alder पहले आपकी चुनी हुई भाषा, फिर यह वैकल्पिक भाषा और फिर अंग्रेज़ी आज़माता है। केवल अपनी चुनी हुई भाषा के लिए बंद चुनें।</string>
+    <string name="failure_preferred_audio">आपकी पसंदीदा भाषा में कोई समर्थित ऑडियो ट्रैक नहीं है</string>
+    <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
+    <string name="list_added_on">%1$s को जोड़ा गया</string>
 </resources>

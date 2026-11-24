@@ -15,8 +15,8 @@ android {
         applicationId = "team.cyborgs.chadflix" // ChadFlix fork: installs beside Alder (namespace stays dev.alder)
         minSdk = 23
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.3.1-chadflix.2"
+        versionCode = 9
+        versionName = "1.4-chadflix.1"
         // TVs are ARM; the x86 builds of ffmpeg's native code would only add size.
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
@@ -41,6 +41,8 @@ android {
     }
 
     buildTypes {
+        // Debug builds use the release key when it is here, so they install as an update over the TV's release build.
+        debug { signingConfigs.findByName("release")?.let { signingConfig = it } }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

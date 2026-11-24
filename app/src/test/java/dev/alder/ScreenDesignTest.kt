@@ -105,10 +105,35 @@ class ScreenDesignTest {
         """.trimMargin()
         val changes = changesFor(log, "Unreleased")
         assertEquals(listOf("Trailers", "Live TV", "Direct play"), showcaseHighlights(changes).map { it.title })
+        assertEquals(listOf(null, null, null), showcaseHighlights(changes).map { it.image })
+        val pictured = changesFor("## 2.0\n<!-- Spotlight: whats-new/p2p.webp -->\n- **P2P.** Play.\n- **Plain.** Text.", "2.0")
+        assertEquals(listOf("whats-new/p2p.webp", null), pictured.map { it.image })
+        assertEquals(listOf(true, false), pictured.map { it.spotlight })
         assertEquals(listOf("New", "New", "Easier to use"), showcaseHighlights(changes).map { it.group })
         assertEquals(5, changes.size)
         assertEquals(listOf("Trailers", "30 GB limit", "Live TV", "Direct play", "Back"),
             showcaseHighlights(changes.map { Change(it.group, it.text) }).map { it.title })
+    }
+
+    @Test fun whatsNewReadsCompactArtAndKeepsSettingsPathsSeparate() {
+        val log = """## Unreleased
+            |### New
+            |<!-- Spotlight -->
+            |<!-- Player: VLC whats-new/player-icon.webp -->
+            |- **External player.** Choose an installed player. **Settings → Streams → Video player**.
+            |<!-- Detail: whats-new/sources.webp -->
+            |- **Sources.** Find more sources.
+            |- **Picture size.** Choose **Zoom**. **Audio & subtitles → Sync & Style → Picture**.
+            |- **Older entry.** Select **Settings → Profile** to change it.
+        """.trimMargin()
+        val changes = changesFor(log, "Unreleased")
+        assertEquals(listOf("External player"), showcaseHighlights(changes).map { it.title })
+        assertEquals(listOf(null, "whats-new/sources.webp", null, null), changes.map { it.detailImage })
+        assertEquals(listOf(PlayerExample("VLC", "whats-new/player-icon.webp"), null, null, null), changes.map { it.player })
+        assertEquals(listOf("Settings → Streams → Video player", null, "Audio & subtitles → Sync & Style → Picture", null),
+            changes.map { it.settingsPath })
+        assertEquals(listOf("Choose an installed player.", "Find more sources.", "Choose **Zoom**.",
+            "Select **Settings → Profile** to change it."), changes.map { it.summary })
     }
 
     @Test fun debridServiceFromTagsAndLinks() {
@@ -128,6 +153,8 @@ class ScreenDesignTest {
         assertEquals("More like Dune", homeRowName("Because you watched Dune"))
         assertEquals("More like Crayon Shin-chan", homeRowName("Because you watched Crayon Shin-chan: Pursuit"))
         assertEquals("Popular", homeRowName("Popular"))
+        assertEquals("More like Doctor Strange in the Multiverse of Madness",
+            homeRowName("Because you watched Doctor Strange in the Multiverse of Madness"))
     }
 
     @Test fun seasonCountIsSingularForOne() {
@@ -163,6 +190,7 @@ class ScreenDesignTest {
         assertEquals("Recommended in India", shortRowName("Recommended in India"))
         assertEquals("Comedy Sci-Fi", shortRowName("Comedy Science Fiction"))
         assertEquals("Adventure", shortRowName("Short & Sweet Adventure", listOf("Drama", "Adventure")))
+        assertEquals("Top Rated Korean Dramas Of…", shortRowName("Top Rated Korean Dramas Of All Time"))
     }
 
     @Test fun homeRowsIdentifyMoviesAndShows() {

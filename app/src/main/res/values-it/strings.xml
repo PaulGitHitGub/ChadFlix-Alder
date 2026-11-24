@@ -24,20 +24,10 @@
     <string name="whats_new">Novità</string>
     <string name="whats_new_no_notes">Non ci sono note per la versione %1$s.</string>
     <string name="whats_new_version">Versione %1$s</string>
+    <string name="whats_new_preview">Anteprima della versione</string>
+    <string name="whats_new_example_player">Esempio di lettore esterno</string>
     <string name="whats_new_group">Novità</string>
-    <plurals name="whats_new_highlights">
-        <item quantity="one">Novità · %1$d in evidenza</item>
-        <item quantity="many">Novità · %1$d in evidenza</item>
-        <item quantity="other">Novità · %1$d in evidenza</item>
-    </plurals>
-    <string name="whats_new_all">Tutte le modifiche (%1$d)</string>
     <string name="whats_new_highlights_short">In evidenza</string>
-    <string name="whats_new_back">← Torna alle novità in evidenza</string>
-    <plurals name="whats_new_see_all">
-        <item quantity="one">Vedi %1$d modifica  →</item>
-        <item quantity="many">Vedi tutte le %1$d modifiche  →</item>
-        <item quantity="other">Vedi tutte le %1$d modifiche  →</item>
-    </plurals>
 
     <!-- Home -->
     <string name="tab_home">Home</string>
@@ -255,7 +245,7 @@
     <string name="player_no_other_app">Su questa TV non c’è un altro lettore video. Alder riproduce il video.</string>
     <string name="clear_dialogue_setting_hint">Mette in risalto le voci sopra musica ed effetti forti con gli altoparlanti della TV.</string>
     <string name="dubbed">Versioni doppiate</string>
-    <string name="dubbed_hint">Prima l’originale mette in fondo le versioni doppiate; Prima la mia lingua usa la lingua audio di questo profilo.</string>
+    <string name="dubbed_hint">Prima l’originale mette in fondo le versioni doppiate. Prima la mia lingua verifica l’audio nel lettore di Alder prima della riproduzione automatica. Puoi ancora scegliere qualsiasi fonte.</string>
     <string name="dubbed_original">Prima l’originale</string>
     <string name="dubbed_mine">Prima la mia lingua</string>
     <string name="subs_default">Sottotitoli predefiniti</string>
@@ -312,6 +302,10 @@
     <string name="ratings_source">Valutazioni</string>
     <string name="ratings_source_hint">Sceglie le valutazioni nelle pagine dei titoli e nella Home. Letterboxd vale solo per i film e richiede una chiave MDBList. Le serie usano sempre IMDb.</string>
     <string name="ratings_both">Entrambe</string>
+    <string name="episode_badges">Badge nuovi episodi</string>
+    <string name="episode_badges_hint">Sceglie il numero sui poster delle serie. Appena usciti conta gli episodi usciti dopo l’ultima visione. Stagione attuale conta gli episodi rimasti nella stagione che guardi.</string>
+    <string name="episode_badges_aired">Appena usciti</string>
+    <string name="episode_badges_season">Stagione attuale</string>
     <string name="mdblist_key">Chiave MDBList</string>
     <string name="mdblist_key_hint">La tua chiave API gratuita da mdblist.com/preferences. Alder la usa solo per le valutazioni Letterboxd.</string>
     <string name="key_not_set">Non impostata</string>
@@ -359,8 +353,8 @@
     <string name="unhide_row_hint">Seleziona una riga per ripristinarla.</string>
     <string name="custom">Personalizzato</string>
     <string name="source_choice">Scelta della fonte</string>
-    <string name="source_choice_hint">Immagine migliore: prima Blu-ray completo e Dolby Vision. Bilanciato: file più leggeri. Avvio rapido: versioni web. Ordine dell’add-on: segue l’add-on.</string>
-    <string name="preset_addon_order">Ordine dell’add-on</string>
+    <string name="source_choice_hint">Immagine migliore: prima Blu-ray completo e Dolby Vision. Bilanciato: file più leggeri. Avvio rapido: versioni web. Qualsiasi versione: la copia più nitida, qualunque sia la versione.</string>
+    <string name="preset_addon_order">Qualsiasi versione</string>
     <string name="preset_best_picture">Immagine migliore</string>
     <string name="preset_balanced">Bilanciato</string>
     <string name="preset_fast_start">Avvio rapido</string>
@@ -563,4 +557,10 @@
     <string name="filmography_loading">Ricerca titoli…</string>
     <string name="filmography_empty">Nessun altro titolo trovato nei tuoi cataloghi.</string>
     <string name="details_ends_at">Finisce alle %1$s</string>
+    <string name="streams_no_preferred_audio">Nessuna fonte corrisponde alle lingue per la riproduzione automatica. Scegli una fonte per continuare.</string>
+    <string name="audio_fallback">Lingua audio di riserva</string>
+    <string name="audio_fallback_hint">Con Prima la mia lingua, Alder prova la tua lingua, questa lingua di riserva e infine l’inglese. Seleziona Disattivato per usare solo la tua lingua.</string>
+    <string name="failure_preferred_audio">nessuna traccia audio supportata nella tua lingua preferita</string>
+    <string name="failure_advice_preferred_audio">Scegli una fonte con la tua lingua audio.</string>
+    <string name="list_added_on">Aggiunto il %1$s</string>
 </resources>

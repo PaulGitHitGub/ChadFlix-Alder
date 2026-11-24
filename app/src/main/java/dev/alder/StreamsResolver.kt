@@ -12,6 +12,8 @@ interface Cancellable {
     fun cancel()
 }
 
+internal data class PlaybackSource(val stream: Stream, val language: String? = null)
+
 object StreamsResolver {
     const val TRY = 3
 
@@ -26,8 +28,7 @@ object StreamsResolver {
         val file = prefs.getString("file:$videoId", null)
         val binge = metaId?.let { prefs.getString("binge:$it", null) }
         val tv = Device.of(context)
-        val preferResolution = Settings.release(context) == "remux" && Settings.hdrPref(context) == "dv"
-        return rank(streams, tv, Settings.displayHeight(context), file, binge, maxHeight > 0, preference(context), preferResolution)
+        return rank(streams, tv, Settings.displayHeight(context), file, binge, maxHeight > 0, preference(context))
     }
 
     internal fun rank(
@@ -37,8 +38,7 @@ object StreamsResolver {
         file: String?,
         binge: String?,
         lower: Boolean,
-        prefer: (Stream) -> Int,
-        preferResolution: Boolean
+        prefer: (Stream) -> Int
     ): List<Stream> {
         val displayHeight = if (displayOverride > 0) displayOverride else tv.height
         // P2P after every direct or debrid source: peers start slower and can't be checked first.
@@ -52,7 +52,8 @@ object StreamsResolver {
             .thenBy { it.dolbyVisionOnly && !tv.dolbyVision }
             .thenByDescending { it.fit(tv, displayHeight) }
             .thenByDescending(prefer)
-            .thenByDescending { if (preferResolution && it.height <= displayHeight) it.height else 0 }
+            // Among equally preferred sources, the sharpest picture the TV can show, not the add-on's first.
+            .thenByDescending { if (it.height <= displayHeight) it.height else 0 }
             .thenByDescending { if (it.torrent != null) it.seeders ?: 0 else 0 })
     }
 
@@ -91,6 +92,23 @@ object StreamsResolver {
             (Settings.hdr(context) || !s.isHdr) && !s.cam
     }
 
+    internal fun automaticLanguages(context: Context, metaId: String?): List<String> =
+        if (Settings.dub(context) == "mine") languageOrder(Settings.preferredAudio(context, metaId), Settings.fallbackAudio(context))
+        else emptyList()
+
+    internal fun languageOrder(preferred: String, fallback: String): List<String> =
+        if (fallback.isEmpty()) listOf(preferred) else listOf(preferred, fallback, "en").distinctBy(Languages::base)
+
+    internal fun matchesAutomaticLanguage(stream: Stream, language: String): Boolean =
+        Languages.base(language) in stream.audioLanguages ||
+            (Languages.base(language) == "en" && stream.audioLanguages.isEmpty())
+
+    internal fun playbackQueue(ranked: List<Stream>, languages: List<String>): List<PlaybackSource> =
+        if (languages.isEmpty()) ranked.take(TRY).map { PlaybackSource(it) }
+        else languages.flatMap { language ->
+            ranked.filter { matchesAutomaticLanguage(it, language) }.map { PlaybackSource(it, language) }
+        }
+
     /**
      * Stream add-ons for [type] and [videoId]: the active profile's [own] add-ons first, then [lent] household
      * add-ons whose transport URL and id do not match an own add-on so a lender config never shadows own settings.
@@ -106,7 +124,7 @@ object StreamsResolver {
         }
     }
 
-    fun resolve(
+    internal fun resolve(
         context: Context,
         type: String,
         videoId: String,
@@ -115,7 +133,8 @@ object StreamsResolver {
         maxHeight: Int = 0,
         executor: Executor = Screen.pool,
         mainHandler: Handler = Handler(Looper.getMainLooper()),
-        onReady: (List<Stream>) -> Unit,
+        onPreferredReady: (List<PlaybackSource>) -> Unit,
+        onReady: (List<PlaybackSource>) -> Unit,
         onFallback: () -> Unit
     ): Cancellable {
         val key = authKey ?: run {
@@ -125,8 +144,11 @@ object StreamsResolver {
 
         var canceled = false
         var started = false
+        var preferredStarted = false
         var waitingForEarlier = false
         val tv = Device.of(context)
+        val languages = automaticLanguages(context, metaId)
+        val eligible: (Stream) -> Boolean = { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) }
 
         val cancellable = object : Cancellable {
             override fun cancel() {
@@ -158,22 +180,36 @@ object StreamsResolver {
 
             fun tryStart(allowGaps: Boolean = false) {
                 if (canceled || started) return
+                val pending = answers.any { it == null }
+                val preferredOnly = pending && languages.isNotEmpty()
+                if (preferredOnly && preferredStarted) return
                 val ready = readyStreams(answers, allowGaps)
-                val best = rank(context, ready.filter { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) }, videoId, metaId, maxHeight)
-                if (best.isEmpty() && answers.any { it == null }) return
+                val ranked = rank(context, ready.filter(eligible), videoId, metaId, maxHeight)
+                // A known preferred-language source can start now. Fallbacks wait for every add-on.
+                if (preferredOnly) {
+                    val preferred = playbackQueue(ranked, languages.take(1))
+                    if (preferred.isEmpty()) return
+                    preferredStarted = true
+                    onPreferredReady(preferred)
+                    return
+                }
+                val best = playbackQueue(ranked, languages)
+                if (best.isEmpty() && pending) return
                 if (best.isEmpty()) {
                     started = true
                     onFallback()
                     return
                 }
                 started = true
-                onReady(best.take(TRY))
+                onReady(best)
             }
 
             addons.forEachIndexed { i, addon ->
                 executor.execute {
                     if (canceled) return@execute
-                    val streamsResult = runCatching { addon.streams(type, videoId) }
+                    val streamsResult = runCatching {
+                        addon.streams(type, videoId, allowTorrents = languages.isNotEmpty() && supportsTorrentPlayback)
+                    }
                     mainHandler.post {
                         if (canceled) return@post
                         answers[i] = streamsResult.getOrNull()?.playable.orEmpty()
@@ -181,7 +217,10 @@ object StreamsResolver {
                             tryStart(allowGaps = true)
                         } else {
                             tryStart(allowGaps = false)
-                            if (!started && !waitingForEarlier && readyStreams(answers, true).any { it.isVideo && it.playableOn(tv) && wanted(context, it, maxHeight) }) {
+                            val preferred = languages.firstOrNull()
+                            if (!started && !preferredStarted && !waitingForEarlier && readyStreams(answers, true).any {
+                                eligible(it) && (preferred == null || matchesAutomaticLanguage(it, preferred))
+                            }) {
                                 waitingForEarlier = true
                                 mainHandler.postDelayed({ tryStart(allowGaps = true) }, 800)
                             }

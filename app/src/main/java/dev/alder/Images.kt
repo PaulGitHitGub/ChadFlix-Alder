@@ -38,8 +38,6 @@ object Images {
     // ChadFlix: a request for a picture already being fetched only waits for it: it must not hold one of the two urgent
     // threads (the title page asks for its logo again each time its details refresh, which starved the art).
     private val joiners = java.util.concurrent.Executors.newCachedThreadPool { r -> Thread { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); r.run() } }
-    private val tmdb = Regex("""(image\.tmdb\.org/t/p/)(original|w1280)/""")
-    private val metahub = Regex("""(images\.metahub\.space/(?:poster|background)/)(small|medium)/""")
 
     /**
      * The latest request first: after racing along a row, the cards the remote stopped on load before the ones it
@@ -187,16 +185,12 @@ object Images {
      * at the small poster (about 150 px) and medium background (about 1000 px): soft on a TV once stretched. The large
      * copy is asked for instead, and the decode below scales it to the size shown.
      */
-    fun sharp(url: String) = url.replace(metahub, "$1large/")
+    fun sharp(url: String) = sharpImageUrl(url)
 
     /** The 16:9 art MetaHub keeps for an IMDb title, for places that have no art of their own (Watch Next). */
     fun backgroundFor(id: String) = id.takeIf { it.startsWith("tt") }?.let { "https://images.metahub.space/background/large/${it.substringBefore(':')}/img" }
 
-    // TMDB serves every picture in a few widths: a card needs the 780 px copy, not the 4K original (a tenth of the bytes).
-    fun sized(url: String, widthPx: Int): String {
-        val size = if (widthPx <= 780) "w780" else if (widthPx <= 1280) "w1280" else return sharp(url)
-        return sharp(url).replace(tmdb, "$1$size/")
-    }
+    fun sized(url: String, widthPx: Int) = sizedImageUrl(url, widthPx)
 
     // One copy per size: a card's small copy must never stand in for the full-screen art (it would be blurry).
     private fun key(url: String, widthPx: Int, look: Look? = null) = "$url#$widthPx" + (look?.name?.let { "#$it" } ?: "")
@@ -249,3 +243,16 @@ internal fun logoSizePx(trimW: Int, trimH: Int, density: Float): Pair<Int, Int> 
     val h = minOf(trimH, Math.floor(hDp * density * scale).toInt()).coerceAtLeast(1)
     return w to h
 }
+
+private val tmdb = Regex("""(image\.tmdb\.org/t/p/)(original|w1280)/""")
+private val metahub = Regex("""(images\.metahub\.space/(?:poster|background)/)(small|medium)/""")
+
+internal fun sharpImageUrl(url: String) = url.replace(metahub, "$1large/")
+
+/**
+ * TMDB serves every picture in a few widths: a card needs the 780 px copy, full-screen art the 1280 px one (as NuvioTV
+ * asks). Never the original: at 2-3 MB and 3840 px it took long to decode on the TV and filled the disk cache, pushing
+ * posters out so they downloaded again.
+ */
+internal fun sizedImageUrl(url: String, widthPx: Int) =
+    sharpImageUrl(url).replace(tmdb, "$1${if (widthPx <= 780) "w780" else "w1280"}/")

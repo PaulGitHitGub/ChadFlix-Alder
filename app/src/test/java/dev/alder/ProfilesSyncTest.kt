@@ -12,6 +12,29 @@ import org.junit.Test
 
 class ProfilesSyncTest {
     @Test
+    fun listDateIsPerProfileAndChangesOnlyWithListMembership() {
+        val dates = InMemoryPrefs()
+        val otherProfile = InMemoryPrefs()
+        val title = Library.newItem("tt1", "movie", "Film", null).put("_ctime", "2020-01-01T00:00:00.000Z")
+        assertNull(dates.getString("tt1", null))
+
+        Library.setInList(title, true)
+        Library.recordListDate(dates, title)
+        val added = title.getString("_mtime")
+        assertEquals(added, dates.getString("tt1", null))
+        assertNull(otherProfile.getString("tt1", null))
+        Library.markTitleWatched(title)
+        assertEquals(added, dates.getString("tt1", null))
+
+        Library.setInList(title, false)
+        Library.recordListDate(dates, title)
+        assertNull(dates.getString("tt1", null))
+        Library.setInList(title, true)
+        Library.recordListDate(dates, title)
+        assertEquals(title.getString("_mtime"), dates.getString("tt1", null))
+    }
+
+    @Test
     fun newestSeedsBrandNewSavingTitleWhenMissingFromRemoteAndPending() {
         ProgressSaves.init(InMemoryPrefs())
         Stremio.clearSavingForTest()
@@ -112,9 +135,11 @@ class ProfilesSyncTest {
         prefs.edit()
             .putString("subPref@1", "foreign")
             .putString("release@1", "remux")
+            .putString("audioFallback@1", "fr")
             .putString("title:tt123@1", """{"audio":"ja"}""")
             .putBoolean("showTab:anime@1", false)
             .putString("subPref@2", "off")
+            .putString("audioFallback@2", "")
             .putString("release@2", "web")
             .putInt("maxHeight", 1080)
             .apply()
@@ -123,10 +148,12 @@ class ProfilesSyncTest {
 
         assertFalse(prefs.contains("subPref@1"))
         assertFalse(prefs.contains("release@1"))
+        assertFalse(prefs.contains("audioFallback@1"))
         assertFalse(prefs.contains("title:tt123@1"))
         assertFalse(prefs.contains("showTab:anime@1"))
 
         assertEquals("off", prefs.getString("subPref@2", null))
+        assertEquals("", prefs.getString("audioFallback@2", null))
         assertEquals("web", prefs.getString("release@2", null))
         assertEquals(1080, prefs.getInt("maxHeight", 0))
     }
