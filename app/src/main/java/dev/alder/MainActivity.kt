@@ -1047,6 +1047,7 @@ class MainActivity : Screen() {
         }
         // As tall as the words' pills (match parent), the glyph 18 dp inside it.
         search = ImageView(this).apply {
+            id = View.generateViewId()
             setImageResource(R.drawable.ic_search)
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
@@ -1152,12 +1153,15 @@ class MainActivity : Screen() {
         }
         // ChadFlix: Home shows only when it's the start page (Settings › Default tab) or open.
         navItems[Page.HOME]?.visibility = if (page == Page.HOME || Settings.startTab(this) == "home") View.VISIBLE else View.GONE
-        // Cross the gap to Settings within the header, even when a content row offers a nearer card.
-        navBar.findViewById<View>(settingsGear.nextFocusLeftId)?.nextFocusRightId = View.NO_ID
-        val lastIndex = (0 until navBar.childCount).last { navBar.getChildAt(it).visibility == View.VISIBLE }
-        val lastTab = navBar.getChildAt(lastIndex)
-        lastTab.nextFocusRightId = settingsGear.id
-        settingsGear.nextFocusLeftId = lastTab.id
+        // Keep horizontal navigation in the header after tabs are hidden, revealed or reordered.
+        var right: View = settingsGear
+        for (i in navBar.childCount - 1 downTo 0) {
+            val item = navBar.getChildAt(i)
+            if (item.visibility != View.VISIBLE) continue
+            item.nextFocusRightId = right.id
+            right.nextFocusLeftId = item.id
+            right = item
+        }
     }
 
     private fun showLiveTab(addons: List<Addon>) {
