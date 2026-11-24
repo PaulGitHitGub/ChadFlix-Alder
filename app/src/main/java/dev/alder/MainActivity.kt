@@ -1268,16 +1268,19 @@ class MainActivity : Screen() {
     }
 
     /**
-     * ChadFlix: a white pill with black words follows the remote; the open page keeps its pill, white while the remote is
-     * down in the rows and faint while it's on another item up here.
+     * ChadFlix: a white pill with black words follows the remote; the open page's pill is white while the remote is down
+     * in the rows, faint while it's on the avatar or the gear, and gone while it's on another name (owner: no grey pill
+     * left on the old one).
      */
     private fun styleNav() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         val pill = pillStartedAt > 0 // Search's pill is moving on this bar ([startPill]): it draws the pill and colours the names
+        val onName = navItems.values.any { it.isFocused } || search?.isFocused == true
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
-            item.background = if (pill) null else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
+            item.background = if (pill) null else if (lit) HomeStyle.pill(HomeStyle.WHITE)
+                else if (p == page && !onName) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
             if (!pill) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
         }
