@@ -87,7 +87,7 @@ Install ChadFlix on that TV.
 ```
 
 If you built ChadFlix yourself before, Android refuses this update because the signing key differs. Uninstall that
-copy first: the settings on the TV go, your Stremio account stays.
+copy first. The settings on the TV are lost. Your Stremio account stays.
 
 ### 3. Allow the Computer
 

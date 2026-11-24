@@ -35,7 +35,7 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 - **Menu over HDR.** When the video is HDR, the **Audio & Subtitles** menu dims the picture more. The text in the menu is easier to read.
 - **No picture size.** The player always shows the whole picture. **Zoom** and **Stretch** are gone.
 - **No Sleep Timer.** The player no longer has a Sleep Timer.
-- **No Clear dialogue in the player.** To turn **Clear dialogue** on or off, select **Settings → Clear dialogue**.
+- **No Clear dialogue in the player.** To turn **Clear dialogue** on or off, select **Settings → Picture & Sound → Clear dialogue**.
 - **No subtitle timing.** The player no longer has controls to move subtitles earlier or later. If subtitles are out of time, select **More** and select a different subtitle.
 - **Simpler badges.** The badges in the player no longer show the audio language, the subtitle language or the debrid service. **REMUX** now shows as **BLU-RAY**. The channels, for example **5.1**, always show when ChadFlix knows them.
 
