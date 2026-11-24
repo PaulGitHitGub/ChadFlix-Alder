@@ -604,12 +604,9 @@
     <string name="library_load_failed">Couldn\'t load your Stremio library</string>
     <string name="list_added_on">Added %1$s</string>
     <string name="ex_people">People</string>
-    <string name="ex_rating">TMDb Rating</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Network</string>
-    <string name="ex_runtime">Runtime</string>
     <string name="ex_country">Country</string>
-    <string name="ex_franchise">Franchise</string>
     <string name="ex_keyboard">Keyboard Search</string>
     <string name="ex_any">Any</string>
     <string name="ex_match">Match</string>
@@ -625,7 +622,6 @@
     <string name="ex_role">Any Role</string>
     <string name="ex_popular">Popular Now</string>
     <string name="ex_remove">Remove %1$s</string>
-    <string name="ex_order">Release Order</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
 </resources>

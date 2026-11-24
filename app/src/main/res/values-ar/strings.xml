@@ -600,12 +600,9 @@
     <string name="failure_advice_preferred_audio">اختر مصدرًا يوفر لغة الصوت التي تفضلها.</string>
     <string name="list_added_on">تاريخ الإضافة %1$s</string>
     <string name="ex_people">الأشخاص</string>
-    <string name="ex_rating">تقييم TMDb</string>
     <string name="ex_studio">الاستوديو</string>
     <string name="ex_network">الشبكة</string>
-    <string name="ex_runtime">المدة</string>
     <string name="ex_country">البلد</string>
-    <string name="ex_franchise">السلسلة</string>
     <string name="ex_keyboard">بحث بلوحة المفاتيح</string>
     <string name="ex_any">أي منها</string>
     <string name="ex_match">تطابق</string>
@@ -621,7 +618,6 @@
     <string name="ex_role">أي دور</string>
     <string name="ex_popular">الرائج الآن</string>
     <string name="ex_remove">إزالة %1$s</string>
-    <string name="ex_order">ترتيب الإصدار</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
     <string name="showing_most_watched">الأكثر مشاهدة</string>

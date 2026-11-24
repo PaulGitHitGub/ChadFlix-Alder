@@ -576,12 +576,9 @@
     <string name="failure_advice_preferred_audio">Wähle eine Quelle mit deiner Audiosprache.</string>
     <string name="list_added_on">Hinzugefügt am %1$s</string>
     <string name="ex_people">Personen</string>
-    <string name="ex_rating">TMDb-Bewertung</string>
     <string name="ex_studio">Studio</string>
     <string name="ex_network">Sender</string>
-    <string name="ex_runtime">Laufzeit</string>
     <string name="ex_country">Land</string>
-    <string name="ex_franchise">Filmreihe</string>
     <string name="ex_keyboard">Tastatursuche</string>
     <string name="ex_any">Beliebig</string>
     <string name="ex_match">Übereinstimmung</string>
@@ -597,7 +594,6 @@
     <string name="ex_role">Alle Rollen</string>
     <string name="ex_popular">Jetzt Beliebt</string>
     <string name="ex_remove">%1$s entfernen</string>
-    <string name="ex_order">Erscheinungsfolge</string>
     <string name="ex_unavailable">Titel Nicht Verfügbar</string>
     <string name="ex_clear_filters">Alle Filter Löschen</string>
     <string name="showing_most_watched">Meistgesehen</string>

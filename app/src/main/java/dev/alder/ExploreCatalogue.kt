@@ -6,33 +6,29 @@ internal data class Pick(val key: String, val label: String)
 internal data class Person(val id: Int, val name: String, val role: String, val photo: String?)
 internal enum class Facet(val title: Int) {
     PEOPLE(R.string.ex_people), GENRE(R.string.discover_genre), YEAR(R.string.discover_year),
-    RATING(R.string.ex_rating), SORT(R.string.list_sort), STUDIO(R.string.ex_studio),
-    RUNTIME(R.string.ex_runtime), LANGUAGE(R.string.group_language), COUNTRY(R.string.ex_country),
-    FRANCHISE(R.string.ex_franchise)
+    SORT(R.string.list_sort), STUDIO(R.string.ex_studio), LANGUAGE(R.string.group_language), COUNTRY(R.string.ex_country)
 }
 
 internal data class ExploreQuery(
     val type: String = "movie", val genres: List<Pick> = emptyList(), val any: Boolean = false,
-    val person: Person? = null, val collection: Pick? = null, val choices: Map<Facet, Pick> = emptyMap()
+    val person: Person? = null, val choices: Map<Facet, Pick> = emptyMap()
 ) {
     val movie get() = type == "movie"
     val media get() = if (movie) "movie" else "tv"
-    val sort get() = choices[Facet.SORT]?.key ?: if (collection == null) "popular" else "release"
+    val sort get() = choices[Facet.SORT]?.key ?: "popular"
 
     fun sortOptions() = buildList {
-        if (collection != null) add("release" to R.string.ex_order)
         add("popular" to R.string.discover_sort_popular)
         add("top" to R.string.discover_sort_top)
         add("new" to R.string.discover_sort_new)
-        if (collection == null) add("old" to R.string.ex_old)
+        add("old" to R.string.ex_old)
         add("votes" to R.string.showing_most_watched)
-        if (movie && collection == null) add("box" to R.string.showing_blockbusters)
+        if (movie) add("box" to R.string.showing_blockbusters)
     }
 
     fun without(f: Facet) = when (f) {
         Facet.PEOPLE -> copy(person = null)
         Facet.GENRE -> copy(genres = emptyList())
-        Facet.FRANCHISE -> copy(collection = null, choices = if (sort == "release") choices - Facet.SORT else choices)
         else -> copy(choices = choices - f)
     }
 
@@ -44,15 +40,7 @@ internal data class ExploreQuery(
                 if (it.first().isNotEmpty()) put("$date.gte", it.first() + "-01-01")
                 put("$date.lte", it.last() + "-12-31")
             }
-            choices[Facet.RATING]?.let {
-                put("vote_average.gte", it.key)
-                put("vote_count.gte", if (movie) "200" else "100")
-            }
             choices[Facet.STUDIO]?.let { put(if (movie) "with_companies" else "with_networks", it.key) }
-            choices[Facet.RUNTIME]?.key?.split(":")?.let {
-                if (it.first().isNotEmpty()) put("with_runtime.gte", it.first())
-                if (it.last().isNotEmpty()) put("with_runtime.lte", it.last())
-            }
             choices[Facet.LANGUAGE]?.let { put("with_original_language", it.key) }
             choices[Facet.COUNTRY]?.let { put("with_origin_country", it.key) }
             val narrowed = isNotEmpty() || person != null
@@ -78,15 +66,36 @@ internal object ExploreCatalogue {
     data class Page(val titles: List<JSONObject>, val count: Int, val last: Boolean)
 
     fun people(query: String): List<Person> {
-        val result = if (query.isBlank()) Tmdb.exploreRequest("trending/person/week", cache = true)
-            else Tmdb.exploreRequest("search/person", mapOf("query" to query), cache = true)
-        val list = result.optJSONArray("results").objects()
-        return (if (query.isBlank()) list else list.sortedByDescending { it.optDouble("popularity", 0.0) }).map {
+        val list = Tmdb.exploreRequest("search/person", mapOf("query" to query), cache = true).optJSONArray("results").objects()
+        return list.sortedByDescending { it.optDouble("popularity", 0.0) }.map {
             Person(it.getInt("id"), it.getString("name"), when(it.text("known_for_department")) {
                 "Acting" -> "actor"; "Writing" -> "writer"; "Directing" -> "director"; else -> "any"
             }, it.text("profile_path"))
         }
     }
+
+    /**
+     * Popular Now: the top-billed cast (and a film's director) of the catalogue's current popular titles, in the titles'
+     * order. TMDb's own trending people led with names few viewers know. Credits are cached for a day.
+     */
+    fun popularPeople(movie: Boolean): List<Person> {
+        val media = if (movie) "movie" else "tv"
+        val titles = Tmdb.exploreDiscover(ExploreQuery(type = if (movie) "movie" else "series").discover(), 1)
+            .optJSONArray("results").objects().take(POPULAR_TITLES)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(POPULAR_TITLES / 2)
+        try {
+            val credits = titles.map { t -> pool.submit<JSONObject?> {
+                runCatching { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits", cache = true) }.getOrNull()
+            } }.map { runCatching { it.get() }.getOrNull() }
+            return credits.filterNotNull().flatMap { c ->
+                c.optJSONArray("cast").objects().take(2).map { Person(it.getInt("id"), it.getString("name"), "actor", it.text("profile_path")) } +
+                    c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1)
+                        .map { Person(it.getInt("id"), it.getString("name"), "director", it.text("profile_path")) }
+            }.filter { it.photo != null }.distinctBy { it.id }.take(18)
+        } finally { pool.shutdown() }
+    }
+
+    private const val POPULAR_TITLES = 12
 
     private fun credits(q: ExploreQuery): List<JSONObject> {
         val person = requireNotNull(q.person)
@@ -99,14 +108,15 @@ internal object ExploreCatalogue {
                 else -> person.role == "any"
             }
         }
-        return (cast + crew).filter { q.movie || it.optInt("episode_count", 5) >= 5 }.distinctBy { it.getInt("id") }
+        // Guest spots (under 5 episodes) drop out for actors only: a show's directors and writers often have 1–4.
+        return (cast.filter { q.movie || it.optInt("episode_count", 5) >= 5 } + crew).distinctBy { it.getInt("id") }
     }
 
     internal fun localOrder(rows: List<JSONObject>, q: ExploreQuery): List<JSONObject> {
         val date = if (q.movie) "release_date" else "first_air_date"
         return when (q.sort) {
             "new" -> rows.sortedByDescending { it.optString(date) }
-            "release", "old" -> rows.sortedBy { it.text(date) ?: "9999" }
+            "old" -> rows.sortedBy { it.text(date) ?: "9999" }
             "votes" -> rows.sortedByDescending { it.optInt("vote_count") }
             "top" -> rows.sortedWith(compareByDescending<JSONObject> { it.optInt("vote_count") >= 100 }
                 .thenByDescending { it.optDouble("vote_average",0.0) })
@@ -115,11 +125,6 @@ internal object ExploreCatalogue {
     }
 
     fun page(q: ExploreQuery, page: Int): Page {
-        q.collection?.let {
-            val parts = Tmdb.exploreRequest("collection/${it.key}", cache = true).optJSONArray("parts").objects()
-
-            return Page(localOrder(parts,q), parts.size, true)
-        }
         if (!q.movie && q.person != null) {
             val params = q.discover().filters
             val rows = credits(q).filter {
@@ -127,7 +132,6 @@ internal object ExploreCatalogue {
                 val date = it.optString("first_air_date")
                 (q.genres.isEmpty() || if (q.any) q.genres.any { g -> g.key in genres } else q.genres.all { g -> g.key in genres }) &&
                     date >= params["first_air_date.gte"].orEmpty() && date <= (params["first_air_date.lte"] ?: "9999") &&
-                    it.optDouble("vote_average", 0.0) >= (params["vote_average.gte"]?.toDouble() ?: 0.0) &&
                     it.optInt("vote_count") >= (params["vote_count.gte"]?.toInt() ?: 0) &&
                     (params["with_original_language"]?.equals(it.text("original_language")) != false) &&
                     (params["with_origin_country"]?.let { c -> c in it.optJSONArray("origin_country").strings() } != false)

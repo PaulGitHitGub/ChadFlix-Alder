@@ -6,14 +6,14 @@ import org.junit.Test
 class ExploreQueryTest {
     private val genres = listOf(Pick("35", "Comedy"), Pick("27", "Horror"))
 
-    @Test fun matchModeAndRatingFloorReachTheDiscoverRequest() {
-        val q = ExploreQuery(genres = genres, choices = mapOf(Facet.RATING to Pick("7.5", "7.5+")))
+    @Test fun matchModeAndStudioReachTheDiscoverRequest() {
+        val q = ExploreQuery(genres = genres, choices = mapOf(Facet.STUDIO to Pick("1632|35", "Lionsgate")))
         assertEquals("35,27", q.discover().filters["with_genres"])
         assertEquals("35|27", q.copy(any = true).discover().filters["with_genres"])
-        assertEquals("200", q.discover().filters["vote_count.gte"])
-        assertEquals("100", q.copy(type = "series").discover().filters["vote_count.gte"])
+        assertEquals("1632|35", q.discover().filters["with_companies"])
+        assertEquals("1632|35", q.copy(type = "series").discover().filters["with_networks"])
         val newest = q.copy(choices = q.choices + (Facet.SORT to Pick("new", "Newest"))).discover()
-        assertTrue(discoverUrl(newest,1,"US","en","2026-11-24","k").contains("vote_count.gte=200"))
+        assertNull(newest.filters["vote_count.gte"])
     }
 
     @Test fun tvUsesFirstAirDateAndNeverAddsMoviePeopleParameters() {
@@ -30,7 +30,7 @@ class ExploreQueryTest {
         assertEquals("500",top.copy(genres=genres).discover().filters["vote_count.gte"])
         assertEquals("1000",top.copy(type="series").discover().filters["vote_count.gte"])
         assertEquals("200",top.copy(type="series",genres=genres).discover().filters["vote_count.gte"])
-        assertEquals("release",ExploreQuery(collection=Pick("10","Star Wars")).sort)
+        assertEquals("popular",ExploreQuery().sort)
     }
 
     @Test fun reliableSortsFollowCatalogueType() {
@@ -39,16 +39,17 @@ class ExploreQueryTest {
         val moviesList = listOf("popular","top","new","old","votes","box")
         assertEquals(moviesList,movies.sortOptions().map { it.first })
         assertEquals(moviesList.dropLast(1),shows.sortOptions().map { it.first })
-        val collection = movies.copy(collection=Pick("10","Star Wars"))
-        assertEquals(listOf("release","popular","top","new","votes"),collection.sortOptions().map { it.first })
         val oldest = mapOf(Facet.SORT to Pick("old","Oldest"))
         assertEquals("1000",movies.copy(choices=oldest).discover().filters["vote_count.gte"])
         assertEquals("100",shows.copy(choices=oldest).discover().filters["vote_count.gte"])
     }
 
-    @Test fun clearingFranchiseRestoresEveryPausedFilterAndSort() {
-        val q = ExploreQuery(genres=genres, any=true, choices=mapOf(Facet.SORT to Pick("votes","Most Votes")))
-        assertEquals(q,q.copy(collection=Pick("10","Star Wars")).without(Facet.FRANCHISE))
+    @Test fun removingAFilterKeepsTheOthersAndTheSort() {
+        val q = ExploreQuery(genres=genres, any=true, choices=mapOf(Facet.SORT to Pick("votes","Most Votes"),
+            Facet.LANGUAGE to Pick("ko","Korean")))
         assertEquals("votes",q.without(Facet.GENRE).sort)
+        assertEquals(q.copy(genres=emptyList()),q.without(Facet.GENRE))
+        assertNull(q.without(Facet.LANGUAGE).discover().filters["with_original_language"])
+        assertEquals("ko",q.without(Facet.GENRE).discover().filters["with_original_language"])
     }
 }

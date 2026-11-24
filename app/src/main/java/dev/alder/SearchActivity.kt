@@ -74,6 +74,7 @@ class SearchActivity : ExploreScreen() {
     private lateinit var recentBox: LinearLayout
     override lateinit var results: LinearLayout
     override lateinit var resultsScroll: ScrollView
+    override lateinit var popLayer: FrameLayout
     private lateinit var keyboard: LinearLayout
     private lateinit var headerBar: View
     private lateinit var nav: LinearLayout
@@ -147,7 +148,8 @@ class SearchActivity : ExploreScreen() {
         root.addView(headerBar, FrameLayout.LayoutParams(-1, dp(76)))
         styleNav()
 
-        // The query's header to the right of the keyboard: a search glyph, then "Popular Titles" until something is typed.
+        // The heading right of the panel, over the posters' left edge (the chosen Heading Strip): the catalogue's name,
+        // or what's typed.
         input = EditText(this).apply {
             hint = getString(R.string.search_popular_titles)
             setHintTextColor(HomeStyle.WHITE)
@@ -160,7 +162,7 @@ class SearchActivity : ExploreScreen() {
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             showSoftInputOnFocus = false // phone remotes and TalkBack type into it without our own keyboard's help
             background = null
-            setPadding(dp(12), 0, 0, 0)
+            setPadding(0, 0, 0, 0)
             setSelectAllOnFocus(false)
             // No box: the header's words are underlined while the field has the remote.
             setOnFocusChangeListener { _, has ->
@@ -171,39 +173,39 @@ class SearchActivity : ExploreScreen() {
         }
         root.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            addView(ImageView(this@SearchActivity).apply {
-                setImageResource(R.drawable.ic_search)
-                imageTintList = ColorStateList.valueOf(HomeStyle.WHITE)
-            }, LinearLayout.LayoutParams(dp(12), dp(12)))
             addView(input, LinearLayout.LayoutParams(0, -2, 1f))
             addView(buildSortStrip(input,searchTab),LinearLayout.LayoutParams(-2,-1))
         }, FrameLayout.LayoutParams(dp((width - RESULTS_X - PAD).toInt()), dp(28)).apply { leftMargin = dp(RESULTS_X); topMargin = dp(QUERY_TOP) })
 
         keyboard = column(Gravity.START)
         buildKeyboard()
-        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(KEYS_W), dp(KEY_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(66) }) }
-        keyboardButton = pill(R.string.ex_keyboard).apply {
-            id = View.generateViewId()
-            setOnClickListener { toggleKeys(true) }
-        }
-        root.addView(keyboardButton,FrameLayout.LayoutParams(dp(KEYS_W),dp(29)).apply { leftMargin=dp(KEYS_X); topMargin=dp(100) })
-        root.addView(buildPanel(),FrameLayout.LayoutParams(dp(KEYS_W),dp((height-145).toInt())).apply {
-            leftMargin=dp(KEYS_X); topMargin=dp(135)
+        // Voice Search and Keyboard Search above the panel, as the panel's rows: words on the dark, a white pill focused.
+        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(PANEL_W), dp(ACTION_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(VOICE_TOP) }) }
+        keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.first
+        root.addView(keyboardButton,FrameLayout.LayoutParams(dp(PANEL_W),dp(ACTION_H)).apply {
+            leftMargin=dp(KEYS_X); topMargin=dp(VOICE_TOP + ACTION_H + ACTION_GAP)
         })
-        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(148) })
+        root.addView(buildPanel(),FrameLayout.LayoutParams(dp(PANEL_W),dp((height - PANEL_TOP - SAFE_BOTTOM).toInt())).apply {
+            leftMargin=dp(KEYS_X); topMargin=dp(PANEL_TOP)
+        })
+        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(PANEL_TOP) })
 
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
-        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(384) })
+        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(PANEL_TOP + 7 * KEY_H + 8) })
         showRecent()
 
         results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
+        popLayer = FrameLayout(this).apply {
+            clipChildren = false
+            addView(results, FrameLayout.LayoutParams(-1, -2))
+        }
         resultsScroll = object : ScrollView(this) {
             override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
         }.apply {
             isVerticalScrollBarEnabled = false
             outlineProvider = ViewOutlineProvider.BOUNDS
             clipToOutline = true
-            addView(results)
+            addView(popLayer)
         }
         // Runs to the screen's right edge, as Home's rows do: stopping 48 dp short sliced the last poster in half.
         root.addView(resultsScroll, FrameLayout.LayoutParams(dp((width - RESULTS_X).toInt()), dp((height - RESULTS_TOP).toInt())).apply {
@@ -346,7 +348,10 @@ class SearchActivity : ExploreScreen() {
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
             isFocusable = true
-            setOnClickListener { peopleButton.requestFocus() }
+            // Down to the open left column: the keys while typing (the panel is hidden then), else People.
+            setOnClickListener {
+                (if (keyboard.visibility == View.VISIBLE) lastKeyboardFocus ?: firstKey else peopleButton)?.requestFocus()
+            }
         }
         nav.addView(searchTab, LinearLayout.LayoutParams(dp(44), -1))
         updateNavTabs()
@@ -432,37 +437,22 @@ class SearchActivity : ExploreScreen() {
         val delete = key(getString(R.string.search_delete), last, 3, true) { delete() }
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
-            val icon = ImageView(this).apply { setImageResource(R.drawable.ic_mic) }
-            val label = text(getString(R.string.search_voice), SMALL, bold = true)
-            voice = LinearLayout(this).apply {
-                id = View.generateViewId()
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), 0, dp(14), 0)
-                isFocusable = true
-                contentDescription = getString(R.string.search_voice)
-                fun style(has: Boolean) {
-                    background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
-                    icon.imageTintList = ColorStateList.valueOf(if (listening) HomeStyle.LIST_RED else if (has) HomeStyle.BLACK else HomeStyle.WHITE)
-                    label.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
-                    label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
-                }
-                style(false)
-                styleVoice = { style(hasFocus()) }
-                setOnFocusChangeListener { v, has ->
-                    if (has) lastKeyboardFocus = v
-                    style(has)
-                }
-                setOnClickListener {
-                    // OK while listening: stop and search what was heard so far.
-                    if (listening) return@setOnClickListener stopVoice()
-                    // ChadFlix: ask for the microphone once; the speech service checks the asking app holds it.
-                    if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
-                    else requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
-                }
-                addView(icon, LinearLayout.LayoutParams(dp(16), dp(16)))
-                addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
+            val (view, style) = sideAction(R.drawable.ic_mic, getString(R.string.search_voice),
+                iconTint = { has -> if (listening) HomeStyle.LIST_RED else if (has) HomeStyle.BLACK else HomeStyle.WHITE },
+                focused = { v -> lastKeyboardFocus = v }) {
+                // OK while listening: stop and search what was heard so far.
+                if (listening) return@sideAction stopVoice()
+                // ChadFlix: ask for the microphone once; the speech service checks the asking app holds it.
+                if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) startVoice()
+                else requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
             }
-            rightEdgeKeys += voice!!
+            val label = view.getChildAt(1) as TextView
+            styleVoice = {
+                label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
+                style(view.hasFocus())
+            }
+            voice = view
+            rightEdgeKeys += view
         }
         // ChadFlix: Clear, in Voice Search's style, above it while the query has words.
         val clearIcon = ImageView(this).apply { setImageResource(R.drawable.ic_close) }
@@ -512,19 +502,51 @@ class SearchActivity : ExploreScreen() {
 
     private var firstRow = emptyList<View>()
 
+    /**
+     * Voice Search and Keyboard Search: an icon and words, as wide as the panel, with no box until focused, when they
+     * take the app's white pill (the top bar's and the keys' focus). Returns the view and its restyle.
+     */
+    private fun sideAction(iconRes: Int, words: String, iconTint: (Boolean) -> Int = { if (it) HomeStyle.BLACK else HomeStyle.WHITE },
+                           focused: (View) -> Unit = {}, click: () -> Unit): Pair<LinearLayout, (Boolean) -> Unit> {
+        val icon = ImageView(this).apply { setImageResource(iconRes) }
+        val label = text(words, SMALL, bold = true)
+        val view = LinearLayout(this).apply {
+            id = View.generateViewId()
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(ACTION_PAD), 0, dp(ACTION_PAD), 0)
+            isFocusable = true
+            contentDescription = words
+            addView(icon, LinearLayout.LayoutParams(dp(14), dp(14)))
+            addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
+            setOnClickListener { click() }
+        }
+        fun style(has: Boolean) {
+            view.background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null // owner: no pill unless focused
+            icon.imageTintList = ColorStateList.valueOf(iconTint(has))
+            label.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+        }
+        style(false)
+        view.setOnFocusChangeListener { v, has ->
+            if (has) focused(v)
+            style(has)
+        }
+        return view to ::style
+    }
+
     /** Clear shows while the query has words; Up from Voice Search (or the keys) goes Clear → query field, Down mirrors. */
     private fun updateClear() {
         val c = clear ?: return
         sortStrip.visibility = if (lookupMode == null && input.text.isBlank() && !listening) View.VISIBLE else View.GONE
         val show = (beforeVoice ?: input.text.toString()).isNotEmpty()
-        input.setPadding(dp(12),0,if (show) dp(95) else 0,0)
+        input.setPadding(0,0,if (show) dp(95) else 0,0)
         if (!show && c.hasFocus()) (voice ?: firstKey)?.requestFocus()
         if (!show && lastKeyboardFocus === c) lastKeyboardFocus = voice ?: firstKey
         c.visibility = if (show) View.VISIBLE else View.GONE
         val above = if (show) c.id else input.id
         voice?.nextFocusUpId = above
         if (voice == null) firstRow.forEach { it.nextFocusUpId = above }
-        input.nextFocusDownId = if (show) c.id else (voice ?: firstKey)?.id ?: View.NO_ID
+        // Never into the keys while they're hidden (no speech recognizer: no Voice Search above them).
+        input.nextFocusDownId = if (show) c.id else (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).id
     }
 
     /** The header's words without searching them: voice's partial words, "Didn't catch that", the query back again. */
@@ -827,10 +849,11 @@ class SearchActivity : ExploreScreen() {
         results.removeAllViews()
         val clearBtn = pill(R.string.search_clear).apply {
             setOnClickListener {
+                // Focus first, onto something showing: after a voice search the keys are hidden.
+                (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: peopleButton).requestFocus()
                 input.setText("")
                 main.removeCallbacks(typed)
                 search(false)
-                firstKey?.requestFocus()
             }
             setOnKeyListener { _, code, event ->
                 if (event.action == KeyEvent.ACTION_DOWN && code == KeyEvent.KEYCODE_DPAD_LEFT)
@@ -874,13 +897,9 @@ class SearchActivity : ExploreScreen() {
         resultsScroll.scrollTo(0, 0)
         clearGrid()
         val mode = lookupMode
-        input.hint = when(mode) {
-            "person" -> getString(R.string.ex_people)
-            "collection" -> getString(R.string.ex_franchise)
-            else -> heading
-        }
+        input.hint = if (mode != null) getString(R.string.ex_people) else heading
         if (mode != null) {
-            findChoices(mode,query,enteringLookup || moveFocus)
+            findPeople(query,enteringLookup || moveFocus)
             enteringLookup = false
             return
         }
@@ -1076,12 +1095,20 @@ class SearchActivity : ExploreScreen() {
 
     private companion object {
         const val RECENT = 4
-        const val RESULTS_X = 256 // dp: the header and the rows start here, right of the keyboard
-        // ChadFlix: tighter gaps, so the Shows row ends inside the TV's safe area (27 dp from the bottom); poster size kept.
-        const val QUERY_TOP = 58 // dp: the search line (was 66)
-        const val RESULTS_TOP = 90 // dp: the rows (was 104)
+        // dp, from the chosen mockups at 1080p (CSS px ÷ 2): the panel 196 wide at 33 from the left edge, the heading and
+        // the posters 18 dp right of it, the first posters at 92 dp (4 dp of that above them is room for the focus ring).
+        const val RESULTS_X = 247 // the heading and the rows start here, right of the panel
+        const val QUERY_TOP = 62 // the heading line (28 tall, centred on 76 dp as the mockup's)
+        const val RESULTS_TOP = 88
         const val ROW_GAP = 12 // dp: a row's caption to the next row's title (was 16)
-        const val KEYS_X = 40
+        const val KEYS_X = 33
+        const val PANEL_W = 196
+        const val VOICE_TOP = 66 // Voice Search, then Keyboard Search, above the panel
+        const val ACTION_H = 28
+        const val ACTION_GAP = 2
+        const val ACTION_PAD = 17 // their icons line up with the panel rows' words (8 + 9 dp inside the panel)
+        const val PANEL_TOP = 130
+        const val SAFE_BOTTOM = 27 // the TV's safe area at the bottom
         const val KEY_W = 33
         const val KEY_H = 32
         const val KEYS_W = KEY_W * 6

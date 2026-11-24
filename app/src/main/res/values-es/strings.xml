@@ -579,12 +579,9 @@
     <string name="failure_advice_preferred_audio">Elige una fuente con tu idioma de audio.</string>
     <string name="list_added_on">Añadido el %1$s</string>
     <string name="ex_people">Personas</string>
-    <string name="ex_rating">Puntuación TMDb</string>
     <string name="ex_studio">Estudio</string>
     <string name="ex_network">Cadena</string>
-    <string name="ex_runtime">Duración</string>
     <string name="ex_country">País</string>
-    <string name="ex_franchise">Saga</string>
     <string name="ex_keyboard">Buscar Con Teclado</string>
     <string name="ex_any">Cualquiera</string>
     <string name="ex_match">Coincidencia</string>
@@ -600,7 +597,6 @@
     <string name="ex_role">Cualquier Función</string>
     <string name="ex_popular">Popular Ahora</string>
     <string name="ex_remove">Quitar %1$s</string>
-    <string name="ex_order">Orden De Estreno</string>
     <string name="ex_unavailable">Título No Disponible</string>
     <string name="ex_clear_filters">Borrar Todos Los Filtros</string>
     <string name="showing_most_watched">Más Vistos</string>

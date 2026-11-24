@@ -576,12 +576,9 @@
     <string name="failure_advice_preferred_audio">अपनी ऑडियो भाषा वाला स्रोत चुनें।</string>
     <string name="list_added_on">%1$s को जोड़ा गया</string>
     <string name="ex_people">लोग</string>
-    <string name="ex_rating">TMDb रेटिंग</string>
     <string name="ex_studio">स्टूडियो</string>
     <string name="ex_network">नेटवर्क</string>
-    <string name="ex_runtime">अवधि</string>
     <string name="ex_country">देश</string>
-    <string name="ex_franchise">फ़िल्म शृंखला</string>
     <string name="ex_keyboard">कीबोर्ड से खोजें</string>
     <string name="ex_any">कोई भी</string>
     <string name="ex_match">मिलान</string>
@@ -597,7 +594,6 @@
     <string name="ex_role">कोई भी भूमिका</string>
     <string name="ex_popular">अभी लोकप्रिय</string>
     <string name="ex_remove">%1$s हटाएँ</string>
-    <string name="ex_order">रिलीज़ क्रम</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>
