@@ -212,6 +212,7 @@ class DetailsActivity : Screen() {
     private var seasonButtons = emptyMap<Int, TextView>()
     private lateinit var similarOverlay: FrameLayout
     private var similarFirst: View? = null
+    private var similarTitles = emptyList<Meta>()
     private lateinit var buttonRow: LinearLayout
     private val castChips = mutableListOf<View>()
     private lateinit var filmographyOverlay: FrameLayout
@@ -513,7 +514,7 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
-            stack.addView(buildMetadataRow(m, detailed = false), wrap().apply { topMargin = dp(8) })
+            stack.addView(buildMetadataRow(m, detailed = false), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             m.description?.takeIf { it.isNotBlank() }?.let {
                 stack.addView(text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
@@ -617,9 +618,10 @@ class DetailsActivity : Screen() {
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
             setOnClickListener { showGuide() }
         } else null
-        similarButton = if (::similarOverlay.isInitialized) titleAction(getString(R.string.details_more_like_this)).apply {
+        similarButton = titleAction(getString(R.string.details_more_like_this)).apply {
+            visibility = if (similarTitles.isEmpty()) View.GONE else View.VISIBLE
             setOnClickListener { showSimilar() }
-        } else null
+        }
         if (unairedNext == null || !episodic) addAction(playButton, 12)
         else guideButton?.let { playButton = it }
         guideButton?.let { addAction(it, if (it === playButton) 12 else 0) }
@@ -1307,7 +1309,7 @@ class DetailsActivity : Screen() {
             result.getOrNull()?.let { titles ->
                 titles.asSequence().filter { it.id != metaId && it.type == type }
                     .distinctBy { it.id }.take(12).toList().takeIf { it.isNotEmpty() }
-                    ?.let { showSimilar(getString(R.string.details_more_like_this), it) }
+                    ?.let { similarTitles = it; similarButton?.visibility = View.VISIBLE }
             }
         }
     }
@@ -1340,14 +1342,6 @@ class DetailsActivity : Screen() {
             leftMargin = dp(PAD); rightMargin = dp(PAD); bottomMargin = dp(38)
         })
         return overlay
-    }
-
-    /** Movies reveal one Home-sized poster row without moving the title off the screen. */
-    private fun showSimilar(heading: String, titles: List<Meta>) {
-        if (::similarOverlay.isInitialized) root.removeView(similarOverlay)
-        similarOverlay = buildPosterRowOverlay(heading, titles) { similarFirst = it }
-        root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
-        if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
     }
 
     private fun addPosterRail(content: LinearLayout, titles: List<Meta>, captionPill: TextView): View? {
@@ -1394,7 +1388,11 @@ class DetailsActivity : Screen() {
     }
 
     private fun showSimilar() {
-        if (!::similarOverlay.isInitialized || similarOpen) return
+        if (similarTitles.isEmpty() || similarOpen) return
+        if (!::similarOverlay.isInitialized) {
+            similarOverlay = buildPosterRowOverlay(getString(R.string.details_more_like_this), similarTitles) { similarFirst = it }
+            root.addView(similarOverlay, FrameLayout.LayoutParams(-1, -1))
+        }
         similarOpen = true
         hero.visibility = View.INVISIBLE
         similarOverlay.visibility = View.VISIBLE
