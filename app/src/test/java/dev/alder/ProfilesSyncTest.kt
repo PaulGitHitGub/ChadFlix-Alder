@@ -223,7 +223,7 @@ class ProfilesSyncTest {
         assertTrue(isValidTitleId { "tt1234567" })
     }
 
-    private class InMemoryPrefs : SharedPreferences {
+    internal class InMemoryPrefs : SharedPreferences {
         private val data = linkedMapOf<String, Any?>()
 
         override fun getAll(): MutableMap<String, *> = data.toMutableMap()

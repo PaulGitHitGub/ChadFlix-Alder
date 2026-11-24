@@ -46,6 +46,7 @@ object Settings {
     fun release(c: Context) = prefs(c).getString(profileKey(c, "release"), "").orEmpty()
     /** "": no preference, "original": dubs last, "mine": the audio language first. */
     fun dub(c: Context) = prefs(c).getString(profileKey(c, "dub"), "").orEmpty()
+    internal fun watchlists(c: Context) = Watchlists(prefs(c), profileKey(c, "watchlists"))
     fun profileKey(c: Context, key: String) = "$key@${Profiles.active(c)?.id}"
     /**
      * Titles this profile hid from Continue Watching on this TV: id to {name, timeOffset}, so Settings can put them
@@ -99,7 +100,7 @@ object Settings {
         listOf(
             "release", "dub", "audioLang", "audioFallback", "subLang", "subPref", "hidden", "blurThumbnails",
             "hiddenRows", "startTab", "showMovies", "showShows", "showLive", "showLibrary",
-            "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
+            "watchlists", "tabOrder", "featuredHome", "recentSubLangs", "recentAudioLangs",
         ).forEach { remove("$it@$profileId") }
         prefs.all.keys.filter { (it.startsWith("title:") || it.startsWith("showTab:") || it.startsWith("rowOrder:") ||
             it.startsWith("rowsOn:") || it.startsWith("rowsKnown:") || it.startsWith("showing:") ||
