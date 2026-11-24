@@ -30,8 +30,9 @@ object Updates {
         // No release published yet: GitHub answers "Not Found", so nothing is newer than this version.
         val release = if (json.optString("message") == "Not Found") Release(mine(c), "") else {
             val assets = json.getJSONArray("assets")
-            val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.optString("name").endsWith(".apk") }?.optString("browser_download_url") ?: return null
+            val apks = (0 until assets.length()).map { assets.getJSONObject(it) }.filter { it.optString("name").endsWith(".apk") }
+            val apk = (apks.firstOrNull { it.optString("name") == "ChadFlix.apk" } ?: apks.firstOrNull()) // ChadFlix: the README's name first
+                ?.optString("browser_download_url") ?: return null
             Release(json.getString("tag_name").removePrefix("v"), apk)
         }
         release.also {

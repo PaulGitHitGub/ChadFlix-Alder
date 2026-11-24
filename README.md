@@ -86,6 +86,9 @@ Install ChadFlix on that TV.
    Then run adb disconnect <IP:PORT> and remind me to turn network debugging off.
 ```
 
+If you built ChadFlix yourself before, Android refuses this update because the signing key differs. Uninstall that
+copy first: the settings on the TV go, your Stremio account stays.
+
 ### 3. Allow the Computer
 
 When the TV asks to allow debugging, choose **Allow**. On a Mac, also allow local network access if macOS asks.
