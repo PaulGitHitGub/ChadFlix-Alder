@@ -101,6 +101,7 @@
     <string name="details_up_to_date">À jour  ·  S%1$d E%2$d diffusé le %3$s</string>
     <string name="details_airs_soon">bientôt</string>
     <string name="airs_on">Diffusé le %1$s</string>
+    <string name="details_more_episodes">Plus d’épisodes</string>
     <string name="action_episodes">Épisodes</string>
     <string name="action_more_info">Plus d’infos</string>
     <string name="action_start_over">Reprendre au début</string>

@@ -100,6 +100,7 @@
     <string name="details_up_to_date">सब देख लिया  ·  S%1$d E%2$d %3$s को आएगा</string>
     <string name="details_airs_soon">जल्द</string>
     <string name="airs_on">%1$s को आएगा</string>
+    <string name="details_more_episodes">और एपिसोड</string>
     <string name="action_episodes">एपिसोड</string>
     <string name="action_more_info">ज़्यादा जानकारी</string>
     <string name="action_start_over">शुरू से देखें</string>

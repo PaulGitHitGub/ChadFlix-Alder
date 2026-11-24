@@ -100,6 +100,7 @@
     <string name="details_up_to_date">Auf dem neuesten Stand  ·  S%1$d F%2$d läuft am %3$s</string>
     <string name="details_airs_soon">bald</string>
     <string name="airs_on">Läuft am %1$s</string>
+    <string name="details_more_episodes">Weitere Folgen</string>
     <string name="action_episodes">Folgen</string>
     <string name="action_more_info">Mehr Infos</string>
     <string name="action_start_over">Von vorn</string>

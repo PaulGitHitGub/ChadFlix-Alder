@@ -101,6 +101,7 @@
     <string name="details_up_to_date">In pari  ·  S%1$d E%2$d in onda il %3$s</string>
     <string name="details_airs_soon">presto</string>
     <string name="airs_on">In onda il %1$s</string>
+    <string name="details_more_episodes">Altri episodi</string>
     <string name="action_episodes">Episodi</string>
     <string name="action_more_info">Altre informazioni</string>
     <string name="action_start_over">Ricomincia</string>

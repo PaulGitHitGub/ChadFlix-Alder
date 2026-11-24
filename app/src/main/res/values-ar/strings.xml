@@ -105,6 +105,7 @@
     <string name="details_up_to_date">شاهدت كل الحلقات المتاحة · الموسم %1$d، الحلقة %2$d تُعرض في %3$s</string>
     <string name="details_airs_soon">قريبًا</string>
     <string name="airs_on">يُعرض في %1$s</string>
+    <string name="details_more_episodes">المزيد من الحلقات</string>
     <string name="action_episodes">الحلقات</string>
     <string name="action_more_info">مزيد من المعلومات</string>
     <string name="action_start_over">إعادة من البداية</string>

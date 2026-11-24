@@ -126,6 +126,7 @@
     <string name="details_up_to_date">Up to date  ·  S%1$d E%2$d airs %3$s</string>
     <string name="details_airs_soon">soon</string>
     <string name="airs_on">Airs %1$s</string>
+    <string name="details_more_episodes">More Episodes</string>
     <string name="action_episodes">Episodes</string>
     <string name="action_more_info">More information</string>
     <string name="action_start_over">Start over</string>
@@ -140,7 +141,7 @@
     <string name="mark_season_unwatched">Mark %1$s as unwatched</string>
     <string name="details_the_story">The story</string>
     <string name="details_cast">Cast</string>
-    <string name="details_more_like_this">More like this</string>
+    <string name="details_more_like_this">More Like This</string>
     <string name="cast_more">+%1$d more</string>
     <string name="cast_director">Director</string>
     <string name="directed_by">Directed by %1$s</string>

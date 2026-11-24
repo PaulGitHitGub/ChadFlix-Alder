@@ -101,6 +101,7 @@
     <string name="details_up_to_date">Al día  ·  T%1$d E%2$d se emite el %3$s</string>
     <string name="details_airs_soon">pronto</string>
     <string name="airs_on">Se emite el %1$s</string>
+    <string name="details_more_episodes">Más episodios</string>
     <string name="action_episodes">Episodios</string>
     <string name="action_more_info">Más información</string>
     <string name="action_start_over">Empezar de nuevo</string>

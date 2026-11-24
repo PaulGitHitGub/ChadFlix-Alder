@@ -95,7 +95,7 @@ internal fun episodeDate(value: String?, locale: Locale = Locale.getDefault()): 
 }
 
 internal enum class HeroControlFocus {
-    PLAY,
+    PLAY, GUIDE, SIMILAR,
     TRAILER,
     START_OVER,
     LIST,
@@ -153,7 +153,7 @@ internal fun resolveHeroFocusTarget(
     } else {
         HeroFocusState(HeroControlFocus.PLAY)
     }
-    HeroControlFocus.PLAY, HeroControlFocus.LIST, HeroControlFocus.INFO -> saved
+    HeroControlFocus.GUIDE, HeroControlFocus.SIMILAR, HeroControlFocus.PLAY, HeroControlFocus.LIST, HeroControlFocus.INFO -> saved
 }
 
 internal fun resolveFilmographyReturnTarget(
@@ -218,6 +218,8 @@ class DetailsActivity : Screen() {
     private var filmographyFirst: View? = null
     private var lastFocusedActor: View? = null
     private lateinit var listButton: TextView
+    private var guideButton: TextView? = null
+    private var similarButton: TextView? = null
     private lateinit var playButton: TextView
     private lateinit var infoButton: TextView
     private var trailerButton: TextView? = null
@@ -310,7 +312,7 @@ class DetailsActivity : Screen() {
             val wasGuide = guideOpen // fresh details can land while the guide is open: rebuild it open, as onRestart does
             if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(m)
             if (hasEpisodes(type, m.videos) && m.videos.isNotEmpty()) { buildGuide(m.videos); if (wasGuide) showGuide() }
-            if (!hasEpisodes(type, m.videos) && !similarRequested) { similarRequested = true; loadSimilar() }
+            if (!similarRequested) { similarRequested = true; loadSimilar() }
             loadRichCast()
             if (!certificateRequested && certificate == null && m.id.startsWith("tt")) {
                 certificateRequested = true
@@ -394,6 +396,8 @@ class DetailsActivity : Screen() {
         val castIndex = castChips.indexOfFirst { it === focused || isInside(focused, it) }
         if (castIndex >= 0) return HeroFocusState(HeroControlFocus.CAST, castIndex)
         return when {
+            focused === guideButton -> HeroFocusState(HeroControlFocus.GUIDE)
+            focused === similarButton -> HeroFocusState(HeroControlFocus.SIMILAR)
             ::playButton.isInitialized && (focused === playButton || isInside(focused, playButton)) ->
                 HeroFocusState(HeroControlFocus.PLAY)
             trailerButton?.let { focused === it || isInside(focused, it) } == true ->
@@ -410,6 +414,8 @@ class DetailsActivity : Screen() {
 
     private fun heroFocusView(target: HeroFocusState): View? = when (target.control) {
         HeroControlFocus.PLAY -> if (::playButton.isInitialized) playButton else null
+        HeroControlFocus.GUIDE -> guideButton ?: playButton
+        HeroControlFocus.SIMILAR -> similarButton ?: playButton
         HeroControlFocus.TRAILER -> trailerButton ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.START_OVER -> startOverButton ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.LIST -> if (::listButton.isInitialized) listButton else null
@@ -439,10 +445,7 @@ class DetailsActivity : Screen() {
         if (!shouldShowHero(overlays())) return
         hero.visibility = View.VISIBLE
         if (!refreshHeroIfNeeded(preferredFocus)) {
-            when (preferredFocus) {
-                HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton.requestFocus()
-                else -> if (::playButton.isInitialized) playButton.requestFocus()
-            }
+            heroFocusView(HeroFocusState(preferredFocus))?.requestFocus()
         }
     }
 
@@ -531,19 +534,13 @@ class DetailsActivity : Screen() {
             }
             addWatch(m, stack)
         }
-        hero.addView(stack, FrameLayout.LayoutParams(dp(HERO_W), -2, Gravity.TOP or Gravity.START).apply {
-            leftMargin = dp(PAD); topMargin = dp(61)
+        hero.addView(ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            isFocusable = false
+            addView(stack)
+        }, FrameLayout.LayoutParams(dp(HERO_W), -1, Gravity.TOP or Gravity.START).apply {
+            leftMargin = dp(PAD); topMargin = dp(61); bottomMargin = dp(16)
         })
-        val hasEpisodes = hasEpisodes(type, m?.videos) && m?.videos?.isNotEmpty() == true
-        if (hasEpisodes || ::similarOverlay.isInitialized) {
-            hero.addView(caps(if (hasEpisodes) R.string.details_episodes_below else R.string.details_more_below, TEXT_2).onArt().apply {
-                isFocusable = true
-                setOnClickListener { if (hasEpisodes) showGuide() else showSimilar() }
-                rowFocus(rest = { null })
-            }, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply {
-                leftMargin = dp(PAD); bottomMargin = dp(28)
-            })
-        }
         if (m != null) {
             val resolved = resolveHeroFocusTarget(
                 saved = savedFocus,
@@ -588,42 +585,13 @@ class DetailsActivity : Screen() {
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END
             }.marginTop(16))
 
-            playButton = pill(R.string.action_episodes).apply {
-                setOnClickListener { showGuide() }
-            }
-            val trailer = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
-            trailerButton = trailer
-            startOverButton = null
-            infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo() }
-            listButton = buildListButton()
-            buttonRow = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                clipChildren = false
-                clipToPadding = false
-                addView(playButton, wrap().apply { marginEnd = dp(14) })
-                trailer?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
-                addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
-                addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
-            }
-            stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
-            return
         }
         val duration = item?.optJSONObject("state")?.optLong("duration") ?: 0L
-        val remaining = timeLeft(duration, resumeAt)
         endsLeftMs = HomeStyle.endsLeftMs(m.runtime, duration, resumeAt)
         showEnds()
-        if (resumeAt > 0) {
-            // ChadFlix: no "Stopped at 46:15"; the time left and the bar say where you are.
-            val where = listOfNotNull(episode?.let { "S${it.season} E${it.episode}" }, episode?.title?.takeIf { it.isNotBlank() }, remaining)
-            stack.addView(text(where.joinToString(DOT), SMALL, bold = true).onArt().apply {
-                maxLines = 2; ellipsize = TextUtils.TruncateAt.END
-            }.marginTop(16))
-        }
-        if (remaining != null) stack.addView(progressBar(resumeAt.toFloat() / duration), LinearLayout.LayoutParams(dp(240), dp(3)).apply { topMargin = dp(8) })
-
-        playButton = pill(if (resumeAt > 0) R.string.action_resume else R.string.action_play, R.drawable.ic_play).apply {
+        val playLabel = getString(if (resumeAt > 0) R.string.action_resume else R.string.action_play)
+        playButton = titleAction(if (episode == null) playLabel else "$playLabel S${episode.season}: E${episode.episode}").apply {
             setOnClickListener { openSources(target?.first ?: metaId, startOver = false) }
-            // Held OK: every source, to choose one by hand.
             setOnLongClickListener { openSources(target?.first ?: metaId, startOver = false, pick = true); true }
         }
         val trailer = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
@@ -638,13 +606,37 @@ class DetailsActivity : Screen() {
             gravity = Gravity.CENTER_VERTICAL
             clipChildren = false
             clipToPadding = false
-            addView(playButton, wrap().apply { marginEnd = dp(14) })
             trailer?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             startOver?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
             addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
+        fun addAction(action: TextView, gap: Int) {
+            stack.addView(action, LinearLayout.LayoutParams(dp(280), -2).apply { topMargin = dp(gap) })
+        }
+        guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
+            setOnClickListener { showGuide() }
+        } else null
+        similarButton = if (::similarOverlay.isInitialized) titleAction(getString(R.string.details_more_like_this)).apply {
+            setOnClickListener { showSimilar() }
+        } else null
+        if (unairedNext == null || !episodic) addAction(playButton, 12)
+        else guideButton?.let { playButton = it }
+        guideButton?.let { addAction(it, if (it === playButton) 12 else 0) }
+        similarButton?.let { addAction(it, 0) }
+    }
+
+    private fun titleAction(label: String) = text(label, SMALL, bold = true).apply {
+        isFocusable = true
+        gravity = Gravity.CENTER_VERTICAL
+        minHeight = dp(BUTTON_H)
+        setPadding(dp(16), 0, dp(16), 0)
+        setOnFocusChangeListener { _, focused ->
+            background = if (focused) rounded(TEXT, BUTTON_H / 2) else null
+            setTextColor(if (focused) BASE else TEXT)
+        }
+
     }
 
     private fun buildMetadataRow(m: Meta, detailed: Boolean): LinearLayout {
@@ -684,8 +676,19 @@ class DetailsActivity : Screen() {
             }
             val ratings = shownRatings("both", m.rating, mdbScores["letterboxd"], mdbScores["tomatoes"])
             if (ratings.isNotEmpty()) {
-                if (facts.isNotBlank() || certificate != null) addView(text(DOT, SMALL, color = TEXT_2).onArt())
-                addRatingLogos(this, ratings)
+                if (detailed) {
+                    if (facts.isNotBlank() || certificate != null) addView(text(DOT, SMALL, color = TEXT_2).onArt())
+                    addRatingLogos(this, ratings)
+                } else {
+                    val metadata = this
+                    return column(Gravity.START).apply {
+                        addView(metadata)
+                        addView(LinearLayout(this@DetailsActivity).apply {
+                            gravity = Gravity.CENTER_VERTICAL
+                            addRatingLogos(this, ratings)
+                        }, wrap().apply { topMargin = dp(4) })
+                    }
+                }
             }
         }
     }
@@ -1412,7 +1415,7 @@ class DetailsActivity : Screen() {
         similarOpen = false
         similarOverlay.exit().alpha(0f).translationY(dp(20).toFloat()).withEndAction {
             similarOverlay.visibility = View.GONE
-            revealHero(HeroControlFocus.PLAY)
+            revealHero(HeroControlFocus.SIMILAR)
         }.start()
     }
 
@@ -1860,31 +1863,6 @@ class DetailsActivity : Screen() {
                         return true
                     }
                 }
-            } else if (!infoOpen && !similarOpen && !filmographyOpen && currentFocus?.let { v -> castChips.any { it === v || isInside(v, it) } } == true) {
-                val chipIndex = castChips.indexOfFirst { it === currentFocus || isInside(currentFocus!!, it) }
-                when (event.keyCode) {
-                    KeyEvent.KEYCODE_DPAD_DOWN -> { playButton.requestFocus(); return true }
-                    KeyEvent.KEYCODE_DPAD_UP -> return true
-                    KeyEvent.KEYCODE_DPAD_LEFT -> if (chipIndex == 0) return true
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> if (chipIndex == castChips.lastIndex) return true
-                }
-            } else if (!infoOpen && !similarOpen && !filmographyOpen &&
-                currentFocus?.let { (::playButton.isInitialized && it === playButton) || (::buttonRow.isInitialized && isInside(it, buttonRow)) } == true) {
-                if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                    castChips.firstOrNull()?.requestFocus()
-                    return true
-                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && ::playButton.isInitialized && currentFocus === playButton) {
-                    return true
-                } else if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && ::buttonRow.isInitialized &&
-                    currentFocus === (0 until buttonRow.childCount).map { buttonRow.getChildAt(it) }.lastOrNull { it.visibility == View.VISIBLE && it.isFocusable }) {
-                    return true
-                }
-            }
-            if (!infoOpen && !similarOpen && !filmographyOpen && event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN &&
-                currentFocus?.let { isInside(it, hero) } == true &&
-                (if (episodic) ::guide.isInitialized else ::similarOverlay.isInitialized)) {
-                if (episodic) showGuide() else showSimilar()
-                return true
             }
         }
         return super.dispatchKeyEvent(event)
