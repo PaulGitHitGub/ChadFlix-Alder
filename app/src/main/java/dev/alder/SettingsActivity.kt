@@ -350,7 +350,6 @@ class SettingsActivity : Screen() {
     private val groupDots = mutableMapOf<Group, TextView>()
     private val groupLabels = mutableMapOf<Group, TextView>()
     private val groupBadges = mutableMapOf<Group, View>()
-    private val choiceRows = mutableSetOf<View>()
     private val refresh = mutableListOf<() -> Unit>()
     private var selectedGroup: Group? = null
     private var reopenGroup: Group? = null
@@ -474,7 +473,7 @@ class SettingsActivity : Screen() {
                 if (firstDetail?.requestFocus() == true) return true
             }
             if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT && !customOwnsLeft(currentFocus) &&
-                currentFocus?.let { isInside(it, detailRows) && it !in choiceRows } == true) {
+                currentFocus?.let { isInside(it, detailRows) } == true) {
                 if (selectedGroup?.let { groupViews[it]?.requestFocus() } == true) return true
             }
             // The rows end where they end: Down past the last one stays put instead of falling into the group list.
@@ -534,7 +533,6 @@ class SettingsActivity : Screen() {
         customStop = null; customBack = null; customOwnsLeft = { false }
         detailRows.removeAllViews()
         rowsScroll.scrollTo(0, 0)
-        choiceRows.clear()
         refresh.clear()
         firstDetail = null
         addonValue = null
@@ -1075,6 +1073,14 @@ class SettingsActivity : Screen() {
     }.apply().also { if (c.key == "uiScale") { reopenGroup = selectedGroup; main.post { recreate() } } } // the new size shows at once
     private fun choice(key: String) = (streaming + pictureAndSound).first { it.key == key }
 
+    private fun View.clickOnRight() {
+        setOnKeyListener { row, code, event ->
+            if (code != android.view.KeyEvent.KEYCODE_DPAD_RIGHT) return@setOnKeyListener false
+            if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) row.performClick()
+            true
+        }
+    }
+
     private fun choiceRow(c: Choice) {
         fun current() = c.values.indexOfFirst { it.first == stored(c) }.coerceAtLeast(0)
         // A switch only where the choice is On or Off; "Best source / Show sources" is a choice with words.
@@ -1092,9 +1098,12 @@ class SettingsActivity : Screen() {
         fun draw() {
             val index = current()
             val on = isSwitch && (c.values[index].first == true || c.values[index].second == this@SettingsActivity.on)
-            words.setTextColor(if (focused) TEXT else TEXT_2)
-            words.text = if (isSwitch) c.values[index].second
-                else if (focused) "‹  " + c.values[index].second + "  ›" else c.values[index].second
+            words.setTextColor(when {
+                !focused -> TEXT_2
+                isSwitch -> TEXT
+                else -> TUNGSTEN
+            })
+            words.text = if (isSwitch) c.values[index].second else c.values[index].second + "  ›"
             if (isSwitch) {
                 track.background = rounded(if (on) TUNGSTEN else GLASS_EDGE, 9)
                 knob.background = rounded(if (on) BASE else TEXT_2, 7)
@@ -1104,25 +1113,19 @@ class SettingsActivity : Screen() {
                 }
             }
         }
-        fun shift(by: Int) {
-            val next = nextSettingIndex(current(), c.values.size, by)
-            store(c, c.values[next].first)
+        fun select(index: Int) {
+            store(c, c.values[index].first)
             refresh.forEach { it() }
         }
-        val row = settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) { shift(1) }
-        choiceRows += row
-        row.setOnKeyListener { _, code, event ->
-            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
-                (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT || code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT)) {
-                shift(if (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT) -1 else 1)
-                true
-            } else false
-        }
+        settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
+            if (isSwitch) select(nextSettingIndex(current(), c.values.size, 1))
+            else choose(c.label, c.values.map { it.second }, checked = current(), pick = ::select)
+        }.clickOnRight()
         refresh += ::draw
         draw()
     }
 
-    /** A language for this profile, picked from a list (too many to step through with Left and Right). */
+    /** A language for this profile, picked from a list. */
     private fun languageRow(key: String, label: String, help: String, emptyLabel: Int = R.string.tv_language) {
         val codes = listOf("") + Languages.all
         // Audio language was once shared by every profile: that pick stands until this profile makes its own.
@@ -1136,7 +1139,7 @@ class SettingsActivity : Screen() {
                 prefs.edit().putString(Settings.profileKey(this, key), codes[i]).apply()
                 refresh.forEach { it() }
             }
-        }
+        }.clickOnRight()
         refresh += ::draw
         draw()
     }
@@ -1144,23 +1147,15 @@ class SettingsActivity : Screen() {
     private fun presetRow() {
         val value = text("", BODY, color = TEXT_2)
         fun current() = PRESETS.indexOfFirst { (_, rows) -> rows.all { (key, v) -> stored(choice(key)) == v } }
-        var focused = false
-        fun draw() { value.text = (if (focused) "‹  " else "") + getString(PRESETS.getOrNull(current())?.first ?: R.string.custom) + (if (focused) "  ›" else "") }
-        fun shift(by: Int) {
-            val next = nextSettingIndex(current(), PRESETS.size, by)
-            PRESETS[next].second.forEach { (key, v) -> store(choice(key), v) }
-            refresh.forEach { it() }
-        }
-        val row = settingRow(getString(R.string.source_choice), value, getString(R.string.source_choice_hint),
-            focus = { has -> focused = has; draw() }) { shift(1) }
-        choiceRows += row
-        row.setOnKeyListener { _, code, event ->
-            if (event.action == android.view.KeyEvent.ACTION_DOWN &&
-                (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT || code == android.view.KeyEvent.KEYCODE_DPAD_RIGHT)) {
-                shift(if (code == android.view.KeyEvent.KEYCODE_DPAD_LEFT) -1 else 1)
-                true
-            } else false
-        }
+        fun draw() { value.text = getString(PRESETS.getOrNull(current())?.first ?: R.string.custom) + "  ›" }
+        val label = getString(R.string.source_choice)
+        settingRow(label, value, getString(R.string.source_choice_hint),
+            focus = { value.setTextColor(if (it) TUNGSTEN else TEXT_2) }) {
+            choose(label, PRESETS.map { getString(it.first) }, checked = current()) { i ->
+                PRESETS[i].second.forEach { (key, v) -> store(choice(key), v) }
+                refresh.forEach { it() }
+            }
+        }.clickOnRight()
         refresh += ::draw
         draw()
     }
