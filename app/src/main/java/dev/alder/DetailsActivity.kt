@@ -612,7 +612,7 @@ class DetailsActivity : Screen() {
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
         infoButton.id = View.generateViewId()
-        if (resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
+        if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) {
             infoButton.nextFocusLeftId = infoButton.id
         } else {
             infoButton.nextFocusRightId = infoButton.id
@@ -788,12 +788,11 @@ class DetailsActivity : Screen() {
             dividerHeight = dp(12)
             isVerticalScrollBarEnabled = false
             // The list owns D-pad selection. Its selector outlines just the thumbnail.
-            val parentDirectionIsRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
             val ring = rounded(android.graphics.Color.TRANSPARENT, 8).apply { setStroke(dp(2), TEXT) }
             selector = android.graphics.drawable.StateListDrawable().apply {
                 addState(intArrayOf(android.R.attr.state_focused), object : android.graphics.drawable.DrawableWrapper(ring) {
                     override fun onBoundsChange(bounds: android.graphics.Rect) {
-                        val left = if (parentDirectionIsRtl) bounds.right - dp(EPISODE_WIDTH) else bounds.left
+                        val left = if (root.layoutDirection == View.LAYOUT_DIRECTION_RTL) bounds.right - dp(EPISODE_WIDTH) else bounds.left
                         drawable?.setBounds(left, bounds.top, left + dp(EPISODE_WIDTH), bounds.bottom)
                     }
                 })
