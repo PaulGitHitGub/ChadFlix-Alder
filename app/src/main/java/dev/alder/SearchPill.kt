@@ -10,6 +10,7 @@ import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
@@ -106,7 +107,7 @@ internal class SearchPill(
     private val slotR = RectF(); private val capR = RectF(); private val voiceR = RectF(); private val keyR = RectF()
     private var floor = 0f // the avatar's right edge and a gap: the pill's left edge is drawn no further left
     private var nameViews = emptyList<TextView>()
-    private var nameMids = FloatArray(0)
+    private var nameRects = emptyList<RectF>()
 
     /** [v]'s bounds in this view, into [out]. */
     private fun rectOf(v: View, out: RectF = RectF()): RectF {
@@ -130,7 +131,7 @@ internal class SearchPill(
         }
         floor = rectOf(avatar, box).right + dp(4f)
         nameViews = names()
-        nameMids = FloatArray(nameViews.size) { rectOf(nameViews[it], box).centerX() }
+        nameRects = nameViews.map { rectOf(it) }
         ((keyboard ?: voice)?.getChildAt(1) as? TextView)?.let { words.textSize = it.textSize; words.typeface = it.typeface }
     }
 
@@ -161,7 +162,8 @@ internal class SearchPill(
     private val glyph = Ink(R.drawable.ic_search)
 
     override fun onDraw(canvas: Canvas) {
-        if (!started) return        recolorNames()
+        if (!started) return
+        recolorNames()
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
         if (pillR - left > 1f) {
@@ -169,6 +171,7 @@ internal class SearchPill(
             box.set(left, pillT + inset, pillR, pillB - inset)
             fill.color = if (lit) HomeStyle.WHITE else HomeStyle.OPEN_TAB
             canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, fill)
+            drawNames(canvas)
         }
         // The magnifier, black while the white pill covers it.
         if (glyphA > 0.01f) {
@@ -231,13 +234,45 @@ internal class SearchPill(
         canvas.restore()
     }
 
-    /** A page's name reads black while the lit pill covers its middle, white on the page otherwise (set only on a flip). */
+    /**
+     * A page's name the lit pill reaches, even in part, is drawn here instead ([drawNames]): its own words go clear (set only
+     * on a change); the others are white on the page.
+     */
     private fun recolorNames() {
         for (i in nameViews.indices) {
-            val mid = nameMids.getOrNull(i) ?: continue
-            val color = if (lit && pillR - pillL > 1f && mid in pillL..pillR) HomeStyle.BLACK else HomeStyle.WHITE
+            val r = nameRects.getOrNull(i) ?: continue
+            val color = if (covers(r)) Color.TRANSPARENT else HomeStyle.WHITE
             val t = nameViews[i]
             if (t.currentTextColor != color) t.setTextColor(color)
+        }
+    }
+
+    private fun covers(r: RectF) = lit && pillR - pillL > 1f && pillR > r.left && pillL < r.right
+
+    /**
+     * The names the pill reaches, twice like Voice and Keyboard: white, then black where the white pill is ([box]), so
+     * a name half under the pill reads in both colours and never vanishes white on white.
+     */
+    private fun drawNames(canvas: Canvas) {
+        for (i in nameViews.indices) {
+            val r = nameRects.getOrNull(i) ?: continue
+            if (!covers(r)) continue
+            val t = nameViews[i]
+            val layout = t.layout ?: continue
+            val paint = layout.paint
+            val own = paint.color
+            canvas.save()
+            canvas.translate(r.left + t.totalPaddingLeft, r.top + t.totalPaddingTop)
+            paint.color = HomeStyle.WHITE
+            layout.draw(canvas)
+            canvas.restore()
+            canvas.save()
+            canvas.clipRect(box)
+            canvas.translate(r.left + t.totalPaddingLeft, r.top + t.totalPaddingTop)
+            paint.color = HomeStyle.BLACK
+            layout.draw(canvas)
+            canvas.restore()
+            paint.color = own
         }
     }
 
@@ -470,7 +505,7 @@ internal class SearchPill(
         if (!started) return
         if (running?.isRunning == true) { // mid-move: only the names (rebuilt meanwhile) get their new places
             nameViews = names()
-            nameMids = FloatArray(nameViews.size) { rectOf(nameViews[it], box).centerX() }
+            nameRects = nameViews.map { rectOf(it) }
             return invalidate()
         }
         measure()
