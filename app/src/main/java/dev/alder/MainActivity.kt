@@ -3392,7 +3392,7 @@ class MainActivity : Screen() {
          * it's known. One badge per row moves to the card the remote is on; other cards have none.
          */
         fun rate(card: MediaCardView, item: Item, fade: Boolean) {
-            if ((compact || continueRow) && ratingPick != "letterboxd") return
+            if (compact || continueRow) return
             if ((!compact && (!homeRow || card.widensBy <= 0)) || item.collectionCard || HomeStyle.isTile(item.id) ||
                 !active || cards.getOrNull(selected) !== card) return
             val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)
