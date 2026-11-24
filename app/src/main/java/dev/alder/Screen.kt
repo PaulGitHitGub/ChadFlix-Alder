@@ -1011,7 +1011,7 @@ abstract class Screen : Activity() {
                         else null
                     act?.let { dialog.dismiss(); it(); true } ?: false
                 }
-                list.addView(this, wrap())
+                list.addView(this, LinearLayout.LayoutParams(-1, -2))
             }
         }
         // A long list (services, genres) stops short of the screen's edges and scrolls; the fading edge is also the

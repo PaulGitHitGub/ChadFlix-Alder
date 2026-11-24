@@ -41,6 +41,7 @@ abstract class ExploreScreen : Screen() {
     private var query = ExploreQuery()
     protected lateinit var peopleButton: View
     private lateinit var filterBar: View
+    private lateinit var barRow: LinearLayout // the bar's pills, inside [filterBar]
     private lateinit var headingControls: View // Clear All Filters and Sort
     private lateinit var infoPanel: View
     private var unseen: Meta? = null // focused while the hero was hidden (typing): shown once it's back
@@ -188,7 +189,7 @@ abstract class ExploreScreen : Screen() {
 
     /**
      * The controls row's filters: Movies | Shows, then a pill per filter in [Facet]'s order showing its value ("Genre
-     * Horror + Comedy"). The bar scrolls when the localized labels exceed its width.
+     * Horror + Comedy"). It fits its width ([fitBar]); only a language too long for even cut words scrolls sideways.
      */
     protected fun buildFilterBar(): View {
         val bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
@@ -221,6 +222,7 @@ abstract class ExploreScreen : Screen() {
             val key = text(title(f), HomeStyle.INFO).apply {
                 isSingleLine = true
                 includeFontPadding = false
+                ellipsize = TextUtils.TruncateAt.END // only when the values alone can't make the bar fit ([fitBar])
             }
             val label = text("", HomeStyle.INFO, bold = true).apply {
                 isSingleLine = true
@@ -244,12 +246,42 @@ abstract class ExploreScreen : Screen() {
             rows[f] = Row(chip, key, label, chevron)
             if (f == Facet.PEOPLE) peopleButton = chip
         }
+        barRow = bar
         filterBar = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             addView(bar)
+            addOnLayoutChangeListener { _, left, _, right, _, oldLeft, _, oldRight, _ ->
+                if (right - left != oldRight - oldLeft) post { fitBar() }
+            }
         }
         updatePanel()
         return filterBar
+    }
+
+    /**
+     * The whole bar in its width: when the values don't fit, the longest are cut to one width (ending in "…"), never
+     * shorter than [VALUE_MIN].
+     */
+    private fun fitBar() {
+        val room = filterBar.width
+        if (room == 0) return
+        val values = rows.values.map { it.value }
+        val keys = rows.values.map { it.key }
+        (values + keys).forEach { it.maxWidth = Int.MAX_VALUE }
+        val any = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        barRow.measure(any, any)
+        val natural = values.map { it.measuredWidth }
+        var cap = natural.maxOrNull() ?: return
+        while (barRow.measuredWidth - natural.sumOf { it - minOf(it, cap) } > room && cap > dp(VALUE_MIN)) cap -= dp(2)
+        values.forEach { it.maxWidth = cap }
+        // Still too long (a long language beside Sort): the longest filter names are cut the same way
+        // ("Directors & C…"), never shorter than [KEY_MIN].
+        barRow.measure(any, any)
+        if (barRow.measuredWidth <= room) return
+        val names = keys.map { it.measuredWidth }
+        var nameCap = names.maxOrNull() ?: return
+        while (barRow.measuredWidth - names.sumOf { it - minOf(it, nameCap) } > room && nameCap > dp(KEY_MIN)) nameCap -= dp(2)
+        keys.forEach { it.maxWidth = nameCap }
     }
 
     protected fun outlined(fill: Int, edge: Int = GLASS_EDGE) = GradientDrawable().apply { setColor(fill); cornerRadius = 999f; setStroke(dp(1), edge) }
@@ -290,6 +322,7 @@ abstract class ExploreScreen : Screen() {
             styleRow(f)
         }
         styleSort()
+        filterBar.post { fitBar() }
     }
 
     private fun active(f: Facet) = query.without(f) != query &&
@@ -595,7 +628,7 @@ abstract class ExploreScreen : Screen() {
         return LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14),0,dp(14),0)
-            addView(key, wrap())
+            addView(key, if (count == null) LinearLayout.LayoutParams(-2,-2) else LinearLayout.LayoutParams(0,-2,1f))
             count?.let { addView(it, LinearLayout.LayoutParams(-2,-2).apply { marginStart = dp(12) }) }
             rowFocus(rest = { if (rest != 0) HomeStyle.pill(rest) else null }, also = { on ->
                 if (on) background = HomeStyle.pill(HomeStyle.WHITE)
@@ -629,7 +662,7 @@ abstract class ExploreScreen : Screen() {
                 if (g == generation) answer.getOrNull()?.takeIf { it.first>0 }?.let { (count, more) ->
                     results.addView(listRow(name, String.format(Locale.getDefault(), "%,d", count) + if (more) "+" else "").apply {
                         setOnClickListener { peopleButton.requestFocus(); change(alternative) }
-                    }, LinearLayout.LayoutParams(-2, dp(30)).apply { bottomMargin = dp(4) })
+                    }, LinearLayout.LayoutParams(dp(380), dp(30)).apply { bottomMargin = dp(4) })
                 }
             }
         }
@@ -972,7 +1005,7 @@ abstract class ExploreScreen : Screen() {
                         ellipsize = TextUtils.TruncateAt.END
                         gravity = Gravity.CENTER_VERTICAL
                         includeFontPadding = false
-                        setPadding(dp(12), 0, dp(12), 0)
+                        setPadding(dp(14), 0, dp(12), 0)
                         if (i == checked || i in checkedRows) tick(true)
                         setOnFocusChangeListener { v, _ -> styleTile(v as TextView) }
                         setOnClickListener {
@@ -986,7 +1019,7 @@ abstract class ExploreScreen : Screen() {
                         }
                     }
                     tiles += tile
-                    addView(tile, LinearLayout.LayoutParams(-2, dp(PICK_H)).apply { if (r > 0) topMargin = dp(PICK_GAP) })
+                    addView(tile, LinearLayout.LayoutParams(dp(PICK_W), dp(PICK_H)).apply { if (r > 0) topMargin = dp(PICK_GAP) })
                 }
             }, LinearLayout.LayoutParams(-2, -2).apply { if (c > 0) marginStart = dp(PICK_GAP) })
         }
@@ -1138,6 +1171,7 @@ abstract class ExploreScreen : Screen() {
         // The pickers in the hero's place, under the top bar: choices in columns of four; faces ten across.
         const val PICKER_TOP = 50
         const val PICK_ROWS = 4
+        const val PICK_W = 164
         const val PICK_H = 26
         const val PICK_GAP = 6
         const val HERO_FACES = 10
@@ -1145,6 +1179,8 @@ abstract class ExploreScreen : Screen() {
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
         const val BAR_H = 28 // the filter bar's pills (Neon A's 54 px, Voice Search's height)
         const val BAR_GAP = 5
+        const val VALUE_MIN = 40 // the shortest a pill's value is cut to so the bar fits
+        const val KEY_MIN = 56 // the shortest a pill's name is cut to, after the values
         const val PICKER_W = 220 // Sort's list, hanging under it
         const val EDGE = 33 // a list never comes nearer the screen's sides
         const val DROP = 6 // between a pill and its list

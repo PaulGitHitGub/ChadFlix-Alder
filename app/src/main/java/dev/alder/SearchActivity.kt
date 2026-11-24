@@ -102,7 +102,7 @@ class SearchActivity : ExploreScreen() {
     private val rightEdgeKeys = mutableSetOf<View>()
     private val cards = mutableListOf<MediaCardView>()
     private var firstKey: View? = null
-    private var lastKey: TextView? = null
+    private var lastKey: View? = null
     private var lastKeyboardFocus: View? = null
     private var firstResult: View? = null
     private var resultsAction: View? = null
@@ -755,13 +755,9 @@ class SearchActivity : ExploreScreen() {
     }
 
     /** Plain white words; the focused key is a white pill with black words, as in the top bar. */
-    private fun updateKeyStyle(view: TextView, has: Boolean) {
-        view.background = if (has) android.graphics.drawable.LayerDrawable(arrayOf(HomeStyle.pill(HomeStyle.WHITE))).apply {
-            val width = kotlin.math.ceil(view.paint.measureText(view.text.toString())).toInt() + 2 * dp(8)
-            setLayerWidth(0, minOf(width, view.layoutParams.width))
-            setLayerGravity(0, Gravity.CENTER_HORIZONTAL or Gravity.FILL_VERTICAL)
-        } else null
-        view.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
+    private fun updateKeyStyle(view: View, has: Boolean) {
+        view.background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null
+        if (view is TextView) view.setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
     }
 
     private fun key(label: String, row: LinearLayout, span: Int, rightEdge: Boolean, click: () -> Unit): TextView {
@@ -770,9 +766,9 @@ class SearchActivity : ExploreScreen() {
             gravity = Gravity.CENTER
             isFocusable = true
         }
-        view.setOnFocusChangeListener { _, has ->
+        view.setOnFocusChangeListener { v, has ->
             if (has) lastKeyboardFocus = view
-            updateKeyStyle(view, has)
+            updateKeyStyle(v, has)
         }
         view.setOnClickListener {
             val previous = lastKey

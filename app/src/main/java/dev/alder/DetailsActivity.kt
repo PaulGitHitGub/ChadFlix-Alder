@@ -209,7 +209,7 @@ class DetailsActivity : Screen() {
     private lateinit var guideRows: ListView
     private lateinit var guideHeading: TextView
     private lateinit var seasonStrip: LinearLayout
-    private var seasonButtons = emptyMap<Int, View>()
+    private var seasonButtons = emptyMap<Int, TextView>()
     private lateinit var similarOverlay: FrameLayout
     private var similarFirst: View? = null
     private var similarTitles = emptyList<Meta>()
@@ -617,6 +617,8 @@ class DetailsActivity : Screen() {
             action.id = View.generateViewId()
             action.nextFocusLeftId = action.id
             action.nextFocusRightId = action.id
+            // The old 280 dp action centered closest to More Info for every combination of the optional icons.
+            if (action === playButton) action.nextFocusUpId = infoButton.id
             stack.addView(action, wrap().apply { topMargin = dp(gap) })
         }
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
@@ -810,15 +812,11 @@ class DetailsActivity : Screen() {
         selectedSeason = browsingEpisode?.let { selected -> videos.firstOrNull { it.id == selected.id }?.season }
             ?: browsingSeason?.takeIf { it in groups } ?: playTarget(meta)?.second?.season ?: videos.first().season
         seasonButtons = groups.mapValues { (season, episodes) ->
-            val name = text(seasonName(season), SMALL, bold = true)
+            val row = titleAction(seasonName(season))
             val number = text(resources.getQuantityString(R.plurals.guide_episodes, episodes.size, episodes.size), SMALL)
-            val row = LinearLayout(this).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                minimumHeight = dp(BUTTON_H)
-                isFocusable = true
-                setPadding(dp(16), 0, dp(16), 0)
-                addView(name, wrap())
-                addView(number, wrap().apply { marginStart = dp(8) })
+            val tile = FrameLayout(this).apply {
+                addView(row, FrameLayout.LayoutParams(-1, -2))
+                addView(number, FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.CENTER_VERTICAL).apply { marginEnd = dp(16) })
             }
             fun style(focused: Boolean) {
                 row.background = when {
@@ -826,10 +824,10 @@ class DetailsActivity : Screen() {
                     season == selectedSeason -> rounded(GLASS_EDGE, BUTTON_H / 2)
                     else -> null
                 }
-                name.setTextColor(if (focused) BASE else TEXT)
+                row.setTextColor(if (focused) BASE else TEXT)
                 number.setTextColor(if (focused) BASE else TEXT_2)
             }
-            row.contentDescription = "${name.text}, ${number.text}"
+            row.contentDescription = "${row.text}, ${number.text}"
             row.setOnFocusChangeListener { _, focused ->
                 if (focused && season != selectedSeason) {
                     val previous = selectedSeason
@@ -842,7 +840,7 @@ class DetailsActivity : Screen() {
             row.setOnClickListener { guideRows.requestFocus() }
             row.setOnLongClickListener { seasonMenu(season); true }
             style(false)
-            seasonStrip.addView(row, wrap())
+            seasonStrip.addView(tile)
             row
         }
         root.addView(guide, FrameLayout.LayoutParams(-1, -1))
@@ -1483,7 +1481,7 @@ class DetailsActivity : Screen() {
                 gravity = Gravity.CENTER_VERTICAL
                 isFocusable = true
                 minimumHeight = dp(28)
-                setPadding(dp(4), dp(4), dp(4), dp(4))
+                setPadding(dp(4), dp(4), dp(11), dp(4))
                 val rest = glassOver(this, 14, shade = FROST_DENSE)
                 background = rest
 
