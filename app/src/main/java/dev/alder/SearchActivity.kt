@@ -311,10 +311,11 @@ class SearchActivity : ExploreScreen() {
         if (searchLayout == SearchLayout.WALL) {
             root.addView(LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H))) }
-                addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(4) })
-                addView(buildFilterBar(), LinearLayout.LayoutParams(0, dp(ACTION_H), 1f).apply { marginStart = dp(10) })
-                addView(sort, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(10) })
+                // The row is full at 1080p: Voice Search's pill hugs its words, and the gaps are the bar's own.
+                voice?.let { it.setPadding(dp(11), 0, dp(12), 0); addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H))) }
+                addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(2) })
+                addView(buildFilterBar(), LinearLayout.LayoutParams(0, dp(ACTION_H), 1f).apply { marginStart = dp(6) })
+                addView(sort, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(6) })
             }, FrameLayout.LayoutParams(-1, dp(ACTION_H)).apply {
                 leftMargin = dp(SearchLayout.WALL_X); rightMargin = dp(SearchLayout.WALL_X); topMargin = dp(SearchLayout.ROW_TOP)
             })

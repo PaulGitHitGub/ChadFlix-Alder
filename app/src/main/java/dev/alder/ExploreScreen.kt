@@ -93,6 +93,10 @@ abstract class ExploreScreen : Screen() {
     private var infoLogoW = INFO_LOGO_W
     private var infoFaces: LinearLayout? = null // Wall and Marquee: the top-billed cast's faces
     private var infoFaceDp = 0
+    private var infoTitleH = INFO_TITLE_H // dp: the title's (or logo's) slot
+    private var logoArea = 0.0 // dp²: Wall's and Marquee's logos are sized to about this much ink, as the title page's
+    private var artAlpha = 1f // the art's strength once it's here
+    private var skipped: Meta? = null // Marquee: the title whose art, logo and faces waited while the hero was shrunk
     // Wall: the details band and the row it sits under.
     private var bandView: View? = null
     private lateinit var bandNotch: View
@@ -272,6 +276,7 @@ abstract class ExploreScreen : Screen() {
             val key = text(title(f), HomeStyle.INFO).apply {
                 isSingleLine = true
                 includeFontPadding = false
+                ellipsize = TextUtils.TruncateAt.END // only when the values alone can't make the bar fit ([fitBar])
             }
             val label = text("", HomeStyle.INFO, bold = true).apply {
                 isSingleLine = true
@@ -315,13 +320,22 @@ abstract class ExploreScreen : Screen() {
         val room = filterBar.width
         if (room == 0) return
         val values = rows.values.map { it.value }
-        values.forEach { it.maxWidth = Int.MAX_VALUE }
+        val keys = rows.values.map { it.key }
+        (values + keys).forEach { it.maxWidth = Int.MAX_VALUE }
         val any = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         barRow.measure(any, any)
         val natural = values.map { it.measuredWidth }
         var cap = natural.maxOrNull() ?: return
         while (barRow.measuredWidth - natural.sumOf { it - minOf(it, cap) } > room && cap > dp(VALUE_MIN)) cap -= dp(2)
         values.forEach { it.maxWidth = cap }
+        // Still too long (Wall's row, which shares its width with Voice Search and Sort): the longest filter names
+        // are cut the same way ("Directors & C…"), never shorter than [KEY_MIN].
+        barRow.measure(any, any)
+        if (barRow.measuredWidth <= room) return
+        val names = keys.map { it.measuredWidth }
+        var nameCap = names.maxOrNull() ?: return
+        while (barRow.measuredWidth - names.sumOf { it - minOf(it, nameCap) } > room && nameCap > dp(KEY_MIN)) nameCap -= dp(2)
+        keys.forEach { it.maxWidth = nameCap }
     }
 
     protected fun outlined(fill: Int, edge: Int = GLASS_EDGE) = GradientDrawable().apply { setColor(fill); cornerRadius = 999f; setStroke(dp(1), edge) }
@@ -755,6 +769,7 @@ abstract class ExploreScreen : Screen() {
         infoName = text("", nameSp, bold = true, color = HomeStyle.WHITE).apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END }
         infoLogo = ImageView(this).apply { adjustViewBounds = true; maxWidth = dp(logoW); maxHeight = dp(titleH) }
         infoLogoW = logoW
+        infoTitleH = titleH
         infoCert = tag("", HomeStyle.WHITE).apply { visibility = View.GONE }
         infoFacts = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
         // Genres on a line of their own, so "Science Fiction" isn't cut by the year and length.
@@ -809,9 +824,11 @@ abstract class ExploreScreen : Screen() {
      * surface, the art fading in from the left behind the cast; it opens after the rest on a poster ([placeBand]).
      */
     protected fun buildBand(): View {
-        infoViews(FadedArt(this, 0.7f, 1.4f).apply { alpha = BAND_ART_ALPHA }, HomeStyle.ROW_TITLE, BAND_LOGO_W, BAND_TITLE_H)
+        infoViews(FadedArt(this, 0.7f, 1.4f).apply { alpha = 0f }, HomeStyle.ROW_TITLE, BAND_LOGO_W, BAND_TITLE_H)
         infoName.maxLines = 1
         infoArtW = BAND_ART_W
+        artAlpha = BAND_ART_ALPHA
+        logoArea = BAND_LOGO_AREA
         infoBody = wideInfoBody(BAND_TITLE_H, 34, BAND_TEXT_W)
         val body = FrameLayout(this).apply {
             background = GradientDrawable().apply { setColor(PANEL_FILL); cornerRadius = dp(13).toFloat(); setStroke(1, PANEL_EDGE) }
@@ -836,9 +853,10 @@ abstract class ExploreScreen : Screen() {
      * slide up under the strip.
      */
     protected fun buildHero(pill: View, lower: View): View {
-        infoViews(FadedArt(this, 0.45f, 1f), HERO_NAME_SP, HERO_LOGO_W, HERO_TITLE_H, overview = BODY)
+        infoViews(FadedArt(this, 0.45f, 1f).apply { alpha = 0f }, HERO_NAME_SP, HERO_LOGO_W, HERO_TITLE_H, overview = BODY)
         infoName.maxLines = 1
         infoArtW = HERO_ART_W
+        logoArea = HERO_LOGO_AREA
         infoBody = wideInfoBody(HERO_TITLE_H, 60, HERO_TEXT_W)
         heroFull = FrameLayout(this).apply {
             addView(infoArt, FrameLayout.LayoutParams(dp(HERO_ART_W), -1, Gravity.END))
@@ -846,7 +864,7 @@ abstract class ExploreScreen : Screen() {
             addView(View(this@ExploreScreen).apply {
                 background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0x99000000.toInt(), 0))
             }, FrameLayout.LayoutParams(-1, dp(96)))
-            addView(infoBody, FrameLayout.LayoutParams(-2, -2).apply { leftMargin = dp(SearchLayout.MARQUEE_X); topMargin = dp(98) })
+            addView(infoBody, FrameLayout.LayoutParams(-2, -2).apply { leftMargin = dp(SearchLayout.MARQUEE_X); topMargin = dp(HERO_BODY_TOP) })
             addView(castFaces(HERO_FACE), FrameLayout.LayoutParams(-2, -2, Gravity.END or Gravity.BOTTOM).apply {
                 rightMargin = dp(SearchLayout.MARQUEE_X); bottomMargin = dp(18)
             })
@@ -916,8 +934,10 @@ abstract class ExploreScreen : Screen() {
         pending?.let(main::removeCallbacks)
         shown = meta
         infoBody.visibility = View.VISIBLE
-        // The hero is wide enough for TMDb's large backdrop; the panel and the band take the smaller one.
-        Images.load(if (heroFull != null) meta.background else meta.background?.replace("/w1280/", "/w780/"), infoArt, dp(infoArtW))
+        // Wall and Marquee: the art waits for the rest with the other lookups (the band isn't open before it, and the
+        // hero's large backdrop isn't decoded for every poster passed); the last one fades out meanwhile.
+        if (infoFaces == null) Images.load(meta.background?.replace("/w1280/", "/w780/"), infoArt, dp(infoArtW))
+        else infoArt.animate().alpha(0f).setDuration(QUICK_MS).start()
         Images.load(null, infoLogo, 0) // and a late logo for the title before is dropped
         stripName?.text = listOfNotNull(meta.name, meta.year).joinToString(DOT)
         stripScores?.removeAllViews()
@@ -934,7 +954,31 @@ abstract class ExploreScreen : Screen() {
         }
         infoOverview.text = meta.description.orEmpty()
         infoCast.text = ""
-        pending = Runnable { if (shown === meta) infoDetails(meta) }.also { main.postDelayed(it, HomeStyle.WASH_WAIT) }
+        pending = Runnable { if (shown === meta) { if (infoFaces != null) wideArt(meta); infoDetails(meta) } }
+            .also { main.postDelayed(it, HomeStyle.WASH_WAIT) }
+    }
+
+    /**
+     * Wall's band and Marquee's hero: the backdrop (TMDb's large one for the hero), fading in once it's here. Not while
+     * the hero is shrunk to its strip: it's asked for when the hero opens again ([shrinkHero]).
+     */
+    private fun wideArt(meta: Meta) {
+        if (shrunk) { skipped = meta; return }
+        Images.load(if (heroFull != null) meta.background else meta.background?.replace("/w1280/", "/w780/"), infoArt, dp(infoArtW),
+            done = { if (shown === meta) infoArt.enter().alpha(artAlpha).start() })
+    }
+
+    /** Wall and Marquee: the logo cropped to its ink, as the title page does, sized by its shape to fill the title's slot. */
+    private fun sizeLogo() {
+        val bitmap = (infoLogo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return
+        if (bitmap.width < 1 || bitmap.height < 1) return
+        val aspect = bitmap.width.toDouble() / bitmap.height
+        var h = minOf(infoTitleH.toDouble(), Math.sqrt(logoArea / aspect))
+        var w = aspect * h
+        if (w > infoLogoW) { w = infoLogoW.toDouble(); h = w / aspect }
+        val density = resources.displayMetrics.density
+        infoLogo.layoutParams = FrameLayout.LayoutParams((w * density).toInt().coerceAtLeast(1), (h * density).toInt().coerceAtLeast(1),
+            Gravity.BOTTOM or Gravity.START)
     }
 
     /** Nothing for the info panel: no matches, or the first page failed. */
@@ -951,12 +995,16 @@ abstract class ExploreScreen : Screen() {
             if (shown !== meta) return@background
             val d = answer.getOrNull() ?: return@background infoScores.removeAllViews()
             val id = d.optJSONObject("external_ids")?.text("imdb_id")
-            // The logo as the title page shows it (metahub, by IMDb id); the name stays when there is none.
-            id?.let(Images::logoFor)?.let { logo ->
-                Images.load(logo, infoLogo, dp(infoLogoW), done = { infoName.visibility = View.INVISIBLE })
+            // The logo as the title page shows it (metahub, by IMDb id); the name stays when there is none. While the
+            // hero is shrunk only its strip shows: the logo and faces wait for it to open ([shrinkHero]).
+            if (shrunk) skipped = meta
+            else id?.let(Images::logoFor)?.let { logo ->
+                if (infoFaces == null) Images.load(logo, infoLogo, dp(infoLogoW), done = { infoName.visibility = View.INVISIBLE })
+                else Images.load(logo, infoLogo, Images.TITLE_LOGO_PX, look = Images.trimmedLogo,
+                    done = { if (shown === meta) { sizeLogo(); infoName.visibility = View.INVISIBLE } })
             }
             // Wall and Marquee: the top-billed cast's faces (TMDb's small profile pictures), in fixed slots.
-            infoFaces?.let { faces ->
+            if (!shrunk) infoFaces?.let { faces ->
                 val cast = d.optJSONObject("credits")?.optJSONArray("cast").objects().take(CAST_FACES)
                 for (i in 0 until faces.childCount) {
                     val slot = faces.getChildAt(i) as LinearLayout
@@ -976,7 +1024,7 @@ abstract class ExploreScreen : Screen() {
             infoGenres.text = d.optJSONArray("genres").objects().take(2).joinToString(DOT) { it.optString("name") }
             // Only the top-billed cast: a director chosen in Directors & Cast isn't cast.
             val names = d.optJSONObject("credits")?.optJSONArray("cast").objects().mapNotNull { it.text("name") }.take(3)
-            if (names.isNotEmpty()) {
+            if (names.isNotEmpty() && infoFaces == null) { // Wall and Marquee show faces instead
                 val label = getString(R.string.details_cast)
                 infoCast.text = SpannableString("$label  ${names.joinToString(", ")}").apply {
                     setSpan(ForegroundColorSpan(TEXT_3), 0, label.length, 0)
@@ -1038,7 +1086,8 @@ abstract class ExploreScreen : Screen() {
      * [chosen] marks the person in use (Marquee's picker, which stays open); [alive] drops a late answer.
      */
     private fun findPeople(words: String, focusFirst: Boolean, into: LinearLayout, perRow: Int, faceDp: Int, tileW: Int,
-                           alive: () -> Boolean, clear: () -> Unit, pick: (Person) -> Unit, chosen: (Person) -> Boolean = { false }) {
+                           alive: () -> Boolean, clear: () -> Unit, pick: (Person) -> Unit, chosen: (Person) -> Boolean = { false },
+                           held: (Person) -> Unit = pick) { // held: a face's hold-OK role list picked a role
         into.removeAllViews()
         val originalFocus = currentFocus
         var firstChoice = focusFirst
@@ -1075,7 +1124,7 @@ abstract class ExploreScreen : Screen() {
                             val roles = listOf("actor" to R.string.ex_actor,"director" to R.string.ex_director,
                                 "writer" to R.string.ex_writer,"any" to R.string.ex_role)
                             choose(p.name,roles.map { getString(it.second) },checked=roles.indexOfFirst { it.first==p.role }) {
-                                pick(p.copy(role=roles[it].first))
+                                held(p.copy(role=roles[it].first))
                             }
                             true
                         }
@@ -1148,6 +1197,8 @@ abstract class ExploreScreen : Screen() {
         if (heroFull == null || on == shrunk) return
         shrunk = on
         styleHero()
+        // Open again: the art, logo and faces the strip didn't need.
+        if (!on) skipped?.takeIf { it === shown }?.let { meta -> skipped = null; wideArt(meta); infoDetails(meta) }
     }
 
     private fun styleHero() {
@@ -1211,10 +1262,13 @@ abstract class ExploreScreen : Screen() {
                            shown: (List<TextView>) -> Unit, pick: (Int) -> Unit) {
         val tiles = mutableListOf<TextView>()
         val columns = LinearLayout(this)
-        items.chunked(PICK_ROWS).forEachIndexed { c, chunk ->
+        // A list whose rows open lists of their own (Year's decades, Custom Range's From and To) is one scrolling
+        // column, as the drop-down is: Right on a row opens its list, and Up and Down reach every row.
+        val perColumn = if (right != null) items.size.coerceAtLeast(1) else PICK_ROWS
+        items.chunked(perColumn).forEachIndexed { c, chunk ->
             columns.addView(column(Gravity.START).apply {
                 chunk.forEachIndexed { r, label ->
-                    val i = c * PICK_ROWS + r
+                    val i = c * perColumn + r
                     val tile = text(label, SMALL).apply {
                         isFocusable = true
                         isSingleLine = true
@@ -1239,7 +1293,12 @@ abstract class ExploreScreen : Screen() {
                 }
             }, LinearLayout.LayoutParams(-2, -2).apply { if (c > 0) marginStart = dp(PICK_GAP) })
         }
-        val body = HorizontalScrollView(this).apply {
+        val body = if (right != null) ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(24))
+            addView(columns)
+        } else HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             clipToPadding = false
             addView(columns)
@@ -1256,6 +1315,7 @@ abstract class ExploreScreen : Screen() {
      * keys and today's people picker), then the faces. A face is picked at once and the picker stays, its posters below.
      */
     private fun heroPeople() {
+        pickedRole = null // each opening starts from the person in use's own role
         val roles = listOf("any" to R.string.ex_role, "actor" to R.string.ex_actor, "director" to R.string.ex_director)
         val segment = LinearLayout(this).apply {
             background = outlined(SEGMENT, GLASS_EDGE)
@@ -1321,7 +1381,14 @@ abstract class ExploreScreen : Screen() {
                 rememberPerson(p)
                 change(query.copy(person = p.copy(role = pickedRole ?: p.role)))
                 restyle()
-            }, chosen = { it.id == query.person?.id })
+            }, chosen = { it.id == query.person?.id },
+            held = { p ->
+                // Hold OK's role wins over the switch, which then shows it.
+                pickedRole = null
+                rememberPerson(p)
+                change(query.copy(person = p))
+                restyle()
+            })
         restyle()
     }
 
@@ -1367,18 +1434,21 @@ abstract class ExploreScreen : Screen() {
         const val WIDE_GAP = 8
         const val CAST_FACES = 5
         // Wall's details band (the mockup's 292 px, with room for ChadFlix's own line heights) and its notch.
-        const val BAND_H = 152
+        const val BAND_H = 158
         const val NOTCH = 14
-        const val BAND_TITLE_H = 30
+        const val BAND_TITLE_H = 40
         const val BAND_LOGO_W = 240
+        const val BAND_LOGO_AREA = 5400.0 // about 0.6 of the title page's logo (8976 dp², Images.logoSizePx)
         const val BAND_TEXT_W = 440
         const val BAND_ART_W = 560
         const val BAND_ART_ALPHA = 0.6f // the art behind the cast stays quiet
         const val BAND_FACE = 50
         // Marquee's hero: a 28 sp title (or logo), the overview at body size, the cast at its lower right.
         const val HERO_NAME_SP = 28f
-        const val HERO_TITLE_H = 50
+        const val HERO_TITLE_H = 64
+        const val HERO_BODY_TOP = 92 // the title's slot, under the search pill
         const val HERO_LOGO_W = 320
+        const val HERO_LOGO_AREA = 11700.0 // about 1.3 of the title page's logo: the hero is the page's subject
         const val HERO_TEXT_W = 430
         const val HERO_ART_W = 680
         const val HERO_FACE = 54
@@ -1394,6 +1464,7 @@ abstract class ExploreScreen : Screen() {
         const val BAR_H = 28 // the filter bar's pills (Neon A's 54 px, Voice Search's height)
         const val BAR_GAP = 5
         const val VALUE_MIN = 40 // the shortest a pill's value is cut to so the bar fits
+        const val KEY_MIN = 56 // the shortest a pill's name is cut to, after the values
         const val PICKER_W = 220 // the lists hanging under a pill or Sort
         const val GENRE_W = 260
         const val EDGE = 33 // a list never comes nearer the screen's sides
