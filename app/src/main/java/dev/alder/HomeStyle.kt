@@ -416,8 +416,8 @@ internal object HomeStyle {
     }
 
     /** "Action · Trending": the list in red on the row the remote is in, all of it quiet on the others. */
-    fun rowTitle(genre: String, list: String, lit: Boolean): CharSequence = android.text.SpannableString("$genre · $list").apply {
-        if (lit) setSpan(android.text.style.ForegroundColorSpan(LIST_RED), genre.length, length, 0)
+    fun rowTitle(genre: String, list: String, color: Int?): CharSequence = android.text.SpannableString("$genre · $list").apply {
+        if (color != null) setSpan(android.text.style.ForegroundColorSpan(color), genre.length, length, 0)
     }
 
     /**

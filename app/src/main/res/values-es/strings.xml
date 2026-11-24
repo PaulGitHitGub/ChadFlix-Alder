@@ -76,14 +76,13 @@
     <string name="page_no_live_catalogs">Ninguno de tus complementos tiene catálogos en vivo. Añade uno en Stremio.</string>
     <string name="filter_all">Todo</string>
     <string name="list_sort">Ordenar</string>
-    <string name="list_sort_recent">Añadidos recientemente</string>
-    <string name="list_sort_name">A–Z</string>
-    <string name="list_sort_unwatched">Sin ver primero</string>
+    <string name="saved_movies">Películas guardadas</string>
+    <string name="saved_shows">Series guardadas</string>
+    <plurals name="saved_titles">
+        <item quantity="one">%1$d título</item>
+        <item quantity="other">%1$d títulos</item>
+    </plurals>
     <string name="list_empty">Los títulos que guardes con + aparecen aquí</string>
-    <string name="list_empty_movies">No hay películas en My Alder</string>
-    <string name="list_empty_shows">No hay series en My Alder</string>
-    <string name="list_empty_unwatched">No hay títulos sin ver en My Alder</string>
-    <string name="list_clear_filters">Borrar filtros</string>
     <string name="action_remove_from_list">Quitar de My Alder</string>
     <string name="action_mark_watched">Marcar como visto</string>
     <string name="list_update_failed">No se pudo actualizar My Alder</string>

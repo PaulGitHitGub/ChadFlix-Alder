@@ -76,14 +76,13 @@
     <string name="page_no_live_catalogs">Aucune de vos extensions n’a de catalogue en direct. Ajoutez-en une dans Stremio.</string>
     <string name="filter_all">Tout</string>
     <string name="list_sort">Trier</string>
-    <string name="list_sort_recent">Ajoutés récemment</string>
-    <string name="list_sort_name">A–Z</string>
-    <string name="list_sort_unwatched">Non vus d’abord</string>
+    <string name="saved_movies">Films enregistrés</string>
+    <string name="saved_shows">Séries enregistrées</string>
+    <plurals name="saved_titles">
+        <item quantity="one">%1$d titre</item>
+        <item quantity="other">%1$d titres</item>
+    </plurals>
     <string name="list_empty">Les titres que vous enregistrez avec + apparaissent ici</string>
-    <string name="list_empty_movies">Aucun film dans My Alder</string>
-    <string name="list_empty_shows">Aucune série dans My Alder</string>
-    <string name="list_empty_unwatched">Aucun titre non vu dans My Alder</string>
-    <string name="list_clear_filters">Effacer les filtres</string>
     <string name="action_remove_from_list">Retirer de My Alder</string>
     <string name="action_mark_watched">Marquer comme vu</string>
     <string name="list_update_failed">Impossible de mettre à jour My Alder</string>

@@ -75,14 +75,13 @@
     <string name="page_no_live_catalogs">Keines deiner Add-ons hat Live-Kataloge. Füge eines in Stremio hinzu.</string>
     <string name="filter_all">Alle</string>
     <string name="list_sort">Sortieren</string>
-    <string name="list_sort_recent">Zuletzt hinzugefügt</string>
-    <string name="list_sort_name">A–Z</string>
-    <string name="list_sort_unwatched">Ungesehene zuerst</string>
+    <string name="saved_movies">Gespeicherte Filme</string>
+    <string name="saved_shows">Gespeicherte Serien</string>
+    <plurals name="saved_titles">
+        <item quantity="one">%1$d Titel</item>
+        <item quantity="other">%1$d Titel</item>
+    </plurals>
     <string name="list_empty">Titel, die du mit + speicherst, erscheinen hier</string>
-    <string name="list_empty_movies">Keine Filme in My Alder</string>
-    <string name="list_empty_shows">Keine Serien in My Alder</string>
-    <string name="list_empty_unwatched">Keine ungesehenen Titel in My Alder</string>
-    <string name="list_clear_filters">Filter zurücksetzen</string>
     <string name="action_remove_from_list">Aus My Alder entfernen</string>
     <string name="action_mark_watched">Als gesehen markieren</string>
     <string name="list_update_failed">My Alder konnte nicht aktualisiert werden</string>

@@ -80,14 +80,17 @@
     <string name="page_no_live_catalogs">لا توفّر إضافاتك أي قوائم بث مباشر. ثبّت إضافة في Stremio.</string>
     <string name="filter_all">الكل</string>
     <string name="list_sort">ترتيب</string>
-    <string name="list_sort_recent">المضافة مؤخرًا</string>
-    <string name="list_sort_name">أبجديًا</string>
-    <string name="list_sort_unwatched">غير المشاهَد أولًا</string>
+    <string name="saved_movies">الأفلام المحفوظة</string>
+    <string name="saved_shows">المسلسلات المحفوظة</string>
+    <plurals name="saved_titles">
+        <item quantity="zero">لا عناوين</item>
+        <item quantity="one">عنوان واحد</item>
+        <item quantity="two">عنوانان</item>
+        <item quantity="few">%1$d عناوين</item>
+        <item quantity="many">%1$d عنوانًا</item>
+        <item quantity="other">%1$d عنوان</item>
+    </plurals>
     <string name="list_empty">تظهر هنا العناوين التي تحفظها بزر +</string>
-    <string name="list_empty_movies">لا توجد أفلام في My Alder</string>
-    <string name="list_empty_shows">لا توجد مسلسلات في My Alder</string>
-    <string name="list_empty_unwatched">لا توجد عناوين غير مشاهَدة في My Alder</string>
-    <string name="list_clear_filters">مسح الفلاتر</string>
     <string name="action_remove_from_list">إزالة من My Alder</string>
     <string name="action_mark_watched">وضع علامة تمت المشاهدة</string>
     <string name="list_update_failed">تعذّر تحديث My Alder</string>

@@ -76,14 +76,13 @@
     <string name="page_no_live_catalogs">Nessuno dei tuoi add-on ha cataloghi di dirette. Aggiungine uno in Stremio.</string>
     <string name="filter_all">Tutto</string>
     <string name="list_sort">Ordina</string>
-    <string name="list_sort_recent">Aggiunti di recente</string>
-    <string name="list_sort_name">A–Z</string>
-    <string name="list_sort_unwatched">Prima i non visti</string>
+    <string name="saved_movies">Film salvati</string>
+    <string name="saved_shows">Serie salvate</string>
+    <plurals name="saved_titles">
+        <item quantity="one">%1$d titolo</item>
+        <item quantity="other">%1$d titoli</item>
+    </plurals>
     <string name="list_empty">I titoli che salvi con + compaiono qui</string>
-    <string name="list_empty_movies">Nessun film in My Alder</string>
-    <string name="list_empty_shows">Nessuna serie in My Alder</string>
-    <string name="list_empty_unwatched">Nessun titolo non visto in My Alder</string>
-    <string name="list_clear_filters">Cancella filtri</string>
     <string name="action_remove_from_list">Rimuovi da My Alder</string>
     <string name="action_mark_watched">Segna come visto</string>
     <string name="list_update_failed">Impossibile aggiornare My Alder</string>

@@ -83,18 +83,6 @@ class DiscoverTest {
         assertEquals(listOf("Action", "Science Fiction"), m.genres)
     }
 
-    @Test fun myListYearsGoInTheirDecade() {
-        assertTrue(inDecade("2019", 2010))
-        assertTrue(inDecade("2019–2023", 2010))
-        assertFalse(inDecade("2020", 2010))
-        assertTrue(inDecade("1975", 0))
-        assertFalse(inDecade("1980", 0))
-        assertFalse(inDecade(null, 2010))
-        assertTrue(inYear("2024", 2024))
-        assertTrue(inYear("2024–2026", 2024))
-        assertFalse(inYear("2023", 2024))
-    }
-
     @Test fun heroAboutShrinksDownToOneLineWhenTallTextTouchesHeader() {
         assertEquals(1, nextHeroMaxLines(top = 90, minTop = 120, maxLines = 2))
         assertEquals(2, nextHeroMaxLines(top = 90, minTop = 120, maxLines = 3))

@@ -75,14 +75,13 @@
     <string name="page_no_live_catalogs">आपके किसी भी ऐड-ऑन में लाइव कैटलॉग नहीं है। Stremio में एक जोड़ें।</string>
     <string name="filter_all">सभी</string>
     <string name="list_sort">क्रम</string>
-    <string name="list_sort_recent">हाल में जोड़े गए</string>
-    <string name="list_sort_name">A–Z</string>
-    <string name="list_sort_unwatched">पहले बिना देखे</string>
+    <string name="saved_movies">सेव की गई फ़िल्में</string>
+    <string name="saved_shows">सेव किए गए शो</string>
+    <plurals name="saved_titles">
+        <item quantity="one">%1$d शीर्षक</item>
+        <item quantity="other">%1$d शीर्षक</item>
+    </plurals>
     <string name="list_empty">+ से सहेजे गए टाइटल यहाँ दिखते हैं</string>
-    <string name="list_empty_movies">My Alder में कोई फ़िल्म नहीं</string>
-    <string name="list_empty_shows">My Alder में कोई शो नहीं</string>
-    <string name="list_empty_unwatched">My Alder में कोई बिना देखा टाइटल नहीं</string>
-    <string name="list_clear_filters">फ़िल्टर साफ़ करें</string>
     <string name="action_remove_from_list">My Alder से हटाएँ</string>
     <string name="action_mark_watched">देखा गया मार्क करें</string>
     <string name="list_update_failed">My Alder अपडेट नहीं हो सकी</string>
