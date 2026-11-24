@@ -31,8 +31,17 @@ abstract class ExploreScreen : Screen() {
     private var preview: View? = null
     private var pending: Runnable? = null
     private var delayed = Runnable { refreshCatalogue() }
-    protected val heading: String get() = query.collection?.let { it.label + DOT + value(Facet.SORT) }
-        ?: value(Facet.SORT) + " " + getString(if (query.movie) R.string.tab_movies else R.string.tab_shows)
+    protected val heading: String get() {
+        val sort = value(Facet.SORT)
+        query.collection?.let { return it.label + DOT + sort }
+        val type = getString(if (query.movie) R.string.tab_movies else R.string.tab_shows)
+        return when {
+            query.sort=="az" -> "$type $sort"
+            query.sort=="votes" -> getString(R.string.ex_most_voted,type)
+            Locale.getDefault().language != "en" -> type + DOT + sort
+            else -> "$sort $type"
+        }
+    }
 
     private fun title(f: Facet) = getString(if (f == Facet.STUDIO && !query.movie) R.string.ex_network else f.title)
     private fun value(f: Facet): String = when (f) {
@@ -445,9 +454,15 @@ abstract class ExploreScreen : Screen() {
         lookup(null,restoreTitle=false)
     }
 
-    protected fun findChoices(kind: String, words: String) {
+    protected fun findChoices(kind: String, words: String, focusFirst: Boolean) {
         val g = generation
         results.removeAllViews()
+        val originalFocus = currentFocus
+        var firstChoice = focusFirst
+        fun focusChoice(view: View) {
+            if (firstChoice && currentFocus === originalFocus) view.requestFocus()
+            firstChoice = false
+        }
         val all = pill(R.string.filter_all).apply { setOnClickListener {
             query = query.without(if(kind=="person") Facet.PEOPLE else Facet.FRANCHISE)
             lookup(null,restoreTitle=false)
@@ -455,9 +470,12 @@ abstract class ExploreScreen : Screen() {
         results.addView(all)
         if (kind=="collection") {
             fun show(items: List<Pick>) {
-                items.forEach { pick -> results.addView(pill(pick.label).apply {
+                items.forEach { pick -> val button = pill(pick.label).apply {
                     setOnClickListener { query = query.copy(collection=pick,choices=query.choices-Facet.SORT); lookup(null,restoreTitle=false) }
-                }) }
+                }
+                    results.addView(button)
+                    focusChoice(button)
+                }
             }
             if (words.isEmpty()) show(collections) else background({
                 Tmdb.exploreRequest("search/collection",mapOf("query" to words),cache=true).optJSONArray("results").objects()
@@ -493,6 +511,7 @@ abstract class ExploreScreen : Screen() {
                     Images.load(p.photo?.let { "https://image.tmdb.org/t/p/w185$it" },face,dp(62))
                     tile.addView(text(p.name,SMALL).apply { gravity=Gravity.CENTER; maxLines=2 },-1,dp(34))
                     row.addView(tile,LinearLayout.LayoutParams((resources.displayMetrics.widthPixels-dp(285))/5,-2))
+                    focusChoice(tile)
                 }
             }
         }

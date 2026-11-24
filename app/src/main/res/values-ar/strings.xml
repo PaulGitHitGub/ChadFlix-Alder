@@ -627,4 +627,5 @@
     <string name="ex_order">ترتيب الإصدار</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
+    <string name="ex_most_voted">%1$s الأكثر تصويتًا</string>
 </resources>

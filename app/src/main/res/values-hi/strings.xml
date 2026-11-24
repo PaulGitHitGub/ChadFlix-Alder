@@ -603,4 +603,5 @@
     <string name="ex_order">रिलीज़ क्रम</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
+    <string name="ex_most_voted">सर्वाधिक वोट वाले %1$s</string>
 </resources>

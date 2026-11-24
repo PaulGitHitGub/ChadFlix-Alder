@@ -603,4 +603,5 @@
     <string name="ex_order">Erscheinungsfolge</string>
     <string name="ex_unavailable">Titel Nicht Verfügbar</string>
     <string name="ex_clear_filters">Alle Filter Löschen</string>
+    <string name="ex_most_voted">%1$s mit den meisten Stimmen</string>
 </resources>

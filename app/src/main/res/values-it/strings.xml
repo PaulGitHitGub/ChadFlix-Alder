@@ -606,4 +606,5 @@
     <string name="ex_order">Ordine Di Uscita</string>
     <string name="ex_unavailable">Titolo Non Disponibile</string>
     <string name="ex_clear_filters">Cancella Tutti I Filtri</string>
+    <string name="ex_most_voted">%1$s con più voti</string>
 </resources>

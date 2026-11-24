@@ -106,6 +106,7 @@ class SearchActivity : ExploreScreen() {
     private lateinit var keyboardButton: View
     private var lookupMode: String? = null
     private var savedTitleQuery = ""
+    private var enteringLookup = false
 
     override fun refreshCatalogue() {
         if (lookupMode == null) {
@@ -119,6 +120,7 @@ class SearchActivity : ExploreScreen() {
     override fun lookup(facet: String?, restoreTitle: Boolean) {
         cancelVoice()
         if (lookupMode == null) savedTitleQuery = input.text.toString()
+        enteringLookup = facet != null
         lookupMode = facet
         setHeader(if (facet == null && restoreTitle) savedTitleQuery else "")
         main.removeCallbacks(typed)
@@ -880,7 +882,8 @@ class SearchActivity : ExploreScreen() {
         }
         summary.visibility = if (mode==null && query.isEmpty()) View.VISIBLE else View.GONE
         if (mode != null) {
-            findChoices(mode,query)
+            findChoices(mode,query,enteringLookup || moveFocus)
+            enteringLookup = false
             return
         }
         showLoading()
