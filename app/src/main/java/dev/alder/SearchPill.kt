@@ -30,6 +30,9 @@ internal const val HOME_PILL = "homePill"
 /** Search's intent extra: how far (ms) Home's copy of the pill's move got before Search took over, to carry on from. */
 internal const val PILL_PLAYED = "pillPlayed"
 
+/** Search's intent extra: Home's pill was still gliding between names when the slingshot started (a held Left). */
+internal const val PILL_CHAINED = "pillChained"
+
 /** Animators run (Remove animations off); before API 26 they always do, ending at once when the scale is 0. */
 internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
 
@@ -358,15 +361,18 @@ internal class SearchPill(
      * capsule with the black pill on [focus]. [played] (ms): how far Home's own copy of the move had got when it froze
      * ([freeze]), so this one carries on from what Home last drew instead of starting again.
      */
-    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L) {
+    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L, chained: Boolean = false) {
+        // Home's own pill already on (or gliding between) its names: the slingshot carries on from where it is.
+        val live = started && fromOnScreen == null && mode == Mode.NAME
+        handChained = chained || (live && running?.isRunning == true)
         started = true
         measure()
         if (fromOnScreen != null && fromOnScreen.size == 4) {
             getLocationOnScreen(here)
             pillL = fromOnScreen[0] - here[0].toFloat(); pillT = fromOnScreen[1] - here[1].toFloat()
             pillR = fromOnScreen[2] - here[0].toFloat(); pillB = fromOnScreen[3] - here[1].toFloat()
-        } else { pillL = slotR.left; pillR = slotR.right; pillT = slotR.top; pillB = slotR.bottom }
-        glyphA = 1f; glyphS = 1f
+        } else if (!live) { pillL = slotR.left; pillR = slotR.right; pillT = slotR.top; pillB = slotR.bottom }
+        if (!live) { glyphA = 1f; glyphS = 1f }
         blackA = 0f
         vIconA = 0f; vWordsA = 0f; kIconA = 0f; kWordsA = 0f
         mode = Mode.NAME
@@ -374,7 +380,40 @@ internal class SearchPill(
         pendingSeek = played
         open(focus ?: voice ?: keyboard)
         pendingSeek = 0L
+        handChained = false
     }
+
+    /** The pill rests on [name] at once (Home's bar as it's first laid out, or back from Search). */
+    fun restOn(name: View, lit: Boolean) {
+        stop()
+        started = true
+        this.lit = lit
+        measure()
+        rectOf(name).let { pillL = it.left; pillR = it.right; pillT = it.top; pillB = it.bottom }
+        squash = 1f; glyphA = 1f; glyphS = 1f; blackA = 0f
+        vIconA = 0f; vWordsA = 0f; kIconA = 0f; kWordsA = 0f
+        mode = Mode.NAME
+        on = name
+        invalidate()
+    }
+
+    /** Home's bar: the pill goes to [name] (the Taffy), lit, or faint while the avatar or the gear has the remote. */
+    fun moveTo(name: View, lit: Boolean) {
+        if (!started) return restOn(name, lit)
+        this.lit = lit
+        toName(name)
+    }
+
+    val isStarted get() = started
+    val isMoving get() = running?.isRunning == true
+
+    /** Where the pill is now (screen px: left, top, right, bottom), for Search to carry on from. */
+    fun pillOnScreen(): IntArray {
+        getLocationOnScreen(here)
+        return intArrayOf((pillL + here[0]).toInt(), (pillT + here[1]).toInt(), (pillR + here[0]).toInt(), (pillB + here[1]).toInt())
+    }
+
+    private var handChained = false // the slingshot starts from a moving pill (a held Left): no delay, cruising curves
 
     /** The remote moved to [v]: the pill follows it. */
     fun focusOn(v: View?) {
@@ -411,12 +450,19 @@ internal class SearchPill(
             rest(blackS = !popped, blackSy = !moving)
             return play()
         }
-        // From a page's name (or Home's pill): the slingshot.
+        // From a page's name (or Home's pill): the slingshot. From a pill still gliding between names (a held Left), the
+        // stretch just carries on: no 50 ms delay, both edges on the cruising curve (tab-anim README, Taffy hand-over).
+        val chained = handChained || running?.isRunning == true
         mode = Mode.OPEN
         on = item
         begin()
-        go(PILL_L, capR.left, 0, 300, O4)
-        go(PILL_R, capR.right, 50, 250, FOS)
+        if (chained) {
+            go(PILL_L, capR.left, 0, cruise(capR.left - pillL, 220, 300), CHN)
+            go(PILL_R, capR.right, 0, cruise(capR.right - pillR, 220, 300), CHN)
+        } else {
+            go(PILL_L, capR.left, 0, 300, O4)
+            go(PILL_R, capR.right, 50, 250, FOS)
+        }
         go(PILL_T, capR.top, 0, 250, FOS)
         go(PILL_B, capR.bottom, 0, 250, FOS)
         dip(SQUASH, 0.92f, 0, 120, 240)
@@ -481,9 +527,10 @@ internal class SearchPill(
         dip(BLACK_SY, 0.94f, 0, 70, 120)
     }
 
-    /** Onto a page's name: from the capsule the mirrored slingshot (right edge first); between names a glide. */
+    /** Onto a page's name: from the capsule the mirrored slingshot (right edge first); between names the Taffy. */
     private fun toName(name: View) {
         if (mode == Mode.NAME && on === name) return invalidate()
+        val chained = running?.isRunning == true // a press while the pill is still moving (a held remote)
         begin()
         val t = rectOf(name)
         if (mode == Mode.OPEN) {
@@ -491,17 +538,15 @@ internal class SearchPill(
             go(PILL_L, t.left, 40, 220, FOS)
             go(GLYPH_A, 1f, 110, 60, LIN)
             go(GLYPH_S, 1f, 110, 200, POP)
+            go(SQUASH, 1f, 0, 200, FOS)
         } else {
-            val right = t.centerX() > (pillL + pillR) / 2f
-            go(if (right) PILL_R else PILL_L, if (right) t.right else t.left, 0, 200, FOS)
-            go(if (right) PILL_L else PILL_R, if (right) t.left else t.right, 30, 200, FOS)
+            taffy(t, chained)
             go(GLYPH_A, 1f, 0, 60, LIN)
             go(GLYPH_S, 1f, 0, 200, POP)
         }
-        // Everything else to a name's rest: the capsule's content and the black pill gone, no squash.
+        // Everything else to a name's rest: the capsule's content and the black pill gone.
         go(PILL_T, t.top, 0, 220, FOS)
         go(PILL_B, t.bottom, 0, 220, FOS)
-        go(SQUASH, 1f, 0, 200, FOS)
         go(V_ICON_A, 0f, 0, 70, LIN); go(V_WORDS_A, 0f, 0, 70, LIN)
         go(K_ICON_A, 0f, 0, 70, LIN); go(K_WORDS_A, 0f, 0, 70, LIN)
         go(BLACK_A, 0f, 0, 80, LIN)
@@ -509,6 +554,37 @@ internal class SearchPill(
         on = name
         play()
     }
+
+    /**
+     * The Taffy (tab-anim-20261124/README.md, variant 1): the leading edge leaps to the next name, the trailing one sets
+     * off 25 ms later and catches up, the pill thinning a little as it stretches. A jump of n names takes 30 ms more per
+     * extra name with a smaller overshoot; landing on the last name has none. A press while it's still moving carries on
+     * at its speed (the chn curve, no delay, duration by the distance left), so a held remote pours one streak across.
+     */
+    private fun taffy(t: RectF, chained: Boolean) {
+        val right = t.centerX() > (pillL + pillR) / 2f
+        val lead = if (right) PILL_R else PILL_L
+        val trail = if (right) PILL_L else PILL_R
+        val leadTo = if (right) t.right else t.left
+        val trailTo = if (right) t.left else t.right
+        if (chained) {
+            go(lead, leadTo, 0, cruise(leadTo - lead.get(this), 110, 230), CHN)
+            go(trail, trailTo, 0, cruise(trailTo - trail.get(this), 110, 250), CHN)
+            go(SQUASH, 1f, 0, 140, POP)
+            return
+        }
+        val from = (pillL + pillR) / 2f
+        val names = 1 + nameRects.count { r -> val m = r.centerX(); m > minOf(from, t.centerX()) + 1f && m < maxOf(from, t.centerX()) - 1f }
+        val leadMs = 170L + 30L * (names - 1)
+        val last = right && nameRects.all { it.right <= t.right + 1f }
+        go(lead, leadTo, 0, leadMs, if (last) SNAP else if (names > 1) O1 else O2)
+        go(trail, trailTo, 25, leadMs - 10, FOS)
+        dip(SQUASH, if (names > 1) 0.93f else 0.95f, 0, 70, 140)
+    }
+
+    /** A chained move's duration: the distance left at the held-remote speed (1.3 px/ms at 1080p), within [min]..[max]. */
+    private fun cruise(distance: Float, min: Long, max: Long) =
+        (Math.abs(distance) / (1.3f * resources.displayMetrics.density / 2f)).toLong().coerceIn(min, max)
 
     /** The places moved (the capsule widened for "Listening…", the names changed): at rest, the pill follows at once. */
     fun relayout() {
@@ -539,6 +615,8 @@ internal class SearchPill(
         val O2 = PathInterpolator(0.2f, 0.9f, 0.3f, 1.1f)
         val O1 = PathInterpolator(0.2f, 0.9f, 0.3f, 1.05f)
         val POP = PathInterpolator(0.3f, 1f, 0.3f, 1.35f)
+        val SNAP = PathInterpolator(0.2f, 0.9f, 0.3f, 1f) // no overshoot: the last name, nothing past the bar's end
+        val CHN = PathInterpolator(0.25f, 0.25f, 0.2f, 1f) // starts at cruising speed: a press arriving mid-move
         val PILL_L = F("pillL", { it.pillL }, { o, v -> o.pillL = v })
         val PILL_R = F("pillR", { it.pillR }, { o, v -> o.pillR = v })
         val PILL_T = F("pillT", { it.pillT }, { o, v -> o.pillT = v })

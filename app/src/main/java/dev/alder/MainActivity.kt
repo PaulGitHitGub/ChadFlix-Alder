@@ -820,8 +820,8 @@ class MainActivity : Screen() {
     override fun onResume() {
         super.onResume()
         searching = false
-        // Back from Search (or it never showed): the magnifier shows its own focus again.
-        endPill()
+        // Back from Search (or it never showed): the pill rests on its name again.
+        endPill(instant = true)
         if (searchFrom != null) { searchFrom = null; if (search != null) styleNav() }
         if (!::profile.isInitialized) return
         startFps()
@@ -1096,6 +1096,7 @@ class MainActivity : Screen() {
         // Search's pill, laid out with the bar (so its places are right) and drawn only once the magnifier has the remote.
         launchPill = SearchPill(this, header, null, null, null, search!!, avatarSlot) { navItems.values.filter { it.isShown } }
             .also { header.addView(it, 0, FrameLayout.LayoutParams(-1, -1)) }
+        navBar.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> if (pillStartedAt == 0L) startNavPill() }
         arrangeTabs()
         styleNav()
         return header
@@ -1206,23 +1207,31 @@ class MainActivity : Screen() {
         // Search seeks to where this one froze, which needs API 26's AnimatorSet seeking.
         if (android.os.Build.VERSION.SDK_INT < 26 || !animationsOn()) return
         val target = savedCapsule(this) ?: return
-        val from = pillFrom() ?: return
-        val slot = search ?: return
-        val pill = launchPill ?: return
+        val pill = launchPill?.takeIf { it.isStarted } ?: return
+        // The slingshot starts from the pill where it is: resting on a name, or still gliding (a held Left), which Search
+        // is told so it carries on the same way.
+        pillFromRect = pill.pillOnScreen()
+        pillChained = pill.isMoving
         pill.capsuleOnScreen = target
-        pill.arrive(from, null)
-        slot.imageAlpha = 0 // the pill draws the magnifier while it shrinks away
+        pill.arrive(null, null)
         pillStartedAt = SystemClock.uptimeMillis()
     }
+    private var pillFromRect: IntArray? = null
+    private var pillChained = false
 
-    /** Home again: its copy of the pill goes, the names and the magnifier draw themselves. */
-    private fun endPill() {
+    /** Home again: the pill leaves Search's move; back from Search ([instant]) it rests on its name at once, else glides back. */
+    private fun endPill(instant: Boolean = false) {
         if (pillStartedAt == 0L) return
-        launchPill?.reset()
         pillStartedAt = 0L
-        search?.imageAlpha = 255
+        if (instant) navTarget()?.let { launchPill?.restOn(it, navLit(it)) }
         styleNav()
     }
+
+    /** The name the pill belongs on: the focused one, the one Search is opening from, else the open page's. */
+    private fun navTarget(): TextView? = navItems.values.firstOrNull { it.isFocused } ?: navItems[searchFrom] ?: navItems[page]?.takeIf { it.isShown }
+
+    /** White while the remote is on a name or below the bar; faint while it's on the avatar or the gear. */
+    private fun navLit(target: View) = header.findFocus() == null || target.isFocused || searchFrom != null
 
     /** The lit page's name on screen (left, top, right, bottom px): where Search's pill starts. */
     private fun pillFrom() = navItems[searchFrom]?.takeIf { it.isShown }?.let { v ->
@@ -1238,13 +1247,14 @@ class MainActivity : Screen() {
     private fun startSearch() {
         if (searching) return
         searching = true
-        val from = pillFrom()
         // Home's copy holds still where it was last drawn while Search opens (they share the main thread); Search's
         // first frame carries on from exactly there. Home keeps it on screen until it's back ([endPill] in onResume).
         val played = if (pillStartedAt > 0) launchPill?.freeze() ?: 0L else 0L
+        val from = if (pillStartedAt > 0) pillFromRect else launchPill?.takeIf { it.isStarted }?.pillOnScreen() ?: pillFrom()
         startActivity(Intent(this, SearchActivity::class.java).apply {
             from?.let { putExtra(HOME_PILL, it) }
             if (played > 0) putExtra(PILL_PLAYED, played)
+            if (pillStartedAt > 0 && pillChained) putExtra(PILL_CHAINED, true)
         })
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
@@ -1274,18 +1284,36 @@ class MainActivity : Screen() {
     private fun styleNav() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
-        val pill = pillStartedAt > 0 // Search's pill is moving on this bar ([startPill]): it draws the pill and colours the names
+        // ChadFlix: once the bar is laid out, one white pill ([SearchPill]) moves between the names (the Taffy) and colours
+        // the words it covers, instead of each name's own white pill and the grey one left on the open page.
+        val pill = launchPill?.takeIf { it.isStarted }
+        val pillOn = if (pill != null && pillStartedAt == 0L) navTarget() else null
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
-            item.background = if (pill) null else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
-            if (!pill) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
+            // With the moving pill, the open page keeps today's grey pill while the white one is on another name.
+            item.background = if (pill != null) (if (p == page && pillOn != null && pillOn !== item) HomeStyle.pill(HomeStyle.OPEN_TAB) else null)
+                else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
+            if (pill == null) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
         }
         search?.let {
-            val lit = it.isFocused && searchFrom == null
+            val lit = it.isFocused && searchFrom == null && pill == null
             it.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else null
             it.setColorFilter(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
+            it.imageAlpha = if (pill != null) 0 else 255 // the pill draws the magnifier
         }
+        if (pill == null || pillStartedAt > 0) return // Search's opening move has the pill ([startPill])
+        val target = navTarget() ?: return
+        pill.moveTo(target, navLit(target))
+    }
+
+    /** The bar's first layout: the pill appears on its name ([styleNav] moves it from then on). */
+    private fun startNavPill() {
+        val pill = launchPill ?: return
+        if (pill.isStarted) return pill.relayout()
+        val target = navTarget() ?: return
+        pill.restOn(target, navLit(target))
+        styleNav()
     }
 
     // ---------- the art, and what shows over it ----------
