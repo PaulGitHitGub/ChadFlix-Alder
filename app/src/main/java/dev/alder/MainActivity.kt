@@ -13,6 +13,7 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
@@ -679,6 +680,7 @@ class MainActivity : Screen() {
     // the library's rows are redrawn, so the remote stays where it was on the rest of the page.
     override fun onRestart() {
         super.onRestart()
+        if (searchFrom != null) { searchFrom = null; styleNav() } // back from Search: the magnifier shows its own focus again
         val featured = Settings.featuredHome(this)
         val hiddenRows = Settings.hiddenRows(this)
         val hiddenRowsChanged = hiddenRows != lastHiddenRows || HomeStyle.signature(this, page.label) != lastHomeRows
@@ -1051,13 +1053,15 @@ class MainActivity : Screen() {
             setImageResource(R.drawable.ic_search)
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
-            // ChadFlix: like the tabs, resting on Search opens it (no OK needed).
+            // ChadFlix: Search opens as soon as the remote lands here, its pill thrown open from the one on the name the
+            // remote came from (or the open page's) ([SearchPill]); meanwhile that one stays lit here, so it never jumps.
             setOnFocusChangeListener { _, has ->
+                searchFrom = if (has) navLeft.takeIf { SystemClock.uptimeMillis() - navLeftAt < 200 } ?: page else null
                 styleNav()
                 main.removeCallbacks(openSearch)
-                if (has) main.postDelayed(openSearch, SWITCH_WAIT)
+                if (has) main.post(openSearch)
             }
-            setOnClickListener { main.removeCallbacks(openSearch); startActivity(Intent(this@MainActivity, SearchActivity::class.java)) }
+            setOnClickListener { main.removeCallbacks(openSearch); startSearch() }
         }.inNav(width = dp(44), height = -1)
         // A page opens as soon as the remote rests on its name. OK on Shows or Movies goes to its genres. Live shows only
         // once the profile's add-ons have a live catalog; order and hidden tabs come from Settings › Tabs ([arrangeTabs]).
@@ -1097,6 +1101,7 @@ class MainActivity : Screen() {
         compoundDrawablePadding = dp(2)
         setPadding(dp(16), dp(5), dp(16), dp(5))
         setOnFocusChangeListener { _, has ->
+            if (!has) { navLeft = p; navLeftAt = SystemClock.uptimeMillis() } // Search's pill may start here
             styleNav()
             main.removeCallbacks(switchPage)
             if (has && p != page) { pending = p; main.postDelayed(switchPage, SWITCH_WAIT) }
@@ -1171,7 +1176,20 @@ class MainActivity : Screen() {
 
     private var pending = Page.HOME
     private var jump = false // OK on a page's name: go down into its rows once they're in
-    private val openSearch = Runnable { if (search?.isFocused == true && hasWindowFocus()) startActivity(Intent(this, SearchActivity::class.java)) }
+    private val openSearch = Runnable { if (search?.isFocused == true && hasWindowFocus()) startSearch() }
+    private var searchFrom: Page? = null // the page whose pill Search opens from, kept lit here until it's open
+    private var navLeft: Page? = null // the page name the remote last left, and when
+    private var navLeftAt = 0L
+
+    /** Search, its pill starting on this one (screen px), with no screen change: the pill carries it ([SearchPill]). */
+    private fun startSearch() {
+        val from = navItems[searchFrom]?.takeIf { it.isShown }?.let { v ->
+            val at = IntArray(2).also(v::getLocationOnScreen)
+            intArrayOf(at[0], at[1], at[0] + v.width, at[1] + v.height)
+        }
+        startActivity(Intent(this, SearchActivity::class.java).apply { from?.let { putExtra(HOME_PILL, it) } })
+        @Suppress("DEPRECATION") overridePendingTransition(0, 0)
+    }
     private val switchPage = Runnable { if (pending != page && navItems[pending]?.isFocused == true) { jump = false; showPage(pending) } }
 
     private fun profileMenu() {
@@ -1199,14 +1217,15 @@ class MainActivity : Screen() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         navItems.forEach { (p, item) ->
-            val lit = item.isFocused || (p == page && !inBar)
+            val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
             item.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
             item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
         }
         search?.let {
-            it.background = if (it.isFocused) HomeStyle.pill(HomeStyle.WHITE) else null
-            it.setColorFilter(if (it.isFocused) HomeStyle.BLACK else HomeStyle.WHITE)
+            val lit = it.isFocused && searchFrom == null
+            it.background = if (lit) HomeStyle.pill(HomeStyle.WHITE) else null
+            it.setColorFilter(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
         }
     }
 

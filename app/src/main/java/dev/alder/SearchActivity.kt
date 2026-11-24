@@ -84,8 +84,9 @@ class SearchActivity : ExploreScreen() {
     private lateinit var avatar: View
     private lateinit var tabSlot: View // the magnifier tab's room in the top bar, under the capsule
     private lateinit var capsule: LinearLayout // Voice and Keyboard in the top bar ([attachCapsule])
-    private var capsuleLit = true // white while the remote is below or on it; faint while elsewhere in the top bar
-    private var styleKeyboard: (Boolean) -> Unit = {}
+    private lateinit var topPill: SearchPill // draws and moves the top bar's pill ([attachCapsule])
+    private var arrived = false // the pill has opened from Home's (or the magnifier)
+    private var pageViews = emptyList<View>() // the page under the top bar, faded in as the pill lands
     private var voice: View? = null
     private var shownAt: Long? = null // when the page first had the remote (uptime ms)
     private var styleVoice: () -> Unit = {}
@@ -188,10 +189,7 @@ class SearchActivity : ExploreScreen() {
 
         keyboard = column(Gravity.START)
         buildKeyboard()
-        sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.let { (view, style) ->
-            keyboardButton = view
-            styleKeyboard = style
-        }
+        keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }
         attachCapsule()
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
         showRecent()
@@ -293,8 +291,10 @@ class SearchActivity : ExploreScreen() {
             addView(headingRow, LinearLayout.LayoutParams(-1, dp(QUERY_H)).apply { marginEnd = dp(KEYS_X) })
             addView(resultsScroll, LinearLayout.LayoutParams(resultsW, 0, 1f))
         }
-        root.addView(buildHero(), 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
+        val hero = buildHero()
+        root.addView(hero, 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
         root.addView(resultsColumn, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(SearchLayout.ROW_TOP) })
+        pageViews = listOf(hero, resultsColumn)
     }
 
     /**
@@ -302,32 +302,52 @@ class SearchActivity : ExploreScreen() {
      * right edge stays where the magnifier's ended, so Movies, Shows and the rest don't move; [tabSlot] keeps the
      * magnifier's room in the bar. Focus is a black pill inside it. Voice has the remote on arrival, Up from the
      * controls row comes back to it, Left from Voice is the avatar and Right from Keyboard is the first page's name.
-     * ponytail: the magnifier-to-capsule opening animation (the designer's next round) goes here.
+     * The capsule's views are invisible focus targets: [SearchPill], behind the names, draws the pills and Voice |
+     * Keyboard and moves them (the designer's "Slingshot"), starting from Home's pill ([HOME_PILL]) or the magnifier.
      */
     private fun attachCapsule() {
         capsule = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(2), dp(2), dp(2), dp(2))
+            alpha = 0f // drawn by the pill
             voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
             addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4)))
         }
+        topPill = SearchPill(this, headerBar, capsule, voice as? LinearLayout, keyboardButton, tabSlot) {
+            (1 until nav.childCount).mapNotNull { nav.getChildAt(it) as? TextView }
+        }
+        val bar = headerBar as FrameLayout
+        bar.addView(topPill, 0, FrameLayout.LayoutParams(-1, -1))
         // Never over the avatar (many pages' names, or "Listening…"): then it grows right over the magnifier's room.
-        val place = { capsule.x = maxOf(nav.left + tabSlot.right - capsule.width, (avatar.parent as View).right + dp(8)).toFloat() }
+        val place = {
+            capsule.x = maxOf(nav.left + tabSlot.right - capsule.width, (avatar.parent as View).right + dp(8)).toFloat()
+            topPill.relayout()
+            // The first time everything has its place: the pill opens from where Home's was (or the magnifier).
+            if (!arrived && capsule.width > 0) {
+                arrived = true
+                topPill.post {
+                    topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton })
+                    if (android.os.Build.VERSION.SDK_INT < 26 || android.animation.ValueAnimator.areAnimatorsEnabled()) pageViews.forEach { v ->
+                        v.alpha = 0f // the page comes in as the pill lands (its old one is gone at once)
+                        v.animate().alpha(1f).setStartDelay(PAGE_IN_AT).setDuration(PAGE_IN_MS).start()
+                    }
+                }
+            }
+        }
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
         capsule.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() } // "Listening…" widens Voice
-        (headerBar as FrameLayout).addView(capsule, FrameLayout.LayoutParams(-2, dp(CAPSULE_H), Gravity.START or Gravity.CENTER_VERTICAL))
+        bar.addView(capsule, FrameLayout.LayoutParams(-2, dp(CAPSULE_H), Gravity.START or Gravity.CENTER_VERTICAL))
         voice?.nextFocusLeftId = avatar.id
         if (voice == null) keyboardButton.nextFocusLeftId = avatar.id
         linkCapsule()
-        styleNav()
     }
 
-    /** Right from Keyboard: the first page's name (the names are rebuilt as the add-ons' types arrive). */
+    /** Right from Keyboard: the first page's name; Left from it, Voice (the names are rebuilt as the add-ons' types arrive). */
     private fun linkCapsule() {
         if (!::capsule.isInitialized) return
         val first = nav.getChildAt(1) ?: return
         keyboardButton.nextFocusRightId = first.id
-        first.nextFocusLeftId = keyboardButton.id
+        first.nextFocusLeftId = (voice ?: keyboardButton).id
     }
 
     /**
@@ -456,13 +476,9 @@ class SearchActivity : ExploreScreen() {
         return bar
     }
 
-    /** As Home's bar: the open page (Search) keeps a white pill while the remote is below or on it, a faint one while it's elsewhere up here. */
+    /** The top bar's pill follows the remote ([SearchPill]): the capsule, a page's name, or faint for the avatar and gear. */
     private fun styleNav() {
-        if (!::capsule.isInitialized) return
-        capsuleLit = capsule.hasFocus() || headerBar.findFocus() == null
-        capsule.background = HomeStyle.pill(if (capsuleLit) HomeStyle.WHITE else HomeStyle.OPEN_TAB)
-        styleVoice()
-        styleKeyboard(keyboardButton.hasFocus())
+        if (::topPill.isInitialized) topPill.focusOn(currentFocus)
     }
 
     private fun updateNavTabs() {
@@ -495,10 +511,11 @@ class SearchActivity : ExploreScreen() {
                         .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                         .putExtra("page", page))
                     finish()
+                    // The pill is already on the page's name: Home takes over under it with no screen change.
+                    @Suppress("DEPRECATION") overridePendingTransition(0, 0)
                 }
+                // The white pill under the name and its colour are [SearchPill]'s.
                 setOnFocusChangeListener { _, has ->
-                    background = if (has) HomeStyle.pill(HomeStyle.WHITE) else null
-                    setTextColor(if (has) HomeStyle.BLACK else HomeStyle.WHITE)
                     // ChadFlix: as on Home, resting on a page's name opens it.
                     pendingTab?.let(main::removeCallbacks)
                     pendingTab = if (has) Runnable { if (hasWindowFocus()) open.run() }.also { main.postDelayed(it, HomeStyle.NAV_WAIT) } else null
@@ -522,9 +539,7 @@ class SearchActivity : ExploreScreen() {
         delete.setOnLongClickListener { clearQuery(); true } // hold Delete: the whole query
 
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
-            val (view, style) = sideAction(R.drawable.ic_mic, getString(R.string.search_voice),
-                iconTint = { color -> if (listening) HomeStyle.LIST_RED else color },
-                focused = { v -> lastKeyboardFocus = v }) {
+            val view = sideAction(R.drawable.ic_mic, getString(R.string.search_voice), focused = { v -> lastKeyboardFocus = v }) {
                 // OK while listening: stop and search what was heard so far.
                 if (listening) return@sideAction stopVoice()
                 // ChadFlix: ask for the microphone once; the speech service checks the asking app holds it.
@@ -534,7 +549,7 @@ class SearchActivity : ExploreScreen() {
             val label = view.getChildAt(1) as TextView
             styleVoice = {
                 label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
-                style(view.hasFocus())
+                if (::topPill.isInitialized) { topPill.listening = listening; topPill.invalidate() }
             }
             voice = view
         }
@@ -549,35 +564,20 @@ class SearchActivity : ExploreScreen() {
         voice?.nextFocusDownId = rows[0][0].id
     }
 
-    /** Voice and Keyboard: an icon and words in the top bar's capsule. Returns the view and its restyle. */
-    private fun sideAction(iconRes: Int, words: String, iconTint: (Int) -> Int = { it },
-                           focused: (View) -> Unit = {}, click: () -> Unit): Pair<LinearLayout, (Boolean) -> Unit> {
-        val icon = ImageView(this).apply { setImageResource(iconRes) }
-        val label = text(words, HomeStyle.TAB_SP)
-        val view = LinearLayout(this).apply {
-            id = View.generateViewId()
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(ACTION_PAD), 0, dp(ACTION_PAD), 0)
-            isFocusable = true
-            contentDescription = words
-            addView(icon, LinearLayout.LayoutParams(dp(13), dp(13)))
-            addView(label, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
-            setOnClickListener { click() }
-        }
-        // Inside the capsule ([attachCapsule]): focused, a black pill with white words; else black words on the white
-        // capsule, or white on its faint pill while the remote is elsewhere in the top bar.
-        fun style(has: Boolean) {
-            view.background = if (has) HomeStyle.pill(HomeStyle.BLACK) else null
-            val color = if (has || !capsuleLit) HomeStyle.WHITE else HomeStyle.BLACK
-            icon.imageTintList = ColorStateList.valueOf(iconTint(color))
-            label.setTextColor(color)
-        }
-        style(false)
-        view.setOnFocusChangeListener { v, has ->
-            if (has) focused(v)
-            style(has)
-        }
-        return view to ::style
+    /**
+     * Voice and Keyboard: an icon and words in the top bar's capsule. The capsule is invisible: its views are the focus
+     * targets and give [SearchPill] the places to draw them.
+     */
+    private fun sideAction(iconRes: Int, words: String, focused: (View) -> Unit = {}, click: () -> Unit) = LinearLayout(this).apply {
+        id = View.generateViewId()
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(ACTION_PAD), 0, dp(ACTION_PAD), 0)
+        isFocusable = true
+        contentDescription = words
+        addView(ImageView(this@SearchActivity).apply { setImageResource(iconRes) }, LinearLayout.LayoutParams(dp(13), dp(13)))
+        addView(text(words, HomeStyle.TAB_SP), LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        setOnClickListener { click() }
+        setOnFocusChangeListener { v, has -> if (has) focused(v) }
     }
 
     /**
@@ -1171,6 +1171,8 @@ class SearchActivity : ExploreScreen() {
         const val ACTION_H = 28 // the controls row's pills
         const val ACTION_PAD = 12 // Voice's and Keyboard's sides inside their focus pill
         const val CAPSULE_H = 30 // the top bar's Voice | Keyboard capsule, as tall as a page's name focused
+        const val PAGE_IN_AT = 180L // ms: the page fades in as the pill's left edge settles (the README's page dip)
+        const val PAGE_IN_MS = 70L
         const val KEY_W = 33
         const val KEY_H = 32
         const val KEYS_W = KEY_W * 6
