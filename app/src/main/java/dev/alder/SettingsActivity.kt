@@ -1120,8 +1120,9 @@ class SettingsActivity : Screen() {
             }
         }
         fun select(index: Int) {
-            if (index == current()) return
-            store(c, c.values[index].first)
+            val selected = c.values[index].first
+            if (selected == stored(c)) return
+            store(c, selected)
             refresh.forEach { it() }
         }
         val row = settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
