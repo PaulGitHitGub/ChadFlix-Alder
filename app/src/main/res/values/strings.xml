@@ -83,6 +83,9 @@
     <string name="page_no_live_catalogs">None of your addons has live catalogs. Add one in Stremio.</string>
     <string name="filter_all">All</string>
     <string name="list_sort">Sort</string>
+    <string name="list_sort_recent">Recently added</string>
+    <string name="list_sort_name">A–Z</string>
+    <string name="list_sort_unwatched">Unwatched first</string>
     <string name="saved_movies">Saved Movies</string>
     <string name="saved_shows">Saved Shows</string>
     <string name="watchlists">Watchlists</string>

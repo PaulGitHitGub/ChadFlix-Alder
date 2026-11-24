@@ -90,6 +90,9 @@
     <string name="page_no_live_catalogs">لا توفّر إضافاتك أي قوائم بث مباشر. ثبّت إضافة في Stremio.</string>
     <string name="filter_all">الكل</string>
     <string name="list_sort">ترتيب</string>
+    <string name="list_sort_recent">المضافة مؤخرًا</string>
+    <string name="list_sort_name">أبجديًا</string>
+    <string name="list_sort_unwatched">غير المشاهَد أولًا</string>
     <string name="saved_movies">الأفلام المحفوظة</string>
     <string name="saved_shows">المسلسلات المحفوظة</string>
     <string name="watchlists">قوائم المشاهدة</string>

@@ -82,6 +82,9 @@
     <string name="page_no_live_catalogs">Nenhum dos seus complementos tem catálogos ao vivo. Adicione um no Stremio.</string>
     <string name="filter_all">Tudo</string>
     <string name="list_sort">Ordenar</string>
+    <string name="list_sort_recent">Adicionados recentemente</string>
+    <string name="list_sort_name">A–Z</string>
+    <string name="list_sort_unwatched">Não assistidos primeiro</string>
     <string name="saved_movies">Filmes salvos</string>
     <string name="saved_shows">Séries salvas</string>
     <string name="watchlists">Listas para assistir</string>

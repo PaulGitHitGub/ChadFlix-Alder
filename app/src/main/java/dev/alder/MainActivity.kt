@@ -241,6 +241,13 @@ class MainActivity : Screen() {
         }
     }
     private enum class Mode { CINEMA, BROWSE }
+    private enum class ListSort(val label: Int) {
+        RECENT(R.string.list_sort_recent), NAME(R.string.list_sort_name), UNWATCHED(R.string.list_sort_unwatched)
+    }
+    private data class SavedFilter(val genre: String? = null, val decade: Int? = null, val year: Int? = null,
+                                   val sort: ListSort = ListSort.RECENT)
+    private val fillingListDetails = mutableSetOf<String>()
+    private var refreshSavedGenres: ((String) -> Unit)? = null
     private lateinit var profile: Profile
     override val backdrop get() = art
     private lateinit var scroller: ScrollView
@@ -1470,7 +1477,7 @@ class MainActivity : Screen() {
 
     /** The focused title: its art across the screen, and logo, facts (and time left) and description top left. */
     private fun showHero(item: Item) {
-        if (item.collectionCard) return clearLibraryHero()
+        if (item.collectionCard || (page == Page.LIBRARY && HomeStyle.isTile(item.id))) return clearLibraryHero()
         val changed = heroItem !== item
         heroItem = item
         if (page == Page.LIBRARY) {
@@ -2390,7 +2397,7 @@ class MainActivity : Screen() {
     }
 
     /** Discover's Year choices: All, recent years, the 2020s back to the 1980s, then before 1980 (0). */
-    private fun decadeOptions(): List<Pair<String, Any?>> {
+    private fun decadeOptions(): List<Pair<String, Pair<Int?, Int?>>> {
         val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
         return listOf(getString(R.string.filter_all) to (null to null)) +
             (currentYear downTo 2020).map { "$it" to (null to it) } +
@@ -2688,13 +2695,12 @@ class MainActivity : Screen() {
                     "", emptyList(), null, 0f, false, collectionCard = true, watchlist = list)
             }
             appendRow(getString(R.string.watchlists), cards, plural(R.plurals.watchlist_count, shownWatchlists.size), wide = true)
-            val dates = Library.listDates(this, profile.id)
-            val saved = listTitles().sortedByDescending { dates.getString(it.optString("_id"), null) ?: it.optString("_ctime") }
-            val (movies, shows) = saved.partition { it.optString("type") == "movie" }
-            for ((label, titles) in listOf(R.string.saved_movies to movies, R.string.saved_shows to shows)) {
-                if (titles.isEmpty()) continue
-                val items = titles.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
-                appendRow(getString(label), items, plural(R.plurals.saved_titles, items.size))
+            for (type in listOf("movie", "series")) {
+                val filter = savedFilter(type)
+                val host = FrameLayout(this)
+                column.addView(host)
+                showSavedRow(host, type, filter, focusTag)
+                if (filter.genre != null || filter.year != null || filter.decade != null) fillListDetails(type)
             }
         } else if (opened.items.isNotEmpty()) {
             val items = opened.items.map { Item(it.id, it.type, it.name, it.poster, it.background, Images.logoFor(it.id),
@@ -2708,6 +2714,142 @@ class MainActivity : Screen() {
         }
         if (focusTag != null && slot.findViewWithTag<View>(focusTag)?.requestFocus() != true &&
             firstRow()?.focusFirst() != true) navItems[page]?.requestFocus()
+    }
+
+    private fun savedFilter(type: String): SavedFilter {
+        val raw = HomeStyle.showing(this, Page.LIBRARY.label, type, default = "")
+        if (raw.isEmpty()) return SavedFilter()
+        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return SavedFilter()
+        return SavedFilter(json.text("genre"), json.text("decade")?.toIntOrNull(), json.text("year")?.toIntOrNull(),
+            ListSort.entries.find { it.name == json.text("sort") } ?: ListSort.RECENT)
+    }
+
+    private fun savedTitles(type: String) = listTitles().filter { (it.optString("type") == "movie") == (type == "movie") }
+
+    private fun showSavedRow(host: FrameLayout, type: String, filter: SavedFilter, focusTag: Any?): Row {
+        val dates = Library.listDates(this, profile.id)
+        fun sortDate(title: JSONObject) = dates.getString(title.optString("_id"), null) ?: title.optString("_ctime")
+        val all = savedTitles(type).filter { title ->
+            val meta = metas[title.optString("_id")]
+            (filter.genre == null || meta?.genres?.contains(filter.genre) == true) &&
+                (filter.year == null || inYear(meta?.year, filter.year)) && (filter.decade == null || inDecade(meta?.year, filter.decade))
+        }
+        val ordered = when (filter.sort) {
+            ListSort.RECENT -> all.sortedByDescending(::sortDate)
+            ListSort.NAME -> all.sortedBy { it.optString("name").lowercase() }
+            ListSort.UNWATCHED -> all.sortedWith(compareBy<JSONObject> { libraryFinished(it) }.thenByDescending(::sortDate))
+        }
+        val label = filter.genre ?: when {
+            filter.year != null -> filter.year.toString()
+            filter.decade == 0 -> getString(R.string.discover_before_1980)
+            filter.decade != null -> "${filter.decade}s"
+            else -> getString(filter.sort.label)
+        }
+        val tile = Item(HomeStyle.tileId("saved:$type"), type, "", null, null, null, "", emptyList(), null, 0f, false)
+        val items = listOf(tile) + ordered.map { libraryItem(it, dates.getString(it.optString("_id"), null)) }
+        val first = items.take(maxOf(START, 1 + items.indexOfFirst { it.cardTag == focusTag }))
+        val title = getString(if (type == "movie") R.string.saved_movies else R.string.saved_shows)
+        return row(title, first, later(items), subtitle = plural(R.plurals.saved_titles, ordered.size), tileLabel = label)
+            .also { host.addView(it.view) }
+    }
+
+    private fun refreshSavedRow(type: String, filter: SavedFilter, focusTile: Boolean = false) {
+        val old = rows.find { it.items.firstOrNull()?.id == HomeStyle.tileId("saved:$type") } ?: return
+        val host = old.view.parent as? FrameLayout ?: return
+        val tag = if (focusTile) old.items.first().cardTag else old.view.findFocus()?.tag
+        rows.remove(old)
+        old.cards.forEach { it.unload() }
+        host.removeView(old.view)
+        val row = showSavedRow(host, type, filter, tag)
+        if (tag != null) (row.view.findViewWithTag<View>(tag) ?: row.cards.first()).requestFocus()
+    }
+
+    // Genre and year use the original My Lists disk/remote metadata lookup. Start it for the requested
+    // row when its menu opens or when it needs to apply a remembered filter.
+    private fun fillListDetails(type: String) {
+        val missing = savedTitles(type).filter {
+            val id = it.optString("_id")
+            (id !in metas || isMetaExpired(it.optString("type"), metaFetchedAt[id], META_REFRESH_MS)) && id !in fillingListDetails
+        }
+        if (missing.isEmpty()) return
+        val ids = missing.map { it.optString("_id") }
+        fillingListDetails += ids
+        val key = profile.authKey
+        background({
+            val saved by lazy { Stremio.savedAddons(key).orEmpty() }
+            val remote by lazy { runCatching { Stremio.addons(key) } }
+            missing.mapNotNull { title ->
+                val id = title.optString("_id")
+                val media = title.optString("type")
+                resolveMetaWithOfflineFallback(
+                    ttl = if (media != "movie") META_REFRESH_MS else null,
+                    readSaved = { age -> saved.savedMeta(media, id, age) },
+                    fetchRemote = { remote.getOrThrow().meta(media, id) },
+                )?.let { id to it }
+            }
+        }, metaPool) { result ->
+            fillingListDetails -= ids
+            val details = result.getOrNull().orEmpty()
+            val now = System.currentTimeMillis()
+            details.forEach { (id, found) ->
+                cacheMeta(id, found.meta, preservedMetaTimestamp(found.fresh, metaFetchedAt[id], now))
+            }
+            if (details.isNotEmpty() && page == Page.LIBRARY && openedWatchlist == null) {
+                val filter = savedFilter(type)
+                if (filter.genre != null || filter.year != null || filter.decade != null) refreshSavedRow(type, filter)
+                refreshSavedGenres?.invoke(type)
+            }
+        }
+    }
+
+    private fun savedShowingMenu(type: String, focus: Int = -1) {
+        val filter = savedFilter(type)
+        val title = getString(if (type == "movie") R.string.saved_movies else R.string.saved_shows)
+        val years = decadeOptions()
+        val yearIndex = years.indexOfFirst { it.second == (filter.decade to filter.year) }.coerceAtLeast(0)
+        fun apply(value: SavedFilter, line: Int) {
+            if (value != filter) {
+                val json = JSONObject().putOpt("genre", value.genre).putOpt("year", value.year)
+                    .putOpt("decade", value.decade).put("sort", value.sort.name)
+                HomeStyle.setShowing(this, Page.LIBRARY.label, type, json.toString())
+                refreshSavedRow(type, value, focusTile = true)
+            }
+            savedShowingMenu(type, line)
+        }
+        fun subMenu(line: Int, focusedLabel: String? = null) {
+            val genres = if (line == 0) savedTitles(type).flatMap { metas[it.optString("_id")]?.genres.orEmpty() }
+                .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } else emptyList()
+            val choices = if (line == 0) listOf(getString(R.string.filter_all)) + genres else years.map { it.first }
+            val checked = if (line == 0) genres.indexOf(filter.genre) + 1 else yearIndex
+            val name = getString(if (line == 0) R.string.discover_genre else R.string.discover_year)
+            choose("$title · $name", choices, header = true, checked = checked,
+                focus = choices.indexOf(focusedLabel).takeIf { it >= 0 } ?: checked,
+                left = { savedShowingMenu(type, line) }, back = { savedShowingMenu(type, line) }) { i ->
+                val value = if (line == 0) filter.copy(genre = genres.getOrNull(i - 1))
+                    else filter.copy(decade = years[i].second.first, year = years[i].second.second)
+                apply(value, line)
+            }
+            if (line == 0) {
+                val dialog = lastChoose ?: return
+                val refresh = { changedType: String ->
+                    if (type == changedType && dialog.isShowing) {
+                        val current = (dialog.currentFocus as? TextView)?.text?.toString()
+                        dialog.dismiss()
+                        subMenu(0, current)
+                    }
+                }
+                refreshSavedGenres = refresh
+                dialog.setOnDismissListener { if (refreshSavedGenres === refresh) refreshSavedGenres = null }
+            }
+        }
+        val names = listOf("${getString(R.string.discover_genre)}   ${filter.genre ?: getString(R.string.filter_all)}  ›",
+            "${getString(R.string.discover_year)}   ${years[yearIndex].first}  ›") +
+            ListSort.entries.map { getString(it.label) + if (it == ListSort.RECENT) " " + getString(R.string.showing_default) else "" }
+        val checked = 2 + filter.sort.ordinal
+        choose("$title · ${getString(R.string.showing)}", names, checked = checked, focus = if (focus < 0) checked else focus,
+            header = true, right = { i -> if (i < 2) ({ subMenu(i) }) else null }) { i ->
+            if (i < 2) subMenu(i) else apply(filter.copy(sort = ListSort.entries[i - 2]), i)
+        }
     }
 
     private fun clearLibraryHero() {
@@ -2887,6 +3029,11 @@ class MainActivity : Screen() {
 
     /** ChadFlix: OK on a genre row's Showing tile picks the list the row shows; only that row loads again. */
     private fun showingMenu(row: Row, focus: Int = -1) {
+        if (page == Page.LIBRARY) {
+            val type = row.items.first().type
+            fillListDetails(type)
+            return savedShowingMenu(type, focus)
+        }
         val movie = page == Page.MOVIES
         val key = HomeStyle.rowKey(movie, row.title, page.label) ?: return
         if (key == "a") return animeMenu(row, focus)
@@ -2958,7 +3105,8 @@ class MainActivity : Screen() {
         if (all.size <= START) null else { from -> all.drop(from).take(PAGE) }
 
     private fun row(title: String, items: List<Item>, more: ((Int) -> List<Item>)? = null, wide: Boolean = false, grid: Boolean = false,
-                    continueRow: Boolean = false, subtitle: String? = null): Row = Row(title, items, more, wide, grid, continueRow, subtitle).also {
+                    continueRow: Boolean = false, subtitle: String? = null, tileLabel: String? = null): Row =
+        Row(title, items, more, wide, grid, continueRow, subtitle, tileLabel).also {
         rows += it
         main.post(::updateImages)
         if (!focusedSomething && mode == Mode.BROWSE) {
@@ -3047,7 +3195,8 @@ class MainActivity : Screen() {
      * ends on the same foot line as the poster rows.
      */
     private inner class Row(val title: String, first: List<Item>, private var more: ((Int) -> List<Item>)?, val wide: Boolean = false,
-                            val grid: Boolean = false, val continueRow: Boolean = false, subtitle: String? = null) {
+                            val grid: Boolean = false, val continueRow: Boolean = false, subtitle: String? = null,
+                            private val tileLabel: String? = null) {
         private val collections = first.firstOrNull()?.collectionCard == true
         private val compact = page == Page.LIBRARY
         private val cardWidth = when {
@@ -3122,7 +3271,7 @@ class MainActivity : Screen() {
 
         // ChadFlix: a genre row starts with its Showing tile: Up and Down land on the first title after it, and while the
         // remote is on the tile or that first title the row doesn't scroll, so the tile stays in view.
-        private val tileRow = homeRow && first.firstOrNull()?.id?.let(HomeStyle::isTile) == true
+        private val tileRow = (homeRow || compact) && !collections && first.firstOrNull()?.id?.let(HomeStyle::isTile) == true
         private var tileLook: ((Int) -> Unit)? = null
         private fun pinOf(i: Int) = if (tileRow && i <= 1) 0 else i
         private fun styleTile() = tileLook?.invoke(when { cards.firstOrNull()?.isFocused == true -> 2; active -> 1; else -> 0 })
@@ -3152,7 +3301,8 @@ class MainActivity : Screen() {
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
-            if (!collections && HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this, getString(R.string.showing), list.orEmpty())
+            if (!collections && HomeStyle.isTile(item.id)) tileLook = HomeStyle.dressTile(this@MainActivity, this,
+                getString(R.string.showing), tileLabel ?: list.orEmpty(), compact)
             dim(grid || !active, animate = false)
             payload = item
             tag = item.cardTag
@@ -3200,7 +3350,8 @@ class MainActivity : Screen() {
             }
             // A channel has no title page to show: OK plays it, and holding OK lists its sources.
             setOnClickListener { if (HomeStyle.isTile(item.id)) showingMenu(this@Row) else if (item.live) play(item) else openDetails(item) }
-            if (page == Page.LIBRARY) setOnLongClickListener { listMenu(item); true }
+            if (compact && HomeStyle.isTile(item.id)) setOnLongClickListener { showingMenu(this@Row); true }
+            else if (page == Page.LIBRARY) setOnLongClickListener { listMenu(item); true }
             else if (continueRow) setOnLongClickListener { continueMenu(item); true }
             else setOnLongClickListener { rowMenu(this@Row, item); true }
         }
@@ -3765,6 +3916,15 @@ internal fun saveTabOrder(saved: List<String>, reordered: List<String>): List<St
  */
 internal fun extraPageTypes(types: List<String>): List<String> =
     types.map { it.trim().lowercase() }.filter { it.isNotEmpty() && it != "movie" && it != "series" && !isLiveType(it) }.distinct()
+
+internal fun inYear(titleYear: String?, year: Int): Boolean =
+    titleYear?.take(4)?.toIntOrNull() == year
+
+/** A title's [year] ("1999", "2019–2023") in [decade]: 2010 is 2010–2019, 0 is before 1980. No year is in none. */
+internal fun inDecade(year: String?, decade: Int): Boolean {
+    val y = year?.take(4)?.toIntOrNull() ?: return false
+    return if (decade == 0) y < 1980 else y in decade..decade + 9
+}
 
 internal fun nextHeroMaxLines(top: Int, minTop: Int, maxLines: Int): Int? =
     (maxLines - 1).takeIf { top < minTop && maxLines > 1 }

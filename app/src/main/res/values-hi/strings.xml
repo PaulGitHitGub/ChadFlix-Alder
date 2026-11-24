@@ -81,6 +81,9 @@
     <string name="page_no_live_catalogs">आपके किसी भी ऐड-ऑन में लाइव कैटलॉग नहीं है। Stremio में एक जोड़ें।</string>
     <string name="filter_all">सभी</string>
     <string name="list_sort">क्रम</string>
+    <string name="list_sort_recent">हाल में जोड़े गए</string>
+    <string name="list_sort_name">A–Z</string>
+    <string name="list_sort_unwatched">पहले बिना देखे</string>
     <string name="saved_movies">सेव की गई फ़िल्में</string>
     <string name="saved_shows">सेव किए गए शो</string>
     <string name="watchlists">वॉचलिस्ट</string>

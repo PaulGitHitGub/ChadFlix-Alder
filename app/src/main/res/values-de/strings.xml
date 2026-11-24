@@ -81,6 +81,9 @@
     <string name="page_no_live_catalogs">Keines deiner Add-ons hat Live-Kataloge. Füge eines in Stremio hinzu.</string>
     <string name="filter_all">Alle</string>
     <string name="list_sort">Sortieren</string>
+    <string name="list_sort_recent">Zuletzt hinzugefügt</string>
+    <string name="list_sort_name">A–Z</string>
+    <string name="list_sort_unwatched">Ungesehene zuerst</string>
     <string name="saved_movies">Gespeicherte Filme</string>
     <string name="saved_shows">Gespeicherte Serien</string>
     <string name="watchlists">Merklisten</string>

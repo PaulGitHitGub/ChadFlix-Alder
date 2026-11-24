@@ -82,6 +82,9 @@
     <string name="page_no_live_catalogs">Nessuno dei tuoi add-on ha cataloghi di dirette. Aggiungine uno in Stremio.</string>
     <string name="filter_all">Tutto</string>
     <string name="list_sort">Ordina</string>
+    <string name="list_sort_recent">Aggiunti di recente</string>
+    <string name="list_sort_name">A–Z</string>
+    <string name="list_sort_unwatched">Prima i non visti</string>
     <string name="saved_movies">Film salvati</string>
     <string name="saved_shows">Serie salvate</string>
     <string name="watchlists">Liste da guardare</string>

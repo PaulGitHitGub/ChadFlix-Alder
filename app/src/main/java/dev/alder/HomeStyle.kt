@@ -260,8 +260,8 @@ internal object HomeStyle {
     }
 
     /** What a genre row ([key] its TMDb genre id) or platform row ("p<n>") shows on [page]; "trending" until the Showing tile picks another. */
-    fun showing(c: Context, page: String, key: String): String =
-        prefs(c).getString(Settings.profileKey(c, "showing:$page:$key"), "trending").orEmpty()
+    fun showing(c: Context, page: String, key: String, default: String = "trending"): String =
+        prefs(c).getString(Settings.profileKey(c, "showing:$page:$key"), default).orEmpty()
 
     fun genreSource(c: Context, page: String, id: Int) = "$TMDB$id:${showing(c, page, "$id")}"
 
@@ -428,13 +428,16 @@ internal object HomeStyle {
      * Returns how to show the tile's state: 2 focused (grey label, white list, red mark), 1 its row in use (both grey,
      * no mark), 0 another row (blank).
      */
-    fun dressTile(screen: Screen, card: MediaCardView, label: String, list: String): (Int) -> Unit {
-        val pad = px(screen, 12f).toInt()
+    fun dressTile(screen: Screen, card: MediaCardView, label: String, list: String, compact: Boolean = false): (Int) -> Unit {
+        val pad = px(screen, if (compact) 6f else 12f).toInt()
         card.contentDescription = "$label $list"
         val words = LinearLayout(screen).apply {
             orientation = LinearLayout.VERTICAL
-            addView(screen.text(label.uppercase(), 10.5f, bold = true, color = LABEL_GREY).apply { letterSpacing = 0.08f })
-            addView(screen.text(list, 15f, bold = true, color = WHITE).apply { maxLines = 2 },
+            addView(screen.text(label.uppercase(), if (compact) 9f else 10.5f, bold = true, color = LABEL_GREY).apply { letterSpacing = 0.08f })
+            addView(screen.text(list, if (compact) 12f else 15f, bold = true, color = WHITE).apply {
+                maxLines = 2
+                if (compact) ellipsize = android.text.TextUtils.TruncateAt.END
+            },
                 LinearLayout.LayoutParams(-2, -2).apply { topMargin = px(screen, 2f).toInt() })
             visibility = View.INVISIBLE
         }
@@ -460,6 +463,7 @@ internal object HomeStyle {
 
     /** A genre row's first card, the Showing tile: it opens the list picker instead of a title. */
     fun isTile(id: String) = id.startsWith(TILE)
+    fun tileId(key: String) = TILE + key
 
     /**
      * A genre row's titles, one TMDb page, after its Showing tile (a card with no picture: "Showing" over the list's
@@ -468,7 +472,7 @@ internal object HomeStyle {
     fun genreTitles(c: Context, movie: Boolean, source: String): Pair<List<Meta>, Boolean> {
         val parts = source.removePrefix(TMDB).split(":")
         // No name: the card's own title would draw over the tile's words ([dressTile]).
-        val tile = Meta(org.json.JSONObject().put("id", TILE + parts[0]).put("type", if (movie) "movie" else "series").put("name", ""))
+        val tile = Meta(org.json.JSONObject().put("id", tileId(parts[0])).put("type", if (movie) "movie" else "series").put("name", ""))
         val day = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
         val since = java.util.Calendar.getInstance().apply { add(java.util.Calendar.MONTH, if (movie) -6 else -12) }.time
         val list = parts.getOrElse(1) { "trending" }
