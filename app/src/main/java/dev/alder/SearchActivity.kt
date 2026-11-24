@@ -311,7 +311,8 @@ class SearchActivity : ExploreScreen() {
             voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4))) }
             addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(CAPSULE_H - 4)))
         }
-        val place = { capsule.x = (nav.left + tabSlot.right - capsule.width).toFloat() }
+        // Never over the avatar (many pages' names, or "Listening…"): then it grows right over the magnifier's room.
+        val place = { capsule.x = maxOf(nav.left + tabSlot.right - capsule.width, (avatar.parent as View).right + dp(8)).toFloat() }
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
         capsule.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() } // "Listening…" widens Voice
         (headerBar as FrameLayout).addView(capsule, FrameLayout.LayoutParams(-2, dp(CAPSULE_H), Gravity.START or Gravity.CENTER_VERTICAL))
