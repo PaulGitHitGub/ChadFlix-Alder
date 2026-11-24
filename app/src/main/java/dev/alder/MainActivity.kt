@@ -472,7 +472,8 @@ class MainActivity : Screen() {
             }
 
             // Rows snap into place (below) instead of scrolling just far enough, which left them cut off.
-            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
+            override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) =
+                if (page == Page.LIBRARY) super.computeScrollDeltaToGetChildRectOnScreen(rect) else 0
 
             override fun requestChildRectangleOnScreen(child: View, rectangle: Rect, immediate: Boolean): Boolean =
                 if (page.isGrid) false else super.requestChildRectangleOnScreen(child, rectangle, immediate)
@@ -1403,6 +1404,7 @@ class MainActivity : Screen() {
     /** Wakes from the cinema to where the remote was; the card taking focus brings its own art back. */
     private fun enterBrowse() {
         mode = Mode.BROWSE
+        if (page == Page.LIBRARY) resetArt()
         dimHome(false)
         main.removeCallbacks(advance)
         scroller.visibility = View.VISIBLE
@@ -1471,6 +1473,10 @@ class MainActivity : Screen() {
         if (item.collectionCard) return clearLibraryHero()
         val changed = heroItem !== item
         heroItem = item
+        if (page == Page.LIBRARY) {
+            scheduleRatings(item, metas[item.id])
+            return
+        }
         if (page.isGrid) {
             // The year sits in the facts line below the title, with the genre, seasons and ratings.
             showHeroTitle(item, item.name, null)
@@ -1603,18 +1609,22 @@ class MainActivity : Screen() {
         }
         episodeDate(item.addedAt)?.let { factsList += getString(R.string.list_added_on, it) }
         heroFacts.text = factsList.joinToString(HomeStyle.SEP)
-        // ChadFlix: the ratings (views, and any MDBList request) only for the card the remote stops on: racing past films
-        // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
-        main.removeCallbacks(ratingsTask)
-        if (ratingsItem !== item) heroRatings.removeAllViews() // another title's ratings go at once; the same title's stay
-        ratingsTask = Runnable { if (heroItem === item) showRatings(item, meta) }
-        if (page.isBrowse) main.postDelayed(ratingsTask, HOME_HERO_WAIT) else ratingsTask.run()
+        scheduleRatings(item, meta)
         val showResume = false // ChadFlix: OK on the card opens the title page; no Resume between the rows
         heroActions.visibility = if (showResume) View.VISIBLE else View.GONE
         // ChadFlix: only the words change; the plot's box is a fixed 3 lines, ending in "…".
         heroAbout.text = episode?.overview?.takeIf { code != null && it.isNotBlank() } ?: item.about
         if (mode == Mode.BROWSE && !page.isBrowse) browseInfo.enter(if (page.polishedRail) HOME_ART_MS else FOCUS_MS) // ChadFlix: showHero fades home's
             .alpha(if (homeDimmed && (page.isBrowse || page.isGrid)) 0.3f else 1f).start()
+    }
+
+    private fun scheduleRatings(item: Item, meta: Meta?) {
+        // ChadFlix: the ratings (views, and any MDBList request) only for the card the remote stops on: racing past films
+        // with Letterboxd on would spend MDBList's daily requests. The words above switch at once.
+        main.removeCallbacks(ratingsTask)
+        if (ratingsItem !== item) heroRatings.removeAllViews() // another title's ratings go at once; the same title's stay
+        ratingsTask = Runnable { if (heroItem === item) showRatings(item, meta) }
+        if (page.isBrowse) main.postDelayed(ratingsTask, HOME_HERO_WAIT) else ratingsTask.run()
     }
 
     private var ratingsTask = Runnable {}
@@ -1759,10 +1769,15 @@ class MainActivity : Screen() {
         val gridTop = GRID_TOP + 40
         if (grid) listPosterWidth = libraryPosterWidth()
         scroller.layoutParams = (scroller.layoutParams as FrameLayout.LayoutParams).apply {
-            topMargin = if (grid) dp(gridTop) else browseRowTop
-            height = if (grid) resources.displayMetrics.heightPixels - dp(gridTop) else browseRowH
+            topMargin = when {
+                grid -> dp(gridTop)
+                p == Page.LIBRARY -> dp(55)
+                else -> browseRowTop
+            }
+            height = resources.displayMetrics.heightPixels - topMargin
         }
-        content.setPadding(0, 0, 0, if (grid) 0 else browseEndPad)
+        content.setPadding(0, 0, 0, if (grid || p == Page.LIBRARY) 0 else browseEndPad)
+        browseInfo.visibility = if (p == Page.LIBRARY) View.GONE else View.VISIBLE
         // ChadFlix: the last page's info line goes at once. Fading out (~240 ms) it was already moved to the new page's
         // spot below (translationX 0, or Discover's top), so the old words jumped left and lingered there.
         browseInfo.animate().cancel()
@@ -2960,7 +2975,7 @@ class MainActivity : Screen() {
     private val nextRowCheck = Runnable { updateNextRow() }
 
     private fun updateNextRow() {
-        if (!page.isBrowse) return
+        if (!page.isBrowse || page == Page.LIBRARY) return
         val visible = rows.filter { it.view.isAttachedToWindow }.sortedBy { offsetIn(it.view) }
         // No row in use (the remote is on the chips or the top bar): the row sitting in the band counts.
         val active = visible.indexOfFirst { it.active }.takeIf { it >= 0 }
@@ -3034,9 +3049,20 @@ class MainActivity : Screen() {
     private inner class Row(val title: String, first: List<Item>, private var more: ((Int) -> List<Item>)?, val wide: Boolean = false,
                             val grid: Boolean = false, val continueRow: Boolean = false, subtitle: String? = null) {
         private val collections = first.firstOrNull()?.collectionCard == true
-        private val cardWidth = if (grid) listPosterWidth else dp(if (wide) WIDE_W else CARD_W)
-        private val cardHeight = if (grid) listPosterWidth * 3 / 2 else dp(if (collections) WIDE_W * 2 / 3 else if (wide) WIDE_H else CARD_H)
-        val homeRow = !wide && !grid // ChadFlix: Netflix's row: posters, the focused one widened, pinned left
+        private val compact = page == Page.LIBRARY
+        private val cardWidth = when {
+            collections -> dp(170)
+            compact -> dp(80)
+            grid -> listPosterWidth
+            else -> dp(if (wide) WIDE_W else CARD_W)
+        }
+        private val cardHeight = when {
+            collections -> dp(116)
+            compact -> dp(120)
+            grid -> listPosterWidth * 3 / 2
+            else -> dp(if (wide) WIDE_H else CARD_H)
+        }
+        val homeRow = !wide && !grid && !compact // browse posters widen when focused
         private val polishedRail = page.polishedRail
         private val gap = if (grid) LIST_GAP else HomeStyle.CARD_GAP
         val cardStep = cardWidth + dp(gap)
@@ -3046,14 +3072,14 @@ class MainActivity : Screen() {
         var active = false
         var loaded = false
 
-        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow || collections) HomeStyle.INSET else PAD)
+        private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow || compact) HomeStyle.INSET else PAD)
         val rail = HorizontalCardRail(
             screen = this@MainActivity,
             cardGapPx = dp(gap),
             paddingStartPx = inset,
-            paddingTopPx = dp(if (grid) LIST_TOP_ROOM else ROW_TOP_ROOM),
+            paddingTopPx = dp(when { compact -> 4; grid -> LIST_TOP_ROOM; else -> ROW_TOP_ROOM }),
             paddingEndPx = inset,
-            paddingBottomPx = if (collections) dp(12) else if (grid) dp(GRID_ROW_BOTTOM) else rowBottom,
+            paddingBottomPx = when { compact -> dp(10); grid -> dp(GRID_ROW_BOTTOM); else -> rowBottom },
             wideMotion = wide,
             rightFadePx = if (polishedRail) dp(30) else 0,
             cullLeft = !homeRow, // the card before the focused one peeks in at the left edge
@@ -3077,14 +3103,18 @@ class MainActivity : Screen() {
         // ChadFlix: a genre row's title names its list, "Action · Trending".
         private val list = subtitle ?: if (homeRow && (page.hasGenreShortcuts || page == Page.SERVICES)) HomeStyle.rowList(this@MainActivity, page.label, page == Page.MOVIES, title) else null
         private val shownTitle = if (openedWatchlist != null && page == Page.LIBRARY) title else HomeStyle.titleCase(HomeStyle.rowName(this@MainActivity, title)) // All Genres in the app's language
-        private val quietTitle = list?.let { HomeStyle.rowTitle(shownTitle, it, if (subtitle != null) TEXT_2 else null) }
+        private val quietTitle = if (compact) android.text.SpannableString("$shownTitle  •  $subtitle").apply {
+            setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, shownTitle.length, 0)
+            setSpan(android.text.style.ForegroundColorSpan(TEXT_2), shownTitle.length, length, 0)
+            setSpan(android.text.style.RelativeSizeSpan(0.76f), shownTitle.length, length, 0)
+        } else list?.let { HomeStyle.rowTitle(shownTitle, it, if (subtitle != null) TEXT_2 else null) }
         private val litTitle = if (subtitle != null) quietTitle else list?.let { HomeStyle.rowTitle(shownTitle, it, HomeStyle.LIST_RED) }
-        private val heading = text(shownTitle, HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE).onArt().apply {
+        private val heading = text(shownTitle, HomeStyle.ROW_TITLE, bold = !compact, color = HomeStyle.WHITE).onArt().apply {
             quietTitle?.let { text = it }
             setPadding(inset, 0, dp(PAD), 0)
             setSingleLine()
             ellipsize = TextUtils.TruncateAt.END
-            maxWidth = dp(PAD + HERO_W) // a long "Because you watched…" stops at the hero's width
+            if (!compact) maxWidth = dp(PAD + HERO_W) // a long "Because you watched…" stops at the hero's width
             alpha = QUIET
             if (grid) visibility = View.GONE
         }
@@ -3118,7 +3148,7 @@ class MainActivity : Screen() {
             live = item.live,
             settled = item.settled,
             liftShadow = !page.hasGenreShortcuts,
-            home = homeRow || collections,
+            home = homeRow || compact,
             wideW = if (homeRow && !HomeStyle.isTile(item.id)) dp(HomeStyle.WIDE_W) else 0,
         ).apply {
             logoUrl = item.logo
@@ -3204,7 +3234,8 @@ class MainActivity : Screen() {
          * it's known. One badge per row moves to the card the remote is on; other cards have none.
          */
         fun rate(card: MediaCardView, item: Item, fade: Boolean) {
-            if (!homeRow || HomeStyle.isTile(item.id) || !active || cards.getOrNull(selected) !== card || card.widensBy <= 0) return
+            if ((!compact && (!homeRow || card.widensBy <= 0)) || item.collectionCard || HomeStyle.isTile(item.id) ||
+                !active || cards.getOrNull(selected) !== card) return
             val (mark, score) = if (ratingPick == "letterboxd") R.drawable.ic_rating_letterboxd to knownLetterboxd(item.id)
                 else R.drawable.ic_rating_imdb to (metas[item.id]?.rating ?: item.facts.firstOrNull { it.startsWith("IMDb") }?.removePrefix("IMDb "))
             if (score.isNullOrBlank()) return hideBadge()
@@ -3267,9 +3298,11 @@ class MainActivity : Screen() {
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
                 if (!held) cards[index].expand(true, animate = !entering)
+                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
+            }
+            if (homeRow || (compact && !collections)) {
                 hideBadge()
                 rate(cards[index], items[index], fade = false)
-                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
             if (!held && entering) prefetchNeighbours(this) // ChadFlix: also beside rows that never widen
             if (page.isBrowse) updateNextRow()
@@ -3501,6 +3534,13 @@ class MainActivity : Screen() {
     private fun snapTo(focused: View) {
         val rowView = rows.firstOrNull { isInside(focused, it.view) }?.view ?: return
         val top = offsetIn(rowView)
+        if (page == Page.LIBRARY) {
+            val bottom = top + rowView.height
+            val y = scroller.scrollY
+            if (top < y) scroller.scrollTo(0, top)
+            else if (bottom > y + scroller.height) scroller.scrollTo(0, minOf(top, bottom - scroller.height))
+            return
+        }
         val viewportHeight = scroller.height - if (page.isGrid) dp(SAFE_BOTTOM) else 0
         val target = if (page.isGrid) gridScrollTarget(scroller.scrollY, viewportHeight, top, rowView.height) else top.coerceAtLeast(0)
         if (page.isGrid) scroller.smoothScrollTo(0, target) else slideRows(target)
@@ -3549,7 +3589,7 @@ class MainActivity : Screen() {
     private fun updateImages() {
         val top = scroller.scrollY
         // ChadFlix: home rows go by one row's height, not the taller scroller's.
-        val height = if (!page.isGrid) browseRowBlock else scroller.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val height = if (!page.isGrid && page != Page.LIBRARY) browseRowBlock else scroller.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
         // Requests run newest first, so the bottom rows are asked for first and the top row last: it loads first.
         for (r in rows.filter { it.view.isAttachedToWindow }.sortedByDescending { offsetIn(it.view) }) {
             val y = offsetIn(r.view)

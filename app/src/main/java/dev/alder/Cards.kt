@@ -325,7 +325,8 @@ internal class MediaCardView(
         face.removeAllViews()
         face.setBackgroundColor(Screen.CARD_PLACEHOLDER)
         val pictures = LinearLayout(screen)
-        face.addView(pictures, LayoutParams(-1, -1).apply { bottomMargin = screen.dp(29) })
+        val footerHeight = screen.dp(32)
+        face.addView(pictures, LayoutParams(-1, -1).apply { bottomMargin = footerHeight })
         val urls = list?.items.orEmpty().asSequence().mapNotNull { it.background ?: it.poster }.take(2).toList()
         watchlistPictures = urls.map { url ->
             val view = ImageView(screen).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
@@ -346,7 +347,7 @@ internal class MediaCardView(
                 }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(screen.text(java.text.NumberFormat.getIntegerInstance().format(list.items.size), Screen.SMALL, color = Screen.TEXT_2))
             }
-            face.addView(footer, LayoutParams(-1, screen.dp(29), Gravity.BOTTOM))
+            face.addView(footer, LayoutParams(-1, footerHeight, Gravity.BOTTOM))
             contentDescription = "$titleName, $count"
         }
         face.alpha = 1f
