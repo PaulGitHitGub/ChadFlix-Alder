@@ -62,6 +62,12 @@
     <string name="action_resume">Continuar</string>
     <string name="time_left_hours">Faltam %1$d h %2$d min</string>
     <string name="time_left_minutes">Faltam %1$d min</string>
+    <string name="guide_episode_label">T%1$d: E%2$d</string>
+    <string name="guide_minutes">%1$d min</string>
+    <plurals name="guide_episodes">
+        <item quantity="one">%1$d episódio</item>
+        <item quantity="other">%1$d episódios</item>
+    </plurals>
     <plurals name="seasons">
         <item quantity="one">%1$d temporada</item>
         <item quantity="many">%1$d temporadas</item>
@@ -103,13 +109,11 @@
 
     <!-- Title page -->
     <string name="details_load_failed">Não foi possível carregar os detalhes deste título.</string>
-    <string name="details_episodes_below">▾  Episódios</string>
-    <string name="details_more_below">▾  Títulos parecidos</string>
     <string name="details_premiere">Estreia  ·  T%1$d E%2$d vai ao ar em %3$s</string>
     <string name="details_up_to_date">Em dia  ·  T%1$d E%2$d vai ao ar em %3$s</string>
     <string name="details_airs_soon">breve</string>
     <string name="airs_on">Vai ao ar em %1$s</string>
-    <string name="action_episodes">Episódios</string>
+    <string name="details_more_episodes">Mais episódios</string>
     <string name="action_more_info">Mais informações</string>
     <string name="action_start_over">Começar do início</string>
     <string name="action_trailer">Trailer</string>

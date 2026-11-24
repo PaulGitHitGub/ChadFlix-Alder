@@ -62,6 +62,12 @@
     <string name="action_resume">जारी रखें</string>
     <string name="time_left_hours">%1$d घं %2$d मि बाकी</string>
     <string name="time_left_minutes">%1$d मि बाकी</string>
+    <string name="guide_episode_label">सी%1$d: ए%2$d</string>
+    <string name="guide_minutes">%1$d मि॰</string>
+    <plurals name="guide_episodes">
+        <item quantity="one">%1$d एपिसोड</item>
+        <item quantity="other">%1$d एपिसोड</item>
+    </plurals>
     <plurals name="seasons">
         <item quantity="one">%1$d सीज़न</item>
         <item quantity="other">%1$d सीज़न</item>
@@ -102,13 +108,11 @@
 
     <!-- Title page -->
     <string name="details_load_failed">इस टाइटल की जानकारी लोड नहीं हो सकी।</string>
-    <string name="details_episodes_below">▾  एपिसोड</string>
-    <string name="details_more_below">▾  ऐसे और टाइटल</string>
     <string name="details_premiere">प्रीमियर  ·  S%1$d E%2$d %3$s को आएगा</string>
     <string name="details_up_to_date">सब देख लिया  ·  S%1$d E%2$d %3$s को आएगा</string>
     <string name="details_airs_soon">जल्द</string>
     <string name="airs_on">%1$s को आएगा</string>
-    <string name="action_episodes">एपिसोड</string>
+    <string name="details_more_episodes">और एपिसोड</string>
     <string name="action_more_info">ज़्यादा जानकारी</string>
     <string name="action_start_over">शुरू से देखें</string>
     <string name="action_trailer">ट्रेलर</string>

@@ -63,6 +63,16 @@
     <string name="time_left_hours">متبقٍّ %1$d ساعة و%2$d دقيقة</string>
     <string name="time_left_minutes">متبقٍّ %1$d دقيقة</string>
     <string name="time_left_under_minute">متبقٍّ أقل من دقيقة</string>
+    <string name="guide_episode_label">م%1$d: ح%2$d</string>
+    <string name="guide_minutes">%1$d د</string>
+    <plurals name="guide_episodes">
+        <item quantity="zero">لا حلقات</item>
+        <item quantity="one">حلقة واحدة</item>
+        <item quantity="two">حلقتان</item>
+        <item quantity="few">%1$d حلقات</item>
+        <item quantity="many">%1$d حلقةً</item>
+        <item quantity="other">%1$d حلقة</item>
+    </plurals>
     <plurals name="seasons">
         <item quantity="zero">لا مواسم</item>
         <item quantity="one">موسم واحد</item>
@@ -115,13 +125,11 @@
 
     <!-- Title page -->
     <string name="details_load_failed">تعذّر تحميل تفاصيل هذا العنوان.</string>
-    <string name="details_episodes_below">▾  الحلقات</string>
-    <string name="details_more_below">▾  عناوين مشابهة</string>
     <string name="details_premiere">العرض الأول · الموسم %1$d، الحلقة %2$d تُعرض في %3$s</string>
     <string name="details_up_to_date">شاهدت كل الحلقات المتاحة · الموسم %1$d، الحلقة %2$d تُعرض في %3$s</string>
     <string name="details_airs_soon">قريبًا</string>
     <string name="airs_on">يُعرض في %1$s</string>
-    <string name="action_episodes">الحلقات</string>
+    <string name="details_more_episodes">المزيد من الحلقات</string>
     <string name="action_more_info">مزيد من المعلومات</string>
     <string name="action_start_over">إعادة من البداية</string>
     <string name="action_trailer">إعلان تشويقي</string>
