@@ -156,7 +156,6 @@ class SearchActivity : ExploreScreen() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("PillLag", "Search onCreate start ${SystemClock.uptimeMillis()}") // ponytail: remove once measured
         super.onCreate(savedInstanceState)
         val key = authKey ?: return finish()
         val width = resources.displayMetrics.widthPixels / resources.displayMetrics.density
@@ -269,9 +268,7 @@ class SearchActivity : ExploreScreen() {
                 root.post { if (!isDestroyed) { showRecent(); if (searched == null) search(false) } }
                 return true
             }
-        })
-        Log.d("PillLag", "Search onCreate end ${SystemClock.uptimeMillis()}")
-    }
+        })    }
 
     /**
      * The page: the hero across the top under the top bar (Voice and Keyboard are in it: [attachCapsule]), the controls row under it

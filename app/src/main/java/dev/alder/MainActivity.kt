@@ -874,9 +874,6 @@ class MainActivity : Screen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // ponytail: PillLag timing log (Left onto the magnifier → Search's first pill frame), remove once measured.
-        if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN && header.findFocus() != null)
-            android.util.Log.d("PillLag", "Home Left ${SystemClock.uptimeMillis()} (pressed ${event.downTime})")
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
             else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false); showInfo() } // where the hold ends
@@ -1060,6 +1057,8 @@ class MainActivity : Screen() {
             setImageResource(R.drawable.ic_search)
             contentDescription = getString(R.string.nav_search)
             setPadding(dp(13), dp(7), dp(13), dp(7))
+            // No system focus overlay: while Search opens the magnifier has no pill of its own, only Search's passing over it.
+            if (android.os.Build.VERSION.SDK_INT >= 26) defaultFocusHighlightEnabled = false
             // ChadFlix: Search opens as soon as the remote lands here, its pill thrown open from the one on the name the
             // remote came from (or the open page's) ([SearchPill]); meanwhile that one stays lit here, so it never jumps.
             setOnFocusChangeListener { _, has ->
@@ -1067,9 +1066,9 @@ class MainActivity : Screen() {
                 if (has && !searching) startPill() else if (!has && !searching) endPill()
                 styleNav()
                 main.removeCallbacks(openSearch)
-                // With the pill moving here, Search opens two frames in, so the stretch is visibly under way before the
-                // launch takes the main thread (the pill then holds still until Search's first frame carries it on).
-                if (has) main.postDelayed(openSearch, if (pillStartedAt > 0) PILL_LEAD_MS else 0L)
+                // Search opens at once: Home's pill holds on the name it starts from (the launch takes the shared main
+                // thread), never part-way over the magnifier, and Search's first frame throws it on from there.
+                if (has) main.post(openSearch)
             }
             setOnClickListener { main.removeCallbacks(openSearch); startSearch() }
         }.inNav(width = dp(44), height = -1)
@@ -3937,7 +3936,6 @@ class MainActivity : Screen() {
         const val NAV_GAP = 10 // dp between them
         const val WARM_AFTER = 3000L // ms after launch before other pages' posters are fetched ahead
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
-        const val PILL_LEAD_MS = 34L // ms (two frames) Search's pill moves on Home's bar before Search is launched
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
         const val ROW_TOP_ROOM = 10 // dp between the row title box and its cards (was 2: the title nearly touched the focus border); ROWS_TOP and INFO_GAP give the 8 back, so the cards, info line and peek stay put

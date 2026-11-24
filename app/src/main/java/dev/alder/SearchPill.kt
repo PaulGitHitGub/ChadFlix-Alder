@@ -83,8 +83,6 @@ internal class SearchPill(
     var listening = false // Voice's mic goes red
     /** Home: no capsule of its own; the pill opens towards where Search's was ([savedCapsule]), Search carrying on. */
     var capsuleOnScreen: IntArray? = null
-    private var drawnOnce = false // ponytail: PillLag timing log, remove once measured
-
     // The state: the white pill, its squash; the black pill, its alpha, scale and squash; the magnifier; each item's
     // icon (alpha, scale) and words (alpha, sideways offset); and whether the capsule is lit (white) or faint.
     private var pillL = 0f; private var pillR = 0f; private var pillT = 0f; private var pillB = 0f; private var squash = 1f
@@ -163,9 +161,7 @@ internal class SearchPill(
     private val glyph = Ink(R.drawable.ic_search)
 
     override fun onDraw(canvas: Canvas) {
-        if (!started) return
-        if (!drawnOnce) { drawnOnce = true; android.util.Log.d("PillLag", "${context.javaClass.simpleName} pill first draw ${android.os.SystemClock.uptimeMillis()}") }
-        recolorNames()
+        if (!started) return        recolorNames()
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
         if (pillR - left > 1f) {
@@ -290,7 +286,7 @@ internal class SearchPill(
     }
 
     /** Home again: the pill it started is gone (Search took over, or never opened). */
-    fun reset() { stop(); started = false; drawnOnce = false; invalidate() }
+    fun reset() { stop(); started = false; invalidate() }
 
     /** [p] from [from] to [to] after [delay] ms over [ms]; with animations off, or already there, it lands at once. */
     private fun tween(p: F, from: Float, to: Float, delay: Long, ms: Long, curve: TimeInterpolator) {
