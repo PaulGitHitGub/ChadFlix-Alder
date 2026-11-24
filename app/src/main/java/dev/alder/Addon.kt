@@ -298,7 +298,7 @@ class Meta(json: JSONObject) {
         .map {
             Video(it.getString("id"), it.text("title") ?: it.text("name") ?: "", it.optInt("season"), it.optInt("episode"),
                 it.text("thumbnail"), it.text("overview") ?: it.text("description"),
-                it.text("released") ?: it.text("available"))
+                it.text("released") ?: it.text("available"), it.text("runtime"))
         }
         .sortedWith(compareBy({ if (it.season == 0) Int.MAX_VALUE else it.season }, { it.episode }))
 }
@@ -341,7 +341,7 @@ class CastMember(
 }
 
 class Video(val id: String, val title: String, val season: Int, val episode: Int, val thumbnail: String?,
-            val overview: String?, val released: String?)
+            val overview: String?, val released: String?, val runtime: String? = null)
 
 internal fun episodeNumber(season: Int, episode: Int): String? =
     if (season >= 0 && episode > 0) "S$season E$episode" else null

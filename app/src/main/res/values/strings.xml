@@ -64,6 +64,12 @@
     <string name="time_left_hours">%1$dh %2$dm left</string>
     <string name="time_left_minutes">%1$d min left</string>
     <string name="time_left_under_minute">Under 1 min left</string>
+    <string name="guide_episode_label">S%1$d: E%2$d</string>
+    <string name="guide_minutes">%1$dm</string>
+    <plurals name="guide_episodes">
+        <item quantity="one">%1$d Episode</item>
+        <item quantity="other">%1$d Episodes</item>
+    </plurals>
     <plurals name="seasons">
         <item quantity="one">%1$d season</item>
         <item quantity="other">%1$d seasons</item>
@@ -120,14 +126,11 @@
 
     <!-- Title page -->
     <string name="details_load_failed">Couldn\'t load this title\'s details.</string>
-    <string name="details_episodes_below">▾  Episodes</string>
-    <string name="details_more_below">▾  More like this</string>
     <string name="details_premiere">Premiere  ·  S%1$d E%2$d airs %3$s</string>
     <string name="details_up_to_date">Up to date  ·  S%1$d E%2$d airs %3$s</string>
     <string name="details_airs_soon">soon</string>
     <string name="airs_on">Airs %1$s</string>
     <string name="details_more_episodes">More Episodes</string>
-    <string name="action_episodes">Episodes</string>
     <string name="action_more_info">More information</string>
     <string name="action_start_over">Start over</string>
     <string name="action_trailer">Trailer</string>
