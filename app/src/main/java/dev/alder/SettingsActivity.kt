@@ -581,7 +581,8 @@ class SettingsActivity : Screen() {
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)
                 choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
-                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
+                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
+                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
             }

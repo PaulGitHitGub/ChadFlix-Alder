@@ -382,7 +382,7 @@
     <string name="search_remove_recent">Letzte Suche entfernen?</string>
     <string name="search_remove_query">%1$s entfernen</string>
     <string name="search_popular_unavailable">Beliebte Titel sind nicht verfügbar.</string>
-    <string name="search_voice">Sprache</string>
+    <string name="search_voice">Sprachsuche</string>
     <string name="search_listening">Ich höre zu…</string>
     <string name="search_voice_missed">Das habe ich nicht verstanden</string>
     <string name="search_delete">Löschen</string>
