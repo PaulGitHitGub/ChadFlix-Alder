@@ -617,7 +617,9 @@ class DetailsActivity : Screen() {
             action.id = View.generateViewId()
             action.nextFocusLeftId = action.id
             action.nextFocusRightId = action.id
-            stack.addView(action, LinearLayout.LayoutParams(dp(280), -2).apply { topMargin = dp(gap) })
+            // The old 280 dp action centered closest to More Info for every combination of the optional icons.
+            if (action === playButton) action.nextFocusUpId = infoButton.id
+            stack.addView(action, wrap().apply { topMargin = dp(gap) })
         }
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
             setOnClickListener { showGuide() }

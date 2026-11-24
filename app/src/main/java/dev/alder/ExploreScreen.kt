@@ -128,7 +128,7 @@ abstract class ExploreScreen : Screen() {
             isSingleLine = true
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setPadding(dp(12),0,dp(11),0)
+            setPadding(dp(11),0,dp(11),0)
             setCompoundDrawablesRelative(null, null, getDrawable(R.drawable.ic_chevron_down)?.mutate()?.apply {
                 setBounds(0, 0, dp(10), dp(10))
             }, null)
@@ -233,7 +233,7 @@ abstract class ExploreScreen : Screen() {
             val chip = LinearLayout(this).apply {
                 id = View.generateViewId()
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10),0,dp(8),0)
+                setPadding(dp(8),0,dp(8),0)
                 isFocusable = true
                 addView(key)
                 addView(label, LinearLayout.LayoutParams(-2,-2).apply { marginStart = dp(4) })
@@ -382,8 +382,8 @@ abstract class ExploreScreen : Screen() {
         }
         val match = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(8), dp(8), dp(8))
-            addView(text(R.string.ex_match, BODY), LinearLayout.LayoutParams(0, -2, 1f))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            addView(text(R.string.ex_match, BODY), wrap().apply { marginEnd = dp(8) })
             addView(LinearLayout(this@ExploreScreen).apply {
                 background = HomeStyle.pill(SEGMENT)
                 setPadding(dp(2), dp(2), dp(2), dp(2))
