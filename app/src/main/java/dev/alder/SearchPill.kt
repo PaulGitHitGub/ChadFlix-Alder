@@ -178,12 +178,6 @@ internal class SearchPill(
     override fun onDraw(canvas: Canvas) {
         if (!started) return
         recolorNames()
-        // Home: the open page's grey pill while the white one is on another name, under it as the white streak passes.
-        openName?.let { name ->
-            rectOf(name, box)
-            fill.color = HomeStyle.OPEN_TAB
-            canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, fill)
-        }
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
         if (pillR - left > 1f) {
@@ -426,10 +420,6 @@ internal class SearchPill(
 
     val isStarted get() = started
     val isMoving get() = edgesMoving
-
-    /** Home: the open page's name, given its grey pill (today's look) while the white pill is elsewhere; null: none. */
-    var openName: View? = null
-        set(v) { if (field !== v) { field = v; invalidate() } }
     val squashNow get() = squash // the live thinning, for Search to carry on without a step
 
     /** Where the pill is now (screen px: left, top, right, bottom), for Search to carry on from. */

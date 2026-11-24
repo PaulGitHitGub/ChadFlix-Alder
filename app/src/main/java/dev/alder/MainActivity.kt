@@ -823,6 +823,8 @@ class MainActivity : Screen() {
         // Back from Search (or it never showed): the pill rests at once where the remote is (the magnifier, still focused).
         val opening = searchFrom
         searchFrom = null
+        // Search opened without Home's copy of the move (first open, or before API 26): the pill rests at once too.
+        if (opening != null && pillStartedAt == 0L) navTarget()?.let { launchPill?.takeIf { p -> p.isStarted }?.restOn(it, navLit(it)) }
         endPill(instant = true)
         if (opening != null && search != null) styleNav()
         if (!::profile.isInitialized) return
@@ -1290,23 +1292,20 @@ class MainActivity : Screen() {
     }
 
     /**
-     * ChadFlix: a white pill with black words follows the remote; the open page keeps its pill, white while the remote is
-     * down in the rows and faint while it's on another item up here.
+     * ChadFlix: a white pill with black words follows the remote; the open page's pill is white while the remote is down
+     * in the rows, faint while it's on the avatar or the gear, and gone while it's on another name (owner: no grey pill
+     * left on the old one).
      */
     private fun styleNav() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         // ChadFlix: once the bar is laid out, one white pill ([SearchPill]) moves between the names (the Taffy) and colours
-        // the words it covers, instead of each name's own white pill and the grey one left on the open page.
+        // the words it covers, instead of each name's own white pill; nothing grey is left on the old page's name (the
+        // pill itself goes faint on the open page while the avatar or the gear has the remote).
         val pill = launchPill?.takeIf { it.isStarted }
-        val pillOn = if (pill != null && pillStartedAt == 0L) navTarget() else null
-        // With the moving pill, the open page keeps today's grey pill while the white one is elsewhere, drawn by the pill
-        // under the white one (so the white streak passes over it, not under a grey veil).
-        pill?.openName = navItems[page]?.takeIf { pillOn != null && it !== pillOn && it.isShown }
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom
-            item.background = if (pill != null) null
-                else if (lit) HomeStyle.pill(HomeStyle.WHITE) else if (p == page) HomeStyle.pill(HomeStyle.OPEN_TAB) else null
+            item.background = if (pill == null && lit) HomeStyle.pill(HomeStyle.WHITE) else null
             if (pill == null) item.setTextColor(if (lit) HomeStyle.BLACK else HomeStyle.WHITE)
             item.text = pageName(p)
         }
