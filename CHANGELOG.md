@@ -28,7 +28,9 @@ each entry that does not follow these rules. Then rename that heading to the ver
 - **More Episodes.** On a show, select **More Episodes**. The seasons are on the left. Each episode shows its picture, name and story on the right.
 
 ### Easier to use
-- **Simpler My Lists.** **My Lists** shows **Saved Movies** and **Saved Shows** in rows. The filters are gone.
+- **Simpler My Lists.** **My Lists** shows your watchlists, **Saved Movies** and **Saved Shows** on one screen.
+- **Filter your saved titles.** The first card in **Saved Movies** and **Saved Shows** is **Showing**. Press **OK** on it to choose a genre, a year or the order.
+- **Cleaner posters.** Posters in **My Lists** and **Continue Watching** no longer show a rating. The title page still does.
 - **Settings with OK.** In **Settings**, press **OK** or **Right** to change a value. Press **Left** to go back to the menu.
 
 ## 1.4-chadflix.1
