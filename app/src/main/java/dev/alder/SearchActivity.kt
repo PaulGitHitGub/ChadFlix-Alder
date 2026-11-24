@@ -268,7 +268,8 @@ class SearchActivity : ExploreScreen() {
                 root.post { if (!isDestroyed) { showRecent(); if (searched == null) search(false) } }
                 return true
             }
-        })    }
+        })
+    }
 
     /**
      * The page: the hero across the top under the top bar (Voice and Keyboard are in it: [attachCapsule]), the controls row under it
@@ -468,8 +469,9 @@ class SearchActivity : ExploreScreen() {
         // Last time's types first, so the first layout has the same names (and capsule place) as Home's bar expects.
         catalogTypes = searchTabTypes(this)
         updateNavTabs()
-        background({ Stremio.savedAddons(authKey.orEmpty()).orEmpty().flatMap { a -> a.catalogs.map { it.type } } }) { r ->
-            r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = searchTabTypes(this, save = it); updateNavTabs() }
+        // The profile's add-ons as saved (null: none saved yet, keep last time's); an empty list is kept too.
+        background({ Stremio.savedAddons(authKey.orEmpty())?.flatMap { a -> a.catalogs.map { it.type } } }) { r ->
+            r.getOrNull()?.let { catalogTypes = searchTabTypes(this, save = it); updateNavTabs() }
         }
         bar.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         // As Home's: a gear for Settings at the right.

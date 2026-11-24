@@ -41,12 +41,18 @@ private const val PILL_PREFS = "searchPill"
 
 /**
  * The add-ons' catalog types Search's top bar last had (they add Live and per-type tabs), so its first layout already has
- * them and the capsule sits where Home threw its pill; [save] keeps a newly fetched list.
+ * them and the capsule sits where Home threw its pill; [save] keeps a newly fetched list, empty too. Per profile: each
+ * has its own add-ons.
  */
 internal fun searchTabTypes(c: Context, save: List<String>? = null): List<String> {
     val prefs = c.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE)
-    if (save != null) { if (prefs.getString("types", null) != save.joinToString("\n")) prefs.edit().putString("types", save.joinToString("\n")).apply(); return save }
-    return prefs.getString("types", null)?.split("\n")?.filter { it.isNotEmpty() }.orEmpty()
+    val key = Settings.profileKey(c, "types")
+    if (save != null) {
+        val words = save.joinToString("\n")
+        if (prefs.getString(key, null) != words) prefs.edit().putString(key, words).apply()
+        return save
+    }
+    return prefs.getString(key, null)?.split("\n")?.filter { it.isNotEmpty() }.orEmpty()
 }
 
 /**
@@ -151,6 +157,7 @@ internal class SearchPill(
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val words = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val box = RectF()
+    private val round = android.graphics.Path() // the white pill's outline, for the names' black pass
     /** An icon with its own tint, set only when it changes (each pass has its own, so they don't alternate). */
     private inner class Ink(res: Int) {
         val d: Drawable = context.getDrawable(res)!!.mutate()
@@ -267,7 +274,10 @@ internal class SearchPill(
             layout.draw(canvas)
             canvas.restore()
             canvas.save()
-            canvas.clipRect(box)
+            // The pill's own rounded shape, so the black follows its caps, not their square corners.
+            round.reset()
+            round.addRoundRect(box, box.height() / 2f, box.height() / 2f, android.graphics.Path.Direction.CW)
+            canvas.clipPath(round)
             canvas.translate(r.left + t.totalPaddingLeft, r.top + t.totalPaddingTop)
             paint.color = HomeStyle.BLACK
             layout.draw(canvas)

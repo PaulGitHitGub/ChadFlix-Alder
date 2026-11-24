@@ -1194,11 +1194,11 @@ class MainActivity : Screen() {
     }
     private lateinit var avatarSlot: View
     private var launchPill: SearchPill? = null // Search's pill, started here the moment the remote lands on the magnifier
-    private var pillStartedAt = 0L // uptime ms, handed to Search so its pill carries on from there
+    private var pillStartedAt = 0L // uptime ms Home's copy of the pill started (0: none); it's frozen and its played time sent ([startSearch])
 
     /**
      * The magnifier has the remote: Search's opening move starts here at once, on this bar, while Search starts behind it
-     * (its own first frame carries on from the same moment, [PILL_START]). Only once Search's capsule has been seen
+     * (its first frame carries on from where this copy froze, [PILL_PLAYED]). Only once Search's capsule has been seen
      * ([savedCapsule]); before that, Search starts the move itself.
      */
     private fun startPill() {
