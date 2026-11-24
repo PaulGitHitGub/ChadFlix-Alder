@@ -617,4 +617,9 @@
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
     <string name="showing_most_watched">الأكثر مشاهدة</string>
     <string name="showing_blockbusters">الأعلى إيرادًا</string>
+    <string name="search_layout">تخطيط البحث</string>
+    <string name="search_layout_hint">كيف تُرتَّب صفحة البحث. إعداد مؤقت إلى أن يُختار أحدها.</string>
+    <string name="search_layout_wall">جدار</string>
+    <string name="search_layout_marquee">واجهة</string>
+    <string name="search_layout_current">الحالي</string>
 </resources>

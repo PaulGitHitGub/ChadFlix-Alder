@@ -596,4 +596,9 @@
     <string name="ex_clear_filters">Borrar Todos Los Filtros</string>
     <string name="showing_most_watched">Más Vistos</string>
     <string name="showing_blockbusters">Éxitos de Taquilla</string>
+    <string name="search_layout">Diseño de Búsqueda</string>
+    <string name="search_layout_hint">Cómo se organiza la página de Búsqueda. Un ajuste temporal mientras se elige uno.</string>
+    <string name="search_layout_wall">Muro</string>
+    <string name="search_layout_marquee">Marquesina</string>
+    <string name="search_layout_current">Actual</string>
 </resources>

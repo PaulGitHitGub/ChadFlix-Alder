@@ -596,4 +596,9 @@
     <string name="ex_clear_filters">Effacer Tous Les Filtres</string>
     <string name="showing_most_watched">Les Plus Regardés</string>
     <string name="showing_blockbusters">Succès au Box-office</string>
+    <string name="search_layout">Disposition de la Recherche</string>
+    <string name="search_layout_hint">Comment la page Recherche est organisée. Un réglage temporaire le temps d\'en choisir une.</string>
+    <string name="search_layout_wall">Mur</string>
+    <string name="search_layout_marquee">Affiche</string>
+    <string name="search_layout_current">Actuelle</string>
 </resources>

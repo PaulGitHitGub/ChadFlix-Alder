@@ -596,4 +596,9 @@
     <string name="ex_clear_filters">Cancella Tutti I Filtri</string>
     <string name="showing_most_watched">Più Visti</string>
     <string name="showing_blockbusters">Campioni di Incassi</string>
+    <string name="search_layout">Layout della Ricerca</string>
+    <string name="search_layout_hint">Come è organizzata la pagina Cerca. Un\'impostazione temporanea finché non se ne sceglie uno.</string>
+    <string name="search_layout_wall">Muro</string>
+    <string name="search_layout_marquee">Insegna</string>
+    <string name="search_layout_current">Attuale</string>
 </resources>

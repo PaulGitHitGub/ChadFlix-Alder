@@ -593,4 +593,9 @@
     <string name="ex_clear_filters">Alle Filter Löschen</string>
     <string name="showing_most_watched">Meistgesehen</string>
     <string name="showing_blockbusters">Blockbuster</string>
+    <string name="search_layout">Suche-Layout</string>
+    <string name="search_layout_hint">Wie die Suchseite aufgebaut ist. Eine vorübergehende Einstellung, bis eines gewählt ist.</string>
+    <string name="search_layout_wall">Wand</string>
+    <string name="search_layout_marquee">Bühne</string>
+    <string name="search_layout_current">Aktuell</string>
 </resources>

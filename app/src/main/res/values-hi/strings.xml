@@ -593,4 +593,9 @@
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>
     <string name="showing_blockbusters">ब्लॉकबस्टर</string>
+    <string name="search_layout">खोज लेआउट</string>
+    <string name="search_layout_hint">खोज पेज कैसे सजा है। एक अस्थायी सेटिंग, जब तक एक चुना न जाए।</string>
+    <string name="search_layout_wall">दीवार</string>
+    <string name="search_layout_marquee">मार्की</string>
+    <string name="search_layout_current">मौजूदा</string>
 </resources>

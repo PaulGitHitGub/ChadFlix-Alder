@@ -104,7 +104,13 @@ class SearchActivity : ExploreScreen() {
     private val searchTasks = mutableListOf<Future<*>>()
     private val typed = Runnable { search(false) }
 
-    private lateinit var keyboardButton: View
+    private lateinit var keyboardButton: LinearLayout
+    // Wall and Marquee (TEMPORARY, see [SearchLayout]): the heading and results, which move with [arrange].
+    private lateinit var resultsColumn: LinearLayout
+    private lateinit var headingRow: View
+    private var controlsRow: View? = null // Marquee's filters and Sort, over its posters
+    private var arranged = false
+    private val rearranged = Runnable { if (lookupMode == null && input.text.isBlank() && gridOutOfDate()) search(false) }
     private var lookupMode: String? = null
     private var savedTitleQuery = ""
     private var enteringLookup = false
@@ -134,7 +140,8 @@ class SearchActivity : ExploreScreen() {
         keyboard.visibility = if (open) View.VISIBLE else View.GONE
         recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
         keyboardButton.visibility = if (open) View.GONE else View.VISIBLE // its keys are showing: only Voice Search above them
-        voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else keyboardButton.id
+        // Wall and Marquee: Down from Voice Search goes by sight (Keyboard Search is beside it, the posters below).
+        voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else if (searchLayout == SearchLayout.CURRENT) keyboardButton.id else View.NO_ID
         lastKeyboardFocus = if (open) firstKey else keyboardButton
         updateHeading()
         // Closing the keys: back to Directors & Cast after the people picker, else (typed words, no bar) Voice Search.
@@ -176,21 +183,12 @@ class SearchActivity : ExploreScreen() {
 
         keyboard = column(Gravity.START)
         buildKeyboard()
-        // Voice Search and Keyboard Search above the info panel: words on the dark, a white pill focused.
-        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(PANEL_W), dp(ACTION_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(VOICE_TOP) }) }
-        keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.first
-        root.addView(keyboardButton,FrameLayout.LayoutParams(dp(PANEL_W),dp(ACTION_H)).apply {
-            leftMargin=dp(KEYS_X); topMargin=dp(VOICE_TOP + ACTION_H + ACTION_GAP)
-        })
-        root.addView(buildInfoPanel(),FrameLayout.LayoutParams(dp(PANEL_W),dp((height - PANEL_TOP - SAFE_BOTTOM).toInt())).apply {
-            leftMargin=dp(KEYS_X); topMargin=dp(PANEL_TOP)
-        })
-        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP) })
-
+        keyboardButton = sideAction(R.drawable.ic_search, getString(R.string.ex_keyboard)) { toggleKeys(true) }.first.apply {
+            // Wall: the mockup's keyboard key, an icon beside Voice Search (its name stays for TalkBack).
+            if (searchLayout == SearchLayout.WALL) { getChildAt(1).visibility = View.GONE; setPadding(dp(7), 0, dp(7), 0) }
+        }
         recentBox = column(Gravity.START).apply { clipChildren = false; clipToPadding = false }
-        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP + 7 * KEY_H + 8) })
         showRecent()
-
         results = column(Gravity.START).apply { setPadding(0, 0, 0, dp(32)) }
         resultsScroll = object : ScrollView(this) {
             override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) = 0
@@ -200,21 +198,12 @@ class SearchActivity : ExploreScreen() {
             clipToOutline = true
             addView(results)
         }
-        // Right of the left column, level with Voice Search: the filter bar (catalogue only), the heading with Sort,
-        // then the posters, which run to the screen's right edge as Home's rows do (stopping short sliced the last).
         val resultsW = dp((width - RESULTS_X).toInt())
-        root.addView(column(Gravity.START).apply {
-            addView(buildFilterBar(), LinearLayout.LayoutParams(-1, dp(ACTION_H)).apply { marginEnd = dp(KEYS_X); bottomMargin = dp(BAR_BELOW) })
-            addView(LinearLayout(this@SearchActivity).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(input, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(sort, LinearLayout.LayoutParams(-2, dp(24)))
-            }, LinearLayout.LayoutParams(-1, dp(QUERY_H)).apply { marginEnd = dp(KEYS_X) })
-            addView(resultsScroll, LinearLayout.LayoutParams(resultsW, 0, 1f))
-        }, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(VOICE_TOP) })
+        if (searchLayout == SearchLayout.CURRENT) arrangeCurrent(root, sort, resultsW, height) else arrangeNew(root, sort, resultsW)
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(root)
-        root.viewTreeObserver.addOnGlobalFocusChangeListener { _, _ ->
+        root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
+            focusMoved(now)
             userMovedFocus = true
             if (lookupMode != null && results.hasFocus()) currentFocus?.let { focused ->
                 val area = Rect()
@@ -268,6 +257,111 @@ class SearchActivity : ExploreScreen() {
         // The remote starts on Voice Search, the top of the left column.
         (voice ?: keyboardButton).let { start -> start.post { start.requestFocus() } }
         search(false)
+    }
+
+    /** Current: Voice and Keyboard Search over the info panel at the left; the filter bar, heading and posters right of them. */
+    private fun arrangeCurrent(root: FrameLayout, sort: View, resultsW: Int, height: Float) {
+        // Voice Search and Keyboard Search above the info panel: words on the dark, a white pill focused.
+        voice?.let { root.addView(it, FrameLayout.LayoutParams(dp(PANEL_W), dp(ACTION_H)).apply { leftMargin = dp(KEYS_X); topMargin = dp(VOICE_TOP) }) }
+        root.addView(keyboardButton,FrameLayout.LayoutParams(dp(PANEL_W),dp(ACTION_H)).apply {
+            leftMargin=dp(KEYS_X); topMargin=dp(VOICE_TOP + ACTION_H + ACTION_GAP)
+        })
+        root.addView(buildInfoPanel(),FrameLayout.LayoutParams(dp(PANEL_W),dp((height - PANEL_TOP - SAFE_BOTTOM).toInt())).apply {
+            leftMargin=dp(KEYS_X); topMargin=dp(PANEL_TOP)
+        })
+        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP) })
+        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(KEYS_TOP + 7 * KEY_H + 8) })
+        // Right of the left column, level with Voice Search: the filter bar (catalogue only), the heading with Sort,
+        // then the posters, which run to the screen's right edge as Home's rows do (stopping short sliced the last).
+        root.addView(column(Gravity.START).apply {
+            addView(buildFilterBar(), LinearLayout.LayoutParams(-1, dp(ACTION_H)).apply { marginEnd = dp(KEYS_X); bottomMargin = dp(BAR_BELOW) })
+            addView(LinearLayout(this@SearchActivity).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(input, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(sort, LinearLayout.LayoutParams(-2, dp(24)))
+            }, LinearLayout.LayoutParams(-1, dp(QUERY_H)).apply { marginEnd = dp(KEYS_X) })
+            addView(resultsScroll, LinearLayout.LayoutParams(resultsW, 0, 1f))
+        }, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(VOICE_TOP) })
+    }
+
+    /**
+     * Wall and Marquee (TEMPORARY, see [SearchLayout]). While typing (the keys open, words searched, the people picker)
+     * both fall back to Current's typing arrangement: the keys under Voice Search, the heading and results right of
+     * them ([arrange]). The views here start in that arrangement.
+     *
+     * Wall: one controls row under the top bar (Voice Search, the keyboard key, Movies | Shows, the filters, then Clear
+     * and Sort at the right end), the posters edge to edge under it, the details band opening under the focused row.
+     * Marquee: the hero across the top with the Voice / Keyboard Search pill at its top left, then the controls row and
+     * the posters, which slide up under the hero's strip further down.
+     */
+    private fun arrangeNew(root: FrameLayout, sort: View, resultsW: Int) {
+        root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(SearchLayout.KEYS_TOP) })
+        root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply {
+            leftMargin = dp(KEYS_X); topMargin = dp(SearchLayout.KEYS_TOP + 7 * KEY_H + 8)
+        })
+        headingRow = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(input, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        resultsColumn = column(Gravity.START).apply {
+            addView(headingRow, LinearLayout.LayoutParams(-1, dp(QUERY_H)).apply { marginEnd = dp(KEYS_X) })
+            addView(resultsScroll, LinearLayout.LayoutParams(resultsW, 0, 1f))
+        }
+        val typingAt = FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(SearchLayout.ROW_TOP) }
+        if (searchLayout == SearchLayout.WALL) {
+            root.addView(LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H))) }
+                addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(4) })
+                addView(buildFilterBar(), LinearLayout.LayoutParams(0, dp(ACTION_H), 1f).apply { marginStart = dp(10) })
+                addView(sort, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(10) })
+            }, FrameLayout.LayoutParams(-1, dp(ACTION_H)).apply {
+                leftMargin = dp(SearchLayout.WALL_X); rightMargin = dp(SearchLayout.WALL_X); topMargin = dp(SearchLayout.ROW_TOP)
+            })
+            buildBand()
+            root.addView(resultsColumn, typingAt)
+        } else {
+            val pill = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                background = outlined(0x8C000000.toInt())
+                setPadding(dp(2), dp(2), dp(2), dp(2))
+                voice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H))) }
+                addView(keyboardButton, LinearLayout.LayoutParams(-2, dp(ACTION_H)))
+            }
+            keyboardButton.nextFocusRightId = keyboardButton.id // the pill's end: not up to the Settings gear
+            controlsRow = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                visibility = View.GONE
+                addView(buildFilterBar(), LinearLayout.LayoutParams(0, dp(ACTION_H), 1f))
+                addView(sort, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { marginStart = dp(10) })
+            }
+            resultsColumn.addView(controlsRow, 0, LinearLayout.LayoutParams(-1, dp(ACTION_H)).apply {
+                marginStart = dp(2); marginEnd = dp(SearchLayout.MARQUEE_X); bottomMargin = dp(10)
+            })
+            root.addView(buildHero(pill, resultsColumn), 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
+            root.addView(resultsColumn, typingAt)
+        }
+    }
+
+    /**
+     * Wall and Marquee: their own arrangement ([w]: the catalogue with the keys closed) or the typing one (keys at the
+     * left, results right of them). A catalogue built for the other one is built again for this one's width.
+     */
+    private fun arrange(w: Boolean) {
+        if (searchLayout == SearchLayout.CURRENT || !::resultsColumn.isInitialized || (arranged && w == wide)) return
+        arranged = true
+        wide = w
+        val screenW = resources.displayMetrics.widthPixels
+        val x = if (w) dp(wideX - 2) else dp(RESULTS_X) // the posters' first column keeps 2 dp at its left for its ring
+        val top = when { !w -> SearchLayout.ROW_TOP; searchLayout == SearchLayout.WALL -> SearchLayout.WALL_TOP; else -> SearchLayout.LOWER_SHUT }
+        (resultsColumn.layoutParams as FrameLayout.LayoutParams).apply { leftMargin = x; topMargin = dp(top); width = screenW - x }
+        (resultsScroll.layoutParams as LinearLayout.LayoutParams).width = screenW - x
+        headingRow.visibility = if (w) View.GONE else View.VISIBLE
+        controlsRow?.visibility = if (w) View.VISIBLE else View.GONE
+        resultsColumn.requestLayout()
+        resetHero()
+        main.removeCallbacks(rearranged)
+        main.post(rearranged)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -512,7 +606,13 @@ class SearchActivity : ExploreScreen() {
         // While voice has the header (listening, "Didn't catch that"), the query before it decides: nothing moves
         // until real words come.
         val catalogue = lookupMode == null && (beforeVoice ?: input.text.toString()).isBlank()
-        showCatalogueControls(bar = catalogue, panel = catalogue && keyboard.visibility != View.VISIBLE)
+        val keys = keyboard.visibility == View.VISIBLE
+        if (searchLayout == SearchLayout.CURRENT) showCatalogueControls(bar = catalogue, panel = catalogue && !keys)
+        else {
+            // Wall and Marquee show their own arrangement only over the catalogue with the keys closed.
+            arrange(catalogue && !keys)
+            showCatalogueControls(bar = wide, panel = wide)
+        }
         if (catalogue && input.hasFocus()) (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).requestFocus()
         input.isFocusable = !catalogue
         voice?.nextFocusUpId = if (catalogue) View.NO_ID else input.id
@@ -718,6 +818,8 @@ class SearchActivity : ExploreScreen() {
             val focus = currentFocus
             // Back while listening cancels it and keeps the page.
             if (event.keyCode == KeyEvent.KEYCODE_BACK && listening) { cancelVoice(); return true }
+            // Marquee: Back in a picker in the hero's place steps back out of it.
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && backFromPicker()) return true
             if (event.keyCode == KeyEvent.KEYCODE_BACK && keyboard.visibility == View.VISIBLE) {
                 when {
                     lookupMode != null -> lookup(null)
@@ -738,7 +840,7 @@ class SearchActivity : ExploreScreen() {
                 return true
             }
             // Right from Keyboard Search: the first poster, not Sort, which is level with it at the far right.
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus === keyboardButton && sortControl.isShown) {
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus === keyboardButton && sortControl.isShown && searchLayout == SearchLayout.CURRENT) {
                 firstPoster()?.requestFocus()
                 return true
             }
@@ -746,7 +848,10 @@ class SearchActivity : ExploreScreen() {
             if (event.keyCode == KeyEvent.KEYCODE_BACK && (headerBar.hasFocus() || input.hasFocus())) {
                 if ((lastKeyboardFocus ?: firstKey)?.requestFocus() == true) return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys && lookupMode == null && input.text.isNotBlank()) {
+            // Wall and Marquee put Keyboard Search beside Voice Search: Right reaches it first, then the results.
+            val besideVoice = searchLayout != SearchLayout.CURRENT && keyboardButton.isShown
+            val toResults = if (besideVoice) focus === keyboardButton || (focus in rightEdgeKeys && focus !== voice) else focus in rightEdgeKeys
+            if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && toResults && lookupMode == null && input.text.isNotBlank()) {
                 // Still loading (nothing to land on): stay put rather than let Android's search jump to the gear.
                 (firstResult ?: resultsAction)?.requestFocus()
                 return true
