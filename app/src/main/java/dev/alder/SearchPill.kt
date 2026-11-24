@@ -409,7 +409,12 @@ internal class SearchPill(
 
     /** The places moved (the capsule widened for "Listening…", the names changed): at rest, the pill follows at once. */
     fun relayout() {
-        if (!started || running?.isRunning == true) return
+        if (!started) return
+        if (running?.isRunning == true) { // mid-move: only the names (rebuilt meanwhile) get their new places
+            nameViews = names()
+            nameMids = FloatArray(nameViews.size) { rectOf(nameViews[it], box).centerX() }
+            return invalidate()
+        }
         measure()
         val target = on
         if (mode == Mode.OPEN) {
