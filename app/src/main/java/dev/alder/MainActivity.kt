@@ -1067,7 +1067,9 @@ class MainActivity : Screen() {
                 if (has && !searching) startPill() else if (!has && !searching) endPill()
                 styleNav()
                 main.removeCallbacks(openSearch)
-                if (has) main.post(openSearch)
+                // With the pill moving here, Search opens two frames in, so the stretch is visibly under way before the
+                // launch takes the main thread (the pill then holds still until Search's first frame carries it on).
+                if (has) main.postDelayed(openSearch, if (pillStartedAt > 0) PILL_LEAD_MS else 0L)
             }
             setOnClickListener { main.removeCallbacks(openSearch); startSearch() }
         }.inNav(width = dp(44), height = -1)
@@ -1092,6 +1094,9 @@ class MainActivity : Screen() {
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
         header.addView(settingsGear, FrameLayout.LayoutParams(dp(44), dp(32), Gravity.END or Gravity.CENTER_VERTICAL))
+        // Search's pill, laid out with the bar (so its places are right) and drawn only once the magnifier has the remote.
+        launchPill = SearchPill(this, header, null, null, null, search!!, avatarSlot) { navItems.values.filter { it.isShown } }
+            .also { header.addView(it, 0, FrameLayout.LayoutParams(-1, -1)) }
         arrangeTabs()
         styleNav()
         return header
@@ -1199,12 +1204,12 @@ class MainActivity : Screen() {
      */
     private fun startPill() {
         pillStartedAt = 0L
+        // Search seeks to where this one froze, which needs API 26's AnimatorSet seeking.
+        if (android.os.Build.VERSION.SDK_INT < 26 || !animationsOn()) return
         val target = savedCapsule(this) ?: return
         val from = pillFrom() ?: return
         val slot = search ?: return
-        if (!animationsOn()) return
-        val pill = launchPill ?: SearchPill(this, header, null, null, null, slot, avatarSlot) { navItems.values.filter { it.isShown } }
-            .also { header.addView(it, 0, FrameLayout.LayoutParams(-1, -1)); launchPill = it }
+        val pill = launchPill ?: return
         pill.capsuleOnScreen = target
         pill.arrive(from, null)
         slot.imageAlpha = 0 // the pill draws the magnifier while it shrinks away
@@ -1213,10 +1218,11 @@ class MainActivity : Screen() {
 
     /** Home again: its copy of the pill goes, the names and the magnifier draw themselves. */
     private fun endPill() {
-        if (pillStartedAt == 0L && launchPill == null) return
+        if (pillStartedAt == 0L) return
         launchPill?.reset()
         pillStartedAt = 0L
         search?.imageAlpha = 255
+        styleNav()
     }
 
     /** The lit page's name on screen (left, top, right, bottom px): where Search's pill starts. */
@@ -1234,9 +1240,12 @@ class MainActivity : Screen() {
         if (searching) return
         searching = true
         val from = pillFrom()
+        // Home's copy holds still where it was last drawn while Search opens (they share the main thread); Search's
+        // first frame carries on from exactly there. Home keeps it on screen until it's back ([endPill] in onResume).
+        val played = if (pillStartedAt > 0) launchPill?.freeze() ?: 0L else 0L
         startActivity(Intent(this, SearchActivity::class.java).apply {
             from?.let { putExtra(HOME_PILL, it) }
-            if (pillStartedAt > 0) putExtra(PILL_START, pillStartedAt)
+            if (played > 0) putExtra(PILL_PLAYED, played)
         })
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }
@@ -3928,6 +3937,7 @@ class MainActivity : Screen() {
         const val NAV_GAP = 10 // dp between them
         const val WARM_AFTER = 3000L // ms after launch before other pages' posters are fetched ahead
         const val SWITCH_WAIT = 300L // ms the remote rests on a page's name before it opens: passing over names opens nothing
+        const val PILL_LEAD_MS = 34L // ms (two frames) Search's pill moves on Home's bar before Search is launched
         const val LOGO_W = 360 // the cinema's title logo
         const val LOGO_H = 100
         const val ROW_TOP_ROOM = 10 // dp between the row title box and its cards (was 2: the title nearly touched the focus border); ROWS_TOP and INFO_GAP give the 8 back, so the cards, info line and peek stay put

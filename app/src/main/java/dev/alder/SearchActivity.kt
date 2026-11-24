@@ -338,9 +338,8 @@ class SearchActivity : ExploreScreen() {
             if (!arrived && capsule.width > 0) {
                 arrived = true
                 // Home may have started the move on its own bar the moment the remote landed: carry on from there.
-                val startedAt = intent.getLongExtra(PILL_START, 0L)
-                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton }, startedAt)
-                val gone = if (startedAt > 0) (SystemClock.uptimeMillis() - startedAt).coerceAtLeast(0) else 0L
+                val gone = intent.getLongExtra(PILL_PLAYED, 0L).coerceAtLeast(0L)
+                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton }, gone)
                 // The page (hidden since onCreate) comes in as the pill lands; the old one is gone at once.
                 pageViews.forEach { it.animate().alpha(1f).setStartDelay((PAGE_IN_AT - gone).coerceAtLeast(0)).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
             }
@@ -469,9 +468,11 @@ class SearchActivity : ExploreScreen() {
         // The magnifier tab's room, kept so the pages' names sit where they do on Home; the capsule covers it.
         tabSlot = View(this)
         nav.addView(tabSlot, LinearLayout.LayoutParams(dp(44), -1))
+        // Last time's types first, so the first layout has the same names (and capsule place) as Home's bar expects.
+        catalogTypes = searchTabTypes(this)
         updateNavTabs()
         background({ Stremio.savedAddons(authKey.orEmpty()).orEmpty().flatMap { a -> a.catalogs.map { it.type } } }) { r ->
-            r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = it; updateNavTabs() }
+            r.getOrNull()?.takeIf { it.isNotEmpty() }?.let { catalogTypes = searchTabTypes(this, save = it); updateNavTabs() }
         }
         bar.addView(nav, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         // As Home's: a gear for Settings at the right.

@@ -26,8 +26,8 @@ import android.widget.TextView
 /** Search's intent extra: Home's pill as Search opens (screen px: left, top, right, bottom), for the pill to open from. */
 internal const val HOME_PILL = "homePill"
 
-/** Search's intent extra: when Home started the pill (uptime ms), for Search to carry on from there, not start again. */
-internal const val PILL_START = "pillStart"
+/** Search's intent extra: how far (ms) Home's copy of the pill's move got before Search took over, to carry on from. */
+internal const val PILL_PLAYED = "pillPlayed"
 
 /** Animators run (Remove animations off); before API 26 they always do, ending at once when the scale is 0. */
 internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
@@ -37,6 +37,16 @@ internal fun savedCapsule(c: Context): IntArray? = c.getSharedPreferences(PILL_P
     ?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 4 }?.toIntArray()
 
 private const val PILL_PREFS = "searchPill"
+
+/**
+ * The add-ons' catalog types Search's top bar last had (they add Live and per-type tabs), so its first layout already has
+ * them and the capsule sits where Home threw its pill; [save] keeps a newly fetched list.
+ */
+internal fun searchTabTypes(c: Context, save: List<String>? = null): List<String> {
+    val prefs = c.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE)
+    if (save != null) { if (prefs.getString("types", null) != save.joinToString("\n")) prefs.edit().putString("types", save.joinToString("\n")).apply(); return save }
+    return prefs.getString("types", null)?.split("\n")?.filter { it.isNotEmpty() }.orEmpty()
+}
 
 /**
  * The Search page's top-bar pill, the designer's variant 1 "Slingshot" (pill-anim-20261124/README.md): one view, behind
@@ -256,11 +266,28 @@ internal class SearchPill(
             override fun onAnimationEnd(animation: Animator) { if (!cancelled && running === set) { running = null; relayout() } }
         })
         running = set
+        // Carrying on from Home's pill: seeked before it starts, so the very first frame already shows that moment
+        // (a seek on a running set only shows from the next frame).
+        val seek = pendingSeek
+        pendingSeek = 0L
+        if (seek > 0 && Build.VERSION.SDK_INT >= 26) set.currentPlayTime = seek.coerceIn(0L, set.totalDuration - 1)
         set.start()
     }
+    private var pendingSeek = 0L
 
     /** The page is going: nothing runs on after it. */
     fun stop() { running?.cancel(); running = null }
+
+    /**
+     * Home is starting Search: its pill holds still where it was last drawn (the shared main thread is about to be busy
+     * opening Search) and says how far into the move that is, for Search to carry on from exactly there.
+     */
+    fun freeze(): Long {
+        val set = running ?: return 0L
+        val played = if (Build.VERSION.SDK_INT >= 24) set.currentPlayTime else 0L
+        set.pause()
+        return played
+    }
 
     /** Home again: the pill it started is gone (Search took over, or never opened). */
     fun reset() { stop(); started = false; drawnOnce = false; invalidate() }
@@ -287,10 +314,10 @@ internal class SearchPill(
     /**
      * The page opens, called as the bar is first laid out (before its first frame is drawn): the pill starts on Home's
      * ([fromOnScreen], the open or focused page's name there, in screen px) or on the magnifier, and opens into the
-     * capsule with the black pill on [focus]. [startedAt] (uptime ms): when Home started the same move on its own bar,
-     * so this one carries on from there instead of starting again.
+     * capsule with the black pill on [focus]. [played] (ms): how far Home's own copy of the move had got when it froze
+     * ([freeze]), so this one carries on from what Home last drew instead of starting again.
      */
-    fun arrive(fromOnScreen: IntArray?, focus: View?, startedAt: Long = 0L) {
+    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L) {
         started = true
         measure()
         if (fromOnScreen != null && fromOnScreen.size == 4) {
@@ -303,10 +330,9 @@ internal class SearchPill(
         vIconA = 0f; vWordsA = 0f; kIconA = 0f; kWordsA = 0f
         mode = Mode.NAME
         on = null
+        pendingSeek = played
         open(focus ?: voice ?: keyboard)
-        if (startedAt > 0 && Build.VERSION.SDK_INT >= 26) running?.let {
-            it.currentPlayTime = (android.os.SystemClock.uptimeMillis() - startedAt).coerceIn(0L, it.totalDuration - 1)
-        }
+        pendingSeek = 0L
     }
 
     /** The remote moved to [v]: the pill follows it. */
