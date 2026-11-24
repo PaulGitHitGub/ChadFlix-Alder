@@ -929,9 +929,9 @@ class SettingsActivity : Screen() {
             val v = LinearLayout(this).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 isFocusable = true
-                setPadding(dp(12), 0, dp(14), 0)
-                addView(name, LinearLayout.LayoutParams(0, -2, 1f))
-                grip?.let { addView(it, LinearLayout.LayoutParams(dp(14), dp(14))) }
+                setPadding(dp(12), 0, dp(12), 0)
+                addView(name, LinearLayout.LayoutParams(-2, -2, 1f))
+                grip?.let { addView(it, LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginStart = dp(6) }) }
             }
             fun restyle() = style(v, name, grip, v.isFocused, isOn, isOn && index == picked)
             restyles += ::restyle
@@ -1007,8 +1007,8 @@ class SettingsActivity : Screen() {
                     maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
                 }, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
             }, LinearLayout.LayoutParams(-1, dp(34)))
-            onRows.forEachIndexed { i, t -> row(t, true, i).also { onViews += it; onList.addView(it, LinearLayout.LayoutParams(-1, dp(34))) } }
-            offRows.forEachIndexed { i, t -> row(t, false, i).also { offViews += it; offList.addView(it, LinearLayout.LayoutParams(-1, dp(34))) } }
+            onRows.forEachIndexed { i, t -> row(t, true, i).also { onViews += it; onList.addView(it, LinearLayout.LayoutParams(-2, dp(34))) } }
+            offRows.forEachIndexed { i, t -> row(t, false, i).also { offViews += it; offList.addView(it, LinearLayout.LayoutParams(-2, dp(34))) } }
             // Up from the top of either column goes to the open list's pill.
             listOfNotNull(onViews.firstOrNull(), offViews.firstOrNull()).forEach { it.nextFocusUpId = openPill().id }
             if (refocus) ((if (inOn) onViews else offViews).let { it.getOrNull(at.coerceAtMost(it.size - 1)) }

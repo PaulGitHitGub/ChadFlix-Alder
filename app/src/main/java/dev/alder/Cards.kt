@@ -298,7 +298,7 @@ internal class MediaCardView(
             })
         }
         view.text = label
-        view.minWidth = screen.dp(24)
+        view.minWidth = if (shownNewEpisodes > 0) 0 else screen.dp(24)
         val hPad = if (shownNewEpisodes > 0) screen.dp(7) else 0
         view.setPadding(hPad, 0, hPad, 0)
     }

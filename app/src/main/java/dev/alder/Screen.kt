@@ -489,7 +489,8 @@ abstract class Screen : Activity() {
         isFocusable = true
         gravity = Gravity.CENTER_VERTICAL
         minHeight = dp(BUTTON_H)
-        setPadding(dp(if (icon != 0) 14 else 16), 0, dp(16), 0)
+        val side = dp(if (icon != 0) 14 else 16)
+        setPadding(side, 0, side, 0)
         compoundDrawablePadding = dp(6)
         if (icon != 0) setCompoundDrawablesRelative(getDrawable(icon)?.mutate()?.apply { setBounds(0, 0, dp(16), dp(16)) }, null, null, null)
         fun style(focused: Boolean) {
@@ -579,7 +580,7 @@ abstract class Screen : Activity() {
             setTint(TEXT_2); setBounds(0, 0, dp(14), dp(14))
         }, null)
         compoundDrawablePadding = dp(4)
-        setPadding(dp(16), 0, dp(12), 0)
+        setPadding(dp(12), 0, dp(12), 0)
     }
 
     /** Solid smoked glass over posters; focus lights the face without an outline. */
@@ -1010,7 +1011,7 @@ abstract class Screen : Activity() {
                         else null
                     act?.let { dialog.dismiss(); it(); true } ?: false
                 }
-                list.addView(this, LinearLayout.LayoutParams(-1, -2))
+                list.addView(this, wrap())
             }
         }
         // A long list (services, genres) stops short of the screen's edges and scrolls; the fading edge is also the
@@ -1045,6 +1046,7 @@ abstract class Screen : Activity() {
     /** A [choose] row's tick: the choice in use, in tungsten with a check at its end. */
     protected fun TextView.tick(on: Boolean) {
         setTextColor(if (on) TUNGSTEN else TEXT)
+        compoundDrawablePadding = dp(4)
         setCompoundDrawablesRelative(null, null, if (!on) null else getDrawable(R.drawable.ic_check)?.mutate()?.apply {
             setTint(TUNGSTEN); setBounds(0, 0, dp(16), dp(16))
         }, null)
