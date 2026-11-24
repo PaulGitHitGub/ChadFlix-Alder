@@ -24,6 +24,15 @@ class ExploreQueryTest {
         assertEquals("42",q.copy(type="movie", person=q.person!!.copy(role="writer")).discover().filters["with_crew"])
     }
 
+    @Test fun sortFloorsFollowTheEffectiveCatalogue() {
+        val top = ExploreQuery(choices=mapOf(Facet.SORT to Pick("top","Top Rated")))
+        assertEquals("3000",top.discover().filters["vote_count.gte"])
+        assertEquals("500",top.copy(genres=genres).discover().filters["vote_count.gte"])
+        assertEquals("1000",top.copy(type="series").discover().filters["vote_count.gte"])
+        assertEquals("200",top.copy(type="series",genres=genres).discover().filters["vote_count.gte"])
+        assertEquals("release",ExploreQuery(collection=Pick("10","Star Wars")).sort)
+    }
+
     @Test fun clearingFranchiseRestoresEveryPausedFilterAndSort() {
         val q = ExploreQuery(genres=genres, any=true, choices=mapOf(Facet.SORT to Pick("votes","Most Votes")))
         assertEquals(q,q.copy(collection=Pick("10","Star Wars")).without(Facet.FRANCHISE))

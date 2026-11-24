@@ -385,7 +385,7 @@ internal fun discoverUrl(q: DiscoverQuery, page: Int, region: String, language: 
     if (q.service != null) { params["with_watch_providers"] = "${q.service}"; params["watch_region"] = region }
     params.putAll(q.filters)
     when (q.sort) {
-        "top" -> { params["sort_by"] = "vote_average.desc"; params["vote_count.gte"] = "300" }
+        "top" -> { params["sort_by"] = "vote_average.desc"; params["vote_count.gte"] = params["vote_count.gte"] ?: "300" }
         "new" -> {
             params["sort_by"] = "$date.desc"; params["vote_count.gte"] = params["vote_count.gte"] ?: "20"
             val lte = params["$date.lte"]

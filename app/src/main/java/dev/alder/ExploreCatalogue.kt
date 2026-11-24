@@ -17,12 +17,12 @@ internal data class ExploreQuery(
 ) {
     val movie get() = type == "movie"
     val media get() = if (movie) "movie" else "tv"
-    val sort get() = choices[Facet.SORT]?.key ?: "popular"
+    val sort get() = choices[Facet.SORT]?.key ?: if (collection == null) "popular" else "release"
 
     fun without(f: Facet) = when (f) {
         Facet.PEOPLE -> copy(person = null)
         Facet.GENRE -> copy(genres = emptyList())
-        Facet.FRANCHISE -> copy(collection = null)
+        Facet.FRANCHISE -> copy(collection = null, choices = if (sort == "release") choices - Facet.SORT else choices)
         else -> copy(choices = choices - f)
     }
 
@@ -45,6 +45,15 @@ internal data class ExploreQuery(
             }
             choices[Facet.LANGUAGE]?.let { put("with_original_language", it.key) }
             choices[Facet.COUNTRY]?.let { put("with_origin_country", it.key) }
+            val narrowed = isNotEmpty() || person != null
+            val sortFloor = when (sort) {
+                "top" -> if (movie) (if (narrowed) 500 else 3000) else (if (narrowed) 200 else 1000)
+                "old", "az" -> if (movie) 1000 else 100
+                else -> 0
+            }
+            if (sortFloor > 0 && (movie || person == null)) {
+                put("vote_count.gte", maxOf(sortFloor,get("vote_count.gte")?.toInt() ?: 0).toString())
+            }
             if (movie && person != null) put(when(person.role) {
                 "actor" -> "with_cast"
                 "any" -> "with_people"
@@ -83,11 +92,24 @@ internal object ExploreCatalogue {
         return (cast + crew).filter { q.movie || it.optInt("episode_count", 5) >= 5 }.distinctBy { it.getInt("id") }
     }
 
+    internal fun localOrder(rows: List<JSONObject>, q: ExploreQuery): List<JSONObject> {
+        val date = if (q.movie) "release_date" else "first_air_date"
+        return when (q.sort) {
+            "new" -> rows.sortedByDescending { it.optString(date) }
+            "release", "old" -> rows.sortedBy { it.text(date) ?: "9999" }
+            "az" -> rows.sortedWith(compareBy(java.text.Collator.getInstance()) { it.optString(if (q.movie) "title" else "name") })
+            "votes" -> rows.sortedByDescending { it.optInt("vote_count") }
+            "top" -> rows.sortedWith(compareByDescending<JSONObject> { it.optInt("vote_count") >= 100 }
+                .thenByDescending { it.optDouble("vote_average",0.0) })
+            else -> rows.sortedByDescending { it.optDouble("popularity",0.0) }
+        }
+    }
+
     fun page(q: ExploreQuery, page: Int): Page {
         q.collection?.let {
             val parts = Tmdb.exploreRequest("collection/${it.key}", cache = true).optJSONArray("parts").objects()
-                .sortedBy { title -> title.text("release_date") ?: "9999" }
-            return Page(parts, parts.size, true)
+
+            return Page(localOrder(parts,q), parts.size, true)
         }
         if (!q.movie && q.person != null) {
             val params = q.discover().filters
@@ -97,18 +119,11 @@ internal object ExploreCatalogue {
                 (q.genres.isEmpty() || if (q.any) q.genres.any { g -> g.key in genres } else q.genres.all { g -> g.key in genres }) &&
                     date >= params["first_air_date.gte"].orEmpty() && date <= (params["first_air_date.lte"] ?: "9999") &&
                     it.optDouble("vote_average", 0.0) >= (params["vote_average.gte"]?.toDouble() ?: 0.0) &&
-                    it.optInt("vote_count") >= (if (q.sort == "top") 300 else params["vote_count.gte"]?.toInt() ?: 0) &&
+                    it.optInt("vote_count") >= (params["vote_count.gte"]?.toInt() ?: 0) &&
                     (params["with_original_language"]?.equals(it.text("original_language")) != false) &&
                     (params["with_origin_country"]?.let { c -> c in it.optJSONArray("origin_country").strings() } != false)
             }
-            val sorted = when(q.sort) {
-                "new" -> rows.sortedByDescending { it.optString("first_air_date") }
-                "old" -> rows.sortedBy { it.optString("first_air_date") }
-                "az" -> rows.sortedBy { it.optString("name") }
-                "votes" -> rows.sortedByDescending { it.optInt("vote_count") }
-                "top" -> rows.sortedByDescending { it.optDouble("vote_average") }
-                else -> rows.sortedByDescending { it.optDouble("popularity", 0.0) }
-            }
+            val sorted = localOrder(rows,q)
             return Page(sorted.drop((page-1)*20).take(20), sorted.size, page*20 >= sorted.size)
         }
         val answer = Tmdb.exploreDiscover(q.discover(), page)

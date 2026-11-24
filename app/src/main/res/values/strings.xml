@@ -630,4 +630,5 @@
     <string name="ex_filters">Filters</string>
     <string name="ex_order">Release Order</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
+    <string name="ex_clear_filters">Clear All Filters</string>
 </resources>

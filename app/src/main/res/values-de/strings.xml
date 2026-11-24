@@ -602,4 +602,5 @@
     <string name="ex_filters">Filter</string>
     <string name="ex_order">Erscheinungsfolge</string>
     <string name="ex_unavailable">Titel Nicht Verfügbar</string>
+    <string name="ex_clear_filters">Alle Filter Löschen</string>
 </resources>

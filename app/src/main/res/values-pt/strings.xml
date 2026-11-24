@@ -605,4 +605,5 @@
     <string name="ex_filters">Filtros</string>
     <string name="ex_order">Ordem De Lançamento</string>
     <string name="ex_unavailable">Título Indisponível</string>
+    <string name="ex_clear_filters">Limpar Todos Os Filtros</string>
 </resources>

@@ -602,4 +602,5 @@
     <string name="ex_filters">फ़िल्टर</string>
     <string name="ex_order">रिलीज़ क्रम</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
+    <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
 </resources>

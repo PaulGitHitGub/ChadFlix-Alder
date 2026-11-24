@@ -626,4 +626,5 @@
     <string name="ex_filters">الفلاتر</string>
     <string name="ex_order">ترتيب الإصدار</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
+    <string name="ex_clear_filters">مسح جميع الفلاتر</string>
 </resources>

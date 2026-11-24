@@ -22,6 +22,7 @@ abstract class ExploreScreen : Screen() {
     protected lateinit var panelScroll: ScrollView
     protected lateinit var summary: TextView
     private val labels = mutableMapOf<Facet, TextView>()
+    private lateinit var clearFilters: View
     private val typeButtons = mutableListOf<TextView>()
     private var genreNames = emptyMap<Int,String>()
     private var loadedBand = -1
@@ -30,7 +31,7 @@ abstract class ExploreScreen : Screen() {
     private var preview: View? = null
     private var pending: Runnable? = null
     private var delayed = Runnable { refreshCatalogue() }
-    protected val heading: String get() = query.collection?.let { it.label + DOT + getString(R.string.ex_order) }
+    protected val heading: String get() = query.collection?.let { it.label + DOT + value(Facet.SORT) }
         ?: value(Facet.SORT) + " " + getString(if (query.movie) R.string.tab_movies else R.string.tab_shows)
 
     private fun title(f: Facet) = getString(if (f == Facet.STUDIO && !query.movie) R.string.ex_network else f.title)
@@ -38,7 +39,7 @@ abstract class ExploreScreen : Screen() {
         Facet.PEOPLE -> query.person?.name
         Facet.GENRE -> query.genres.joinToString(if (query.any) " ${getString(R.string.ex_or)} " else " + ") { it.label }.ifEmpty { null }
         Facet.FRANCHISE -> query.collection?.label
-        Facet.SORT -> query.choices[f]?.label ?: getString(R.string.discover_sort_popular)
+        Facet.SORT -> query.choices[f]?.label ?: getString(if (query.collection==null) R.string.discover_sort_popular else R.string.ex_order)
         else -> query.choices[f]?.label
     } ?: getString(R.string.filter_all)
 
@@ -90,11 +91,19 @@ abstract class ExploreScreen : Screen() {
             labels[f] = label
             if (f == Facet.PEOPLE) peopleButton = row
         }
+        clearFilters = pill(R.string.ex_clear_filters).apply {
+            setOnClickListener {
+                peopleButton.requestFocus()
+                change(ExploreQuery(type=query.type, choices=query.choices.filterKeys { it==Facet.SORT }))
+            }
+        }
+        panel.addView(clearFilters,-1,dp(30))
         updatePanel()
         return ScrollView(this).apply { isVerticalScrollBarEnabled = false; addView(panel) }.also { panelScroll = it }
     }
 
     private fun updatePanel() {
+        clearFilters.visibility = if (query.collection == null && Facet.values().any(::active)) View.VISIBLE else View.GONE
         typeButtons.forEachIndexed { i,b ->
             b.isEnabled = query.collection == null
             b.isFocusable = b.isEnabled
@@ -105,7 +114,7 @@ abstract class ExploreScreen : Screen() {
             val row = t.parent as LinearLayout
             (row.getChildAt(0) as TextView).text = title(f)
             t.text = value(f)
-            val enabled = if (f == Facet.FRANCHISE) query.movie else query.collection == null &&
+            val enabled = if (f == Facet.SORT) true else if (f == Facet.FRANCHISE) query.movie else query.collection == null &&
                 (query.movie || query.person == null || f !in listOf(Facet.RUNTIME, Facet.STUDIO))
             row.isEnabled = enabled
             row.isFocusable = enabled
@@ -202,7 +211,9 @@ abstract class ExploreScreen : Screen() {
     private fun options(f: Facet): List<Pick> = when(f) {
         Facet.SORT -> (listOf("popular" to R.string.discover_sort_popular,"top" to R.string.discover_sort_top,
             "new" to R.string.discover_sort_new,"old" to R.string.ex_old,"votes" to R.string.ex_votes,"az" to R.string.list_sort_name) +
-            if (query.movie) listOf("box" to R.string.ex_box) else emptyList()).map { Pick(it.first,HomeStyle.titleCase(getString(it.second))) }
+            if (query.movie && query.collection == null) listOf("box" to R.string.ex_box) else emptyList()).let { sorts ->
+                if (query.collection == null) sorts else listOf("release" to R.string.ex_order) + sorts.filterNot { it.first == "old" }
+            }.map { Pick(it.first,HomeStyle.titleCase(getString(it.second))) }
         Facet.RATING -> listOf("6","7","7.5","8").map { Pick(it,"$it+") }
         Facet.STUDIO -> if (query.movie) listOf(Pick("41077","A24"),Pick("420","Marvel Studios"),Pick("3","Pixar"),
             Pick("2","Walt Disney Pictures"),Pick("174","Warner Bros."),Pick("33","Universal Pictures"),Pick("4","Paramount Pictures"),
@@ -445,7 +456,7 @@ abstract class ExploreScreen : Screen() {
         if (kind=="collection") {
             fun show(items: List<Pick>) {
                 items.forEach { pick -> results.addView(pill(pick.label).apply {
-                    setOnClickListener { query = query.copy(collection=pick); lookup(null) }
+                    setOnClickListener { query = query.copy(collection=pick,choices=query.choices-Facet.SORT); lookup(null,restoreTitle=false) }
                 }) }
             }
             if (words.isEmpty()) show(collections) else background({
