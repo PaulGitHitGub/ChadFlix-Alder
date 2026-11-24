@@ -434,12 +434,16 @@ class SettingsActivity : Screen() {
         showGroup(start)
         // Now, not posted: otherwise Android gives first focus to the Streams button, and focus on a page button opens it.
         groupViews[start]?.requestFocus()
-        if (reopened != null) detailRows.post { firstDetail?.requestFocus() }
+        if (reopened != null) detailRows.post {
+            val row = savedInstanceState?.getString("focusChoice")?.let { detailRows.findViewWithTag<View>(it) }
+            (row ?: firstDetail)?.requestFocus()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         // The page the size was changed on: focus moving during the rebuild can select another one first.
+        if (reopenGroup != null) outState.putString("focusChoice", "uiScale")
         (reopenGroup ?: selectedGroup)?.let { outState.putString("group", it.name) }
     }
 
@@ -1052,9 +1056,11 @@ class SettingsActivity : Screen() {
         }
     }
 
-    private fun actionRow(label: String, value: String, help: String, perProfile: Boolean = false, click: () -> Unit): TextView {
+    private fun actionRow(label: String, value: String, help: String, perProfile: Boolean = false,
+                          openOnRight: Boolean = false, click: () -> Unit): TextView {
         val display = text(if (value.isEmpty()) "›" else "$value  ›", BODY, color = TEXT_2)
-        settingRow(label, display, help, perProfile, focus = { display.setTextColor(if (it) TUNGSTEN else TEXT_2) }, click = click)
+        val row = settingRow(label, display, help, perProfile, focus = { display.setTextColor(if (it) TUNGSTEN else TEXT_2) }, click = click)
+        if (openOnRight) row.clickOnRight()
         return display
     }
 
@@ -1114,13 +1120,16 @@ class SettingsActivity : Screen() {
             }
         }
         fun select(index: Int) {
+            if (index == current()) return
             store(c, c.values[index].first)
             refresh.forEach { it() }
         }
-        settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
+        val row = settingRow(c.label, value, c.hint, c.perProfile, focus = { has -> focused = has; draw() }) {
             if (isSwitch) select(nextSettingIndex(current(), c.values.size, 1))
             else choose(c.label, c.values.map { it.second }, checked = current(), pick = ::select)
-        }.clickOnRight()
+        }
+        row.tag = c.key
+        row.clickOnRight()
         refresh += ::draw
         draw()
     }
@@ -1152,6 +1161,7 @@ class SettingsActivity : Screen() {
         settingRow(label, value, getString(R.string.source_choice_hint),
             focus = { value.setTextColor(if (it) TUNGSTEN else TEXT_2) }) {
             choose(label, PRESETS.map { getString(it.first) }, checked = current()) { i ->
+                if (i == current()) return@choose
                 PRESETS[i].second.forEach { (key, v) -> store(choice(key), v) }
                 refresh.forEach { it() }
             }
@@ -1173,7 +1183,7 @@ class SettingsActivity : Screen() {
         // "es-MX" picked on Android's own page is Spanish here.
         val at = names.indexOfFirst { it.first == current }.takeIf { it >= 0 }
             ?: names.indexOfFirst { it.first.isNotEmpty() && it.first.substringBefore('-') == current.substringBefore('-') }.coerceAtLeast(0)
-        actionRow(getString(R.string.app_language), names[at].second, getString(R.string.app_language_hint)) {
+        actionRow(getString(R.string.app_language), names[at].second, getString(R.string.app_language_hint), openOnRight = true) {
             choose(getString(R.string.app_language), names.map { it.second }, checked = at) { i ->
                 val picked = names[i].first
                 if (picked == current) return@choose
