@@ -194,7 +194,7 @@ internal class SearchPill(
         // The magnifier, black while the white pill covers it.
         if (glyphA > 0.01f) {
             val size = resources.displayMetrics.density * GLYPH_DP
-            val covered = lit && slotR.centerX() in pillL..pillR
+            val covered = inked && slotR.centerX() in pillL..pillR
             icon(canvas, glyph.tint(if (covered) HomeStyle.BLACK else HomeStyle.WHITE), slotR.centerX(), slotR.centerY(), size, size, glyphA, glyphS)
         }
         // The black pill, popping from its centre and squashing as it moves.
@@ -211,7 +211,7 @@ internal class SearchPill(
         }
         // Voice and Keyboard twice: on the capsule's colour, then white again where the black pill is, so their colour
         // follows its edge as it slides.
-        val base = if (lit) HomeStyle.BLACK else HomeStyle.WHITE
+        val base = if (inked) HomeStyle.BLACK else HomeStyle.WHITE
         items(canvas, base, micOn, keysOn)
         if (blackA > 0.01f) {
             canvas.save()
@@ -265,7 +265,13 @@ internal class SearchPill(
         }
     }
 
-    private fun covers(r: RectF) = lit && pillR - pillL > 1f && pillR > r.left && pillL < r.right
+    private fun covers(r: RectF) = inked && pillR - pillL > 1f && pillR > r.left && pillL < r.right
+
+    /**
+     * The words go black on the white pill only while it's mostly there: as it fades for the avatar or the gear they
+     * turn white half-way, so nothing is white on white or black on a clear pill.
+     */
+    private val inked get() = pillA > 0.5f
 
     /**
      * The names the pill reaches, twice like Voice and Keyboard: white, then black where the white pill is ([box]), so
@@ -383,6 +389,11 @@ internal class SearchPill(
         val live = started && fromOnScreen == null && mode == Mode.NAME
         handChained = chained || (live && edgesMoving)
         started = true
+        // Opening Search lights the pill at once, even if it had faded for the avatar (Right from it onto the magnifier),
+        // so the slingshot is never thrown from a clear pill and Search's first frame matches.
+        fade?.cancel()
+        lit = true
+        pillA = 1f
         measure()
         if (fromOnScreen != null && fromOnScreen.size == 4) {
             getLocationOnScreen(here)

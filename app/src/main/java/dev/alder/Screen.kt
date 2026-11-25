@@ -1420,7 +1420,8 @@ abstract class Screen : Activity() {
         const val SMALL = 12.5f
         const val CAPS = SMALL
         const val CODE = 36f
-        val LEADING = mapOf(SERIF_HERO to 40f, SERIF_TITLE to 30f, SERIF_NAME to 21f, BODY to 20f, SMALL to 17f, CODE to 40f)
+        val LEADING = mapOf(SERIF_HERO to 40f, SERIF_TITLE to 30f, SERIF_NAME to 21f, BODY to 20f, SMALL to 17f, CODE to 40f,
+            13.5f to 17f, 11.25f to 15.3f) // ChadFlix: Search's hero plot and cast names, the same ~1.36 leading as SMALL
 
         const val BASE = 0xFF0E0C0A.toInt()
         const val CARD_PLACEHOLDER = 0xFF28221E.toInt()

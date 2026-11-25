@@ -1025,7 +1025,9 @@ class MainActivity : Screen() {
             }
             style(false)
             isFocusable = true
-            setOnFocusChangeListener { _, has -> style(has); styleNav() }
+            // Losing focus, the bar is restyled once the new focus is known (as the names do): Right onto the magnifier
+            // must not first send the pill there, or Search's slingshot would start from a half-faded, moving pill.
+            setOnFocusChangeListener { _, has -> style(has); if (has) styleNav() else main.post { styleNav() } }
             setOnClickListener { profileMenu() }
         }
         val dot = View(this).apply {
@@ -1093,7 +1095,7 @@ class MainActivity : Screen() {
                 setColorFilter(if (on) HomeStyle.BLACK else HomeStyle.WHITE)
             }
             style(false)
-            setOnFocusChangeListener { _, has -> style(has); styleNav() }
+            setOnFocusChangeListener { _, has -> style(has); if (has) styleNav() else main.post { styleNav() } } // as the avatar's
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
         header.addView(settingsGear, FrameLayout.LayoutParams(dp(44), dp(32), Gravity.END or Gravity.CENTER_VERTICAL))
