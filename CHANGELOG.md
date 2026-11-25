@@ -17,6 +17,28 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 each entry that does not follow these rules. Then rename that heading to the version number.
 
 <!-- ChadFlix: give each release its own section here, named as versionName. Do not rename Unreleased: it is Alder's. -->
+## 1.4-chadflix.3
+
+### New
+<!-- Spotlight -->
+- **A new Search.** The movie or show you rest on fills the top with its logo, ratings, story and cast. The filters sit in one row above the posters, and the posters move one row at a time.
+<!-- Spotlight -->
+- **Keyboard and Voice in the top bar.** Open **Search** and the magnifier becomes **Keyboard** and **Voice**. Search starts on **Voice**.
+<!-- Spotlight -->
+- **Sort in one place.** Choose **Popular**, **Top Rated**, **Newest** and more from **Sort** at the right of the filter row.
+- **A pill that glides.** Moving between **Movies**, **Shows**, **Services** and **My Lists**, the white pill stretches to the next page and settles.
+
+### Easier to use
+- **Simpler filters.** The filters are **Genre**, **Year**, **Directors & Cast**, **Studio** and **Language**. **Clear** and **Country** are gone.
+- **Faster to Search.** Press **Left** onto the magnifier and Search opens as quickly as any other page.
+- **Tidier top bar.** No grey pill is left on the page you came from.
+- **Easier to read.** Titles keep clear of the top bar, and cast photos show whole faces.
+- **Even buttons.** Filter chips, **Sort** and the title page's buttons fit their words.
+
+### Fixes
+- **Small fixes for Search:** opening Search no longer lands in **Directors & Cast**. **Back** in **Custom Range** returns to **Year**, and **All** shows its tick.
+- **Settings:** **Audio Language** is back in **Picture & Sound**.
+
 ## 1.4-chadflix.2
 
 ### New
