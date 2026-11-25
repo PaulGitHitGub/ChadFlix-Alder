@@ -136,6 +136,26 @@ internal fun brightLeft(pixels: IntArray, width: Int): Boolean {
     return luminance / (left * (pixels.size / width) * 255) > 0.5
 }
 
+/**
+ * ChadFlix: how much of [SHADE_FULL] a title's left side needs, 0 to 1. The mean of each sampled pixel's brightest
+ * channel over the left half, so saturated art (Her's red) counts as bright, which luma didn't: 0.25 and under gets
+ * today's light fade, 0.70 and over the full one.
+ */
+internal fun leftShadeStrength(pixels: IntArray, width: Int): Float {
+    require(width > 0 && pixels.isNotEmpty() && pixels.size % width == 0)
+    val left = maxOf(1, width / 2)
+    val vivid = pixels.indices.filter { it % width < left }.sumOf { val c = pixels[it]; maxOf(c ushr 16 and 255, c ushr 8 and 255, c and 255) }
+        .toFloat() / (left * (pixels.size / width) * 255)
+    return ((vivid - 0.25f) / 0.45f).coerceIn(0f, 1f)
+}
+
+/** The left shade's alpha every 10% across the screen: today's light fade, and the full one for bright art. */
+internal val SHADE_LIGHT = intArrayOf(235, 188, 141, 94, 47, 0, 0, 0, 0, 0, 0)
+internal val SHADE_FULL = intArrayOf(240, 235, 230, 224, 217, 184, 109, 34, 0, 0, 0)
+
+internal fun leftShadeColors(strength: Float) =
+    IntArray(SHADE_LIGHT.size) { Math.round(SHADE_LIGHT[it] + strength * (SHADE_FULL[it] - SHADE_LIGHT[it])) shl 24 or 0x0E0C0A }
+
 /** What every screen shares: the signed-in account, background work, and the few view helpers the plain UI uses. */
 abstract class Screen : Activity() {
     protected val main = Handler(Looper.getMainLooper())
@@ -282,13 +302,11 @@ abstract class Screen : Activity() {
         if (art === shadeSource) return
         shadeSource = art
         // Sampled off the main thread: reading a hardware bitmap back from the GPU stalls it for several ms.
-        background({ samplePixels(art, 16, 24)?.let { brightLeft(it, 16) } }) { r ->
-            val bright = r.getOrNull() ?: return@background
-            if (art !== shadeSource) return@background
-            // A bright film keeps the shade dark across the whole text column, not just at the screen's edge.
-            windowShade?.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                if (bright) intArrayOf(0xF70E0C0A.toInt(), 0xE00E0C0A.toInt(), 0x800E0C0A.toInt(), 0x000E0C0A)
-                else intArrayOf(0xEB0E0C0A.toInt(), 0x000E0C0A, 0x000E0C0A))
+        background({ samplePixels(art, 16, 24)?.let { leftShadeStrength(it, 16) } }) { r ->
+            val strength = r.getOrNull() ?: return@background
+            if (art !== shadeSource || strength == 0f) return@background // dark art: today's light fade stays
+            // Bright art: the shade holds dark across the whole text column, as strongly as the art needs.
+            windowShade?.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, leftShadeColors(strength))
         }
     }
 
@@ -301,7 +319,7 @@ abstract class Screen : Activity() {
         setContentView(FrameLayout(this).apply {
             addView(backdrop, FrameLayout.LayoutParams(-1, -1))
             windowShade = View(context).apply {
-                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xEB0E0C0A.toInt(), 0x000E0C0A, 0x000E0C0A))
+                background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, leftShadeColors(0f))
             }.also { addView(it, FrameLayout.LayoutParams(-1, -1)) }
             addView(View(context).apply {
                 background = GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, intArrayOf(0xF70E0C0A.toInt(), 0x000E0C0A, 0x000E0C0A))

@@ -682,4 +682,12 @@ class ScreenDesignTest {
             .flatMap { f -> f.readLines().mapIndexedNotNull { i, line -> if (literal.containsMatchIn(line)) "${f.name}:${i + 1}" else null } }
         org.junit.Assert.assertTrue("Use a motion token: $offenders", offenders.isEmpty())
     }
+
+    @Test fun leftShadeFollowsHowVividTheLeftIs() {
+        val red = 0xFFE0103A.toInt() // Her's saturated red: low luma, but bright to the eye
+        assertEquals(1f, leftShadeStrength(intArrayOf(red, 0xFF000000.toInt()), 2), 0.001f)
+        assertEquals(0f, leftShadeStrength(intArrayOf(0xFF202020.toInt(), 0xFFFFFFFF.toInt()), 2), 0.001f)
+        assertEquals(0xEB0E0C0A.toInt(), leftShadeColors(0f)[0])
+        assertEquals(0xF00E0C0A.toInt(), leftShadeColors(1f)[0])
+    }
 }
