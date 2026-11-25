@@ -471,7 +471,7 @@ class DetailsActivity : Screen() {
             // The box is a fixed height: at large font sizes a two-line name shrinks to fit instead of clipping.
             // Android 8+ only; older TVs ellipsize the second line instead.
             if (android.os.Build.VERSION.SDK_INT >= 26)
-                setAutoSizeTextTypeUniformWithConfiguration(20, SERIF_HERO.toInt(), 1, android.util.TypedValue.COMPLEX_UNIT_SP)
+                setAutoSizeTextTypeUniformWithConfiguration(15, SERIF_HERO.toInt(), 1, android.util.TypedValue.COMPLEX_UNIT_SP)
         }
         val titleArea = FrameLayout(this).apply {
             addView(title, FrameLayout.LayoutParams(-1, -1, Gravity.TOP or Gravity.START))
@@ -1203,7 +1203,7 @@ class DetailsActivity : Screen() {
                             outline.setOval(0, 0, view.width, view.height)
                     }
                 }
-                val initials = text(actor.initials, 15f, bold = true, color = 0xFFF3D9B1.toInt(), serif = true).apply {
+                val initials = text(actor.initials, 12f, bold = true, color = 0xFFF3D9B1.toInt(), serif = true).apply {
                     gravity = Gravity.CENTER
                     includeFontPadding = false
                 }
@@ -1500,7 +1500,7 @@ class DetailsActivity : Screen() {
                             outline.setRoundRect(0, 0, view.width, view.height, dp(10).toFloat())
                     }
                 }
-                val initialsText = text(actor.initials, 9f, bold = true, color = TUNGSTEN, serif = true).apply {
+                val initialsText = text(actor.initials, 7.5f, bold = true, color = TUNGSTEN, serif = true).apply {
                     gravity = Gravity.CENTER
                     includeFontPadding = false
                 }

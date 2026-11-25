@@ -23,9 +23,9 @@ const files = [
   ['docs/tracks.jpg', 'assets/tracks.jpg'],
   ['docs/picker.jpg', 'assets/profiles.jpg'],
   ['app/src/main/assets/fonts/inter.ttf', 'assets/inter.ttf'],
-  ['app/src/main/assets/fonts/instrument_serif.ttf', 'assets/instrument-serif.ttf'],
+  ['site/media/instrument_serif.ttf', 'assets/instrument-serif.ttf'],
   ['app/src/main/assets/fonts/INTER_LICENSE.txt', 'assets/INTER_LICENSE.txt'],
-  ['app/src/main/assets/fonts/INSTRUMENT_SERIF_LICENSE.txt', 'assets/INSTRUMENT_SERIF_LICENSE.txt'],
+  ['site/media/INSTRUMENT_SERIF_LICENSE.txt', 'assets/INSTRUMENT_SERIF_LICENSE.txt'],
 ];
 
 for (const [source, target] of files) {

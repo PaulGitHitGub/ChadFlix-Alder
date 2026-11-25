@@ -66,6 +66,7 @@ class AddonsActivity : Screen() {
             addView(TextClock(this@AddonsActivity).apply {
                 format12Hour = "h:mm a"; format24Hour = "HH:mm"
                 textSize = SMALL; setTextColor(TEXT_2)
+                typeface = text("", SMALL).typeface // ChadFlix: Inter, not the system font
             }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
                 rightMargin = dp(PAD); topMargin = dp(35)
             })

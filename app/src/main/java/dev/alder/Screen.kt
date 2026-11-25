@@ -234,7 +234,7 @@ abstract class Screen : Activity() {
             text = value
             textSize = sp
             setTextColor(color)
-            typeface = if (serif) fonts.serif else if (bold) fonts.semiBold else fonts.medium
+            typeface = if (bold || serif) fonts.semiBold else fonts.medium // ChadFlix: Alder's serif headings in Inter too
             LEADING[sp]?.let { lead ->
                 val want = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, lead, resources.displayMetrics)
                 setLineSpacing(want - paint.getFontMetricsInt(null), 1f)
@@ -679,6 +679,7 @@ abstract class Screen : Activity() {
             setHintTextColor(TEXT_3)
             setTextColor(TEXT)
             textSize = BODY
+            typeface = text("", SMALL).typeface // ChadFlix: Inter, not the system font
             setSingleLine()
             setText(initial)
             imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
@@ -1109,7 +1110,7 @@ abstract class Screen : Activity() {
         }
         page.addView(detailScroll, LinearLayout.LayoutParams(0, -1, 1.94f))
 
-        val titleView = text("", 34f, serif = true).apply { includeFontPadding = false }
+        val titleView = text("", 25f, serif = true).apply { includeFontPadding = false }
         val caption = text("", BODY, color = TEXT_2)
         val summary = text("", 16f, color = TEXT_2).apply {
             setPadding(dp(12), 0, 0, 0)
@@ -1241,7 +1242,7 @@ abstract class Screen : Activity() {
         fun show(change: Change) {
             val title = change.title
             titleView.text = title.ifEmpty { change.text }
-            titleView.textSize = if (change.image != null) 34f else 40f
+            titleView.textSize = if (change.image != null) 25f else 30f
             val artPath = change.image ?: change.detailImage
             val bitmap = artPath?.let { path ->
                 heroCache.get(path) ?: decode(path, if (change.image != null && metrics.widthPixels <= 1280) 2 else 1)
@@ -1364,7 +1365,6 @@ abstract class Screen : Activity() {
         val semiBold: Typeface = if (android.os.Build.VERSION.SDK_INT >= 26)
             Typeface.Builder(assets, "fonts/inter.ttf").setFontVariationSettings("'wght' 600").setWeight(600).build()
         else Typeface.create(medium, Typeface.BOLD)
-        val serif: Typeface = Typeface.createFromAsset(assets, "fonts/instrument_serif.ttf")
     }
 
     companion object {
@@ -1416,14 +1416,15 @@ abstract class Screen : Activity() {
         const val DOT = "  ·  "
 
         const val WORDMARK = 22f // sp, "Alder" beside its mark
-        const val SERIF_HERO = 38f
-        const val SERIF_TITLE = 28.5f
-        const val SERIF_NAME = 19f
+        // Alder's Instrument Serif sizes (38, 28.5, 19 sp), now Inter semi-bold: about three quarters as large reads the same.
+        const val SERIF_HERO = 29f
+        const val SERIF_TITLE = 21f
+        const val SERIF_NAME = 15.5f
         const val BODY = 14.5f
         const val SMALL = 12.5f
         const val CAPS = SMALL
         const val CODE = 36f
-        val LEADING = mapOf(SERIF_HERO to 40f, SERIF_TITLE to 30f, SERIF_NAME to 21f, BODY to 20f, SMALL to 17f, CODE to 40f,
+        val LEADING = mapOf(SERIF_HERO to 34f, SERIF_TITLE to 26f, SERIF_NAME to 20f, BODY to 20f, SMALL to 17f, CODE to 40f,
             13.5f to 17f, 11.25f to 15.3f) // ChadFlix: Search's hero plot and cast names, the same ~1.36 leading as SMALL
 
         const val BASE = 0xFF0E0C0A.toInt()

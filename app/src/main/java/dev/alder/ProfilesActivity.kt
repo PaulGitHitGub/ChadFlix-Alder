@@ -178,10 +178,11 @@ class ProfilesActivity : Screen() {
             })
             addView(TextClock(this@ProfilesActivity).apply {
                 format12Hour = "h:mm a"; format24Hour = "HH:mm"; textSize = SMALL; setTextColor(TEXT_2)
+                typeface = text("", SMALL).typeface // ChadFlix: Inter, not the system font
             }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
                 rightMargin = dp(PAD); topMargin = dp(39)
             })
-            addView(text(R.string.profiles_whos_here, 38f, serif = true).onArt().apply { gravity = Gravity.CENTER },
+            addView(text(R.string.profiles_whos_here, SERIF_HERO, serif = true).onArt().apply { gravity = Gravity.CENTER },
                 FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { topMargin = dp(118) })
             addView(tiles, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply { topMargin = dp(190 - LIFT_ROOM) })
             addView(chip(R.string.manage_profiles).apply {
@@ -463,6 +464,7 @@ class ProfilesActivity : Screen() {
         val name = EditText(this).apply {
             hint = getString(R.string.profiles_your_name)
             textSize = BODY
+            typeface = text("", SMALL).typeface // ChadFlix: Inter, not the system font
             setTextColor(TEXT)
             setHintTextColor(TEXT_3)
             setPadding(dp(14), 0, dp(14), 0)
@@ -568,7 +570,7 @@ class ProfilesActivity : Screen() {
             background = glass(14)
         }
         val steps = column(Gravity.START,
-            text(if (again != null) R.string.profiles_sign_in_again else R.string.profiles_connect, 40f, serif = true).onArt(),
+            text(if (again != null) R.string.profiles_sign_in_again else R.string.profiles_connect, 30f, serif = true).onArt(),
             text(getString(if (again != null) R.string.profiles_signed_out else R.string.profiles_scan, name), BODY).onArt().marginTop(10),
             text("", BODY, color = TEXT_2).onArt().apply {
                 val line = getString(R.string.profiles_or_go_to, "link.stremio.com")
@@ -675,7 +677,7 @@ class ProfilesActivity : Screen() {
 
     private fun onboardingButton(label: String) = pill(label)
 
-    private fun onboardingAvatar(initial: String, size: Int, color: Int = draftColor) = text(initial, if (size > 50) 48f else 19f,
+    private fun onboardingAvatar(initial: String, size: Int, color: Int = draftColor) = text(initial, if (size > 50) 36f else 15f,
         serif = true, color = BASE).apply {
         gravity = Gravity.CENTER
         background = GradientDrawable().apply {
@@ -777,7 +779,7 @@ class ProfilesActivity : Screen() {
             onboardingAvatar(profile.name.take(1).uppercase(), 100, profile.color),
             text(profile.name, SERIF_TITLE, serif = true).marginTop(12)
         ).apply { gravity = Gravity.CENTER }, column(Gravity.START,
-            text(R.string.profiles_all_set, 40f, serif = true),
+            text(R.string.profiles_all_set, 30f, serif = true),
             text(getString(R.string.profiles_ready, profile.name), BODY, color = TEXT_2).marginTop(12),
             done.marginTop(24)
         ).apply { gravity = Gravity.CENTER_VERTICAL }, dp(55), 0.9f, 1.1f), onboardingBackdrop())

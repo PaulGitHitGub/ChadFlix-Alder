@@ -160,6 +160,7 @@ class StreamsActivity : Screen() {
             addView(TextClock(this@StreamsActivity).apply {
                 format12Hour = "h:mm a"; format24Hour = "HH:mm"
                 textSize = SMALL; setTextColor(TEXT_2)
+                typeface = text("", SMALL).typeface // ChadFlix: Inter, not the system font
             }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
                 topMargin = dp(36); rightMargin = dp(PAD)
             })
@@ -507,7 +508,7 @@ class StreamsActivity : Screen() {
 
     private companion object {
         const val TRY = 3
-        const val NAME_SIZE = 23f // sp, the title or episode name in the header
+        const val NAME_SIZE = 17f // sp, the title or episode name in the header
         const val QUALITY_W = 76 // dp, wide enough for "QUALITY" in spaced capitals
         const val ROW_H = 38 // dp a source row: eight fit above the help line, as on the mock
     }

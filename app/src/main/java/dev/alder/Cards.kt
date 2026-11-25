@@ -244,7 +244,7 @@ internal class MediaCardView(
 
     /** A title with no backdrop yet stays a poster until one comes ([refresh]). */
     private fun widen(animate: Boolean = true) {
-        if (expanded || nameMade.isInitialized()) nameView.textSize = if (expanded) Screen.SERIF_NAME else Screen.SMALL
+        if (expanded || nameMade.isInitialized()) nameView.textSize = if (expanded) 19f else Screen.SMALL
         // ChadFlix: on the widened card the name stops short of the rating badge in the corner.
         if (nameMade.isInitialized()) (nameView.layoutParams as? MarginLayoutParams)?.let { lp ->
             val end = screen.dp(if (expanded) 96 else insetDp)

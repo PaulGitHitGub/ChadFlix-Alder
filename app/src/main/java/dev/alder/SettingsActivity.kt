@@ -665,7 +665,7 @@ class SettingsActivity : Screen() {
                 }
             }
             Group.ABOUT -> {
-                detailRows.addView(brand(SERIF_TITLE), LinearLayout.LayoutParams(-2, -2).apply {
+                detailRows.addView(brand(28.5f), LinearLayout.LayoutParams(-2, -2).apply {
                     marginStart = dp(12); bottomMargin = dp(14)
                 })
                 actionRow(getString(R.string.app_name), getString(R.string.version, Updates.mine(this)), getString(R.string.about_hint)) {

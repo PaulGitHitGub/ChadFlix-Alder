@@ -12,7 +12,7 @@ on:
       - 'branding/house-lights/alder_mark.svg'
       - 'branding/house-lights/alder_portfolio_card_product.webp'
       - 'app/src/main/assets/fonts/inter.ttf'
-      - 'app/src/main/assets/fonts/instrument_serif.ttf'
+      - 'site/media/instrument_serif.ttf'
   workflow_dispatch:
 
 permissions:
