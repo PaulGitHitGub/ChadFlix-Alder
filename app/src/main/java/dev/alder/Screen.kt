@@ -382,18 +382,19 @@ abstract class Screen : Activity() {
     protected fun pill(words: Int, icon: Int = 0): TextView = pill(getString(words), icon)
 
     /**
-     * Compact 38 dp glass circle button for secondary title actions (+, ✓, ↺, ⓘ, trailer).
-     * Focus brightens the glass face and icon without outlines or rings; [onFocus] lets the caller show a label below.
+     * Glass circle button for a title's secondary actions (↺, like, watchlist, ⓘ), laid out as Kodi ChadFlix's:
+     * focus turns the circle white with a dark icon; [onFocus] lets the caller show the button's words beside the row.
      */
     protected fun iconButton(
         symbol: String,
         description: String,
-        iconRes: Int = 0,
         onFocus: (Boolean) -> Unit = {},
         action: () -> Unit,
     ): TextView = object : TextView(this) {
-        private val d = resources.displayMetrics.density
-        private val iconDrawable = if (iconRes != 0) getDrawable(iconRes)?.mutate() else null
+        private val d = resources.displayMetrics.density * ICON_BUTTON_H / 38f // the glyphs were drawn for a 38 dp circle
+        private val drawables = HashMap<Int, Drawable?>()
+        private fun icon(): Drawable? = TITLE_ICONS[text?.toString()]
+            ?.let { res -> drawables.getOrPut(res) { getDrawable(res)?.mutate() } }
         private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = TEXT
             style = Paint.Style.STROKE
@@ -408,8 +409,9 @@ abstract class Screen : Activity() {
         private val glyphBounds = Rect()
 
         override fun onDraw(canvas: Canvas) {
+            val iconDrawable = icon()
             if (iconDrawable != null) {
-                val size = (18f * d).toInt()
+                val size = (20f * d).toInt()
                 val left = (width - size) / 2
                 val top = (height - size) / 2
                 iconDrawable.setBounds(left, top, left + size, top + size)
@@ -424,20 +426,6 @@ abstract class Screen : Activity() {
             strokePaint.color = currentTextColor
             fillPaint.color = currentTextColor
             when (s) {
-                "+" -> {
-                    val r = 5.5f * d
-                    strokePaint.strokeWidth = 1.8f * d
-                    canvas.drawLine(cx - r, cy, cx + r, cy, strokePaint)
-                    canvas.drawLine(cx, cy - r, cx, cy + r, strokePaint)
-                }
-                "✓" -> {
-                    strokePaint.strokeWidth = 1.8f * d
-                    glyphPath.reset()
-                    glyphPath.moveTo(cx - 5f * d, cy + 0.3f * d)
-                    glyphPath.lineTo(cx - 1.5f * d, cy + 3.8f * d)
-                    glyphPath.lineTo(cx + 5.2f * d, cy - 3.4f * d)
-                    canvas.drawPath(glyphPath, strokePaint)
-                }
                 "↺" -> {
                     val r = 5.8f * d
                     strokePaint.strokeWidth = 1.6f * d
@@ -468,15 +456,15 @@ abstract class Screen : Activity() {
     }.apply {
         text = symbol
         textSize = 18f
-        setTextColor(TEXT_2)
+        setTextColor(TEXT)
         gravity = Gravity.CENTER
         includeFontPadding = false
         contentDescription = description
         isFocusable = true
         background = glass(ICON_BUTTON_H / 2)
         setOnFocusChangeListener { v, has ->
-            v.background = glass(ICON_BUTTON_H / 2, has)
-            setTextColor(if (has) TEXT else TEXT_2)
+            v.background = if (has) rounded(TEXT, ICON_BUTTON_H / 2) else glass(ICON_BUTTON_H / 2)
+            setTextColor(if (has) BASE else TEXT)
             v.grow(has, CHIP_GROW).start()
             onFocus(has)
         }
@@ -1377,7 +1365,9 @@ abstract class Screen : Activity() {
         const val FROST_DENSE = 0.55f
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
-        const val ICON_BUTTON_H = 38
+        const val ICON_BUTTON_H = 44
+        /** The title page's like and watchlist buttons, named by state: an icon button whose text is one of these draws it. */
+        val TITLE_ICONS = mapOf("like" to R.drawable.ic_like, "liked" to R.drawable.ic_liked, "save" to R.drawable.ic_save, "saved" to R.drawable.ic_saved)
         const val PILL_MIN_W = 64 // Material's shortest text button
         const val CHIP_H = 24 // the mocks' 46–48 px chips
         const val CARD_GROW = 1.06f

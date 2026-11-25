@@ -121,7 +121,6 @@
     <string name="action_more_info">Mais informações</string>
     <string name="action_start_over">Começar do início</string>
     <string name="action_trailer">Trailer</string>
-    <string name="action_add_to_list">Adicionar à My Alder</string>
     <string name="season_specials">Especiais</string>
     <string name="season_number">Temporada %1$d</string>
     <string name="episode_number">Episódio %1$d</string>
@@ -600,4 +599,8 @@
     <string name="ex_clear_filters">Limpar Todos Os Filtros</string>
     <string name="showing_most_watched">Mais Assistidos</string>
     <string name="showing_blockbusters">Sucessos de Bilheteria</string>
+    <string name="like_add">Favorito</string>
+    <string name="like_remove">Remover dos favoritos</string>
+    <string name="watchlist_add">Adicionar a uma lista</string>
+    <string name="watchlist_in">Lista · Em %1$s</string>
 </resources>

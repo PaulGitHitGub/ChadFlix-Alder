@@ -72,26 +72,72 @@ internal object ExploreCatalogue {
     }
 
     /**
-     * The Directors & Cast pop-up before anything is typed: the top-billed cast (and a film's director) of the catalogue's
-     * current popular titles, most popular first (TMDb's own person popularity). TMDb's trending people led with names
-     * few viewers know. [loaded]: the catalogue's own first page of those titles, when it has one, so only the credits
-     * are asked (on Tmdb's pool, cached for a day).
+     * The Directors & Cast pop-up before anything is typed: the director and top-billed cast of the most-voted titles of
+     * the last five years plus today's popular ones with a real following, most popular first (TMDb's own person
+     * popularity). The catalogue's first popular page alone (12 brand-new, often foreign, titles) gave little-known
+     * directors. The finished list is kept for a day ([PEOPLE_KEY]) and built ahead by [warmPeople], so an open waits on
+     * the network (about 60 credit asks) only when Search hasn't had time to build it first.
      */
-    fun popularPeople(movie: Boolean, loaded: List<JSONObject>?): List<Person> {
-        val media = if (movie) "movie" else "tv"
-        val titles = (loaded ?: Tmdb.discoverPage(ExploreQuery(type = if (movie) "movie" else "series").discover(), 1)
-            .optJSONArray("results").objects()).take(POPULAR_TITLES)
-        val credits = Tmdb.pool.invokeAll(titles.map { t -> java.util.concurrent.Callable {
-            runCatching { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits") }.getOrNull()
-        } }).map { runCatching { it.get() }.getOrNull() }
-        fun person(it: JSONObject, role: String) = it.optDouble("popularity", 0.0) to Person(it.getInt("id"), it.getString("name"), role, it.text("profile_path"))
-        return credits.filterNotNull().flatMap { c ->
-            c.optJSONArray("cast").objects().take(3).map { person(it, "actor") } +
-                c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1).map { person(it, "director") }
-        }.filter { it.second.photo != null }.distinctBy { it.second.id }.sortedByDescending { it.first }.map { it.second }
+    fun popularPeople(movie: Boolean): List<Person> {
+        val job = peopleJob(movie)
+        fun forget() = synchronized(peopleJobs) { if (peopleJobs[movie] === job) peopleJobs.remove(movie) }
+        val (people, complete) = runCatching { job.second.get() }.getOrElse { forget(); throw it }
+        if (!complete) forget() // some asks failed: shown as it is, built again on the next open
+        return people
     }
 
-    private const val POPULAR_TITLES = 12
+    /** Starts building [popularPeople] in the background if it isn't built or building; Search calls it once it has loaded. */
+    fun warmPeople(movie: Boolean) { peopleJob(movie) }
+
+    private fun peopleJob(movie: Boolean) = synchronized(peopleJobs) { // a lock, not ConcurrentHashMap.compute: that needs API 24
+        val now = System.currentTimeMillis()
+        peopleJobs[movie]?.takeIf { now - it.first < DAY_MS }
+            ?: (now to peopleThread.submit(java.util.concurrent.Callable { savedPeople(movie) })).also { peopleJobs[movie] = it }
+    }
+
+    private val peopleJobs = HashMap<Boolean, Pair<Long, java.util.concurrent.Future<Pair<List<Person>, Boolean>>>>()
+    // Its own threads: the build waits on its asks from one, and the asks use three more, so Search's catalogue
+    // (on Tmdb.pool) never queues behind its 60 credits.
+    private val peopleThread = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val peopleAsks = java.util.concurrent.Executors.newFixedThreadPool(3)
+
+    /** The list and whether every ask answered; only a complete list is kept for the day. */
+    private fun savedPeople(movie: Boolean): Pair<List<Person>, Boolean> {
+        val key = PEOPLE_KEY + movie
+        Http.savedAnswer(key, maxAgeMs = DAY_MS)?.let { saved ->
+            runCatching { return org.json.JSONArray(saved).objects().map { Person(it.getInt("id"), it.getString("name"), it.getString("role"), it.text("photo")) } to true }
+        }
+        val (people, complete) = buildPeople(movie)
+        if (people.isEmpty()) throw java.io.IOException("No popular people") // offline: the pop-up says so, and the next open asks again
+        if (complete) Http.keep(key, null, org.json.JSONArray(people.map {
+            JSONObject().put("id", it.id).put("name", it.name).put("role", it.role).put("photo", it.photo ?: JSONObject.NULL)
+        }).toString())
+        return people to complete
+    }
+
+    private fun buildPeople(movie: Boolean): Pair<List<Person>, Boolean> {
+        val media = if (movie) "movie" else "tv"
+        val date = if (movie) "primary_release_date" else "first_air_date"
+        val since = "${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - POPULAR_YEARS}-01-01" // the same all year: one cache entry
+        val asks = (1..VOTED_PAGES).map { page -> mapOf("sort_by" to "vote_count.desc", "$date.gte" to since, "page" to "$page") } +
+            mapOf("sort_by" to "popularity.desc", "vote_count.gte" to if (movie) "300" else "100")
+        var complete = true
+        fun <T> all(jobs: List<() -> T?>): List<T> = peopleAsks.invokeAll(jobs.map { job -> java.util.concurrent.Callable { runCatching(job).getOrNull() } })
+            .map { runCatching { it.get() }.getOrNull() }.also { answers -> if (null in answers) complete = false }.filterNotNull()
+        val titles = all(asks.map { params -> { Tmdb.exploreRequest("discover/$media", params).optJSONArray("results").objects() } })
+            .flatten().distinctBy { it.getInt("id") }
+        val credits = all(titles.map { t -> { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits") } })
+        fun person(it: JSONObject, role: String) = it.optDouble("popularity", 0.0) to Person(it.getInt("id"), it.getString("name"), role, it.text("profile_path"))
+        return credits.flatMap { c ->
+            c.optJSONArray("cast").objects().take(3).map { person(it, "actor") } +
+                c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1).map { person(it, "director") }
+        }.filter { it.second.photo != null }.distinctBy { it.second.id }.sortedByDescending { it.first }.map { it.second } to complete
+    }
+
+    private const val POPULAR_YEARS = 5
+    private const val VOTED_PAGES = 2
+    private const val DAY_MS = 24 * 3600_000L
+    private const val PEOPLE_KEY = "chadflix:popular-people:" // not a URL: the day cache's name for the built list
 
     private fun credits(q: ExploreQuery): List<JSONObject> {
         val person = requireNotNull(q.person)

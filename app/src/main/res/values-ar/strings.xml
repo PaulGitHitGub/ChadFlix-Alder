@@ -137,7 +137,6 @@
     <string name="action_more_info">مزيد من المعلومات</string>
     <string name="action_start_over">إعادة من البداية</string>
     <string name="action_trailer">إعلان تشويقي</string>
-    <string name="action_add_to_list">إضافة إلى My Alder</string>
     <string name="season_specials">حلقات خاصة</string>
     <string name="season_number">الموسم %1$d</string>
     <string name="episode_number">الحلقة %1$d</string>
@@ -621,4 +620,8 @@
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
     <string name="showing_most_watched">الأكثر مشاهدة</string>
     <string name="showing_blockbusters">الأعلى إيرادًا</string>
+    <string name="like_add">مفضّل</string>
+    <string name="like_remove">إزالة من المفضلة</string>
+    <string name="watchlist_add">إضافة إلى قائمة مشاهدة</string>
+    <string name="watchlist_in">قائمة المشاهدة · في %1$s</string>
 </resources>

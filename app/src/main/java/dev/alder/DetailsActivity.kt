@@ -38,13 +38,6 @@ internal fun heroCastPreview(allMembers: List<CastMember>, maxCount: Int = 3): L
     return ordered.take(maxCount)
 }
 
-/** ChadFlix: how many cast chips fit the 520 dp hero column: 4 (names up to 52 characters in all), else 3 (first three up to 44), else 2; "+N more" is extra. */
-internal fun heroChipCount(allMembers: List<CastMember>): Int {
-    val names = heroCastPreview(allMembers, 4).map { it.name.length }
-    return if (allMembers.size <= 4 && allMembers.sumOf { it.name.length } <= 52) 4
-    else if (names.take(3).sum() <= 44) 3 else 2
-}
-
 private val dayPattern = Regex("\\d{4}-\\d{2}-\\d{2}")
 
 // Made once per thread, not per episode: building them for every episode of every series in Continue held Home's
@@ -104,6 +97,7 @@ internal enum class HeroControlFocus {
     TRAILER,
     START_OVER,
     LIST,
+    WATCHLIST,
     INFO,
     CAST,
 }
@@ -158,7 +152,8 @@ internal fun resolveHeroFocusTarget(
     } else {
         HeroFocusState(HeroControlFocus.PLAY)
     }
-    HeroControlFocus.GUIDE, HeroControlFocus.SIMILAR, HeroControlFocus.PLAY, HeroControlFocus.LIST, HeroControlFocus.INFO -> saved
+    HeroControlFocus.GUIDE, HeroControlFocus.SIMILAR, HeroControlFocus.PLAY, HeroControlFocus.LIST, HeroControlFocus.WATCHLIST,
+    HeroControlFocus.INFO -> saved
 }
 
 internal fun resolveFilmographyReturnTarget(
@@ -220,6 +215,10 @@ class DetailsActivity : Screen() {
     private var filmographyFirst: View? = null
     private var lastFocusedActor: View? = null
     private lateinit var listButton: TextView
+    private lateinit var watchlistButton: TextView
+    private var watchTitle: WatchTitle? = null
+    /** Kodi ChadFlix's layout: the focused icon button's words, beside the row. */
+    private var rowWords: TextView? = null
     private var guideButton: TextView? = null
     private var similarButton: TextView? = null
     private lateinit var playButton: TextView
@@ -406,6 +405,7 @@ class DetailsActivity : Screen() {
                 HeroFocusState(HeroControlFocus.START_OVER)
             ::listButton.isInitialized && (focused === listButton || isInside(focused, listButton)) ->
                 HeroFocusState(HeroControlFocus.LIST)
+            ::watchlistButton.isInitialized && focused === watchlistButton -> HeroFocusState(HeroControlFocus.WATCHLIST)
             ::infoButton.isInitialized && (focused === infoButton || isInside(focused, infoButton)) ->
                 HeroFocusState(HeroControlFocus.INFO)
             else -> HeroFocusState(HeroControlFocus.PLAY)
@@ -419,6 +419,7 @@ class DetailsActivity : Screen() {
         HeroControlFocus.TRAILER -> trailerButton ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.START_OVER -> startOverButton ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.LIST -> if (::listButton.isInitialized) listButton else null
+        HeroControlFocus.WATCHLIST -> if (::watchlistButton.isInitialized) watchlistButton else null
         HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton else null
         HeroControlFocus.CAST -> castChips.getOrNull(target.castIndex) ?: if (::playButton.isInitialized) playButton else null
     }
@@ -517,7 +518,7 @@ class DetailsActivity : Screen() {
             m.description?.takeIf { it.isNotBlank() }?.let {
                 stack.addView(text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(dp(380), -2).apply { topMargin = dp(4) })
+                }, LinearLayout.LayoutParams(dp(PLOT_W), -2).apply { topMargin = dp(4) })
             }
             val initialCast = richCast.ifEmpty {
                 val dirMembers = m.directors.map { CastMember(it, character = getString(R.string.cast_director), role = "director") }
@@ -593,22 +594,27 @@ class DetailsActivity : Screen() {
             setOnClickListener { openSources(target?.first ?: metaId, startOver = false) }
             setOnLongClickListener { openSources(target?.first ?: metaId, startOver = false, pick = true); true }
         }
-        val trailer = if (hasTrailer) iconButton("", getString(R.string.action_trailer), iconRes = R.drawable.ic_trailer) { playTrailer(m) } else null
-        val startOver = if (resumeAt > 0) iconButton("↺", getString(R.string.action_start_over)) {
+        // ChadFlix: Trailer is words under Play, as Kodi ChadFlix's; the icons above keep to Start Over, like, watchlist, info.
+        val trailer = if (hasTrailer) titleAction(getString(R.string.action_trailer)).apply { setOnClickListener { playTrailer(m) } } else null
+        val startOver = if (resumeAt > 0) iconButton("↺", getString(R.string.action_start_over), onFocus = ::showRowWords) {
             openSources(target?.first ?: metaId, startOver = true)
         } else null
         trailerButton = trailer
         startOverButton = startOver
-        infoButton = iconButton("ⓘ", getString(R.string.action_more_info)) { showInfo(focusCast = false) }
+        infoButton = iconButton("ⓘ", getString(R.string.action_more_info), onFocus = ::showRowWords) { showInfo(focusCast = false) }
         listButton = buildListButton()
+        watchTitle = WatchTitle(metaId, type, m.name.ifEmpty { name }, m.poster ?: poster, m.background ?: initialArt)
+        watchlistButton = iconButton("", "", onFocus = ::showRowWords, action = ::toggleWatchlist).also(::showWatchlisted)
+        rowWords = text("", SMALL, color = TEXT_2).onArt().apply { maxLines = 1 }
         buttonRow = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
             clipChildren = false
             clipToPadding = false
-            trailer?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             startOver?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
+            addView(watchlistButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
             addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
+            addView(rowWords, wrap().apply { marginStart = dp(10) })
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
         infoButton.id = View.generateViewId()
@@ -637,6 +643,7 @@ class DetailsActivity : Screen() {
         if (unairedNext == null || !episodic) addAction(playButton, 12)
         else guideButton?.let { playButton = it }
         guideButton?.let { addAction(it, if (it === playButton) 12 else 0) }
+        trailer?.let { addAction(it, 0) }
         similarButton?.let { addAction(it, 0) }
     }
 
@@ -729,8 +736,45 @@ class DetailsActivity : Screen() {
 
     private fun buildListButton(): TextView {
         val inList = Library.inList(item)
-        val desc = getString(if (inList) R.string.action_remove_from_list else R.string.action_add_to_list)
-        return iconButton(if (inList) "✓" else "+", desc, action = ::toggleList)
+        return iconButton(if (inList) "liked" else "like", getString(if (inList) R.string.like_remove else R.string.like_add),
+            onFocus = ::showRowWords, action = ::toggleList)
+    }
+
+    private fun showRowWords(@Suppress("UNUSED_PARAMETER") focused: Boolean) {
+        // A blur comes before the next button's focus: read the focus once both have happened. English capitalises every
+        // word, as Kodi's "Add To Watchlist" does (titleCase would make it "Add to"); other languages keep their own case.
+        rowWords?.post {
+            val words = currentFocus?.takeIf { it.parent === buttonRow }?.contentDescription?.toString().orEmpty()
+            rowWords?.text = if (java.util.Locale.getDefault().language != "en") words
+                else words.split(" ").joinToString(" ") { w -> w.replaceFirstChar(Char::uppercaseChar) }
+        }
+    }
+
+    private fun showWatchlisted(button: TextView) {
+        val title = watchTitle ?: return
+        val count = Settings.watchlists(this).all().count { list -> list.items.any(title::matches) }
+        button.text = if (count > 0) "saved" else "save"
+        button.contentDescription = if (count > 0) getString(R.string.watchlist_in, plural(R.plurals.watchlist_count, count))
+            else getString(R.string.watchlist_add)
+        button.invalidate()
+        if (button.isFocused) showRowWords(true)
+    }
+
+    /**
+     * ChadFlix: saved anywhere, the button takes the title out of every watchlist; not saved, it goes straight into the only
+     * watchlist, or the Save To Watchlist picker opens when there are none or several.
+     */
+    private fun toggleWatchlist() {
+        val title = watchTitle ?: return
+        val store = Settings.watchlists(this)
+        val lists = store.all()
+        val holding = lists.filter { list -> list.items.any(title::matches) }
+        when {
+            holding.isNotEmpty() -> holding.forEach { store.toggle(it.name, title) }
+            lists.size == 1 -> store.toggle(lists.single().name, title)
+            else -> return saveToWatchlist(title) { showWatchlisted(watchlistButton) }
+        }
+        showWatchlisted(watchlistButton)
     }
 
     private fun toggleList() {
@@ -738,9 +782,10 @@ class DetailsActivity : Screen() {
         val dates = Library.listDates(this, profile.id)
         val add = !Library.inList(item)
         editLibrary({ Library.setInList(it, add) }, R.string.list_update_failed, listDates = dates) {
-            listButton.text = if (add) "✓" else "+"
-            val desc = getString(if (add) R.string.action_remove_from_list else R.string.action_add_to_list)
-            listButton.contentDescription = desc
+            listButton.text = if (add) "liked" else "like"
+            listButton.contentDescription = getString(if (add) R.string.like_remove else R.string.like_add)
+            listButton.invalidate()
+            if (listButton.isFocused) showRowWords(true)
         }
     }
 
@@ -1469,98 +1514,76 @@ class DetailsActivity : Screen() {
 
     private fun buildCastChips(allMembers: List<CastMember>): View? {
         castChips.clear()
-        val members = heroCastPreview(
-            allMembers,
-            maxCount = heroChipCount(allMembers)
-        )
+        // ChadFlix: portraits with names under them, as many as fit the plot's width; "+N" takes the last place.
+        val total = (richCast.ifEmpty { allMembers }).size
+        val places = (PLOT_W + CAST_GAP) / (CAST_TILE + CAST_GAP)
+        val members = heroCastPreview(allMembers, maxCount = if (total > places) places - 1 else places)
         if (members.isEmpty()) return null
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.TOP
             clipChildren = false
             clipToPadding = false
         }
-
-        members.forEachIndexed { index, actor ->
-            val chip = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                isFocusable = true
-                minimumHeight = dp(28)
-                setPadding(dp(4), dp(4), dp(11), dp(4))
-                val rest = glassOver(this, 14, shade = FROST_DENSE)
-                background = rest
-
-                val avatarSize = dp(20)
-                val avatarFrame = FrameLayout(context).apply {
-                    background = rounded(0x33F3D9B1.toInt(), 10)
-                    clipToOutline = true
-                    outlineProvider = object : android.view.ViewOutlineProvider() {
-                        override fun getOutline(view: View, outline: android.graphics.Outline) =
-                            outline.setRoundRect(0, 0, view.width, view.height, dp(10).toFloat())
-                    }
-                }
-                val initialsText = text(actor.initials, 7.5f, bold = true, color = TUNGSTEN, serif = true).apply {
-                    gravity = Gravity.CENTER
+        fun ring(on: Boolean) = if (on) GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(dp(2), TEXT) } else null
+        fun tile(face: View, label: String?, open: () -> Unit) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            isFocusable = true
+            val box = FrameLayout(context).apply { setPadding(dp(3), dp(3), dp(3), dp(3)); addView(face, FrameLayout.LayoutParams(-1, -1)) }
+            addView(box, LinearLayout.LayoutParams(dp(CAST_FACE + 6), dp(CAST_FACE + 6)))
+            val nameView = label?.let {
+                text(it, 10.5f, color = TEXT_2).onArt().apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
                     includeFontPadding = false
-                }
-                avatarFrame.addView(initialsText, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
-
-                if (!actor.photo.isNullOrBlank()) {
-                    val photoView = FaceView(this@DetailsActivity).apply { // the head kept, not cut at the forehead
-                        visibility = View.GONE
-                    }
-                    avatarFrame.addView(photoView, FrameLayout.LayoutParams(-1, -1))
-                    Images.load(actor.photo, photoView, avatarSize, failed = {
-                        photoView.visibility = View.GONE
-                        initialsText.visibility = View.VISIBLE
-                    }) {
-                        photoView.visibility = View.VISIBLE
-                        initialsText.visibility = View.GONE
-                    }
-                }
-                addView(avatarFrame, LinearLayout.LayoutParams(avatarSize, avatarSize).apply { marginEnd = dp(7) })
-
-                val nameView = text(castChipLabel(actor), SMALL, color = TEXT_2).apply {
-                    includeFontPadding = false
-                    maxLines = 1
-                }
-                addView(nameView, wrap())
-
-                setOnFocusChangeListener { v, has ->
-                    v.background = if (has) glass(14, true) else rest
-                    v.grow(has, CHIP_GROW).start()
-                    nameView.setTextColor(if (has) TEXT else TEXT_2)
-                }
-                setOnClickListener { showFilmography(actor, this) }
+                }.also { v -> addView(v, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }) }
             }
-            castChips.add(chip)
-            container.addView(chip, LinearLayout.LayoutParams(-2, -2).apply {
-                if (index > 0) marginStart = dp(8)
-            })
+            setOnFocusChangeListener { _, has ->
+                box.background = ring(has)
+                nameView?.setTextColor(if (has) TEXT else TEXT_2)
+            }
+            setOnClickListener { open() }
+            castChips.add(this)
+            container.addView(this, LinearLayout.LayoutParams(dp(CAST_TILE), -2).apply { if (container.childCount > 0) marginStart = dp(CAST_GAP) })
+        }
+        fun round(v: FrameLayout) = v.apply {
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) = outline.setOval(0, 0, view.width, view.height)
+            }
         }
 
-        val totalCastCount = (richCast.ifEmpty { allMembers }).size
-        val remainingCount = totalCastCount - members.size
-        if (remainingCount > 0) {
-            val moreChip = text(getString(R.string.cast_more, remainingCount), SMALL, color = TEXT_2).apply {
+        members.forEach { actor ->
+            val face = round(FrameLayout(this).apply { background = rounded(0x33F3D9B1.toInt(), CAST_FACE / 2) })
+            val initialsText = text(actor.initials, 15f, bold = true, color = TUNGSTEN).apply {
                 gravity = Gravity.CENTER
-                setSingleLine()
                 includeFontPadding = false
-                minHeight = dp(28)
-                setPadding(dp(12), dp(4), dp(12), dp(4))
-                val rest = glassOver(this, 14, shade = FROST_DENSE)
-                background = rest
-                isFocusable = true
-                setOnFocusChangeListener { v, has ->
-                    v.background = if (has) glass(14, true) else rest
-                    setTextColor(if (has) TEXT else TEXT_2)
-                    v.grow(has, CHIP_GROW).start()
-                }
-                setOnClickListener { showInfo(focusCast = true) }
             }
-            castChips.add(moreChip)
-            container.addView(moreChip, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+            face.addView(initialsText, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
+            if (!actor.photo.isNullOrBlank()) {
+                val photoView = FaceView(this@DetailsActivity).apply { visibility = View.GONE } // the head kept, not cut at the forehead
+                face.addView(photoView, FrameLayout.LayoutParams(-1, -1))
+                Images.load(actor.photo, photoView, dp(CAST_FACE), failed = {
+                    photoView.visibility = View.GONE
+                    initialsText.visibility = View.VISIBLE
+                }) {
+                    photoView.visibility = View.VISIBLE
+                    initialsText.visibility = View.GONE
+                }
+            }
+            lateinit var me: View
+            me = tile(face, castChipLabel(actor)) { showFilmography(actor, me) }
+        }
+        val remainingCount = total - members.size
+        if (remainingCount > 0) {
+            val more = round(FrameLayout(this).apply { background = glassOver(this, CAST_FACE / 2, shade = FROST_DENSE) })
+            more.addView(text("+$remainingCount", SMALL, bold = true, color = TEXT_2).apply {
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+            }, FrameLayout.LayoutParams(-1, -1))
+            tile(more, null) { showInfo(focusCast = true) }.contentDescription = getString(R.string.cast_more, remainingCount)
         }
 
         val room = dp(4)
@@ -1890,5 +1913,10 @@ class DetailsActivity : Screen() {
     private companion object {
         const val EPISODE_WIDTH = 216
         const val GUIDE_ART = 0.24f // the film's brightness behind the episode guide
+        const val PLOT_W = 380
+        // The cast portraits: six 60 dp places with 4 dp gaps are exactly the plot's 380 dp.
+        const val CAST_FACE = 48
+        const val CAST_TILE = 60
+        const val CAST_GAP = 4
     }
 }

@@ -54,13 +54,4 @@ class TitleLogoTest {
             assertTrue(pw / d <= 240.01f && ph / d <= 68.01f)
         }
     }
-
-    private fun cast(vararg names: String) = names.map { CastMember(it) }
-
-    @Test fun chipCountGuardsTheColumnWidth() {
-        assertEquals(4, heroChipCount(cast("Tom Hanks", "Meg Ryan", "Bill Pullman", "Rosie O'Donnell")))
-        assertEquals(3, heroChipCount(cast("Aaaaaaaaaa Bbbb", "Cccccccccc Dddd", "Eeeeeeeee", "Ffffffffff Gggggggggg")))
-        assertEquals(2, heroChipCount(cast("Aaaaaaaaaaaaaa Bbbbbbbbbbbbbb", "Cccccccccccccc Dddddddddddddd", "Eeeeeeeeeeee Ffffff", "Gg")))
-        assertEquals(4, heroChipCount(cast("A B", "C D")))
-    }
 }

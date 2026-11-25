@@ -120,7 +120,6 @@
     <string name="action_more_info">ज़्यादा जानकारी</string>
     <string name="action_start_over">शुरू से देखें</string>
     <string name="action_trailer">ट्रेलर</string>
-    <string name="action_add_to_list">My Alder में जोड़ें</string>
     <string name="season_specials">स्पेशल</string>
     <string name="season_number">सीज़न %1$d</string>
     <string name="episode_number">एपिसोड %1$d</string>
@@ -597,4 +596,8 @@
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>
     <string name="showing_blockbusters">ब्लॉकबस्टर</string>
+    <string name="like_add">पसंदीदा</string>
+    <string name="like_remove">पसंदीदा से हटाएँ</string>
+    <string name="watchlist_add">वॉचलिस्ट में जोड़ें</string>
+    <string name="watchlist_in">वॉचलिस्ट · %1$s में</string>
 </resources>

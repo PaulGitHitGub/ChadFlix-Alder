@@ -1393,7 +1393,7 @@ class MainActivity : Screen() {
         cinemaName = text("", SERIF_HERO, serif = true).onArt().apply { maxLines = 2; ellipsize = TextUtils.TruncateAt.END; maxWidth = dp(520) }
         cinemaLogo = ImageView(this).apply { adjustViewBounds = true; scaleType = ImageView.ScaleType.FIT_START; maxHeight = dp(LOGO_H); maxWidth = dp(LOGO_W) }
         cinemaLine = text("", SMALL, color = TEXT).onArt().apply { maxLines = 1; ellipsize = TextUtils.TruncateAt.END; maxWidth = dp(INFO_W) }
-        cinemaPlay = pill(R.string.action_resume, R.drawable.ic_play).apply {
+        cinemaPlay = pill(R.string.action_resume).apply {
             isFocusable = false
             setOnClickListener { cinema.getOrNull(cinemaAt)?.let(::play) }
         }
@@ -1502,7 +1502,7 @@ class MainActivity : Screen() {
         // Small tags, as tall as the letters: SMALL's leading and font padding made them blocks twice the mock's.
         heroRatings = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         heroAbout = text("", BODY, color = HomeStyle.PLOT).onArt().apply { setLines(HomeStyle.PLOT_LINES); ellipsize = TextUtils.TruncateAt.END }
-        heroResume = pill(R.string.action_resume, R.drawable.ic_play).apply {
+        heroResume = pill(R.string.action_resume).apply {
             setOnClickListener { heroItem?.let(::play) }
             setOnLongClickListener { heroItem?.let { play(it, pick = true) }; true }
         }

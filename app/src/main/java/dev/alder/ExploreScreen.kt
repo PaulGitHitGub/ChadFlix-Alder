@@ -56,7 +56,6 @@ abstract class ExploreScreen : Screen() {
     private var loadedBand = -1
     @Volatile private var generation = 0
     private val catalogueCards = mutableListOf<MediaCardView>()
-    private val popularTitles = mutableMapOf<Boolean, List<JSONObject>>() // the unfiltered catalogue's first page, by movie
     @Volatile private var shown: Meta? = null // the info panel's title; read off the main thread by its rating lookups
     private var pending: Runnable? = null // the info panel's lookups, after a rest on the poster
     private lateinit var infoBody: View
@@ -75,6 +74,8 @@ abstract class ExploreScreen : Screen() {
     private var pickerFacet: Facet? = null // the facet whose picker has the hero
     private var pickerBack: (() -> Unit)? = null
     private var peopleToken = 0
+    /** The Directors & Cast pop-up's filter: "director" or "actor" shows only that half; null shows both. */
+    private var peopleShow: String? = null
     private var delayed = Runnable { refreshCatalogue() }
     private val medium by lazy { text("", SMALL).typeface }
     private val semiBold by lazy { text("", SMALL, bold = true).typeface }
@@ -527,7 +528,7 @@ abstract class ExploreScreen : Screen() {
                 result.fold({ page ->
                     failure?.let(results::removeView)
                     failure = null
-                    if (next == 1 && q == ExploreQuery(type = q.type)) popularTitles[q.movie] = page.titles // for Popular Now
+                    if (next == 1) ExploreCatalogue.warmPeople(q.movie) // the Directors & Cast pop-up's list, built ahead
                     done = page.last
                     next++
                     val before = seen.size
@@ -879,71 +880,148 @@ abstract class ExploreScreen : Screen() {
             if (firstChoice && currentFocus === originalFocus) view.requestFocus()
             firstChoice = false
         }
+        // Along the top: All People (no one chosen), then Directors and Cast, each showing only that half while ticked.
+        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; clipChildren = false; clipToPadding = false }
+        into.addView(top, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(RING_ROOM) })
         val all = listRow(getString(R.string.ex_all_people), rest = PLACEHOLDER).apply {
             if (query.person == null) (getChildAt(0) as TextView).apply { tick(true); setTextColor(TEXT) }
             setOnClickListener { query = query.without(Facet.PEOPLE); lookup(null,restoreTitle=false) }
         }
-        into.addView(all, LinearLayout.LayoutParams(-2, dp(28)).apply { topMargin = dp(RING_ROOM) })
+        top.addView(all, LinearLayout.LayoutParams(-2, dp(28)))
+        val box = column(Gravity.START)
+        into.addView(box, LinearLayout.LayoutParams(-1, -2))
         val r = HomeStyle.ringOut(this)
-        val tileW = resultsScroll.layoutParams.width / FACES // six across the pop-up's whole width
-        fun faces(label: Int, people: List<Person>) {
-            if (people.isEmpty()) return
-            into.addView(caps(label), LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(16); bottomMargin = dp(10) })
-            people.chunked(FACES).forEach { group ->
-                val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
-                into.addView(row, LinearLayout.LayoutParams(-2,-2).apply { bottomMargin = dp(10) })
-                group.forEach { p ->
-                    val ring = View(this).apply {
-                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(r * 2, HomeStyle.RING_COLOR) }
-                        visibility = View.INVISIBLE
+        val width = resultsScroll.layoutParams.width
+        var found: List<Person> = emptyList()
+
+        fun tile(p: Person, tileW: Int): View {
+            val ring = View(this).apply {
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(r * 2, HomeStyle.RING_COLOR) }
+                visibility = View.INVISIBLE
+            }
+            val name = text(p.name, SMALL, bold = true, color = TEXT).apply { gravity = Gravity.CENTER; maxLines = 2 }
+            val tile = column(Gravity.CENTER_HORIZONTAL).apply {
+                isFocusable = true
+                setOnFocusChangeListener { _, has ->
+                    ring.visibility = if (has) View.VISIBLE else View.INVISIBLE
+                    name.setTextColor(if (has) HomeStyle.WHITE else TEXT)
+                }
+                setOnClickListener { selectPerson(p) }
+                setOnLongClickListener {
+                    val roles = listOf("actor" to R.string.ex_actor,"director" to R.string.ex_director,
+                        "writer" to R.string.ex_writer,"any" to R.string.ex_role)
+                    choose(p.name,roles.map { getString(it.second) },checked=roles.indexOfFirst { it.first==p.role }) {
+                        selectPerson(p.copy(role=roles[it].first))
                     }
-                    val name = text(p.name, SMALL, bold = true, color = TEXT).apply { gravity = Gravity.CENTER; maxLines = 2 }
-                    val tile = column(Gravity.CENTER_HORIZONTAL).apply {
-                        isFocusable = true
-                        setOnFocusChangeListener { _, has ->
-                            ring.visibility = if (has) View.VISIBLE else View.INVISIBLE
-                            name.setTextColor(if (has) HomeStyle.WHITE else TEXT)
-                        }
-                        setOnClickListener { selectPerson(p) }
-                        setOnLongClickListener {
-                            val roles = listOf("actor" to R.string.ex_actor,"director" to R.string.ex_director,
-                                "writer" to R.string.ex_writer,"any" to R.string.ex_role)
-                            choose(p.name,roles.map { getString(it.second) },checked=roles.indexOfFirst { it.first==p.role }) {
-                                selectPerson(p.copy(role=roles[it].first))
-                            }
-                            true
-                        }
-                    }
-                    val face = FaceView(this).apply {
-                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PLACEHOLDER) }
-                        clipToOutline = true
-                    }
-                    val faceBox = FrameLayout(this).apply {
-                        addView(face, FrameLayout.LayoutParams(dp(FACE), dp(FACE), Gravity.CENTER))
-                        // No photo: their initials, as the mockup's placeholders.
-                        if (p.photo == null) addView(text(p.name.split(' ').filter { it.isNotBlank() }.let { listOfNotNull(it.firstOrNull(), it.drop(1).lastOrNull()) }
-                            .joinToString("") { it.take(1).uppercase() }, HomeStyle.ROW_TITLE + 4f, bold = true, color = TEXT_2).apply { gravity = Gravity.CENTER },
-                            FrameLayout.LayoutParams(-1, -1))
-                        addView(ring, FrameLayout.LayoutParams(-1, -1))
-                    }
-                    tile.addView(faceBox, dp(FACE) + 6 * r, dp(FACE) + 6 * r)
-                    Images.load(p.photo?.let { "https://image.tmdb.org/t/p/w185$it" },face,dp(FACE))
-                    tile.addView(name, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(4) })
-                    row.addView(tile,LinearLayout.LayoutParams(tileW,-2))
-                    focusChoice(tile)
+                    true
                 }
             }
+            val face = FaceView(this).apply {
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PLACEHOLDER) }
+                clipToOutline = true
+            }
+            val faceBox = FrameLayout(this).apply {
+                addView(face, FrameLayout.LayoutParams(dp(FACE), dp(FACE), Gravity.CENTER))
+                // No photo: their initials, as the mockup's placeholders.
+                if (p.photo == null) addView(text(p.name.split(' ').filter { it.isNotBlank() }.let { listOfNotNull(it.firstOrNull(), it.drop(1).lastOrNull()) }
+                    .joinToString("") { it.take(1).uppercase() }, HomeStyle.ROW_TITLE + 4f, bold = true, color = TEXT_2).apply { gravity = Gravity.CENTER },
+                    FrameLayout.LayoutParams(-1, -1))
+                addView(ring, FrameLayout.LayoutParams(-1, -1))
+            }
+            tile.addView(faceBox, dp(FACE) + 6 * r, dp(FACE) + 6 * r)
+            Images.load(p.photo?.let { "https://image.tmdb.org/t/p/w185$it" },face,dp(FACE))
+            tile.addView(name, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(4) })
+            tile.layoutParams = LinearLayout.LayoutParams(tileW, -2)
+            return tile
+        }
+        /** One long row that scrolls sideways as the remote moves along it, with an arrow at each edge that has more. */
+        fun sideways(people: List<Person>): View {
+            val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
+            val tileW = width * 10 / (FACES * 10 + 4) // six and a bit: the next face peeks in at the edge
+            people.forEach { p -> tile(p, tileW).also { row.addView(it); focusChoice(it) } }
+            val scroller = HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_NEVER
+                clipChildren = false
+                addView(row)
+            }
+            fun arrow(glyph: String, end: Boolean) = text(glyph, HomeStyle.ROW_TITLE + 8f, bold = true, color = TEXT).apply {
+                gravity = Gravity.CENTER
+                visibility = View.INVISIBLE
+                background = GradientDrawable(if (end) GradientDrawable.Orientation.RIGHT_LEFT else GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(BLACK_FADE, BLACK_FADE and 0xCCFFFFFF.toInt(), 0))
+            }
+            val back = arrow("‹", end = false)
+            val more = arrow("›", end = true)
+            fun showArrows() {
+                back.visibility = if (scroller.canScrollHorizontally(-1)) View.VISIBLE else View.INVISIBLE
+                more.visibility = if (scroller.canScrollHorizontally(1)) View.VISIBLE else View.INVISIBLE
+            }
+            scroller.setOnScrollChangeListener { _, _, _, _, _ -> showArrows() }
+            scroller.post { showArrows() }
+            // The focused face stays clear of the arrows: the row scrolls an arrow's width further than the scroller would.
+            (0 until row.childCount).map(row::getChildAt).forEach { t ->
+                val ring = t.onFocusChangeListener
+                t.setOnFocusChangeListener { v, has ->
+                    ring.onFocusChange(v, has)
+                    if (has) scroller.post {
+                        val room = dp(ARROW_W)
+                        val x = scroller.scrollX
+                        when {
+                            v.left - room < x -> scroller.smoothScrollTo(v.left - room, 0)
+                            v.right + room > x + scroller.width -> scroller.smoothScrollTo(v.right + room - scroller.width, 0)
+                        }
+                    }
+                }
+            }
+            return FrameLayout(this).apply {
+                clipChildren = false
+                addView(scroller, FrameLayout.LayoutParams(-1, -2))
+                addView(back, FrameLayout.LayoutParams(dp(ARROW_W), dp(FACE) + 6 * r, Gravity.START or Gravity.TOP))
+                addView(more, FrameLayout.LayoutParams(dp(ARROW_W), dp(FACE) + 6 * r, Gravity.END or Gravity.TOP))
+            }
+        }
+        fun section(label: Int, people: List<Person>, alone: Boolean) {
+            if (people.isEmpty()) return
+            box.addView(caps(label), LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(16); bottomMargin = dp(10) })
+            if (!alone) {
+                box.addView(sideways(people.take(PER_ROW)), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+                return
+            }
+            // Only this half: a page of rows, read top to bottom.
+            people.take(FACES * ALONE_ROWS).chunked(FACES).forEach { group ->
+                val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
+                box.addView(row, LinearLayout.LayoutParams(-2,-2).apply { bottomMargin = dp(10) })
+                group.forEach { p -> tile(p, width / FACES).also { row.addView(it); focusChoice(it) } }
+            }
+        }
+        fun show() {
+            box.removeAllViews()
+            // A director picked here is matched as one; everyone else (actors, writers) keeps their own role.
+            val (directors, cast) = found.partition { p -> p.role == "director" }
+            if (peopleShow != "actor") section(R.string.ex_directors, directors, alone = peopleShow == "director")
+            if (peopleShow != "director") section(R.string.ex_cast, cast, alone = peopleShow == "actor")
+            // Directors or Cast ticked and a typed name has none of them: say so, not an empty panel.
+            if (box.childCount == 0) box.addView(text(R.string.discover_empty, BODY, color = TEXT_2), LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(16) })
+        }
+        val marks = mutableListOf<() -> Unit>()
+        listOf("director" to R.string.ex_directors, "actor" to R.string.ex_cast).forEach { (role, label) ->
+            val chip = listRow(getString(label), rest = PLACEHOLDER)
+            val key = chip.getChildAt(0) as TextView
+            val mark = { key.tick(peopleShow == role); key.setTextColor(if (chip.isFocused) HomeStyle.BLACK else TEXT) }
+            marks += mark
+            mark()
+            chip.setOnClickListener {
+                peopleShow = if (peopleShow == role) null else role
+                marks.forEach { it() }
+                show()
+            }
+            top.addView(chip, LinearLayout.LayoutParams(-2, dp(28)).apply { marginStart = dp(10) })
         }
         val movie = query.movie
-        val loaded = popularTitles[movie]
-        background({ if (words.isBlank()) ExploreCatalogue.popularPeople(movie, loaded) else ExploreCatalogue.people(words) }) {
+        background({ if (words.isBlank()) ExploreCatalogue.popularPeople(movie) else ExploreCatalogue.people(words) }) {
             if (g != generation || token != peopleToken) return@background
-            it.fold({ found ->
-                // A director picked here is matched as one; everyone else (actors, writers) keeps their own role.
-                val (directors, cast) = found.partition { p -> p.role == "director" }
-                faces(R.string.ex_directors, directors.take(FACES * 2))
-                faces(R.string.ex_cast, cast.take(FACES * 3))
-            },{toastFailure(R.string.search_unavailable)})
+            it.fold({ people -> found = people; show() },{toastFailure(R.string.search_unavailable)})
         }
     }
 
@@ -1110,6 +1188,10 @@ abstract class ExploreScreen : Screen() {
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
         const val FACE = 74 // option A's 148 px faces
+        const val PER_ROW = 24 // people in a sideways row
+        const val ALONE_ROWS = 6 // rows when only Directors or only Cast shows
+        const val ARROW_W = 28
+        const val BLACK_FADE = 0xFF000000.toInt() // the pop-up's own black, under its arrows
         const val SEGMENT = 0x12FFFFFF
         const val FOCUSED_VALUE = 0xAD000000.toInt()
         // A chosen filter's pill (Neon A's .fpill.active): a warm tint, a tungsten edge, its name in faded tungsten.

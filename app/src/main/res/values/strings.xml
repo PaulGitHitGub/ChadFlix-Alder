@@ -146,7 +146,6 @@
     <string name="action_more_info">More information</string>
     <string name="action_start_over">Start over</string>
     <string name="action_trailer">Trailer</string>
-    <string name="action_add_to_list">Add to My Lists</string>
     <string name="season_specials">Specials</string>
     <string name="season_number">Season %1$d</string>
     <string name="episode_number">Episode %1$d</string>
@@ -623,4 +622,8 @@
     <string name="ex_find_person">Search People</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
+    <string name="like_add">Favorite</string>
+    <string name="like_remove">Remove From Favorites</string>
+    <string name="watchlist_add">Add To Watchlist</string>
+    <string name="watchlist_in">Watchlist · In %1$s</string>
 </resources>
