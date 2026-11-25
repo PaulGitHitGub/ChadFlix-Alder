@@ -383,6 +383,7 @@
     <string name="search_remove_query">%1$s हटाएँ</string>
     <string name="search_popular_unavailable">लोकप्रिय टाइटल उपलब्ध नहीं हैं।</string>
     <string name="search_voice">वॉइस</string>
+    <string name="search_voice_long">आवाज़ से खोजें</string>
     <string name="search_listening">सुन रहे हैं…</string>
     <string name="search_voice_missed">समझ नहीं आया</string>
     <string name="search_delete">मिटाएं</string>
@@ -588,7 +589,10 @@
     <string name="ex_director">निर्देशक के रूप में</string>
     <string name="ex_writer">लेखक के रूप में</string>
     <string name="ex_role">कोई भी भूमिका</string>
-    <string name="ex_popular">अभी लोकप्रिय</string>
+    <string name="ex_all_people">सभी लोग</string>
+    <string name="ex_directors">निर्देशक</string>
+    <string name="ex_cast">कलाकार</string>
+    <string name="ex_find_person">लोग खोजें</string>
     <string name="ex_unavailable">यह शीर्षक उपलब्ध नहीं है</string>
     <string name="ex_clear_filters">सभी फ़िल्टर हटाएँ</string>
     <string name="showing_most_watched">सर्वाधिक देखे गए</string>

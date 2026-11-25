@@ -384,6 +384,7 @@
     <string name="search_remove_query">Rimuovi %1$s</string>
     <string name="search_popular_unavailable">I titoli popolari non sono disponibili.</string>
     <string name="search_voice">Voce</string>
+    <string name="search_voice_long">Ricerca Vocale</string>
     <string name="search_listening">In ascolto…</string>
     <string name="search_voice_missed">Non ho capito</string>
     <string name="search_delete">Cancella</string>
@@ -591,7 +592,10 @@
     <string name="ex_director">Alla Regia</string>
     <string name="ex_writer">Alla Sceneggiatura</string>
     <string name="ex_role">Qualsiasi Ruolo</string>
-    <string name="ex_popular">Popolari Ora</string>
+    <string name="ex_all_people">Tutte Le Persone</string>
+    <string name="ex_directors">Regia</string>
+    <string name="ex_cast">Cast</string>
+    <string name="ex_find_person">Cerca Persone</string>
     <string name="ex_unavailable">Titolo Non Disponibile</string>
     <string name="ex_clear_filters">Cancella Tutti I Filtri</string>
     <string name="showing_most_watched">Più Visti</string>

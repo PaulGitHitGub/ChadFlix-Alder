@@ -400,6 +400,7 @@
     <string name="search_remove_query">إزالة %1$s</string>
     <string name="search_popular_unavailable">العناوين الرائجة غير متاحة.</string>
     <string name="search_voice">صوت</string>
+    <string name="search_voice_long">البحث الصوتي</string>
     <string name="search_listening">جارٍ الاستماع…</string>
     <string name="search_voice_missed">لم أفهم ذلك</string>
     <string name="search_delete">حذف</string>
@@ -612,7 +613,10 @@
     <string name="ex_director">بصفة مخرج</string>
     <string name="ex_writer">بصفة كاتب</string>
     <string name="ex_role">أي دور</string>
-    <string name="ex_popular">الرائج الآن</string>
+    <string name="ex_all_people">كل الأشخاص</string>
+    <string name="ex_directors">المخرجون</string>
+    <string name="ex_cast">الممثلون</string>
+    <string name="ex_find_person">ابحث عن شخص</string>
     <string name="ex_unavailable">هذا العنوان غير متاح</string>
     <string name="ex_clear_filters">مسح جميع الفلاتر</string>
     <string name="showing_most_watched">الأكثر مشاهدة</string>

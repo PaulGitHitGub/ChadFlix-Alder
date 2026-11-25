@@ -415,6 +415,7 @@
     <string name="search_remove_query">Remove %1$s</string>
     <string name="search_popular_unavailable">Popular titles are unavailable.</string>
     <string name="search_voice">Voice</string>
+    <string name="search_voice_long">Voice Search</string>
     <string name="search_listening">Listening…</string>
     <string name="search_voice_missed">Didn\'t catch that</string>
     <string name="search_delete">Delete</string>
@@ -616,7 +617,10 @@
     <string name="ex_director">As Director</string>
     <string name="ex_writer">As Writer</string>
     <string name="ex_role">Any Role</string>
-    <string name="ex_popular">Popular Now</string>
+    <string name="ex_all_people">All People</string>
+    <string name="ex_directors">Directors</string>
+    <string name="ex_cast">Cast</string>
+    <string name="ex_find_person">Search People</string>
     <string name="ex_unavailable">This Title Is Unavailable</string>
     <string name="ex_clear_filters">Clear All Filters</string>
 </resources>

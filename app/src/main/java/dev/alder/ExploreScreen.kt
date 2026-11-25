@@ -74,7 +74,6 @@ abstract class ExploreScreen : Screen() {
     private lateinit var pickerHost: FrameLayout
     private var pickerFacet: Facet? = null // the facet whose picker has the hero
     private var pickerBack: (() -> Unit)? = null
-    private var pickedRole: String? = null // the role chosen in the hero's Directors & Cast, for the next face picked
     private var peopleToken = 0
     private var delayed = Runnable { refreshCatalogue() }
     private val medium by lazy { text("", SMALL).typeface }
@@ -343,7 +342,7 @@ abstract class ExploreScreen : Screen() {
 
     private fun open(f: Facet) {
         when(f) {
-            Facet.PEOPLE -> heroPeople()
+            Facet.PEOPLE -> lookup("person")
             Facet.GENRE -> {
                 if (genreNames.isNotEmpty()) return genrePicker(genreNames.toList())
                 val media = query.media
@@ -845,7 +844,7 @@ abstract class ExploreScreen : Screen() {
 
     private val recentPrefs get() = getSharedPreferences("explore_people", MODE_PRIVATE)
     private val recentKey get() = Settings.profileKey(this,"recent")
-    private fun recentPeople(): List<Person> = runCatching {
+    internal fun recentPeople(): List<Person> = runCatching {
         JSONArray(recentPrefs.getString(recentKey,"[]")).objects().map {
             Person(it.getInt("id"),it.getString("name"),it.getString("role"),it.text("photo"))
         }
@@ -859,27 +858,20 @@ abstract class ExploreScreen : Screen() {
         recentPrefs.edit().putString(recentKey,array.toString()).apply()
     }
 
-    private fun selectPerson(p: Person) {
+    internal fun selectPerson(p: Person) {
         rememberPerson(p)
         query = query.copy(person=p)
         lookup(null,restoreTitle=false)
     }
 
-    /** The People picker (A2): Recent and Popular Now faces, or the typed name's matches; All clears the person. */
+    /**
+     * The Directors & Cast pop-up's faces (owner's option A): All People, then Directors and Cast, each most popular
+     * first; [words]' matches once a name is typed. Recent people are chips under the keys (SearchActivity).
+     */
     protected fun findPeople(words: String, focusFirst: Boolean) {
         val g = generation
         val token = ++peopleToken
-        findPeople(words, focusFirst, results, FACES, FACE, gridWidth / FACES, alive = { g == generation && token == peopleToken },
-            clear = { query = query.without(Facet.PEOPLE); lookup(null,restoreTitle=false) }, pick = ::selectPerson)
-    }
-
-    /**
-     * The faces into [into], [perRow] to a row of [tileW] px: All, then Recent and Popular Now, or [words]' matches.
-     * [chosen] marks the person in use (the hero's picker, which stays open); [alive] drops a late answer.
-     */
-    private fun findPeople(words: String, focusFirst: Boolean, into: LinearLayout, perRow: Int, faceDp: Int, tileW: Int,
-                           alive: () -> Boolean, clear: () -> Unit, pick: (Person) -> Unit, chosen: (Person) -> Boolean = { false },
-                           held: (Person) -> Unit = pick) { // held: a face's hold-OK role list picked a role
+        val into = results
         into.removeAllViews()
         val originalFocus = currentFocus
         var firstChoice = focusFirst
@@ -887,14 +879,17 @@ abstract class ExploreScreen : Screen() {
             if (firstChoice && currentFocus === originalFocus) view.requestFocus()
             firstChoice = false
         }
-        val all = listRow(getString(R.string.filter_all), rest = PLACEHOLDER).apply { setOnClickListener { clear() } }
-        into.addView(all, LinearLayout.LayoutParams(-2, dp(28)).apply { topMargin = dp(RING_ROOM); bottomMargin = dp(6) })
+        val all = listRow(getString(R.string.ex_all_people), rest = PLACEHOLDER).apply {
+            if (query.person == null) (getChildAt(0) as TextView).apply { tick(true); setTextColor(TEXT) }
+            setOnClickListener { query = query.without(Facet.PEOPLE); lookup(null,restoreTitle=false) }
+        }
+        into.addView(all, LinearLayout.LayoutParams(-2, dp(28)).apply { topMargin = dp(RING_ROOM) })
         val r = HomeStyle.ringOut(this)
-        fun faces(label: String, people: List<Person>) {
+        val tileW = resultsScroll.layoutParams.width / FACES // six across the pop-up's whole width
+        fun faces(label: Int, people: List<Person>) {
             if (people.isEmpty()) return
-            into.addView(text(label, HomeStyle.ROW_TITLE, bold = true, color = HomeStyle.WHITE),
-                LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(10); bottomMargin = dp(8) })
-            people.take(perRow * 3).chunked(perRow).forEach { group ->
+            into.addView(caps(label), LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(16); bottomMargin = dp(10) })
+            people.chunked(FACES).forEach { group ->
                 val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
                 into.addView(row, LinearLayout.LayoutParams(-2,-2).apply { bottomMargin = dp(10) })
                 group.forEach { p ->
@@ -902,47 +897,53 @@ abstract class ExploreScreen : Screen() {
                         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setStroke(r * 2, HomeStyle.RING_COLOR) }
                         visibility = View.INVISIBLE
                     }
-                    val name = text(p.name, SMALL, bold = true, color = TEXT_2).apply { gravity = Gravity.CENTER; maxLines = 2 }
-                    fun style(has: Boolean) = name.setTextColor(when { has -> HomeStyle.WHITE; chosen(p) -> TUNGSTEN; else -> TEXT_2 })
+                    val name = text(p.name, SMALL, bold = true, color = TEXT).apply { gravity = Gravity.CENTER; maxLines = 2 }
                     val tile = column(Gravity.CENTER_HORIZONTAL).apply {
                         isFocusable = true
-                        tag = Runnable { style(isFocused) } // restyled when the person in use changes
                         setOnFocusChangeListener { _, has ->
                             ring.visibility = if (has) View.VISIBLE else View.INVISIBLE
-                            style(has)
+                            name.setTextColor(if (has) HomeStyle.WHITE else TEXT)
                         }
-                        setOnClickListener { pick(p) }
+                        setOnClickListener { selectPerson(p) }
                         setOnLongClickListener {
                             val roles = listOf("actor" to R.string.ex_actor,"director" to R.string.ex_director,
                                 "writer" to R.string.ex_writer,"any" to R.string.ex_role)
                             choose(p.name,roles.map { getString(it.second) },checked=roles.indexOfFirst { it.first==p.role }) {
-                                held(p.copy(role=roles[it].first))
+                                selectPerson(p.copy(role=roles[it].first))
                             }
                             true
                         }
                     }
-                    style(false)
                     val face = FaceView(this).apply {
                         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PLACEHOLDER) }
                         clipToOutline = true
                     }
                     val faceBox = FrameLayout(this).apply {
-                        addView(face, FrameLayout.LayoutParams(dp(faceDp), dp(faceDp), Gravity.CENTER))
+                        addView(face, FrameLayout.LayoutParams(dp(FACE), dp(FACE), Gravity.CENTER))
+                        // No photo: their initials, as the mockup's placeholders.
+                        if (p.photo == null) addView(text(p.name.split(' ').filter { it.isNotBlank() }.let { listOfNotNull(it.firstOrNull(), it.drop(1).lastOrNull()) }
+                            .joinToString("") { it.take(1).uppercase() }, HomeStyle.ROW_TITLE + 4f, bold = true, color = TEXT_2).apply { gravity = Gravity.CENTER },
+                            FrameLayout.LayoutParams(-1, -1))
                         addView(ring, FrameLayout.LayoutParams(-1, -1))
                     }
-                    tile.addView(faceBox, dp(faceDp) + 6 * r, dp(faceDp) + 6 * r)
-                    Images.load(p.photo?.let { "https://image.tmdb.org/t/p/w185$it" },face,dp(faceDp))
+                    tile.addView(faceBox, dp(FACE) + 6 * r, dp(FACE) + 6 * r)
+                    Images.load(p.photo?.let { "https://image.tmdb.org/t/p/w185$it" },face,dp(FACE))
                     tile.addView(name, LinearLayout.LayoutParams(-1,-2).apply { topMargin = dp(4) })
                     row.addView(tile,LinearLayout.LayoutParams(tileW,-2))
                     focusChoice(tile)
                 }
             }
         }
-        if (words.isEmpty()) faces(getString(R.string.search_recent),recentPeople())
         val movie = query.movie
         val loaded = popularTitles[movie]
         background({ if (words.isBlank()) ExploreCatalogue.popularPeople(movie, loaded) else ExploreCatalogue.people(words) }) {
-            if (alive()) it.fold({ found -> faces(if (words.isBlank()) getString(R.string.ex_popular) else words,found) },{toastFailure(R.string.search_unavailable)})
+            if (g != generation || token != peopleToken) return@background
+            it.fold({ found ->
+                // A director picked here is matched as one; everyone else (actors, writers) keeps their own role.
+                val (directors, cast) = found.partition { p -> p.role == "director" }
+                faces(R.string.ex_directors, directors.take(FACES * 2))
+                faces(R.string.ex_cast, cast.take(FACES * 3))
+            },{toastFailure(R.string.search_unavailable)})
         }
     }
 
@@ -1040,88 +1041,6 @@ abstract class ExploreScreen : Screen() {
         tiles.forEach(::styleTile)
     }
 
-    /**
-     * Directors & Cast in the hero (b-2): the role the person is matched as, Keyboard for a name (the
-     * keys and today's people picker), then the faces. A face is picked at once and the picker stays, its posters below.
-     */
-    private fun heroPeople() {
-        pickedRole = null // each opening starts from the person in use's own role
-        val roles = listOf("any" to R.string.ex_role, "actor" to R.string.ex_actor, "director" to R.string.ex_director)
-        val segment = LinearLayout(this).apply {
-            background = outlined(SEGMENT, GLASS_EDGE)
-            setPadding(dp(3), dp(3), dp(3), dp(3))
-        }
-        val faces = column(Gravity.START)
-        fun role() = pickedRole ?: query.person?.role ?: "any"
-        fun restyle() {
-            for (i in 0 until segment.childCount) (segment.getChildAt(i) as TextView).let { it.pillState(it.isFocused, roles[i].first == role()) }
-            fun walk(v: View) {
-                (v.tag as? Runnable)?.run()
-                if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
-            }
-            walk(faces)
-        }
-        roles.forEach { (key, words) ->
-            segment.addView(text(words, HomeStyle.INFO).apply {
-                gravity = Gravity.CENTER
-                isFocusable = true
-                includeFontPadding = false
-                setPadding(dp(10), 0, dp(10), 0)
-                setOnFocusChangeListener { _, _ -> restyle() }
-                setOnClickListener {
-                    pickedRole = key
-                    query.person?.let { change(query.copy(person = it.copy(role = key))) }
-                    restyle()
-                }
-            }, LinearLayout.LayoutParams(-2, dp(BAR_H - 6)))
-        }
-        val byName = text(R.string.ex_keyboard, HomeStyle.INFO).apply {
-            gravity = Gravity.CENTER
-            isFocusable = true
-            includeFontPadding = false
-            setPadding(dp(12), 0, dp(12), 0)
-            setCompoundDrawablesRelative(getDrawable(R.drawable.ic_search)?.mutate()?.apply { setBounds(0, 0, dp(12), dp(12)) }, null, null, null)
-            compoundDrawablePadding = dp(7)
-            fun style(on: Boolean) {
-                background = if (on) HomeStyle.pill(HomeStyle.WHITE) else outlined(SEGMENT, GLASS_EDGE)
-                setTextColor(if (on) HomeStyle.BLACK else TEXT)
-                compoundDrawablesRelative[0]?.setTint(if (on) HomeStyle.BLACK else TEXT)
-            }
-            style(false)
-            setOnFocusChangeListener { _, has -> style(has) }
-            setOnClickListener { closePicker(focusChip = false); lookup("person") }
-        }
-        val extra = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(segment, LinearLayout.LayoutParams(-2, dp(BAR_H)))
-            addView(byName, LinearLayout.LayoutParams(-2, dp(BAR_H)).apply { marginStart = dp(12) })
-        }
-        val scroll = ScrollView(this).apply {
-            isVerticalScrollBarEnabled = false
-            isVerticalFadingEdgeEnabled = true
-            setFadingEdgeLength(dp(24))
-            addView(faces)
-        }
-        showPicker(Facet.PEOPLE, title(Facet.PEOPLE), extra, scroll, back = null)
-        val token = ++peopleToken
-        val width = resources.displayMetrics.widthPixels - 2 * dp(SearchLayout.SIDE)
-        findPeople("", true, faces, HERO_FACES, HERO_PICK_FACE, width / HERO_FACES, alive = { token == peopleToken && pickerFacet == Facet.PEOPLE },
-            clear = { change(query.without(Facet.PEOPLE)); restyle() },
-            pick = { p ->
-                rememberPerson(p)
-                change(query.copy(person = p.copy(role = pickedRole ?: p.role)))
-                restyle()
-            }, chosen = { it.id == query.person?.id },
-            held = { p ->
-                // Hold OK's role wins over the switch, which then shows it.
-                pickedRole = null
-                rememberPerson(p)
-                change(query.copy(person = p))
-                restyle()
-            })
-        restyle()
-    }
-
     /** The picker leaves the hero; with [focusChip] the remote goes back to its pill. */
     protected fun closePicker(focusChip: Boolean) {
         val f = pickerFacet ?: return
@@ -1173,14 +1092,12 @@ abstract class ExploreScreen : Screen() {
         const val HERO_ART_W = 680
         const val HERO_FACE = 49 // owner: the cast 10% smaller (54 dp faces, 12.5 sp names before)
         const val HERO_CAST_SP = 11.25f
-        // The pickers in the hero's place, under the top bar: choices in columns of four; faces ten across.
+        // The pickers in the hero's place, under the top bar: choices in columns of four.
         const val PICKER_TOP = 50
         const val PICK_ROWS = 4
         const val PICK_W = 164
         const val PICK_H = 26
         const val PICK_GAP = 6
-        const val HERO_FACES = 10
-        const val HERO_PICK_FACE = 44
         const val RING_ROOM = 4 // above the first row, for Home's focus ring
         const val BAR_H = 28 // the filter bar's pills (Neon A's 54 px, Voice Search's height)
         const val BAR_GAP = 5
@@ -1192,7 +1109,7 @@ abstract class ExploreScreen : Screen() {
         const val RESOLVING_ALPHA = 0.6f // a poster waiting for its title page
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
-        const val FACE = 72
+        const val FACE = 74 // option A's 148 px faces
         const val SEGMENT = 0x12FFFFFF
         const val FOCUSED_VALUE = 0xAD000000.toInt()
         // A chosen filter's pill (Neon A's .fpill.active): a warm tint, a tungsten edge, its name in faded tungsten.

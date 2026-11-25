@@ -87,6 +87,11 @@ class SearchActivity : ExploreScreen() {
     private lateinit var topPill: SearchPill // draws and moves the top bar's pill ([attachCapsule])
     private var arrived = false // the capsule has been put at rest ([SearchPill.openAtRest])
     private var voice: View? = null
+    private var panelVoice: LinearLayout? = null // Voice Search in the Directors & Cast pop-up, which hides the top bar
+    // The Directors & Cast pop-up (owner's option A): its panel over the page, and the name typed with Voice above the keys.
+    private lateinit var panel: FrameLayout
+    private lateinit var peopleSide: LinearLayout
+    private lateinit var peopleField: TextView
     private var shownAt: Long? = null // when the page first had the remote (uptime ms)
     private var styleVoice: () -> Unit = {}
     private var recognizer: SpeechRecognizer? = null // ChadFlix: in-app listening, no Google overlay
@@ -120,7 +125,6 @@ class SearchActivity : ExploreScreen() {
     private val rearranged = Runnable { if (lookupMode == null && input.text.isBlank() && gridOutOfDate()) search(false) }
     private var lookupMode: String? = null
     private var savedTitleQuery = ""
-    private var enteringLookup = false
 
     override fun refreshCatalogue() {
         if (lookupMode == null) {
@@ -134,8 +138,9 @@ class SearchActivity : ExploreScreen() {
     override fun lookup(facet: String?, restoreTitle: Boolean) {
         cancelVoice()
         if (lookupMode == null) savedTitleQuery = input.text.toString()
-        enteringLookup = facet != null
         lookupMode = facet
+        arranged = false // the pop-up moves the keys and the results: place them again
+        showRecent() // people's names in the pop-up, searches outside it
         setHeader(if (facet == null && restoreTitle) savedTitleQuery else "")
         main.removeCallbacks(typed)
         toggleKeys(facet != null)
@@ -145,7 +150,7 @@ class SearchActivity : ExploreScreen() {
     /** Opens or closes the keys, putting the remote on [to] if given. */
     private fun toggleKeys(open: Boolean, to: View? = null) {
         keyboard.visibility = if (open) View.VISIBLE else View.GONE
-        recentBox.visibility = if (open && lookupMode == null) View.VISIBLE else View.GONE
+        recentBox.visibility = if (open) View.VISIBLE else View.GONE
         // Down from Voice goes by sight (the controls row below) unless the keys are open under it.
         voice?.nextFocusDownId = if (open) firstKey?.id ?: View.NO_ID else View.NO_ID
         lastKeyboardFocus = if (open) firstKey else keyboardButton
@@ -276,6 +281,32 @@ class SearchActivity : ExploreScreen() {
      * views here start in that arrangement.
      */
     private fun arrangePage(root: FrameLayout, sort: View, resultsW: Int) {
+        panel = FrameLayout(this).apply {
+            visibility = View.GONE
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(HomeStyle.BLACK); setStroke(dp(1), GLASS_EDGE); cornerRadius = dp(PANEL_RADIUS).toFloat()
+            }
+            addView(View(this@SearchActivity).apply { setBackgroundColor(GLASS_EDGE) }, FrameLayout.LayoutParams(dp(1), -1).apply {
+                leftMargin = dp(PANEL_DIVIDER_X - PANEL_INSET); topMargin = dp(PANEL_TOP - PANEL_INSET); bottomMargin = dp(PANEL_TOP - PANEL_INSET)
+            })
+        }
+        root.addView(panel, FrameLayout.LayoutParams(-1, -1).apply { setMargins(dp(PANEL_INSET), dp(PANEL_INSET), dp(PANEL_INSET), dp(PANEL_INSET)) })
+        peopleField = text("", BODY, color = TEXT).apply {
+            hint = getString(R.string.ex_find_person)
+            setHintTextColor(TEXT_2)
+            isSingleLine = true
+            ellipsize = TextUtils.TruncateAt.START
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(14), 0)
+            background = rounded(HomeStyle.PLACEHOLDER, 16)
+            setCompoundDrawablesRelative(getDrawable(R.drawable.ic_search)?.mutate()?.apply { setTint(TEXT_2); setBounds(0, 0, dp(13), dp(13)) }, null, null, null)
+            compoundDrawablePadding = dp(8)
+        }
+        peopleSide = column(Gravity.CENTER_HORIZONTAL).apply {
+            visibility = View.GONE
+            addView(peopleField, LinearLayout.LayoutParams(-1, dp(KEY_H)))
+            panelVoice?.let { addView(it, LinearLayout.LayoutParams(-2, dp(ACTION_H)).apply { topMargin = dp(12) }) }
+        }
         root.addView(keyboard, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(KEYS_X); topMargin = dp(SearchLayout.KEYS_TOP) })
         root.addView(recentBox, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply {
             leftMargin = dp(KEYS_X); topMargin = dp(SearchLayout.KEYS_TOP + 7 * KEY_H + 8)
@@ -300,6 +331,7 @@ class SearchActivity : ExploreScreen() {
         val hero = buildHero()
         root.addView(hero, 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
         root.addView(resultsColumn, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(SearchLayout.ROW_TOP) })
+        root.addView(peopleSide, FrameLayout.LayoutParams(dp(KEYS_W), -2).apply { leftMargin = dp(PANEL_LEFT); topMargin = dp(PANEL_TOP) })
     }
 
     /**
@@ -364,14 +396,30 @@ class SearchActivity : ExploreScreen() {
         if (!::resultsColumn.isInitialized || (arranged && w == wide)) return
         arranged = true
         wide = w
+        val people = !w && lookupMode != null // the Directors & Cast pop-up
         val screenW = resources.displayMetrics.widthPixels
-        val x = if (w) dp(SearchLayout.SIDE - 2) else dp(RESULTS_X) // the posters' first column keeps 2 dp at its left for its ring
+        // The posters' first column keeps 2 dp at its left for its ring.
+        val x = dp(when { w -> SearchLayout.SIDE - 2; people -> PANEL_RESULTS_X; else -> RESULTS_X })
+        val resultsW = if (people) dp(PANEL_RESULTS_W) else screenW - x
         (resultsColumn.layoutParams as FrameLayout.LayoutParams).apply {
-            leftMargin = x; topMargin = dp(if (w) SearchLayout.CONTROLS_TOP else SearchLayout.ROW_TOP); width = screenW - x
+            leftMargin = x; topMargin = dp(when { w -> SearchLayout.CONTROLS_TOP; people -> PANEL_TOP; else -> SearchLayout.ROW_TOP })
+            width = resultsW; bottomMargin = if (people) dp(PANEL_TOP) else 0
         }
-        (resultsScroll.layoutParams as LinearLayout.LayoutParams).width = screenW - x
-        headingRow.visibility = if (w) View.GONE else View.VISIBLE
+        (resultsScroll.layoutParams as LinearLayout.LayoutParams).width = resultsW
+        headingRow.visibility = if (w || people) View.GONE else View.VISIBLE
         controlsRow.visibility = if (w) View.VISIBLE else View.GONE
+        // The pop-up's panel covers the page, the top bar hidden under it; the name and Voice go above the keys.
+        panel.visibility = if (people) View.VISIBLE else View.GONE
+        peopleSide.visibility = panel.visibility
+        headerBar.visibility = if (people) View.INVISIBLE else View.VISIBLE
+        val keysX = dp(if (people) PANEL_LEFT else KEYS_X)
+        val keysTop = if (people) PANEL_KEYS_TOP else SearchLayout.KEYS_TOP
+        (keyboard.layoutParams as FrameLayout.LayoutParams).apply { leftMargin = keysX; topMargin = dp(keysTop) }
+        (recentBox.layoutParams as FrameLayout.LayoutParams).apply { leftMargin = keysX; topMargin = dp(keysTop + 7 * KEY_H + if (people) 24 else 8) }
+        val up = ((if (people) panelVoice else voice) ?: input).id
+        (keyboard.getChildAt(0) as LinearLayout).let { row -> for (i in 0 until row.childCount) row.getChildAt(i).nextFocusUpId = up }
+        keyboard.requestLayout()
+        recentBox.requestLayout()
         resultsColumn.requestLayout()
         main.removeCallbacks(rearranged)
         main.post(rearranged)
@@ -555,21 +603,36 @@ class SearchActivity : ExploreScreen() {
                 else requestPermissions(arrayOf(android.Manifest.permission.RECORD_AUDIO), MIC_REQUEST)
             }
             val label = view.getChildAt(1) as TextView
+            val inPanel = sideAction(R.drawable.ic_mic, getString(R.string.search_voice_long)) { view.performClick() }.apply {
+                val icon = getChildAt(0) as ImageView
+                val words = getChildAt(1) as TextView
+                words.textSize = BODY
+                fun style(on: Boolean) {
+                    background = if (on) HomeStyle.pill(HomeStyle.WHITE) else null
+                    icon.setColorFilter(if (on) HomeStyle.BLACK else HomeStyle.WHITE)
+                    words.setTextColor(if (on) HomeStyle.BLACK else HomeStyle.WHITE)
+                }
+                style(false)
+                setOnFocusChangeListener { _, has -> style(has) }
+            }
+            panelVoice = inPanel
             styleVoice = {
                 label.text = getString(if (listening) R.string.search_listening else R.string.search_voice)
+                (inPanel.getChildAt(1) as TextView).text = getString(if (listening) R.string.search_listening else R.string.search_voice_long)
                 if (::topPill.isInitialized) { topPill.listening = listening; topPill.invalidate() }
             }
             voice = view
         }
         rows.forEachIndexed { r, keys ->
             keys.forEachIndexed { c, v ->
-                v.nextFocusUpId = if (r > 0) rows[r - 1][c].id else voice?.id ?: input.id
+                if (r > 0) v.nextFocusUpId = rows[r - 1][c].id // the top row's: [arrange]
                 v.nextFocusDownId = if (r < rows.lastIndex) rows[r + 1][c].id else (if (c < 3) space else delete).id
             }
         }
         space.nextFocusUpId = rows.last()[1].id
         delete.nextFocusUpId = rows.last()[4].id
         voice?.nextFocusDownId = rows[0][0].id
+        panelVoice?.nextFocusDownId = rows[0][0].id
     }
 
     /**
@@ -596,6 +659,7 @@ class SearchActivity : ExploreScreen() {
         // While voice has the header (listening, "Didn't catch that"), the query before it decides: nothing moves
         // until real words come.
         val catalogue = lookupMode == null && (beforeVoice ?: input.text.toString()).isBlank()
+        if (::peopleField.isInitialized) peopleField.text = input.text
         arrange(catalogue && keyboard.visibility != View.VISIBLE)
         showCatalogueControls(wide)
         if (catalogue && input.hasFocus()) (voice ?: firstKey?.takeIf { keyboard.visibility == View.VISIBLE } ?: keyboardButton).requestFocus()
@@ -860,7 +924,9 @@ class SearchActivity : ExploreScreen() {
 
     private fun showRecent(restoreFocus: Boolean = false) {
         recentBox.removeAllViews()
-        val values = recent().take(RECENT)
+        // In the Directors & Cast pop-up: the people picked lately, a chip picking one again.
+        val people = if (lookupMode != null) recentPeople().take(RECENT) else null
+        val values = people?.map { it.name } ?: recent().take(RECENT)
         if (values.isEmpty()) {
             if (restoreFocus) (lastKeyboardFocus ?: firstKey)?.requestFocus()
             return
@@ -874,20 +940,21 @@ class SearchActivity : ExploreScreen() {
         var line: LinearLayout? = null
         var used = 0
         var lines = 0
-        values.forEach { query ->
+        values.forEachIndexed { i, query ->
                 val chipView = chip(query).apply {
                     textSize = SMALL
                     maxWidth = columnW
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
-                    contentDescription = getString(R.string.search_recent_hint, query)
+                    contentDescription = if (people != null) query else getString(R.string.search_recent_hint, query)
                     setOnClickListener {
+                        if (people != null) return@setOnClickListener selectPerson(people[i])
                         input.setText(query)
                         input.setSelection(query.length)
                         main.removeCallbacks(typed)
                         search(true)
                     }
-                    setOnLongClickListener {
+                    if (people == null) setOnLongClickListener {
                         choose(getString(R.string.search_remove_recent),
                             listOf(getString(R.string.search_remove_query, query), getString(R.string.action_cancel))) { picked ->
                             if (picked == 0) {
@@ -901,7 +968,7 @@ class SearchActivity : ExploreScreen() {
                 }
                 val w = minOf(columnW, chipView.paint.measureText(query).toInt() + chipView.paddingLeft + chipView.paddingRight + 1)
                 val row = line?.takeIf { used + gap + w <= columnW } ?: run {
-                    if (lines == 2) return@forEach
+                    if (lines == 2) return@forEachIndexed
                     lines++
                     used = -gap
                     LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
@@ -976,8 +1043,7 @@ class SearchActivity : ExploreScreen() {
         val mode = lookupMode
         input.hint = if (mode != null) getString(R.string.ex_people) else heading
         if (mode != null) {
-            findPeople(query,enteringLookup || moveFocus)
-            enteringLookup = false
+            findPeople(query, moveFocus)
             return
         }
         showLoading()
@@ -1177,6 +1243,16 @@ class SearchActivity : ExploreScreen() {
         const val QUERY_H = 28 // the heading line
         const val ROW_GAP = 12 // dp: a row's caption to the next row's title (was 16)
         const val KEYS_X = 33
+        // The Directors & Cast pop-up (option A, 1920x1080 mockup px / 2): a panel 24 dp in from the screen's edges, the
+        // name, Voice and the keys in its left column, a line, then the faces.
+        const val PANEL_INSET = 24
+        const val PANEL_RADIUS = 14
+        const val PANEL_TOP = 48 // the name's box, and the faces' column
+        const val PANEL_LEFT = 48
+        const val PANEL_KEYS_TOP = 124
+        const val PANEL_DIVIDER_X = 262
+        const val PANEL_RESULTS_X = 286
+        const val PANEL_RESULTS_W = 634
         const val ACTION_H = 28 // the controls row's pills
         const val ACTION_PAD = 12 // Voice's and Keyboard's sides inside their focus pill
         const val CAPSULE_H = 30 // the top bar's Keyboard | Voice capsule, as tall as a page's name focused

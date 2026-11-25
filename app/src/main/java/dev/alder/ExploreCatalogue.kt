@@ -72,9 +72,10 @@ internal object ExploreCatalogue {
     }
 
     /**
-     * Popular Now: the top-billed cast (and a film's director) of the catalogue's current popular titles, in the titles'
-     * order. TMDb's own trending people led with names few viewers know. [loaded]: the catalogue's own first page of
-     * those titles, when it has one, so only the credits are asked (on Tmdb's pool, cached for a day).
+     * The Directors & Cast pop-up before anything is typed: the top-billed cast (and a film's director) of the catalogue's
+     * current popular titles, most popular first (TMDb's own person popularity). TMDb's trending people led with names
+     * few viewers know. [loaded]: the catalogue's own first page of those titles, when it has one, so only the credits
+     * are asked (on Tmdb's pool, cached for a day).
      */
     fun popularPeople(movie: Boolean, loaded: List<JSONObject>?): List<Person> {
         val media = if (movie) "movie" else "tv"
@@ -83,11 +84,11 @@ internal object ExploreCatalogue {
         val credits = Tmdb.pool.invokeAll(titles.map { t -> java.util.concurrent.Callable {
             runCatching { Tmdb.exploreRequest("$media/${t.getInt("id")}/credits") }.getOrNull()
         } }).map { runCatching { it.get() }.getOrNull() }
+        fun person(it: JSONObject, role: String) = it.optDouble("popularity", 0.0) to Person(it.getInt("id"), it.getString("name"), role, it.text("profile_path"))
         return credits.filterNotNull().flatMap { c ->
-            c.optJSONArray("cast").objects().take(2).map { Person(it.getInt("id"), it.getString("name"), "actor", it.text("profile_path")) } +
-                c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1)
-                    .map { Person(it.getInt("id"), it.getString("name"), "director", it.text("profile_path")) }
-        }.filter { it.photo != null }.distinctBy { it.id }.take(18)
+            c.optJSONArray("cast").objects().take(3).map { person(it, "actor") } +
+                c.optJSONArray("crew").objects().filter { it.text("job") == "Director" }.take(1).map { person(it, "director") }
+        }.filter { it.second.photo != null }.distinctBy { it.second.id }.sortedByDescending { it.first }.map { it.second }
     }
 
     private const val POPULAR_TITLES = 12
