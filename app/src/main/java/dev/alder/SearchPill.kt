@@ -25,31 +25,15 @@ import android.view.animation.PathInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 
-/** Search's intent extra: Home's pill as Search opens (screen px: left, top, right, bottom), for the pill to open from. */
-internal const val HOME_PILL = "homePill"
-
-/** Search's intent extra: how far (ms) Home's copy of the pill's move got before Search took over, to carry on from. */
-internal const val PILL_PLAYED = "pillPlayed"
-
-/** Search's intent extra: Home's pill was still gliding between names when the slingshot started (a held Left). */
-internal const val PILL_CHAINED = "pillChained"
-
-/** Search's intent extra: how thin Home's pill was when the slingshot started (mid-Taffy), so Search's starts the same. */
-internal const val PILL_SQUASH = "pillSquash"
-
 /** Animators run (Remove animations off); before API 26 they always do, ending at once when the scale is 0. */
 internal fun animationsOn() = Build.VERSION.SDK_INT < 26 || ValueAnimator.areAnimatorsEnabled()
-
-/** Where Search's capsule last was (screen px: left, top, right, bottom), for Home to throw its pill there; null: never yet. */
-internal fun savedCapsule(c: Context): IntArray? = c.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE).getString("capsule", null)
-    ?.split(',')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 4 }?.toIntArray()
 
 private const val PILL_PREFS = "searchPill"
 
 /**
  * The add-ons' catalog types Search's top bar last had (they add Live and per-type tabs), so its first layout already has
- * them and the capsule sits where Home threw its pill; [save] keeps a newly fetched list, empty too. Per profile: each
- * has its own add-ons.
+ * them and the names don't shift when they arrive; [save] keeps a newly fetched list, empty too. Per profile: each has
+ * its own add-ons.
  */
 internal fun searchTabTypes(c: Context, save: List<String>? = null): List<String> {
     val prefs = c.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE)
@@ -68,10 +52,9 @@ internal fun searchTabTypes(c: Context, save: List<String>? = null): List<String
  * an [ObjectAnimator] whose setter only invalidates (nothing is laid out). The real Voice and Keyboard views stay in the
  * invisible [capsule] as focus targets and give the places, measured once per move ([measure]), not per frame.
  *
- * - Opening (from a page's name, from Home's pill [arrive]s at, or in place from the magnifier): the left edge is thrown
- *   to the capsule's left end with an overshoot, the right edge follows 50 ms later, the pill thins as it stretches, the
- *   magnifier shrinks away under it, and the black pill pops out of the focused item's outer end (Voice's right, next to
- *   the names) and grows over it, the icons and words popping in after it (400 ms).
+ * - Search opens with the capsule already at rest ([openAtRest]); from a page's name on Search's own bar the capsule
+ *   opens with the slingshot: the left edge thrown to the capsule's left end, the right edge 50 ms later, the black pill
+ *   popping out over the focused item, the icons and words after it (400 ms).
  * - Closing onto a page's name: the mirror, right edge first (300 ms). Between names the pill glides, its leading edge
  *   first. Voice ↔ Keyboard: the black pill's leading edge first, 30 ms ahead, with a small squash (190 ms).
  * - Every move drives every float to its rest from the live value (a float already there costs nothing), so a new move
@@ -80,7 +63,7 @@ internal fun searchTabTypes(c: Context, save: List<String>? = null): List<String
 internal class SearchPill(
     context: Context,
     private val bar: View, // the top bar: focus in it but not on a name or the capsule (the avatar, the gear) dims the capsule
-    private val capsule: View?, // Voice and Keyboard, invisible, for focus and places; null on Home ([capsuleOnScreen])
+    private val capsule: View?, // Voice and Keyboard, invisible, for focus and places; null on Home
     private val voice: ViewGroup?,
     private val keyboard: ViewGroup?,
     private val slot: View, // the magnifier tab's room
@@ -93,10 +76,10 @@ internal class SearchPill(
     private var running: AnimatorSet? = null
     private val parts = mutableListOf<Animator>()
     private var animate = true
-    private var started = false // nothing is drawn or moved before [arrive]
+    private var started = false // nothing is drawn or moved before [openAtRest] or [restOn]
     var listening = false // Voice's mic goes red
-    /** Home: no capsule of its own; the pill opens towards where Search's was ([savedCapsule]), Search carrying on. */
-    var capsuleOnScreen: IntArray? = null
+    private var lagMove = false // ponytail: KeyLag timing log (first frame of a move), remove once measured
+    private var lagFirst = true // ponytail: KeyLag, the first frame this pill draws
     // The state: the white pill, its squash; the black pill, its alpha, scale and squash; the magnifier; each item's
     // icon (alpha, scale) and words (alpha, sideways offset); and whether the pill is lit (gone while the avatar or the gear has the remote).
     private var pillL = 0f; private var pillR = 0f; private var pillT = 0f; private var pillB = 0f; private var squash = 1f
@@ -136,25 +119,11 @@ internal class SearchPill(
         rectOf(slot, slotR)
         keyboard?.let { rectOf(it, keyR) }
         voice?.let { rectOf(it, voiceR) }
-        val cap = capsule
-        if (cap != null) { rectOf(cap, capR); remember(cap) }
-        else capsuleOnScreen?.let { s ->
-            getLocationOnScreen(here)
-            capR.set(s[0] - here[0].toFloat(), s[1] - here[1].toFloat(), s[2] - here[0].toFloat(), s[3] - here[1].toFloat())
-        }
+        capsule?.let { rectOf(it, capR) }
         floor = rectOf(avatar, box).right + dp(4f)
         nameViews = names()
         nameRects = nameViews.map { rectOf(it) }
         ((keyboard ?: voice)?.getChildAt(1) as? TextView)?.let { words.textSize = it.textSize; words.typeface = it.typeface }
-    }
-
-    /** Search's capsule on screen, kept for Home's next start ([savedCapsule]) when it moved. */
-    private fun remember(cap: View) {
-        if (cap.width == 0) return
-        cap.getLocationOnScreen(there)
-        val now = "${there[0]},${there[1]},${there[0] + cap.width},${there[1] + cap.height}"
-        val prefs = context.getSharedPreferences(PILL_PREFS, Context.MODE_PRIVATE)
-        if (prefs.getString("capsule", null) != now) prefs.edit().putString("capsule", now).apply()
     }
 
     private fun rectFor(v: View) = when (v) { voice -> voiceR; keyboard -> keyR; else -> rectOf(v) }
@@ -177,6 +146,11 @@ internal class SearchPill(
 
     override fun onDraw(canvas: Canvas) {
         if (!started) return
+        // ponytail: KeyLag timing log (key press → first moving frame / Search's first frame), remove once measured.
+        if (lagFirst || lagMove) {
+            android.util.Log.d("KeyLag", "${context.javaClass.simpleName} ${if (lagFirst) "first frame" else "pill moves"} ${SystemClock.uptimeMillis()}")
+            lagFirst = false; lagMove = false
+        }
         recolorNames()
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
@@ -323,7 +297,7 @@ internal class SearchPill(
     private var edgesFor = 0L // ms into the move the edges being planned land
 
     private fun play() {
-        edgesUntil = SystemClock.uptimeMillis() + edgesFor - pendingSeek
+        edgesUntil = SystemClock.uptimeMillis() + edgesFor
         if (parts.isEmpty()) return invalidate()
         val set = AnimatorSet().apply { playTogether(parts.toList()) }
         parts.clear()
@@ -334,29 +308,15 @@ internal class SearchPill(
             override fun onAnimationEnd(animation: Animator) { if (!cancelled && running === set) { running = null; relayout() } }
         })
         running = set
-        // Carrying on from Home's pill: seeked before it starts, so the very first frame already shows that moment
-        // (a seek on a running set only shows from the next frame).
-        val seek = pendingSeek
-        pendingSeek = 0L
-        if (seek > 0 && Build.VERSION.SDK_INT >= 26) set.currentPlayTime = seek.coerceIn(0L, set.totalDuration - 1)
+        lagMove = true
         set.start()
     }
-    private var pendingSeek = 0L
+
+    /** ms until the running move's edges land (0: at rest, or animations off): Home opens Search only then. */
+    val landsIn get() = if (running?.isRunning == true) (edgesUntil - SystemClock.uptimeMillis()).coerceAtLeast(0L) else 0L
 
     /** The page is going: nothing runs on after it. */
     fun stop() { running?.cancel(); running = null; edgesUntil = 0L; fade?.cancel() }
-
-    /**
-     * Home is starting Search: its pill holds still where it was last drawn (the shared main thread is about to be busy
-     * opening Search) and says how far into the move that is, for Search to carry on from exactly there.
-     */
-    fun freeze(): Long {
-        val set = running ?: return 0L
-        val played = if (Build.VERSION.SDK_INT >= 24) set.currentPlayTime else 0L
-        set.pause()
-        edgesUntil = 0L
-        return played
-    }
 
     /** [p] from [from] to [to] after [delay] ms over [ms]; with animations off, or already there, it lands at once. */
     private fun tween(p: F, from: Float, to: Float, delay: Long, ms: Long, curve: TimeInterpolator) {
@@ -379,37 +339,26 @@ internal class SearchPill(
     }
 
     /**
-     * The page opens, called as the bar is first laid out (before its first frame is drawn): the pill starts on Home's
-     * ([fromOnScreen], the open or focused page's name there, in screen px) or on the magnifier, and opens into the
-     * capsule with the black pill on [focus]. [played] (ms): how far Home's own copy of the move had got when it froze
-     * ([freeze]), so this one carries on from what Home last drew instead of starting again.
+     * Search opens (owner: no opening animation): called as the bar is first laid out, so its first frame already has the
+     * capsule at rest, the white pill on it, the black one on [focus] (Voice), the icons and words in.
      */
-    fun arrive(fromOnScreen: IntArray?, focus: View?, played: Long = 0L, chained: Boolean = false, fromSquash: Float = 1f) {
-        // Home's own pill already on (or gliding between) its names: the slingshot carries on from where it is.
-        val live = started && fromOnScreen == null && mode == Mode.NAME
-        handChained = chained || (live && edgesMoving)
+    fun openAtRest(focus: View?) {
+        stop()
         started = true
-        // Opening Search lights the pill at once, even if it had faded for the avatar (Right from it onto the magnifier),
-        // so the slingshot is never thrown from a clear pill and Search's first frame matches.
-        fade?.cancel()
         lit = true
         pillA = 1f
         measure()
-        if (fromOnScreen != null && fromOnScreen.size == 4) {
-            getLocationOnScreen(here)
-            pillL = fromOnScreen[0] - here[0].toFloat(); pillT = fromOnScreen[1] - here[1].toFloat()
-            pillR = fromOnScreen[2] - here[0].toFloat(); pillB = fromOnScreen[3] - here[1].toFloat()
-            squash = fromSquash // Home's pill was thinning mid-move: no step in its thickness at the hand-over
-        } else if (!live) { pillL = slotR.left; pillR = slotR.right; pillT = slotR.top; pillB = slotR.bottom }
-        if (!live) { glyphA = 1f; glyphS = 1f }
-        blackA = 0f
-        vIconA = 0f; vWordsA = 0f; kIconA = 0f; kWordsA = 0f
-        mode = Mode.NAME
-        on = null
-        pendingSeek = played
-        open(focus ?: voice ?: keyboard)
-        pendingSeek = 0L
-        handChained = false
+        pillL = capR.left; pillR = capR.right; pillT = capR.top; pillB = capR.bottom
+        squash = 1f; glyphA = 0f; glyphS = 0.6f
+        val item = focus ?: voice ?: keyboard
+        blackA = if (item != null) 1f else 0f
+        item?.let { rectFor(it).let { r -> blackL = r.left; blackR = r.right; blackT = r.top; blackB = r.bottom } }
+        blackS = 1f; blackSy = 1f
+        vIconA = 1f; vIconS = 1f; vWordsA = 1f; vWordsX = 0f
+        kIconA = 1f; kIconS = 1f; kWordsA = 1f; kWordsX = 0f
+        mode = Mode.OPEN
+        on = item
+        invalidate()
     }
 
     /** The pill rests on [name] at once (Home's bar as it's first laid out, or back from Search). */
@@ -451,16 +400,6 @@ internal class SearchPill(
     private var pillA = 1f // the white pill's strength: 0 while the avatar or the gear has the remote
 
     val isStarted get() = started
-    val isMoving get() = edgesMoving
-    val squashNow get() = squash // the live thinning, for Search to carry on without a step
-
-    /** Where the pill is now (screen px: left, top, right, bottom), for Search to carry on from. */
-    fun pillOnScreen(): IntArray {
-        getLocationOnScreen(here)
-        return intArrayOf((pillL + here[0]).toInt(), (pillT + here[1]).toInt(), (pillR + here[0]).toInt(), (pillB + here[1]).toInt())
-    }
-
-    private var handChained = false // the slingshot starts from a moving pill (a held Left): no delay, cruising curves
 
     /** The remote moved to [v]: the pill follows it. */
     fun focusOn(v: View?) {
@@ -499,7 +438,7 @@ internal class SearchPill(
         }
         // From a page's name (or Home's pill): the slingshot. From a pill still gliding between names (a held Left), the
         // stretch just carries on: no 50 ms delay, both edges on the cruising curve (tab-anim README, Taffy hand-over).
-        val chained = handChained || edgesMoving
+        val chained = edgesMoving
         mode = Mode.OPEN
         on = item
         begin()

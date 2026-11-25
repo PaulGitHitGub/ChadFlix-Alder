@@ -85,8 +85,7 @@ class SearchActivity : ExploreScreen() {
     private lateinit var tabSlot: View // the magnifier tab's room in the top bar, under the capsule
     private lateinit var capsule: LinearLayout // Voice and Keyboard in the top bar ([attachCapsule])
     private lateinit var topPill: SearchPill // draws and moves the top bar's pill ([attachCapsule])
-    private var arrived = false // the pill has opened from Home's (or the magnifier)
-    private var pageViews = emptyList<View>() // the page under the top bar, faded in as the pill lands
+    private var arrived = false // the capsule has been put at rest ([SearchPill.openAtRest])
     private var voice: View? = null
     private var shownAt: Long? = null // when the page first had the remote (uptime ms)
     private var styleVoice: () -> Unit = {}
@@ -203,7 +202,6 @@ class SearchActivity : ExploreScreen() {
         }
         arrangePage(root, sort, dp((width - RESULTS_X).toInt()))
         upFromControls((voice ?: keyboardButton).id) // Up from the controls row: Voice, straight up in the top bar
-        if (animationsOn()) pageViews.forEach { it.alpha = 0f } // shown as the top bar's pill lands ([attachCapsule])
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(HomeStyle.BLACK))
         setContentView(root)
         root.viewTreeObserver.addOnGlobalFocusChangeListener { _, now ->
@@ -302,7 +300,6 @@ class SearchActivity : ExploreScreen() {
         val hero = buildHero()
         root.addView(hero, 0, FrameLayout.LayoutParams(-1, dp(SearchLayout.HERO_H)))
         root.addView(resultsColumn, FrameLayout.LayoutParams(resultsW, -1).apply { leftMargin = dp(RESULTS_X); topMargin = dp(SearchLayout.ROW_TOP) })
-        pageViews = listOf(hero, resultsColumn)
     }
 
     /**
@@ -311,7 +308,7 @@ class SearchActivity : ExploreScreen() {
      * magnifier's room in the bar. Focus is a black pill inside it. Voice has the remote on arrival, Up from the
      * controls row comes back to it, Right from Voice is the first page's name, Left from Keyboard the avatar.
      * The capsule's views are invisible focus targets: [SearchPill], behind the names, draws the pills and Keyboard |
-     * Voice and moves them (the designer's "Slingshot"), starting from Home's pill ([HOME_PILL]) or the magnifier.
+     * Voice, already at rest on the first frame (Home's pill has landed on the magnifier before Search opens).
      */
     private fun attachCapsule() {
         capsule = LinearLayout(this).apply {
@@ -331,16 +328,11 @@ class SearchActivity : ExploreScreen() {
         val place = {
             capsule.x = maxOf(nav.left + tabSlot.right - capsule.width, (avatar.parent as View).right + dp(8)).toFloat()
             topPill.relayout()
-            // The first time everything has its place, in this same layout pass, so the first frame drawn already has the
-            // pill where Home's was (or on the magnifier): it opens from there.
+            // The first time everything has its place, in this same layout pass: the first frame drawn already has the
+            // capsule at rest, Voice lit (owner: no opening animation, nothing to wait for).
             if (!arrived && capsule.width > 0) {
                 arrived = true
-                // Home may have started the move on its own bar the moment the remote landed: carry on from there.
-                val gone = intent.getLongExtra(PILL_PLAYED, 0L).coerceAtLeast(0L)
-                topPill.arrive(intent.getIntArrayExtra(HOME_PILL), currentFocus?.takeIf { it === voice || it === keyboardButton }, gone,
-                    chained = intent.getBooleanExtra(PILL_CHAINED, false), fromSquash = intent.getFloatExtra(PILL_SQUASH, 1f))
-                // The page (hidden since onCreate) comes in as the pill lands; the old one is gone at once.
-                pageViews.forEach { it.animate().alpha(1f).setStartDelay((PAGE_IN_AT - gone).coerceAtLeast(0)).setDuration(PAGE_IN_MS).setInterpolator(android.view.animation.LinearInterpolator()).start() }
+                topPill.openAtRest(currentFocus?.takeIf { it === voice || it === keyboardButton })
             }
         }
         nav.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> place() }
@@ -1052,7 +1044,6 @@ class SearchActivity : ExploreScreen() {
 
     override fun onDestroy() {
         if (::topPill.isInitialized) topPill.stop() // nothing animates on after the page has gone
-        pageViews.forEach { it.animate().cancel() }
         clearGrid()
         main.removeCallbacks(typed)
         main.removeCallbacks(restoreHeader)
@@ -1189,8 +1180,6 @@ class SearchActivity : ExploreScreen() {
         const val ACTION_H = 28 // the controls row's pills
         const val ACTION_PAD = 12 // Voice's and Keyboard's sides inside their focus pill
         const val CAPSULE_H = 30 // the top bar's Keyboard | Voice capsule, as tall as a page's name focused
-        const val PAGE_IN_AT = 180L // ms: the page fades in as the pill's left edge settles (the README's page dip)
-        const val PAGE_IN_MS = 70L
         const val KEY_W = 33
         const val KEY_H = 32
         const val KEYS_W = KEY_W * 6
