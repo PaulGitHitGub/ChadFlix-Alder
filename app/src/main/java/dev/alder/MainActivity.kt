@@ -873,8 +873,6 @@ class MainActivity : Screen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT || event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) && search != null && header.findFocus() != null) // TODO(KeyLag): remove after the TV measurement
-            android.util.Log.d("KeyLag", "Home key ${if (event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT) "Left" else "Right"} ${event.eventTime} at ${android.os.SystemClock.uptimeMillis()}")
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
             else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false); showInfo() } // where the hold ends
@@ -1023,7 +1021,7 @@ class MainActivity : Screen() {
             style(false)
             isFocusable = true
             // Losing focus, the bar is restyled once the new focus is known (as the names do): Right onto the magnifier
-            // must not first send the pill there, or Search's slingshot would start from a half-faded, moving pill.
+            // must not first send the pill towards the open page's name, only then turning back to the magnifier.
             setOnFocusChangeListener { _, has -> style(has); if (has) styleNav() else main.post { styleNav() } }
             setOnClickListener { profileMenu() }
         }
@@ -1205,7 +1203,6 @@ class MainActivity : Screen() {
     private fun startSearch() {
         if (searching) return
         searching = true
-        android.util.Log.d("KeyLag", "Home Search launch ${android.os.SystemClock.uptimeMillis()}") // TODO(KeyLag): remove after the TV measurement
         startActivity(Intent(this, SearchActivity::class.java))
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
     }

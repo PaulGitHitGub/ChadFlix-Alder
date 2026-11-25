@@ -78,8 +78,6 @@ internal class SearchPill(
     private var animate = true
     private var started = false // nothing is drawn or moved before [openAtRest] or [restOn]
     var listening = false // Voice's mic goes red
-    private var lagMove = false // ponytail: KeyLag timing log (first frame of a move), remove once measured
-    private var lagFirst = true // ponytail: KeyLag, the first frame this pill draws
     // The state: the white pill, its squash; the black pill, its alpha, scale and squash; the magnifier; each item's
     // icon (alpha, scale) and words (alpha, sideways offset); and whether the pill is lit (gone while the avatar or the gear has the remote).
     private var pillL = 0f; private var pillR = 0f; private var pillT = 0f; private var pillB = 0f; private var squash = 1f
@@ -146,11 +144,6 @@ internal class SearchPill(
 
     override fun onDraw(canvas: Canvas) {
         if (!started) return
-        // ponytail: KeyLag timing log (key press → first moving frame / Search's first frame), remove once measured.
-        if (lagFirst || lagMove) {
-            android.util.Log.d("KeyLag", "${context.javaClass.simpleName} ${if (lagFirst) "first frame" else "pill moves"} ${SystemClock.uptimeMillis()}")
-            lagFirst = false; lagMove = false
-        }
         recolorNames()
         // The white pill, its top and bottom drawn in while it stretches, never further left than the avatar.
         val left = maxOf(pillL, minOf(floor, pillR))
@@ -308,7 +301,6 @@ internal class SearchPill(
             override fun onAnimationEnd(animation: Animator) { if (!cancelled && running === set) { running = null; relayout() } }
         })
         running = set
-        lagMove = true
         set.start()
     }
 
@@ -436,7 +428,7 @@ internal class SearchPill(
             rest(blackS = !popped, blackSy = !moving)
             return play()
         }
-        // From a page's name (or Home's pill): the slingshot. From a pill still gliding between names (a held Left), the
+        // From a page's name on Search's bar: the slingshot. From a pill still gliding between names (a held Left), the
         // stretch just carries on: no 50 ms delay, both edges on the cruising curve (tab-anim README, Taffy hand-over).
         val chained = edgesMoving
         mode = Mode.OPEN
