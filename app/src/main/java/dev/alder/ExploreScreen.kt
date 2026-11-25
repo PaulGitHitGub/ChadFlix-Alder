@@ -40,9 +40,9 @@ abstract class ExploreScreen : Screen() {
     protected abstract fun refreshCatalogue()
     private var query = ExploreQuery()
     protected lateinit var peopleButton: View
-    private lateinit var filterBar: View
+    protected lateinit var filterBar: View
     private lateinit var barRow: LinearLayout // the bar's pills, inside [filterBar]
-    private lateinit var headingControls: View // Clear All Filters and Sort
+    protected lateinit var headingControls: View // Clear All Filters and Sort
     private lateinit var infoPanel: View
     private var unseen: Meta? = null // focused while the hero was hidden (typing): shown once it's back
     protected lateinit var sortControl: TextView
@@ -341,7 +341,18 @@ abstract class ExploreScreen : Screen() {
                            stay: Boolean = false, checkedRows: Set<Int> = emptySet(), shown: (List<TextView>) -> Unit = {}, pick: (Int)->Unit) =
         heroChoose(f, name, options, checked, focus, checkedRows, right, back, extra, stay, shown, pick)
 
+    /** The filter last opened from the controls row: Back from the posters it narrowed goes back to it. */
+    private var lastOpened: Facet? = null
+
+    /** Back from the posters: the menu that narrowed them opens again (the Directors & Cast pop-up, a picker), if it's still set. */
+    protected fun reopenLastFilter(): Boolean {
+        val f = lastOpened?.takeIf(::active) ?: return false
+        open(f)
+        return true
+    }
+
     private fun open(f: Facet) {
+        lastOpened = f
         when(f) {
             Facet.PEOPLE -> lookup("person")
             Facet.GENRE -> {

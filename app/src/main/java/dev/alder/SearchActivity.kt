@@ -882,8 +882,13 @@ class SearchActivity : ExploreScreen() {
                 return true
             }
             if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus()) {
-                (voice ?: keyboardButton).requestFocus()
+                // Narrowed by a filter: back to the menu it came from (the owner's "back to the director selection").
+                if (!reopenLastFilter()) (voice ?: keyboardButton).requestFocus()
                 return true
+            }
+            // The controls row (and Sort, Clear All Filters): Back goes up to the top bar first, not straight out of Search.
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && (filterBar.hasFocus() || headingControls.hasFocus())) {
+                if ((voice ?: keyboardButton).requestFocus()) return true
             }
             // (The results and the recent chips, shown only with the keys, are handled above.)
             // The top bar's pages and gear, or the heading: Back to Voice (from the capsule itself, Back leaves).
