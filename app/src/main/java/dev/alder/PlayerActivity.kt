@@ -1398,9 +1398,9 @@ class PlayerActivity : Screen() {
             val actions = LinearLayout(this@PlayerActivity).apply { gravity = Gravity.CENTER_VERTICAL }
             val lowerButton = pill(getString(R.string.player_switch_to, lower)).apply { setOnClickListener { lowerQuality() } }
             actions.addView(lowerButton, wrap())
-            actions.addView(chip(getString(R.string.player_keep, height)).apply { setOnClickListener { dismissStall() } },
+            actions.addView(chip(getString(R.string.player_keep, height), tall = true).apply { setOnClickListener { dismissStall() } },
                 wrap().apply { marginStart = dp(6) })
-            actions.addView(chip(R.string.player_other_sources).apply { setOnClickListener { changeStream() } },
+            actions.addView(chip(R.string.player_other_sources, tall = true).apply { setOnClickListener { changeStream() } },
                 wrap().apply { marginStart = dp(6) })
             addView(actions, wrap().apply { topMargin = dp(12) })
             lowerButton.post { lowerButton.requestFocus() }
@@ -1512,7 +1512,7 @@ class PlayerActivity : Screen() {
         }
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         actions.addView(play, wrap())
-        actions.addView(chip(R.string.player_exit_home).apply {
+        actions.addView(chip(R.string.player_exit_home, tall = true).apply {
             setOnClickListener {
                 startActivity(Intent(this@PlayerActivity, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))

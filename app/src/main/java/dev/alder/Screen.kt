@@ -487,8 +487,9 @@ abstract class Screen : Activity() {
     /** The warm-white primary action; focus lifts and grows it with a centered tungsten glow. */
     protected fun pill(label: String, icon: Int = 0): TextView = text(label, SMALL, bold = true).apply {
         isFocusable = true
-        gravity = Gravity.CENTER_VERTICAL
+        gravity = Gravity.CENTER
         minHeight = dp(BUTTON_H)
+        minWidth = dp(PILL_MIN_W) // a short word ("OK") never makes a stubby pill
         val side = dp(if (icon != 0) 14 else 16)
         setPadding(side, 0, side, 0)
         compoundDrawablePadding = dp(6)
@@ -560,17 +561,18 @@ abstract class Screen : Activity() {
         }.start()
     }
 
-    protected fun chip(words: Int, selected: Boolean = false) = chip(getString(words), selected)
+    protected fun chip(words: Int, selected: Boolean = false, tall: Boolean = false) = chip(getString(words), selected, tall)
 
-    /** A persistent choice: its dot remains after remote focus moves. */
-    protected fun chip(label: String, selected: Boolean = false) = text(label, SMALL).apply {
+    /** A persistent choice: its dot remains after remote focus moves. [tall]: beside a [pill], as tall as it. */
+    protected fun chip(label: String, selected: Boolean = false, tall: Boolean = false) = text(label, SMALL).apply {
+        val h = if (tall) BUTTON_H else CHIP_H
         select(label, selected)
         isFocusable = true
         gravity = Gravity.CENTER
-        minHeight = dp(CHIP_H)
+        minHeight = dp(h)
         setPadding(dp(16), 0, dp(16), 0)
-        background = glass(CHIP_H / 2)
-        setOnFocusChangeListener { v, has -> v.background = glass(CHIP_H / 2, has); v.grow(has, CHIP_GROW).start() }
+        background = glass(h / 2)
+        setOnFocusChangeListener { v, has -> v.background = glass(h / 2, has); v.grow(has, CHIP_GROW).start() }
     }
 
     /** A chip that opens a list ([choose]): full-strength words, a chevron centred after them, solid glass. */
@@ -691,7 +693,7 @@ abstract class Screen : Activity() {
             addView(field, LinearLayout.LayoutParams(-1, dp(38)).apply { topMargin = dp(14) })
             addView(LinearLayout(context).apply {
                 gravity = Gravity.END
-                addView(chip(R.string.action_cancel).apply { setOnClickListener { dialog.dismiss() } })
+                addView(chip(R.string.action_cancel, tall = true).apply { setOnClickListener { dialog.dismiss() } })
                 addView(pill(action).apply { setOnClickListener { finish() } },
                     LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
@@ -759,7 +761,7 @@ abstract class Screen : Activity() {
             text(url, SMALL, color = TEXT_3).marginTop(10),
             LinearLayout(this).apply {
                 gravity = Gravity.CENTER
-                addView(chip(R.string.action_cancel).apply { setOnClickListener { dialog.dismiss() } })
+                addView(chip(R.string.action_cancel, tall = true).apply { setOnClickListener { dialog.dismiss() } })
                 addView(typeInstead, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(10) })
             }.marginTop(16),
         ).apply {
@@ -1376,6 +1378,7 @@ abstract class Screen : Activity() {
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
         const val ICON_BUTTON_H = 38
+        const val PILL_MIN_W = 64 // Material's shortest text button
         const val CHIP_H = 24 // the mocks' 46–48 px chips
         const val CARD_GROW = 1.06f
         const val GRID_GROW = 1.05f

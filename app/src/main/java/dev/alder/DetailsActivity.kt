@@ -613,13 +613,19 @@ class DetailsActivity : Screen() {
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
         infoButton.id = View.generateViewId()
         infoButton.nextFocusRightId = infoButton.id // the app is left-to-right in every language (no supportsRtl)
+        // ChadFlix: Play and the actions under it are one stack, all as wide as the widest label (a hidden More Like
+        // This counts too, so Play never widens when it appears); each label still sets that width in every language.
+        val actions = column(Gravity.START)
+        stack.addView(actions, wrap())
         fun addAction(action: TextView, gap: Int) {
             action.id = View.generateViewId()
             action.nextFocusLeftId = action.id
             action.nextFocusRightId = action.id
             // The old 280 dp action centered closest to More Info for every combination of the optional icons.
             if (action === playButton) action.nextFocusUpId = infoButton.id
-            stack.addView(action, wrap().apply { topMargin = dp(gap) })
+            actions.addView(action, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })
+            actions.minimumWidth = maxOf(actions.minimumWidth, action.paint.measureText(action.text.toString()).toInt() +
+                action.paddingLeft + action.paddingRight + 1)
         }
         guideButton = if (episodic && videos.isNotEmpty()) titleAction(getString(R.string.details_more_episodes)).apply {
             setOnClickListener { showGuide() }
