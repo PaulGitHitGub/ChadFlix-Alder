@@ -98,7 +98,7 @@ internal class SearchPill(
     /** Home: no capsule of its own; the pill opens towards where Search's was ([savedCapsule]), Search carrying on. */
     var capsuleOnScreen: IntArray? = null
     // The state: the white pill, its squash; the black pill, its alpha, scale and squash; the magnifier; each item's
-    // icon (alpha, scale) and words (alpha, sideways offset); and whether the capsule is lit (white) or faint.
+    // icon (alpha, scale) and words (alpha, sideways offset); and whether the pill is lit (gone while the avatar or the gear has the remote).
     private var pillL = 0f; private var pillR = 0f; private var pillT = 0f; private var pillB = 0f; private var squash = 1f
     private var blackL = 0f; private var blackR = 0f; private var blackT = 0f; private var blackB = 0f
     private var blackA = 0f; private var blackS = 1f; private var blackSy = 1f
@@ -183,8 +183,12 @@ internal class SearchPill(
         if (pillR - left > 1f) {
             val inset = (1f - squash) * (pillB - pillT) / 2f
             box.set(left, pillT + inset, pillR, pillB - inset)
-            fill.color = if (lit) HomeStyle.WHITE else HomeStyle.OPEN_TAB
-            canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, fill)
+            if (pillA > 0.01f) {
+                fill.color = HomeStyle.WHITE
+                fill.alpha = (pillA * 255).toInt()
+                canvas.drawRoundRect(box, box.height() / 2f, box.height() / 2f, fill)
+                fill.alpha = 255
+            }
             drawNames(canvas)
         }
         // The magnifier, black while the white pill covers it.
@@ -334,7 +338,7 @@ internal class SearchPill(
     private var pendingSeek = 0L
 
     /** The page is going: nothing runs on after it. */
-    fun stop() { running?.cancel(); running = null; edgesUntil = 0L }
+    fun stop() { running?.cancel(); running = null; edgesUntil = 0L; fade?.cancel() }
 
     /**
      * Home is starting Search: its pill holds still where it was last drawn (the shared main thread is about to be busy
@@ -402,6 +406,8 @@ internal class SearchPill(
         stop()
         started = true
         this.lit = lit
+        fade?.cancel()
+        pillA = if (lit) 1f else 0f
         measure()
         rectOf(name).let { pillL = it.left; pillR = it.right; pillT = it.top; pillB = it.bottom }
         squash = 1f; glyphA = 1f; glyphS = 1f; blackA = 0f
@@ -411,12 +417,27 @@ internal class SearchPill(
         invalidate()
     }
 
-    /** Home's bar: the pill goes to [name] (the Taffy), lit, or faint while the avatar or the gear has the remote. */
+    /** Home's bar: the pill goes to [name] (the Taffy); gone while the avatar or the gear has the remote ([lit] false). */
     fun moveTo(name: View, lit: Boolean) {
         if (!started) return restOn(name, lit)
-        this.lit = lit
+        light(lit)
         toName(name)
     }
+
+    /**
+     * Owner: no pill at all while the avatar or the gear has the remote: the white pill (Home's on the open page, Search's
+     * capsule) fades out, and back in where the remote returns. Its own animator, so moves don't cut it short.
+     */
+    private fun light(on: Boolean) {
+        if (lit == on) return
+        lit = on
+        fade?.cancel()
+        val to = if (on) 1f else 0f
+        if (!animationsOn()) { pillA = to; return invalidate() }
+        fade = ObjectAnimator.ofFloat(this, PILL_A, pillA, to).apply { duration = FADE_MS; interpolator = LIN; start() }
+    }
+    private var fade: ObjectAnimator? = null
+    private var pillA = 1f // the white pill's strength: 0 while the avatar or the gear has the remote
 
     val isStarted get() = started
     val isMoving get() = edgesMoving
@@ -434,10 +455,10 @@ internal class SearchPill(
     fun focusOn(v: View?) {
         if (!started) return
         when {
-            v != null && (v === voice || v === keyboard) -> { lit = true; open(v) }
-            v is TextView && names().any { it === v } -> { lit = true; toName(v) }
-            v != null && isIn(v, bar) -> { lit = false; open(null) } // the avatar or the gear
-            else -> { lit = true; open(null) }
+            v != null && (v === voice || v === keyboard) -> { light(true); open(v) }
+            v is TextView && names().any { it === v } -> { light(true); toName(v) }
+            v != null && isIn(v, bar) -> { light(false); open(null) } // the avatar or the gear: no pill
+            else -> { light(true); open(null) }
         }
     }
 
@@ -622,6 +643,7 @@ internal class SearchPill(
 
     private companion object {
         const val GLYPH_DP = 18f
+        const val FADE_MS = 120L // the white pill going and coming back for the avatar and the gear
         // The README's curves: Android's material curves as PathInterpolators, and the overshoots built into the curve.
         val LIN = LinearInterpolator()
         val FOS = PathInterpolator(0.4f, 0f, 0.2f, 1f)
@@ -636,6 +658,7 @@ internal class SearchPill(
         val PILL_R = F("pillR", { it.pillR }, { o, v -> o.pillR = v })
         val PILL_T = F("pillT", { it.pillT }, { o, v -> o.pillT = v })
         val PILL_B = F("pillB", { it.pillB }, { o, v -> o.pillB = v })
+        val PILL_A = F("pillA", { it.pillA }, { o, v -> o.pillA = v })
         val SQUASH = F("squash", { it.squash }, { o, v -> o.squash = v })
         val BLACK_L = F("blackL", { it.blackL }, { o, v -> o.blackL = v })
         val BLACK_R = F("blackR", { it.blackR }, { o, v -> o.blackR = v })

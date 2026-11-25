@@ -1243,7 +1243,7 @@ class MainActivity : Screen() {
         ?: search?.takeIf { it.isFocused && searchFrom == null && pillStartedAt == 0L }
         ?: navItems[searchFrom] ?: navItems[page]?.takeIf { it.isShown }
 
-    /** White while the remote is on a name or below the bar; faint while it's on the avatar or the gear. */
+    /** White while the remote is on a name or below the bar; no pill while it's on the avatar or the gear. */
     private fun navLit(target: View) = header.findFocus() == null || target.isFocused || searchFrom != null
 
     /** The lit page's name on screen (left, top, right, bottom px): where Search's pill starts. */
@@ -1293,15 +1293,15 @@ class MainActivity : Screen() {
 
     /**
      * ChadFlix: a white pill with black words follows the remote; the open page's pill is white while the remote is down
-     * in the rows, faint while it's on the avatar or the gear, and gone while it's on another name (owner: no grey pill
+     * in the rows, and none while it's on the avatar, the gear or another name (owner: no grey or faint pill
      * left on the old one).
      */
     private fun styleNav() {
         val inBar = header.findFocus() != null
         if (inBar) prefetchLanding(firstRow(), ++landingTargets) // ChadFlix: Down from here lands on a wide card: its backdrop comes ahead
         // ChadFlix: once the bar is laid out, one white pill ([SearchPill]) moves between the names (the Taffy) and colours
-        // the words it covers, instead of each name's own white pill; nothing grey is left on the old page's name (the
-        // pill itself goes faint on the open page while the avatar or the gear has the remote).
+        // the words it covers, instead of each name's own white pill; nothing grey is left on the old page's name, and
+        // while the avatar or the gear has the remote there's no pill on the names at all.
         val pill = launchPill?.takeIf { it.isStarted }
         navItems.forEach { (p, item) ->
             val lit = item.isFocused || (p == page && !inBar) || p == searchFrom

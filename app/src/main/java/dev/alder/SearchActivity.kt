@@ -492,7 +492,7 @@ class SearchActivity : ExploreScreen() {
         return bar
     }
 
-    /** The top bar's pill follows the remote ([SearchPill]): the capsule, a page's name, or faint for the avatar and gear. */
+    /** The top bar's pill follows the remote ([SearchPill]): the capsule or a page's name; none for the avatar and gear. */
     private fun styleNav() {
         if (::topPill.isInitialized) topPill.focusOn(currentFocus)
     }
