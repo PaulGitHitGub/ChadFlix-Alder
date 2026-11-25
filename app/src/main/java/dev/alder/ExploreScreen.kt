@@ -934,16 +934,24 @@ abstract class ExploreScreen : Screen() {
             tile.layoutParams = LinearLayout.LayoutParams(tileW, -2)
             return tile
         }
-        /** One long row that scrolls sideways as the remote moves along it, with an arrow at each edge that has more. */
+        /**
+         * Two rows that scroll sideways together as the remote moves along them, with an arrow at each edge that has more.
+         * Each screenful is the next six above six, so the first one is the old page's twelve most popular.
+         */
         fun sideways(people: List<Person>): View {
-            val row = LinearLayout(this).apply { clipChildren = false; clipToPadding = false }
+            val rows = List(2) { LinearLayout(this).apply { clipChildren = false; clipToPadding = false } }
             val tileW = width * 10 / (FACES * 10 + 4) // six and a bit: the next face peeks in at the edge
-            people.forEach { p -> tile(p, tileW).also { row.addView(it); focusChoice(it) } }
+            people.chunked(FACES * 2).forEach { screen ->
+                screen.forEachIndexed { i, p -> tile(p, tileW).also { rows[i / FACES].addView(it); focusChoice(it) } }
+            }
             val scroller = HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
                 overScrollMode = View.OVER_SCROLL_NEVER
                 clipChildren = false
-                addView(row)
+                addView(column(Gravity.START).apply {
+                    clipChildren = false
+                    rows.forEachIndexed { i, row -> addView(row, LinearLayout.LayoutParams(-2, -2).apply { if (i > 0) topMargin = dp(10) }) }
+                })
             }
             fun arrow(glyph: String, end: Boolean) = text(glyph, HomeStyle.ROW_TITLE + 8f, bold = true, color = TEXT).apply {
                 gravity = Gravity.CENTER
@@ -960,7 +968,7 @@ abstract class ExploreScreen : Screen() {
             scroller.setOnScrollChangeListener { _, _, _, _, _ -> showArrows() }
             scroller.post { showArrows() }
             // The focused face stays clear of the arrows: the row scrolls an arrow's width further than the scroller would.
-            (0 until row.childCount).map(row::getChildAt).forEach { t ->
+            rows.flatMap { row -> (0 until row.childCount).map(row::getChildAt) }.forEach { t ->
                 val ring = t.onFocusChangeListener
                 t.setOnFocusChangeListener { v, has ->
                     ring.onFocusChange(v, has)
@@ -977,15 +985,15 @@ abstract class ExploreScreen : Screen() {
             return FrameLayout(this).apply {
                 clipChildren = false
                 addView(scroller, FrameLayout.LayoutParams(-1, -2))
-                addView(back, FrameLayout.LayoutParams(dp(ARROW_W), dp(FACE) + 6 * r, Gravity.START or Gravity.TOP))
-                addView(more, FrameLayout.LayoutParams(dp(ARROW_W), dp(FACE) + 6 * r, Gravity.END or Gravity.TOP))
+                addView(back, FrameLayout.LayoutParams(dp(ARROW_W), -1, Gravity.START))
+                addView(more, FrameLayout.LayoutParams(dp(ARROW_W), -1, Gravity.END))
             }
         }
         fun section(label: Int, people: List<Person>, alone: Boolean) {
             if (people.isEmpty()) return
             box.addView(caps(label), LinearLayout.LayoutParams(-2,-2).apply { topMargin = dp(16); bottomMargin = dp(10) })
             if (!alone) {
-                box.addView(sideways(people.take(PER_ROW)), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+                box.addView(sideways(people.take(PER_ROW * 2)), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
                 return
             }
             // Only this half: a page of rows, read top to bottom.
@@ -1188,7 +1196,7 @@ abstract class ExploreScreen : Screen() {
         const val COUNT_PAGES = 5 // pages a no-results suggestion counts at most
         const val FACES = 6
         const val FACE = 74 // option A's 148 px faces
-        const val PER_ROW = 24 // people in a sideways row
+        const val PER_ROW = 24 // people in each of a half's two sideways rows
         const val ALONE_ROWS = 6 // rows when only Directors or only Cast shows
         const val ARROW_W = 28
         const val BLACK_FADE = 0xFF000000.toInt() // the pop-up's own black, under its arrows
