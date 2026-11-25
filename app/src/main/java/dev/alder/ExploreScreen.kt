@@ -40,9 +40,9 @@ abstract class ExploreScreen : Screen() {
     protected abstract fun refreshCatalogue()
     private var query = ExploreQuery()
     protected lateinit var peopleButton: View
-    protected lateinit var filterBar: View
+    private lateinit var filterBar: View
     private lateinit var barRow: LinearLayout // the bar's pills, inside [filterBar]
-    protected lateinit var headingControls: View // Clear All Filters and Sort
+    private lateinit var headingControls: View // Clear All Filters and Sort
     private lateinit var infoPanel: View
     private var unseen: Meta? = null // focused while the hero was hidden (typing): shown once it's back
     protected lateinit var sortControl: TextView

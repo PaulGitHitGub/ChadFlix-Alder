@@ -881,20 +881,9 @@ class SearchActivity : ExploreScreen() {
                 clearQuery()
                 return true
             }
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus()) {
-                // Narrowed by a filter: back to the menu it came from (the owner's "back to the director selection").
-                if (!reopenLastFilter()) (voice ?: keyboardButton).requestFocus()
-                return true
-            }
-            // The controls row (and Sort, Clear All Filters): Back goes up to the top bar first, not straight out of Search.
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && (filterBar.hasFocus() || headingControls.hasFocus())) {
-                if ((voice ?: keyboardButton).requestFocus()) return true
-            }
-            // (The results and the recent chips, shown only with the keys, are handled above.)
-            // The top bar's pages and gear, or the heading: Back to Voice (from the capsule itself, Back leaves).
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && ((headerBar.hasFocus() && !capsule.hasFocus()) || input.hasFocus())) {
-                if ((voice ?: keyboardButton).requestFocus()) return true
-            }
+            // ChadFlix (owner's rule): Back goes to the previous page, never just up to Voice. From posters a filter narrowed,
+            // that's the menu it came from (the director pop-up, a picker); otherwise Back leaves Search for Home.
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && resultsScroll.hasFocus() && reopenLastFilter()) return true
             if (event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && focus in rightEdgeKeys && lookupMode == null && input.text.isNotBlank()) {
                 // Still loading (nothing to land on): stay put rather than let Android's search jump to the gear.
                 (firstResult ?: resultsAction)?.requestFocus()
