@@ -219,6 +219,7 @@ class DetailsActivity : Screen() {
     private var watchTitle: WatchTitle? = null
     /** Kodi ChadFlix's layout: the focused icon button's words, beside the row. */
     private var rowWords: TextView? = null
+    private var plot: TextView? = null
     private var guideButton: TextView? = null
     private var similarButton: TextView? = null
     private lateinit var playButton: TextView
@@ -459,6 +460,7 @@ class DetailsActivity : Screen() {
         val savedFocus = preferredFocus ?: captureHeroFocus() ?: HeroFocusState(HeroControlFocus.PLAY)
         castChips.clear()
         castStripSlot = null
+        plot = null
         trailerButton = null
         startOverButton = null
         hero.removeAllViews()
@@ -516,9 +518,10 @@ class DetailsActivity : Screen() {
         } else {
             stack.addView(buildMetadataRow(m, detailed = false), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             m.description?.takeIf { it.isNotBlank() }?.let {
-                stack.addView(text(it, BODY, color = TEXT).onArt().apply {
+                plot = text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(dp(PLOT_W), -2).apply { topMargin = dp(4) })
+                }
+                stack.addView(plot, LinearLayout.LayoutParams(dp(PLOT_W), -2).apply { topMargin = dp(4) })
             }
             val initialCast = richCast.ifEmpty {
                 val dirMembers = m.directors.map { CastMember(it, character = getString(R.string.cast_director), role = "director") }
@@ -535,13 +538,20 @@ class DetailsActivity : Screen() {
             }
             addWatch(m, stack)
         }
-        hero.addView(ScrollView(this).apply {
+        val scroller = ScrollView(this).apply {
             isVerticalScrollBarEnabled = false
             isFocusable = false
             addView(stack)
-        }, FrameLayout.LayoutParams(dp(HERO_W), -1, Gravity.TOP or Gravity.START).apply {
+        }
+        hero.addView(scroller, FrameLayout.LayoutParams(dp(HERO_W), -1, Gravity.TOP or Gravity.START).apply {
             leftMargin = dp(PAD); topMargin = dp(61); bottomMargin = dp(16)
         })
+        // ChadFlix: a show with four actions under Play runs past the screen; the plot gives up lines (to two) so the page
+        // fits without scrolling. More Info has the whole story.
+        plot?.let { story -> scroller.post {
+            val over = stack.height - scroller.height
+            if (over > 0) story.maxLines = maxOf(2, minOf(story.lineCount, story.maxLines) - (over + story.lineHeight - 1) / story.lineHeight)
+        } }
         if (m != null) {
             val resolved = resolveHeroFocusTarget(
                 saved = savedFocus,
