@@ -657,13 +657,14 @@ class DetailsActivity : Screen() {
         similarButton?.let { addAction(it, 0) }
     }
 
-    private fun titleAction(label: String) = text(label, SMALL, bold = true).apply {
+    // ChadFlix: the title page's actions are 10% over the app's pills (owner's choice), as are its icons and portraits.
+    private fun titleAction(label: String) = text(label, SMALL * 1.1f, bold = true).apply {
         isFocusable = true
         gravity = Gravity.CENTER_VERTICAL
-        minHeight = dp(BUTTON_H)
-        setPadding(dp(16), 0, dp(16), 0)
+        minHeight = dp(ICON_BUTTON_H)
+        setPadding(dp(18), 0, dp(18), 0)
         setOnFocusChangeListener { _, focused ->
-            background = if (focused) rounded(TEXT, BUTTON_H / 2) else null
+            background = if (focused) rounded(TEXT, ICON_BUTTON_H / 2) else null
             setTextColor(if (focused) BASE else TEXT)
         }
     }
@@ -1543,7 +1544,7 @@ class DetailsActivity : Screen() {
             val box = FrameLayout(context).apply { setPadding(dp(3), dp(3), dp(3), dp(3)); addView(face, FrameLayout.LayoutParams(-1, -1)) }
             addView(box, LinearLayout.LayoutParams(dp(CAST_FACE + 6), dp(CAST_FACE + 6)))
             val nameView = label?.let {
-                text(it, 10.5f, color = TEXT_2).onArt().apply {
+                text(it, 11f, color = TEXT_2).onArt().apply {
                     gravity = Gravity.CENTER_HORIZONTAL
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -1567,7 +1568,7 @@ class DetailsActivity : Screen() {
 
         members.forEach { actor ->
             val face = round(FrameLayout(this).apply { background = rounded(0x33F3D9B1.toInt(), CAST_FACE / 2) })
-            val initialsText = text(actor.initials, 15f, bold = true, color = TUNGSTEN).apply {
+            val initialsText = text(actor.initials, 13f, bold = true, color = TUNGSTEN).apply {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
             }
@@ -1924,9 +1925,10 @@ class DetailsActivity : Screen() {
         const val EPISODE_WIDTH = 216
         const val GUIDE_ART = 0.24f // the film's brightness behind the episode guide
         const val PLOT_W = 380
-        // The cast portraits: six 60 dp places with 4 dp gaps are exactly the plot's 380 dp.
-        const val CAST_FACE = 48
-        const val CAST_TILE = 60
-        const val CAST_GAP = 4
+        // The cast portraits, just bigger than the 37 dp icons: six 57 dp places (room for "Johansson") with 2 dp gaps fit
+        // the plot's 380 dp.
+        const val CAST_FACE = 40
+        const val CAST_TILE = 57
+        const val CAST_GAP = 2
     }
 }

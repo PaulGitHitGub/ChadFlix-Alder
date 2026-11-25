@@ -411,7 +411,7 @@ abstract class Screen : Activity() {
         override fun onDraw(canvas: Canvas) {
             val iconDrawable = icon()
             if (iconDrawable != null) {
-                val size = (20f * d).toInt()
+                val size = (18f * d).toInt()
                 val left = (width - size) / 2
                 val top = (height - size) / 2
                 iconDrawable.setBounds(left, top, left + size, top + size)
@@ -464,8 +464,7 @@ abstract class Screen : Activity() {
         background = glass(ICON_BUTTON_H / 2)
         setOnFocusChangeListener { v, has ->
             v.background = if (has) rounded(TEXT, ICON_BUTTON_H / 2) else glass(ICON_BUTTON_H / 2)
-            setTextColor(if (has) BASE else TEXT)
-            v.grow(has, CHIP_GROW).start()
+            setTextColor(if (has) BASE else TEXT) // no grow: white is focus enough, and a grown first button was cut at the edge
             onFocus(has)
         }
         setOnClickListener { action() }
@@ -1365,7 +1364,7 @@ abstract class Screen : Activity() {
         const val FROST_DENSE = 0.55f
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
-        const val ICON_BUTTON_H = 44
+        const val ICON_BUTTON_H = 37 // the title page's Resume pill's height: the icons and the actions under them are one set
         /** The title page's like and watchlist buttons, named by state: an icon button whose text is one of these draws it. */
         val TITLE_ICONS = mapOf("like" to R.drawable.ic_like, "liked" to R.drawable.ic_liked, "save" to R.drawable.ic_save, "saved" to R.drawable.ic_saved)
         const val PILL_MIN_W = 64 // Material's shortest text button
