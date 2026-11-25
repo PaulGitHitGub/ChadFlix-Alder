@@ -676,11 +676,11 @@ abstract class ExploreScreen : Screen() {
                     background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(PLACEHOLDER) }
                     clipToOutline = true
                 }, LinearLayout.LayoutParams(dp(HERO_FACE), dp(HERO_FACE)))
-                addView(text("", SMALL, color = TEXT).onArt().apply {
+                addView(text("", HERO_CAST_SP, color = TEXT).onArt().apply {
                     gravity = Gravity.CENTER; maxLines = 2; ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
+                }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
                 visibility = View.INVISIBLE
-            }, LinearLayout.LayoutParams(dp(HERO_FACE + 22), -2).apply { if (i > 0) marginStart = dp(6) })
+            }, LinearLayout.LayoutParams(dp(HERO_FACE + 20), -2).apply { if (i > 0) marginStart = dp(5) })
         }
     }
 
@@ -699,11 +699,11 @@ abstract class ExploreScreen : Screen() {
         infoFacts = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
         infoGenres = text("", SMALL, color = TEXT_2).apply { isSingleLine = true; ellipsize = TextUtils.TruncateAt.END }
         infoScores = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        infoOverview = text("", BODY, color = OVERVIEW).apply {
+        infoOverview = text("", HERO_OVERVIEW_SP, color = OVERVIEW).apply {
             ellipsize = TextUtils.TruncateAt.END
-            // As many whole lines as its slot holds, the last ending in "…".
+            // As many whole lines as its slot holds (never more than three), the last ending in "…".
             addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
-                if (bottom - top != oldBottom - oldTop) maxLines = ((bottom - top) / lineHeight).coerceAtLeast(1)
+                if (bottom - top != oldBottom - oldTop) maxLines = ((bottom - top) / lineHeight).coerceIn(1, HERO_OVERVIEW_LINES)
             }
         }
         infoBody = column(Gravity.START).apply {
@@ -716,9 +716,9 @@ abstract class ExploreScreen : Screen() {
                 addView(infoCert, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) })
                 addView(infoFacts, LinearLayout.LayoutParams(-2, -2))
                 addView(infoGenres, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(14) })
-            }, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(20)).apply { topMargin = dp(8) })
-            addView(infoScores, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(18)).apply { topMargin = dp(7) })
-            addView(infoOverview, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(HERO_OVERVIEW_H)).apply { topMargin = dp(9) })
+            }, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(20)).apply { topMargin = dp(6) })
+            addView(infoScores, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(18)).apply { topMargin = dp(6) })
+            addView(infoOverview, LinearLayout.LayoutParams(dp(HERO_TEXT_W), dp(HERO_OVERVIEW_H)).apply { topMargin = dp(8) })
             visibility = View.INVISIBLE
         }
         infoFaces = castFaces()
@@ -1160,14 +1160,19 @@ abstract class ExploreScreen : Screen() {
         const val CAST_FACES = 5
         // The hero: a 28 sp title (or logo), the overview at body size, the cast at its lower right.
         const val HERO_NAME_SP = 28f
-        const val HERO_TITLE_H = 60
-        const val HERO_BODY_TOP = 48 // the title's slot, just under the top bar and its capsule
-        const val HERO_LOGO_W = 320
-        const val HERO_LOGO_AREA = 11700.0 // about 1.3 of the title page's logo (8976 dp², Images.logoSizePx)
+        // The title's slot starts 11 dp under the top bar (its avatar and capsule end at 47 dp), so no logo or name ever
+        // reaches up to them; the logo is fitted inside it (down, never up), bottom-aligned on the facts line.
+        const val HERO_TITLE_H = 52
+        const val HERO_BODY_TOP = 58
+        const val HERO_LOGO_W = 300
+        const val HERO_LOGO_AREA = 8800.0 // about the title page's logo (8976 dp², Images.logoSizePx), for the smaller slot
         const val HERO_TEXT_W = 430
-        const val HERO_OVERVIEW_H = 60 // three lines
+        const val HERO_OVERVIEW_SP = 13.5f // a step under body size (14.5)
+        const val HERO_OVERVIEW_LINES = 3
+        const val HERO_OVERVIEW_H = 52 // three lines at 13.5 sp
         const val HERO_ART_W = 680
-        const val HERO_FACE = 54
+        const val HERO_FACE = 49 // owner: the cast 10% smaller (54 dp faces, 12.5 sp names before)
+        const val HERO_CAST_SP = 11.25f
         // The pickers in the hero's place, under the top bar: choices in columns of four; faces ten across.
         const val PICKER_TOP = 50
         const val PICK_ROWS = 4
