@@ -220,10 +220,32 @@ class DetailsActivity : Screen() {
     /** Kodi ChadFlix's layout: the focused icon button's words, beside the row. */
     private var rowWords: TextView? = null
     private var plot: TextView? = null
+    // ChadFlix: the column fades in once (option A); later arrivals ease in where they belong instead of rebuilding it.
+    private var revealed = false
+    private var heroKey: List<Any?>? = null // what the column was last built from: the same again is no rebuild
+    private var factsKey: List<Any?>? = null // the certificate and ratings the facts were last drawn with
+    private var heroColumn: View? = null
+    private val revealAnyway = Runnable { revealHero() }
+
+    private var heroTarget: View? = null // where the remote should start, until it's used
+    private var remoteUsed = false
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        remoteUsed = true
+    }
+
+    private fun revealHero() {
+        if (revealed || heroColumn == null) return
+        revealed = true
+        main.removeCallbacks(revealAnyway)
+        // Older TVs have no focusedByDefault: until the remote is used, the column opens on its main action.
+        heroTarget?.takeIf { !remoteUsed && currentFocus !== it && it.isAttachedToWindow }?.requestFocus()
+        listOf(endsAt, heroColumn).forEach { it?.enter()?.alpha(1f)?.start() }
+    }
     private var guideButton: TextView? = null
     private var similarButton: TextView? = null
     private lateinit var playButton: TextView
-    private lateinit var infoButton: TextView
     private var trailerButton: TextView? = null
     private var startOverButton: TextView? = null
     private lateinit var infoOverlay: FrameLayout
@@ -407,8 +429,6 @@ class DetailsActivity : Screen() {
             ::listButton.isInitialized && (focused === listButton || isInside(focused, listButton)) ->
                 HeroFocusState(HeroControlFocus.LIST)
             ::watchlistButton.isInitialized && focused === watchlistButton -> HeroFocusState(HeroControlFocus.WATCHLIST)
-            ::infoButton.isInitialized && (focused === infoButton || isInside(focused, infoButton)) ->
-                HeroFocusState(HeroControlFocus.INFO)
             else -> HeroFocusState(HeroControlFocus.PLAY)
         }
     }
@@ -421,7 +441,8 @@ class DetailsActivity : Screen() {
         HeroControlFocus.START_OVER -> startOverButton ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.LIST -> if (::listButton.isInitialized) listButton else null
         HeroControlFocus.WATCHLIST -> if (::watchlistButton.isInitialized) watchlistButton else null
-        HeroControlFocus.INFO -> if (::infoButton.isInitialized) infoButton else null
+        // More Info is opened from the cast's "+N": closed, the remote goes back there.
+        HeroControlFocus.INFO -> castChips.lastOrNull() ?: if (::playButton.isInitialized) playButton else null
         HeroControlFocus.CAST -> castChips.getOrNull(target.castIndex) ?: if (::playButton.isInitialized) playButton else null
     }
 
@@ -457,6 +478,15 @@ class DetailsActivity : Screen() {
         preferredFocus: HeroFocusState? = null,
     ) {
         heroNeedsRefresh = false
+        // Details, library, certificate, ratings and trailer each ask for the column again as they arrive: one that
+        // changes nothing it shows (the library answer usually) leaves the column as it is.
+        val target = m?.let(::playTarget)
+        val key = listOf(m?.id, m?.name, m?.description, m?.logo, m?.runtime, m?.genres, m?.rating, m?.directors, m?.castMembers?.size,
+            m?.videos?.size, m?.trailerStreams?.size, m?.trailerYtId, failure,
+            certificate, mdbScores, imdbTrailers.isNotEmpty(), richCast.size, target?.first, Library.inList(item),
+            item?.let { Library.resumeAt(it, target?.first ?: metaId) }, item?.optJSONObject("state")?.text("video_id"))
+        if (preferredFocus == null && key == heroKey && hero.childCount > 0) return
+        heroKey = key
         val savedFocus = preferredFocus ?: captureHeroFocus() ?: HeroFocusState(HeroControlFocus.PLAY)
         castChips.clear()
         castStripSlot = null
@@ -495,7 +525,7 @@ class DetailsActivity : Screen() {
                 fun loadLogo(url: String?): Unit = Images.load(url, logo, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo, failed = {
                     if (url != null && url == cardLogo) cardLogoFailed = true
                     val next = detailsLogo?.takeIf { url == cardLogo && it != cardLogo }
-                    if (next != null) loadLogo(next) else { title.visibility = View.VISIBLE; logo.visibility = View.GONE }
+                    if (next != null) loadLogo(next) else { title.visibility = View.VISIBLE; logo.visibility = View.GONE; main.post(::revealHero) }
                 }) {
                     val bitmap = (logo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     if (bitmap == null || bitmap.width < 1 || bitmap.height < 1) {
@@ -504,11 +534,16 @@ class DetailsActivity : Screen() {
                         val (w, h) = logoSizePx(bitmap.width, bitmap.height, resources.displayMetrics.density)
                         logo.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.BOTTOM or Gravity.START)
                         title.visibility = View.GONE; logo.visibility = View.VISIBLE
+                        // A logo arriving after the column is up eases in rather than popping.
+                        if (revealed && logo.isAttachedToWindow) { logo.alpha = 0f; logo.enter(FOCUS_MS).alpha(1f).start() }
                     }
+                    main.post(::revealHero)
                 }
                 loadLogo(first)
             }
         }
+        // The first column with details waits (hidden) for its logo, at most REVEAL_WAIT_MS, then fades in once.
+        val hidden = m != null && !revealed
         val stack = column(Gravity.START).apply { addView(titleArea, LinearLayout.LayoutParams(-1, dp(68))) } // ChadFlix: fixed, so the logo arriving never moves what is below
         if (m == null) {
             val error = failed(failure?.let { failureMessage(R.string.details_load_failed, it) }
@@ -516,7 +551,12 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
-            stack.addView(buildMetadataRow(m, detailed = false), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            val facts = buildMetadataRow(m, detailed = false)
+            stack.addView(facts, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+            // A certificate or scores arriving after the column is up: the line eases in again rather than popping.
+            val factsNow = listOf(certificate, mdbScores)
+            if (revealed && factsKey != null && factsNow != factsKey) { facts.alpha = 0f; facts.enter(FOCUS_MS).alpha(1f).start() }
+            factsKey = factsNow
             m.description?.takeIf { it.isNotBlank() }?.let {
                 plot = text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
@@ -546,12 +586,25 @@ class DetailsActivity : Screen() {
         hero.addView(scroller, FrameLayout.LayoutParams(dp(HERO_W), -1, Gravity.TOP or Gravity.START).apply {
             leftMargin = dp(PAD); topMargin = dp(61); bottomMargin = dp(16)
         })
+        heroColumn = scroller
+        if (hidden) {
+            scroller.alpha = 0f
+            endsAt.alpha = 0f
+            main.removeCallbacks(revealAnyway)
+            main.postDelayed(revealAnyway, REVEAL_WAIT_MS)
+        }
         // ChadFlix: a show with four actions under Play runs past the screen; the plot gives up lines (to two) so the page
         // fits without scrolling. More Info has the whole story.
-        plot?.let { story -> scroller.post {
-            val over = stack.height - scroller.height
-            if (over > 0) story.maxLines = maxOf(2, minOf(story.lineCount, story.maxLines) - (over + story.lineHeight - 1) / story.lineHeight)
-        } }
+        // Measured before the first frame is drawn, so the full plot never shows for a frame and pushes the buttons down.
+        plot?.let { story -> scroller.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                scroller.viewTreeObserver.removeOnPreDrawListener(this)
+                val over = stack.height - scroller.height
+                if (over <= 0) return true
+                story.maxLines = maxOf(2, minOf(story.lineCount, story.maxLines) - (over + story.lineHeight - 1) / story.lineHeight)
+                return false // drawn next frame, at its fitted height
+            }
+        }) }
         if (m != null) {
             val resolved = resolveHeroFocusTarget(
                 saved = savedFocus,
@@ -559,7 +612,12 @@ class DetailsActivity : Screen() {
                 hasStartOver = startOverButton != null,
                 castCount = castChips.size,
             )
-            restoreHeroFocus(heroFocusView(resolved))
+            val target = heroFocusView(resolved)
+            // Android puts a new window's focus on its first focusable view (the first cast portrait) unless one is
+            // marked; the rebuilds that used to move it back to Resume are skipped now.
+            if (android.os.Build.VERSION.SDK_INT >= 26) target?.isFocusedByDefault = true
+            heroTarget = target
+            restoreHeroFocus(target)
         }
     }
 
@@ -611,7 +669,6 @@ class DetailsActivity : Screen() {
         } else null
         trailerButton = trailer
         startOverButton = startOver
-        infoButton = iconButton("ⓘ", getString(R.string.action_more_info), onFocus = ::showRowWords) { showInfo(focusCast = false) }
         listButton = buildListButton()
         watchTitle = WatchTitle(metaId, type, m.name.ifEmpty { name }, m.poster ?: poster, m.background ?: initialArt)
         watchlistButton = iconButton("", "", onFocus = ::showRowWords, action = ::toggleWatchlist).also(::showWatchlisted)
@@ -622,13 +679,13 @@ class DetailsActivity : Screen() {
             clipToPadding = false
             startOver?.let { addView(it, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) }) }
             addView(listButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
-            addView(watchlistButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)).apply { marginEnd = dp(8) })
-            addView(infoButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
+            addView(watchlistButton, LinearLayout.LayoutParams(dp(ICON_BUTTON_H), dp(ICON_BUTTON_H)))
             addView(rowWords, wrap().apply { marginStart = dp(10) })
         }
         stack.addView(buttonRow, wrap().apply { topMargin = dp(16) })
-        infoButton.id = View.generateViewId()
-        infoButton.nextFocusRightId = infoButton.id // the app is left-to-right in every language (no supportsRtl)
+        watchlistButton.id = View.generateViewId()
+        watchlistButton.nextFocusRightId = watchlistButton.id // the app is left-to-right in every language (no supportsRtl)
+        val firstIcon = buttonRow.getChildAt(0).apply { if (id == View.NO_ID) id = View.generateViewId() }
         // ChadFlix: Play and the actions under it are one stack, all as wide as the widest label (a hidden More Like
         // This counts too, so Play never widens when it appears); each label still sets that width in every language.
         val actions = column(Gravity.START)
@@ -638,7 +695,7 @@ class DetailsActivity : Screen() {
             action.nextFocusLeftId = action.id
             action.nextFocusRightId = action.id
             // The old 280 dp action centered closest to More Info for every combination of the optional icons.
-            if (action === playButton) action.nextFocusUpId = infoButton.id
+            if (action === playButton) action.nextFocusUpId = firstIcon.id
             actions.addView(action, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(gap) })
             actions.minimumWidth = maxOf(actions.minimumWidth, action.paint.measureText(action.text.toString()).toInt() +
                 action.paddingLeft + action.paddingRight + 1)
@@ -647,7 +704,7 @@ class DetailsActivity : Screen() {
             setOnClickListener { showGuide() }
         } else null
         similarButton = titleAction(getString(R.string.details_more_like_this)).apply {
-            visibility = if (similarTitles.isEmpty()) View.GONE else View.VISIBLE
+            visibility = if (similarTitles.isEmpty()) View.INVISIBLE else View.VISIBLE // its row is kept: nothing moves when it arrives
             setOnClickListener { showSimilar() }
         }
         if (unairedNext == null || !episodic) addAction(playButton, 12)
@@ -661,10 +718,10 @@ class DetailsActivity : Screen() {
     private fun titleAction(label: String) = text(label, SMALL * 1.1f, bold = true).apply {
         isFocusable = true
         gravity = Gravity.CENTER_VERTICAL
-        minHeight = dp(ICON_BUTTON_H)
+        minHeight = dp(ACTION_H)
         setPadding(dp(18), 0, dp(18), 0)
         setOnFocusChangeListener { _, focused ->
-            background = if (focused) rounded(TEXT, ICON_BUTTON_H / 2) else null
+            background = if (focused) rounded(TEXT, ACTION_H / 2) else null
             setTextColor(if (focused) BASE else TEXT)
         }
     }
@@ -1388,7 +1445,7 @@ class DetailsActivity : Screen() {
             result.getOrNull()?.let { titles ->
                 titles.asSequence().filter { it.id != metaId && it.type == type }
                     .distinctBy { it.id }.take(12).toList().takeIf { it.isNotEmpty() }
-                    ?.let { similarTitles = it; similarButton?.visibility = View.VISIBLE }
+                    ?.let { similarTitles = it; similarButton?.apply { alpha = 0f; visibility = View.VISIBLE; enter(FOCUS_MS).alpha(1f).start() } }
             }
         }
     }
@@ -1504,6 +1561,7 @@ class DetailsActivity : Screen() {
                 if (slot != null) {
                     slot.removeAllViews()
                     buildCastChips(richCast)?.let { slot.addView(it) }
+                    if (revealed) { slot.alpha = 0f; slot.enter(FOCUS_MS).alpha(1f).start() } // the full cast eases in
                 } else if (meta != null) {
                     if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                 }
@@ -1582,6 +1640,7 @@ class DetailsActivity : Screen() {
                 }) {
                     photoView.visibility = View.VISIBLE
                     initialsText.visibility = View.GONE
+                    if (revealed && photoView.isAttachedToWindow) { photoView.alpha = 0f; photoView.enter(FOCUS_MS).alpha(1f).start() }
                 }
             }
             lateinit var me: View
@@ -1925,6 +1984,8 @@ class DetailsActivity : Screen() {
         const val EPISODE_WIDTH = 216
         const val GUIDE_ART = 0.24f // the film's brightness behind the episode guide
         const val PLOT_W = 380
+        const val ACTION_H = 37 // Resume, Trailer, More Like This: 10% over the app's 34 dp pills (owner's choice)
+        const val REVEAL_WAIT_MS = 400L // the longest the first column waits for its logo before fading in
         // The cast portraits, just bigger than the 37 dp icons: six 57 dp places (room for "Johansson") with 2 dp gaps fit
         // the plot's 380 dp.
         const val CAST_FACE = 40

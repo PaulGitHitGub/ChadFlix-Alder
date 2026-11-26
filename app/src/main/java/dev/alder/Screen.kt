@@ -306,7 +306,12 @@ abstract class Screen : Activity() {
             val strength = r.getOrNull() ?: return@background
             if (art !== shadeSource || strength == 0f) return@background // dark art: today's light fade stays
             // Bright art: the shade holds dark across the whole text column, as strongly as the art needs.
-            windowShade?.background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, leftShadeColors(strength))
+            // Cross-faded from the light fade, so bright art's shade deepens instead of snapping darker.
+            val shade = windowShade ?: return@background
+            val deeper = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, leftShadeColors(strength))
+            shade.background = shade.background?.let { now ->
+                android.graphics.drawable.TransitionDrawable(arrayOf(now, deeper)).apply { isCrossFadeEnabled = true; startTransition(ENTER_MS.toInt()) }
+            } ?: deeper
         }
     }
 
@@ -400,7 +405,7 @@ abstract class Screen : Activity() {
     protected fun pill(words: Int, icon: Int = 0): TextView = pill(getString(words), icon)
 
     /**
-     * Glass circle button for a title's secondary actions (↺, like, watchlist, ⓘ), laid out as Kodi ChadFlix's:
+     * Glass circle button for a title's secondary actions (↺, like, watchlist), laid out as Kodi ChadFlix's:
      * focus turns the circle white with a dark icon; [onFocus] lets the caller show the button's words beside the row.
      */
     protected fun iconButton(
@@ -455,14 +460,6 @@ abstract class Screen : Activity() {
                     glyphPath.lineTo(ax, ay + 0.4f * d)
                     glyphPath.lineTo(ax + 3.2f * d, ay + 0.4f * d)
                     canvas.drawPath(glyphPath, strokePaint)
-                }
-                "ⓘ" -> {
-                    val r = 6.8f * d
-                    strokePaint.strokeWidth = 1.5f * d
-                    canvas.drawCircle(cx, cy, r, strokePaint)
-                    strokePaint.strokeWidth = 1.6f * d
-                    canvas.drawLine(cx, cy - 0.5f * d, cx, cy + 3.6f * d, strokePaint)
-                    canvas.drawCircle(cx, cy - 3.2f * d, 0.95f * d, fillPaint)
                 }
                 else -> {
                     paint.color = currentTextColor
@@ -1382,7 +1379,7 @@ abstract class Screen : Activity() {
         const val FROST_DENSE = 0.55f
         const val HERO_W = 520 // dp: a title's block on Home and its page, half the screen so the story reads in full lines
         const val BUTTON_H = 34
-        const val ICON_BUTTON_H = 37 // the title page's Resume pill's height: the icons and the actions under them are one set
+        const val ICON_BUTTON_H = 33 // the title page's icons, a little under its 37 dp actions (owner's choice)
         /** The title page's like and watchlist buttons, named by state: an icon button whose text is one of these draws it. */
         val TITLE_ICONS = mapOf("like" to R.drawable.ic_like, "liked" to R.drawable.ic_liked, "save" to R.drawable.ic_save, "saved" to R.drawable.ic_saved)
         const val PILL_MIN_W = 64 // Material's shortest text button
