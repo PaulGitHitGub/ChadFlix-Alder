@@ -223,9 +223,10 @@ class DetailsActivity : Screen() {
     // ChadFlix: the column fades in once (option A); later arrivals ease in where they belong instead of rebuilding it.
     private var revealed = false
     private var heroKey: List<Any?>? = null // what the column was last built from: the same again is no rebuild
-    private var factsKey: List<Any?>? = null // the certificate and ratings the facts were last drawn with
     private var heroColumn: View? = null
-    private val revealAnyway = Runnable { revealHero() }
+    private val revealAnyway = Runnable { revealHero(force = true) }
+    private var logoSettled = false
+    private var waitingForCertificate = false // the certificate is asked for: the column waits for it (at most REVEAL_WAIT_MS)
 
     private var heroTarget: View? = null // where the remote should start, until it's used
     private var remoteUsed = false
@@ -235,8 +236,9 @@ class DetailsActivity : Screen() {
         remoteUsed = true
     }
 
-    private fun revealHero() {
+    private fun revealHero(force: Boolean = false) {
         if (revealed || heroColumn == null) return
+        if (!force && (!logoSettled || waitingForCertificate)) return
         revealed = true
         main.removeCallbacks(revealAnyway)
         // Older TVs have no focusedByDefault: until the remote is used, the column opens on its main action.
@@ -338,7 +340,10 @@ class DetailsActivity : Screen() {
             loadRichCast()
             if (!certificateRequested && certificate == null && m.id.startsWith("tt")) {
                 certificateRequested = true
+                waitingForCertificate = true
                 background<String?>({ imdbCertificate(m.id) }) { r ->
+                    waitingForCertificate = false
+                    main.post { revealHero() }
                     val resolved = r.getOrNull()
                     if (resolved != null && resolved != certificate) {
                         certificate = resolved
@@ -525,7 +530,7 @@ class DetailsActivity : Screen() {
                 fun loadLogo(url: String?): Unit = Images.load(url, logo, Images.TITLE_LOGO_PX, urgent = true, look = Images.trimmedLogo, failed = {
                     if (url != null && url == cardLogo) cardLogoFailed = true
                     val next = detailsLogo?.takeIf { url == cardLogo && it != cardLogo }
-                    if (next != null) loadLogo(next) else { title.visibility = View.VISIBLE; logo.visibility = View.GONE; main.post(::revealHero) }
+                    if (next != null) loadLogo(next) else { title.visibility = View.VISIBLE; logo.visibility = View.GONE; main.post { logoSettled = true; revealHero() } }
                 }) {
                     val bitmap = (logo.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     if (bitmap == null || bitmap.width < 1 || bitmap.height < 1) {
@@ -537,7 +542,7 @@ class DetailsActivity : Screen() {
                         // A logo arriving after the column is up eases in rather than popping.
                         if (revealed && logo.isAttachedToWindow) { logo.alpha = 0f; logo.enter(FOCUS_MS).alpha(1f).start() }
                     }
-                    main.post(::revealHero)
+                    main.post { logoSettled = true; revealHero() }
                 }
                 loadLogo(first)
             }
@@ -551,12 +556,8 @@ class DetailsActivity : Screen() {
             stack.addView(error.marginTop(16))
             error.post { if (!anyOverlayOpen() && error.isAttachedToWindow) error.getChildAt(1).requestFocus() }
         } else {
-            val facts = buildMetadataRow(m, detailed = false)
-            stack.addView(facts, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-            // A certificate or scores arriving after the column is up: the line eases in again rather than popping.
-            val factsNow = listOf(certificate, mdbScores)
-            if (revealed && factsKey != null && factsNow != factsKey) { facts.alpha = 0f; facts.enter(FOCUS_MS).alpha(1f).start() }
-            factsKey = factsNow
+            // A certificate or scores arriving later change the line in place: fading the whole line again blinked it.
+            stack.addView(buildMetadataRow(m, detailed = false), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
             m.description?.takeIf { it.isNotBlank() }?.let {
                 plot = text(it, BODY, color = TEXT).onArt().apply {
                     maxLines = if (resources.configuration.fontScale > 1.15f) 4 else 5; ellipsize = TextUtils.TruncateAt.END
@@ -574,6 +575,9 @@ class DetailsActivity : Screen() {
                     addView(castStrip)
                 }
                 castStripSlot = slot
+                // Until TMDb's cast (with photos) answers, the strip holds its space unseen: shown first as initials and
+                // then swapped, it appeared, vanished and came back (the owner's flicker).
+                if (!castSettled) castStrip.alpha = 0f
                 stack.addView(slot, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
             }
             addWatch(m, stack)
@@ -765,6 +769,14 @@ class DetailsActivity : Screen() {
                 })
             }
             val ratings = shownRatings("both", m.rating, mdbScores["letterboxd"], mdbScores["tomatoes"])
+            if (ratings.isEmpty() && !detailed) {
+                // ChadFlix: the ratings line's room is kept while scores may still arrive, so they never push the page down.
+                val metadata = this
+                return column(Gravity.START).apply {
+                    addView(metadata)
+                    addView(text(" ", SMALL, color = TEXT_2).apply { visibility = View.INVISIBLE }, wrap().apply { topMargin = dp(4) })
+                }
+            }
             if (ratings.isNotEmpty()) {
                 if (detailed) {
                     if (facts.isNotBlank() || certificate != null) addView(text(DOT, SMALL, color = TEXT_2).onArt())
@@ -1546,12 +1558,25 @@ class DetailsActivity : Screen() {
         }.start()
     }
 
+    /** TMDb's cast has answered (or [CAST_WAIT_MS] has passed): the cast strip shows from then on. */
+    private var castSettled = false
+    private val settleCast = Runnable { if (!castSettled) { castSettled = true; showSettledCast() } }
+
+    private fun showSettledCast() {
+        (castStripSlot?.getChildAt(0))?.takeIf { it.alpha < 1f }?.let { if (revealed) it.enter(FOCUS_MS).alpha(1f).start() else it.alpha = 1f }
+    }
+
     private fun loadRichCast() {
+        if (!castSettled) { main.removeCallbacks(settleCast); main.postDelayed(settleCast, CAST_WAIT_MS) }
         background({
             Tmdb.cast(metaId, type)
         }) { result ->
             val enhanced = result.getOrNull().orEmpty()
-            if (enhanced.isNotEmpty()) {
+            val firstAnswer = !castSettled
+            castSettled = true
+            main.removeCallbacks(settleCast)
+            if (enhanced.isEmpty() || enhanced == richCast) showSettledCast()
+            if (enhanced.isNotEmpty() && enhanced != richCast) {
                 richCast = enhanced
                 val focused = currentFocus
                 val focusedCastIndex = if (!anyOverlayOpen()) {
@@ -1560,8 +1585,11 @@ class DetailsActivity : Screen() {
                 val slot = castStripSlot
                 if (slot != null) {
                     slot.removeAllViews()
-                    buildCastChips(richCast)?.let { slot.addView(it) }
-                    if (revealed) { slot.alpha = 0f; slot.enter(FOCUS_MS).alpha(1f).start() } // the full cast eases in
+                    buildCastChips(richCast)?.let { strip ->
+                        slot.addView(strip)
+                        // Its first showing eases in; a later swap of a strip already seen happens in place.
+                        if (firstAnswer && revealed) { strip.alpha = 0f; strip.enter(FOCUS_MS).alpha(1f).start() }
+                    }
                 } else if (meta != null) {
                     if (anyOverlayOpen()) heroNeedsRefresh = true else showHero(meta)
                 }
@@ -1604,7 +1632,7 @@ class DetailsActivity : Screen() {
             val nameView = label?.let {
                 text(it, 11f, color = TEXT_2).onArt().apply {
                     gravity = Gravity.CENTER_HORIZONTAL
-                    maxLines = 2
+                    setLines(2) // every strip is as tall: the full cast taking the first one's place moves nothing
                     ellipsize = TextUtils.TruncateAt.END
                     includeFontPadding = false
                 }.also { v -> addView(v, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) }) }
@@ -1634,6 +1662,7 @@ class DetailsActivity : Screen() {
             if (!actor.photo.isNullOrBlank()) {
                 val photoView = FaceView(this@DetailsActivity).apply { visibility = View.GONE } // the head kept, not cut at the forehead
                 face.addView(photoView, FrameLayout.LayoutParams(-1, -1))
+                initialsText.visibility = View.INVISIBLE // a plain circle while the photo loads: initials then a face flickered
                 Images.load(actor.photo, photoView, dp(CAST_FACE), failed = {
                     photoView.visibility = View.GONE
                     initialsText.visibility = View.VISIBLE
@@ -1985,6 +2014,7 @@ class DetailsActivity : Screen() {
         const val GUIDE_ART = 0.24f // the film's brightness behind the episode guide
         const val PLOT_W = 380
         const val ACTION_H = 37 // Resume, Trailer, More Like This: 10% over the app's 34 dp pills (owner's choice)
+        const val CAST_WAIT_MS = 1500L // the longest the cast strip waits, unseen, for TMDb's cast with photos
         const val REVEAL_WAIT_MS = 400L // the longest the first column waits for its logo before fading in
         // The cast portraits, just bigger than the 37 dp icons: six 57 dp places (room for "Johansson") with 2 dp gaps fit
         // the plot's 380 dp.
