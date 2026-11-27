@@ -401,7 +401,8 @@ class SettingsActivity : Screen() {
             leftMargin = dp(48); topMargin = dp(88)
         })
 
-        detailTitle = text("", BODY, bold = true).apply { setPadding(dp(12), 0, 0, 0) }
+        // ChadFlix: centred and heavier than the rows, so the group's name reads as a heading, not an option.
+        detailTitle = text("", BODY, bold = true).apply { typeface = heavyFace; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(12), 0, dp(12), 0) }
         detailRows = column(Gravity.START)
         // A long group (Profile) scrolls in its own space: drawn past it, rows ran over the group's title and pushed the
         // help off the screen. The padding keeps room for the focused row's glow inside that space.
