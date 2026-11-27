@@ -625,4 +625,6 @@
     <string name="like_remove">Remove From Favorites</string>
     <string name="watchlist_add">Add To Watchlist</string>
     <string name="watchlist_in">Watchlist · In %1$s</string>
+    <string name="trailer_previews">Trailer Previews</string>
+    <string name="trailer_previews_hint">Play a trailer with sound when you pause on a title.</string>
 </resources>

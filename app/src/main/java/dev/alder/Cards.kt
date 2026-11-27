@@ -137,6 +137,37 @@ internal class MediaCardView(
     }
     private val logoView by logoMade
 
+    val resizing get() = widthAnim?.isRunning == true
+    val fullyWidened get() = expanded && width == wideW && !resizing
+    val hasBackdrop get() = face.alpha == 1f && shownWide && image.tag == artUrl && image.drawable != null
+    var previewArtAlpha = 1f
+        set(value) {
+            field = value
+            image.alpha = value
+            updatePreviewTitleAlpha()
+        }
+
+    var ratingNeedsShade = false
+        set(value) {
+            field = value
+            if (previewArtAlpha != 1f) updatePreviewTitleAlpha()
+        }
+
+    private fun updatePreviewTitleAlpha() {
+        if (logoMade.isInitialized()) logoView.alpha = previewArtAlpha
+        if (nameMade.isInitialized()) nameView.alpha = previewArtAlpha
+        if (titleShadeMade.isInitialized()) titleShade.alpha = if (ratingNeedsShade) 1f else previewArtAlpha
+    }
+
+    var onPreviewData: (() -> Unit)? = null // only while the focused preview awaits its backdrop or metadata
+
+    fun attachPreview(surface: android.view.TextureView) {
+        image.animate().cancel()
+        image.alpha = 1f
+        // The decoder buffer keeps its settled size while the covered card shrinks.
+        face.addView(surface, 0, LayoutParams(face.width, face.height))
+    }
+
     private val hasProgress = !grid && progress > 0f
 
     private val titleShadeMade = lazy {
@@ -145,7 +176,7 @@ internal class MediaCardView(
                 GradientDrawable.Orientation.BOTTOM_TOP,
                 intArrayOf(0xE6000000.toInt(), 0x66000000, 0x00000000),
             )
-        }.also { face.addView(it, 1, LayoutParams(-1, heightPx * 6 / 10, Gravity.BOTTOM)) }
+        }.also { face.addView(it, face.indexOfChild(image) + 1, LayoutParams(-1, heightPx * 6 / 10, Gravity.BOTTOM)) }
     }
     private val titleShade by titleShadeMade
 
@@ -353,6 +384,21 @@ internal class MediaCardView(
         face.alpha = 1f
     }
 
+    /** Only the off-screen poster buffer during a hold. No metadata, fallback art, title or fade. */
+    fun bufferPoster() {
+        val url = posterUrl ?: return
+        if (wanted || wantWide || live) return
+        wanted = true
+        shownUrl = url
+        shownWide = false
+        Images.load(url, image, widthPx, failed = { shownUrl = null }) {
+            if (nameMade.isInitialized()) nameView.visibility = View.INVISIBLE
+            if (titleShadeMade.isInitialized()) titleShade.visibility = View.GONE
+            image.alpha = 1f
+            face.alpha = 1f
+        }
+    }
+
     /** On screen (or nearly): show the title until its picture is ready. */
     fun load() {
         watchlistPictures?.let { pictures ->
@@ -415,6 +461,7 @@ internal class MediaCardView(
                     if (expanded) {
                         logoView.visibility = View.VISIBLE
                         nameView.visibility = View.INVISIBLE
+                        if (previewArtAlpha != 1f) updatePreviewTitleAlpha()
                     }
                 }
             }
@@ -423,6 +470,7 @@ internal class MediaCardView(
                 image.alpha = 0f
                 screen.run { image.enter(Screen.QUICK_MS) }.alpha(1f).start()
             }
+            onPreviewData?.invoke()
             if (isFocused && ring == null) screen.run { lift(true, if (grid) Screen.GRID_GROW else Screen.CARD_GROW, shadow = liftShadow) }
         }
         now = false
@@ -483,9 +531,11 @@ internal class HorizontalCardRail(
     val stepPx: Int get() = (cards.firstOrNull()?.widthPx ?: 0) + cardGapPx
 
     var onScroll: (() -> Unit)? = null
+    var onHoldStart: (() -> Unit)? = null
     var onHoldEnd: ((selected: Int) -> Unit)? = null
 
     private var anim: ValueAnimator? = null
+    val gliding get() = anim?.isRunning == true
 
     val strip = LinearLayout(screen).apply {
         setPadding(paddingStartPx, paddingTopPx, paddingEndPx, paddingBottomPx)
@@ -509,7 +559,9 @@ internal class HorizontalCardRail(
                 return true
             }
             if (left && selected == 0 && !stopAtStart) return super.dispatchKeyEvent(event)
+            val startingHold = !held && event.repeatCount > 0
             held = event.repeatCount > 0
+            if (startingHold) onHoldStart?.invoke()
             if (shouldSkipRepeat(held, wideMotion, event.repeatCount)) return true
             cards.getOrNull(selected + if (left) -1 else 1)?.requestFocus()
             return true

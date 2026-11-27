@@ -795,11 +795,19 @@ internal fun parseImdbTrailerStreams(json: JSONObject): List<Stream> {
     return orderTrailerStreams(videoTitle, urls)
 }
 
-private val imdbTrailerCache = java.util.concurrent.ConcurrentHashMap<String, List<Stream>>()
+// IMDb signs playback URLs for about a day. The cache lives only in this process.
+private const val IMDB_TRAILER_TTL_MS = 12 * 60 * 60 * 1000L
+internal class CachedTrailers(private val fetchedAt: Long, private val streams: List<Stream>) {
+    fun fresh(now: Long): List<Stream>? = streams.takeIf { now - fetchedAt < IMDB_TRAILER_TTL_MS }
+}
+private val imdbTrailerCache = java.util.concurrent.ConcurrentHashMap<String, CachedTrailers>()
+
+// null is a cache miss. A known empty result (or a non-IMDb ID) needs no lookup.
+internal fun cachedImdbTrailerStreams(imdbId: String): List<Stream>? =
+    if (imdbId.startsWith("tt")) imdbTrailerCache[imdbId]?.fresh(android.os.SystemClock.elapsedRealtime()) else emptyList()
 
 internal fun imdbTrailerStreams(imdbId: String): List<Stream> {
-    if (!imdbId.startsWith("tt")) return emptyList()
-    imdbTrailerCache[imdbId]?.let { return it }
+    cachedImdbTrailerStreams(imdbId)?.let { return it }
     return runCatching {
         val query = JSONObject().put(
             "query",
@@ -811,7 +819,7 @@ internal fun imdbTrailerStreams(imdbId: String): List<Stream> {
             timeoutMs = 5_000,
             headers = mapOf("x-imdb-client-name" to "imdb-web-next-localized")
         )
-        parseImdbTrailerStreams(JSONObject(raw)).also { imdbTrailerCache[imdbId] = it }
+        parseImdbTrailerStreams(JSONObject(raw)).also { imdbTrailerCache[imdbId] = CachedTrailers(android.os.SystemClock.elapsedRealtime(), it) }
     }.getOrDefault(emptyList())
 }
 

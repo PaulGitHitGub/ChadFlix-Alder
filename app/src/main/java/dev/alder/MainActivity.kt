@@ -418,6 +418,7 @@ class MainActivity : Screen() {
         var newEpisodeCount: Int = 0,
         val collectionCard: Boolean = false,
         val watchlist: Watchlist? = null,
+        val catalogTrailers: List<Stream> = emptyList(),
         val showRowRating: Boolean = true,
     ) {
         val watchTitle get() = WatchTitle(id, type, name, poster, art)
@@ -479,6 +480,17 @@ class MainActivity : Screen() {
                 snapTo(focused)
             }
 
+            override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+                super.onLayout(changed, l, t, r, b)
+                // A catalog slot above focus can gain a row after requestChildFocus sampled its top.
+                val row = browseAnchor ?: return
+                if (!row.hasFocus()) return
+                val target = browseRowTarget(row)
+                if (slideAnim != null) {
+                    if (slideTarget != target) slideRows(target)
+                } else if (scrollY != target) scrollTo(0, target)
+            }
+
             // Rows snap into place (below) instead of scrolling just far enough, which left them cut off.
             override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect) =
                 if (page == Page.LIBRARY) super.computeScrollDeltaToGetChildRectOnScreen(rect) else 0
@@ -501,7 +513,11 @@ class MainActivity : Screen() {
             outlineProvider = android.view.ViewOutlineProvider.BOUNDS
             clipToOutline = true
             addView(content)
-            setOnScrollChangeListener { _, _, _, _, _ -> placeCaption(); updateImages(); loadMoreSections?.invoke() }
+            setOnScrollChangeListener { _, _, _, _, _ ->
+                updateImages()
+                if (!verticalHeld || page.isGrid) placeCaption()
+                if (!verticalHeld) loadMoreSections?.invoke()
+            }
         }
 
         art = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP; alpha = 0f }
@@ -581,7 +597,10 @@ class MainActivity : Screen() {
                 cardUnderline.visibility = View.INVISIBLE
             }
             // Rows settle after a focus move (the next heading can peek in): name it once, whichever shows.
-            main.removeCallbacks(nextRowCheck); main.postDelayed(nextRowCheck, 300)
+            if (!held) {
+                preview?.deferDetach()
+                main.removeCallbacks(nextRowCheck); main.postDelayed(nextRowCheck, 300)
+            }
         }
         val initialPage = Page.find(intent.getStringExtra("page"))
             ?: when (Settings.startTab(this)) {
@@ -734,10 +753,31 @@ class MainActivity : Screen() {
     private var titleFetched: Item? = null
     private val titleTask = Runnable { fetchTitle() }
 
+    private var preview: HomeTrailerPreview? = null // exists only while resumed with Trailer Previews enabled
+
+    private fun releasePreview() {
+        preview?.release()
+        preview = null
+    }
+
     private fun fetchTitleSoon(item: Item?) {
+        preview?.stop()
         main.removeCallbacks(titleTask)
         titleWanted = item?.takeIf { !it.live && !HomeStyle.isTile(it.id) }
         if (titleWanted != null) main.postDelayed(titleTask, TITLE_AHEAD_MS)
+    }
+
+    private fun watchPreview(item: Item) {
+        val home = preview ?: return
+        val card = currentFocus as? MediaCardView ?: return
+        if (card.payload !== item || card.artUrl == null) return // late backdrop arrival re-arms the dwell
+        val row = rows.firstOrNull { it.active } ?: return
+        home.watch(card, item.id, item.type == "movie", 2_000L - TITLE_AHEAD_MS,
+            motionSettled = { card.fullyWidened && !row.rail.gliding && slideAnim == null &&
+                scroller.scrollY == browseRowTarget(row.view) },
+            still = { card.isFocused && hasWindowFocus() && titleWanted === item && mode == Mode.BROWSE && !held && !searching },
+            metadataSettled = { item.settled },
+            addonUrl = { addonPreviewUrl(metas[item.id]?.trailerStreams.orEmpty()) ?: addonPreviewUrl(item.catalogTrailers) })
     }
 
     private fun fetchTitle() {
@@ -747,6 +787,7 @@ class MainActivity : Screen() {
             old.art?.takeIf { it != item.art }?.let { Images.forget(it, artW) }
             old.logo?.takeIf { it != item.logo }?.let { Images.forget(it, Images.TITLE_LOGO_PX, Images.trimmedLogo) }
         }
+        if (preview != null) watchPreview(item)
         titleFetched = item
         val still = { titleWanted === item }
         item.art?.let { Images.prefetch(it, artW, still = still) }
@@ -823,6 +864,9 @@ class MainActivity : Screen() {
         super.onResume()
         searching = false
         if (!::profile.isInitialized) return
+        if (Settings.trailerPreviews(this)) preview = HomeTrailerPreview(applicationContext, { held }) {
+            slideAnim != null || rows.any { it.active && (it.rail.gliding || it.cards.any { card -> card.resizing }) }
+        }
         startFps()
         // ChadFlix: Settings › Ratings may have changed: the focused card's badge follows (no score hides it).
         Settings.ratings(this).takeIf { it != ratingPick }?.let { pick ->
@@ -862,7 +906,50 @@ class MainActivity : Screen() {
         if (::loadingView.isInitialized) loadingView.visibility = View.GONE
     }
 
+    private var interruptedHold = false
+
+    private fun clearHolds() {
+        if (!held) return
+        interruptedHold = true
+        verticalHeld = false
+        rows.forEach { it.rail.clearHeld() }
+        preview?.deferDetach()
+    }
+
+    private fun beginBrowseHold() {
+        if (titleWanted != null) fetchTitleSoon(null)
+        main.removeCallbacks(artTask)
+        main.removeCallbacks(ratingsTask)
+        main.removeCallbacks(nextRowCheck)
+        landingTargets++
+        browseInfo.animate().cancel()
+        browseInfo.alpha = 0f
+    }
+
+    private fun settleRows() {
+        currentFocus?.let(::snapTo)
+        updateImages(refreshNear = true)
+        placeCaption()
+        loadMoreSections?.invoke()
+        val row = rows.firstOrNull { it.active }
+        if (row != null && !row.rail.held && page.isBrowse) row.settle(animate = false) else showInfo()
+        preview?.deferDetach()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) {
+            clearHolds()
+            preview?.stop()
+        } else if (interruptedHold) {
+            interruptedHold = false
+            settleRows()
+        } else if (preview != null) titleWanted?.let(::fetchTitleSoon)
+    }
+
     override fun onPause() {
+        clearHolds()
+        releasePreview()
         main.removeCallbacks(openSearch) // ChadFlix: resting on Search, then gone (Back, a dialog): it doesn't open behind
         cancelStreamResolution()
         stopFps()
@@ -873,9 +960,23 @@ class MainActivity : Screen() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (preview != null && titleWanted != null && event.action == KeyEvent.ACTION_DOWN &&
+            (event.repeatCount == 1 || event.keyCode == KeyEvent.KEYCODE_BACK) &&
+            event.keyCode != KeyEvent.KEYCODE_VOLUME_UP && event.keyCode != KeyEvent.KEYCODE_VOLUME_DOWN &&
+            event.keyCode != KeyEvent.KEYCODE_VOLUME_MUTE) {
+            main.removeCallbacks(titleTask)
+            preview?.stop() // keep the title for a long-OK menu that closes back onto the same card
+        }
         if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP || event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            if (event.action == KeyEvent.ACTION_DOWN) verticalHeld = event.repeatCount > 0
-            else if (verticalHeld) { verticalHeld = false; rows.firstOrNull { it.active }?.settle(animate = false); showInfo() } // where the hold ends
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (!verticalHeld && event.repeatCount > 0) {
+                    verticalHeld = true
+                    if (page.isBrowse && mode == Mode.BROWSE) beginBrowseHold()
+                }
+            } else if (verticalHeld) {
+                verticalHeld = false
+                settleRows()
+            }
         }
         if (event.action == KeyEvent.ACTION_DOWN) {
             restoreCatalogFocus = null
@@ -955,6 +1056,7 @@ class MainActivity : Screen() {
             val at = ordered.indexOfFirst { r -> currentFocus?.let { isInside(it, r.view) } == true }
             if (at >= 0) {
                 val next = ordered.getOrNull(at + if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1)
+                if (next == null && verticalHeld && event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) loadMoreSections?.invoke()
                 if (next != null) {
                     next.view.visibility = View.VISIBLE
                     val to = landingCard(ordered[at].selected, next.selected, next.cards.size, next.grid)
@@ -1202,6 +1304,7 @@ class MainActivity : Screen() {
     /** Search, with no screen change: its capsule is at rest in the same top bar. */
     private fun startSearch() {
         if (searching) return
+        releasePreview()
         searching = true
         startActivity(Intent(this, SearchActivity::class.java))
         @Suppress("DEPRECATION") overridePendingTransition(0, 0)
@@ -1319,7 +1422,8 @@ class MainActivity : Screen() {
         val url = item.art ?: return
         if (url == art.tag) return
         artTask = Runnable {
-            if (held || slideAnim != null) return@Runnable run { main.postDelayed(artTask, HomeStyle.WASH_WAIT) }
+            if (held) return@Runnable // the landing card asks again on key-up
+            if (slideAnim != null) return@Runnable run { main.postDelayed(artTask, HomeStyle.WASH_WAIT) }
             if (heroItem !== item || !page.isBrowse) return@Runnable
             art.animate().cancel()
             if (art.drawable != null && art.alpha > 0.5f) artBack.setImageDrawable(art.drawable)
@@ -1458,6 +1562,7 @@ class MainActivity : Screen() {
 
     private fun enterCinema() {
         if (cinema.isEmpty() || mode == Mode.CINEMA) return
+        preview?.stop()
         cancelBrowseHero()
         beforeCinema = currentFocus
         cinemaAt = 0
@@ -1543,6 +1648,7 @@ class MainActivity : Screen() {
 
     /** The focused title: its art across the screen, and logo, facts (and time left) and description top left. */
     private fun showHero(item: Item) {
+        if (page.isBrowse && (interruptedHold || held)) return
         if (item.collectionCard || (page == Page.LIBRARY && HomeStyle.isTile(item.id))) return clearLibraryHero()
         val changed = heroItem !== item
         heroItem = item
@@ -1823,6 +1929,9 @@ class MainActivity : Screen() {
 
     /** Opens [p] with saved answers and refreshes them in the background. */
     private fun showPage(p: Page) {
+        clearHolds()
+        interruptedHold = false
+        preview?.stop()
         val opened = android.os.SystemClock.uptimeMillis()
         cancelBrowseHero()
         if (page.polishedRail || p.polishedRail || page.isGrid || p.isGrid) resetArt()
@@ -1898,6 +2007,7 @@ class MainActivity : Screen() {
         pageWarning = null
         rows.forEach { r -> r.cards.forEach { it.unload() } }
         rows.clear()
+        browseAnchor = null
         genreStrip.animate().cancel()
         genreStrip.alpha = 1f
         genreStrip.isFillViewport = grid
@@ -3193,7 +3303,7 @@ class MainActivity : Screen() {
     private val nextRowCheck = Runnable { updateNextRow() }
 
     private fun updateNextRow() {
-        if (!page.isBrowse || page == Page.LIBRARY) return
+        if (!page.isBrowse || page == Page.LIBRARY || held) return
         val visible = rows.filter { it.view.isAttachedToWindow }.sortedBy { offsetIn(it.view) }
         // No row in use (the remote is on the chips or the top bar): the row sitting in the band counts.
         val active = visible.indexOfFirst { it.active }.takeIf { it >= 0 }
@@ -3290,6 +3400,7 @@ class MainActivity : Screen() {
         var pendingUpdate: (() -> Unit)? = null
         var active = false
         var loaded = false
+        private var posterBuffer = -1
 
         private val inset = if (grid) (artW - cardWidth * LIST_COLUMNS - dp(gap) * (LIST_COLUMNS - 1)) / 2 else dp(if (homeRow || compact) HomeStyle.INSET else PAD)
         val rail = HorizontalCardRail(
@@ -3304,13 +3415,25 @@ class MainActivity : Screen() {
             cullLeft = !homeRow, // the card before the focused one peeks in at the left edge
         ).apply {
             onScroll = {
-                if (scroller.hasFocus()) placeCaption()
-                loadRest(this@Row)
+                if (homeRow && this.held) {
+                    // Keep posters ahead of a long hold without rebinding each passing title.
+                    val block = scroller.scrollX / (4 * cardStep)
+                    if (block != posterBuffer) {
+                        posterBuffer = block
+                        loadRest(this@Row, postersAhead = true)
+                    }
+                } else if (!verticalHeld) {
+                    if (scroller.hasFocus()) placeCaption()
+                    loadRest(this@Row)
+                }
             }
-            onHoldEnd = { sel ->
-                if (!grid && !polishedRail) items.getOrNull(sel)?.let(::showArt)
-                // ChadFlix: racing along a row passes the cards as posters; the one the remote stops on widens.
-                if (homeRow) settle()
+            if (page.isBrowse) onHoldStart = {
+                posterBuffer = -1
+                beginBrowseHold()
+            }
+            onHoldEnd = {
+                if (page.isBrowse && !verticalHeld) settle()
+                preview?.deferDetach()
             }
         }
         val cards: MutableList<MediaCardView> get() = rail.cards
@@ -3390,13 +3513,20 @@ class MainActivity : Screen() {
                 if (list != null) setOnLongClickListener { watchlistMenu(list); true }
                 return@apply
             }
-            onRequestMeta = { fill(item) }
+            onRequestMeta = { if (!homeRow || !held) fill(item) }
             item.onFill += {
                 setNewEpisodes(item.newEpisodeCount)
                 logoUrl = item.logo
+                val artChanged = preview != null && isFocused && artUrl != item.art
+                if (artChanged) preview?.stop()
                 refresh(item.poster, item.art, item.settled)
                 rate(this, item, fade = true) // its score came with its details (focused card only)
-                if (homeRow && active && cards.getOrNull(selected) === this) pin(selected) // widened by a late backdrop: the row's end allows for it
+                if (homeRow && active && !held && cards.getOrNull(selected) === this) { // a late backdrop can move the row
+                    val x = scroller.scrollX
+                    val target = pin(selected)
+                    if (preview != null && (artChanged || target != x) && isFocused && !held) fetchTitleSoon(item)
+                }
+                onPreviewData?.invoke()
             }
             // Saved shows need episode metadata for their badges even when their poster is already available.
             // Bind one page of cards at a time, including later pages, on the same cache and executor as Home.
@@ -3415,7 +3545,7 @@ class MainActivity : Screen() {
                     showHero(item)
                     if (homeRow && !held) fetchTitleSoon(item)
                 } else if (titleWanted === item) fetchTitleSoon(null)
-                if (!has) main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
+                if (!has && pendingUpdate != null) main.post { if (!view.hasFocus()) pendingUpdate?.let { pendingUpdate = null; it() } }
                 styleTile()
             }
             // A channel has no title page to show: OK plays it, and holding OK lists its sources.
@@ -3433,7 +3563,10 @@ class MainActivity : Screen() {
             if (active == on) return
             active = on
             if (on) peek(true) else {
-                rail.clearHeld()
+                if (rail.held) {
+                    rail.clearHeld()
+                    preview?.deferDetach()
+                }
                 hideBadge()
                 cards.getOrNull(selected)?.expand(false, animate = false) // leaving the row: a poster again at once
                 if (tileRow && selected == 0 && cards.size > 1) rail.selectIndex(1) // back in, the remote lands on a title
@@ -3463,8 +3596,9 @@ class MainActivity : Screen() {
             if (score.isNullOrBlank()) return hideBadge()
             val b = badge ?: HomeStyle.badge(this@MainActivity).also { badge = it }
             if (b.parent !== card) {
-                (b.parent as? android.view.ViewGroup)?.removeView(b)
+                hideBadge()
                 card.addView(b, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.END).apply { rightMargin = dp(8) })
+                card.ratingNeedsShade = true
             }
             // Above Continue Watching's bar (6-10 dp up) whenever it's there, even if it came after the badge.
             (b.layoutParams as FrameLayout.LayoutParams).let { lp ->
@@ -3477,11 +3611,17 @@ class MainActivity : Screen() {
             if (fade) { b.alpha = 0f; b.animate().alpha(1f).setDuration(FOCUS_MS).start() } else b.alpha = 1f
         }
 
-        fun hideBadge() { badge?.let { (it.parent as? android.view.ViewGroup)?.removeView(it) } }
+        fun hideBadge() {
+            val b = badge ?: return
+            val card = b.parent as? MediaCardView ?: return
+            card.removeView(b)
+            card.ratingNeedsShade = false
+        }
 
         /** ChadFlix: scrolls to card [index], and the info line starts under it (after the Showing tile, further right). */
         fun pin(index: Int, snap: Boolean = false): Int {
             val target = rail.scrollToCard(index, if (homeRow) cards[index].widensBy else 0, pinOf(index), snap)
+            if (homeRow && (rail.held || verticalHeld)) return target
             // Kept on screen: near a row's end the card sits far right, and the info box is wider than what's left.
             // The set width, not the measured one: right after a page switch the box may still measure at the old page's width.
             val info = browseInfo.layoutParams as FrameLayout.LayoutParams
@@ -3492,12 +3632,22 @@ class MainActivity : Screen() {
 
         /** ChadFlix: a hold ended here: the card the remote stopped on widens (at once after Up/Down, sliding after Left/Right). */
         fun settle(animate: Boolean = true) {
-            if (!homeRow) return
-            cards.getOrNull(selected)?.expand(true, animate) ?: return
-            items.getOrNull(selected)?.let { rate(cards[selected], it, fade = false) }
-            pin(selected, snap = !animate)
-            if (cards[selected].isFocused) fetchTitleSoon(items.getOrNull(selected))
-            prefetchNeighbours(this)
+            val card = cards.getOrNull(selected)?.takeIf { it.isFocused } ?: return
+            val item = items[selected]
+            if (homeRow) {
+                card.expand(true, animate)
+                rate(card, item, fade = false)
+                pin(selected, snap = !animate)
+                fill(item)
+                fetchTitleSoon(item)
+                if (animate) loadRest(this) // vertical release already refreshed the visible rows
+                prefetchNeighbours(this)
+            }
+            heroItem = item // showInfo owns the single fade from the hold
+            showHero(item)
+            updateNextRow()
+            if (page.isCatalog) markChip(title)
+            showInfo()
         }
 
         /** ChadFlix: the card the remote lands on coming into this row from above or below. */
@@ -3513,14 +3663,20 @@ class MainActivity : Screen() {
             val previous = selected
             val entering = !active // ChadFlix: from another row or the top bar: the card is wide at once, no slide
             rail.selectIndex(index)
-            main.post { loadMoreSections?.invoke() }
+            if (!rail.held && !verticalHeld) main.post { if (!verticalHeld) loadMoreSections?.invoke() }
             if (active) {
                 if (previous != index && grid) { cards[previous].dim(true); cards[index].dim(false) }
             } else light(true)
             if (homeRow) { // ChadFlix: the old card goes back to a poster, the new one widens; its neighbours' backdrops come ahead
                 if (previous != index) cards.getOrNull(previous)?.expand(false)
-                if (!held) cards[index].expand(true, animate = !entering)
-                if (!held) listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
+                if (held) {
+                    hideBadge()
+                    pin(index, snap = entering)
+                    if (index >= items.size - AHEAD) fetchMore()
+                    return
+                }
+                cards[index].expand(true, animate = !entering)
+                listOf(index - 1, index + 1).mapNotNull { items.getOrNull(it)?.art }.forEach { Images.prefetch(it, dp(HomeStyle.WIDE_W), wide = true) }
             }
             if (homeRow) { // (My Lists' compact rows never show a badge)
                 hideBadge()
@@ -3569,7 +3725,7 @@ class MainActivity : Screen() {
                     rail.appendCard(card)
                     card.show(homeRow) // shows once focus moves near, like the cards past the right margin (home rows don't cull)
                 }
-                if (loaded) loadRest(this@Row)
+                if (loaded) loadRest(this@Row, postersAhead = homeRow && (rail.held || verticalHeld))
                 if (active && !grid) rail.strip.post {
                     if (active) {
                         placeCaption()
@@ -3652,7 +3808,7 @@ class MainActivity : Screen() {
         m.id, m.type, m.name, m.poster, m.background,
         m.logo ?: Images.logoFor(m.id) ?: m.poster?.takeIf { isLiveType(m.type) && m.posterShape in listOf("square", "landscape") },
         m.description ?: "", facts(m),
-        null, 0f, resume = false,
+        null, 0f, resume = false, catalogTrailers = m.trailerStreams,
     )
 
     private data class HomeLibrary(
@@ -3719,6 +3875,7 @@ class MainActivity : Screen() {
     /** Resume: straight to the sources for the episode Continue Watching points at; with [pick] (held OK) they're all listed. */
     private fun play(item: Item, pick: Boolean = false) {
         if (resolvingStreams != null) return
+        releasePreview()
         val videoId = item.videoId ?: item.id
         val videos = metas[item.id]?.videos.orEmpty()
         val next = videos.getOrNull(videos.indexOfFirst { it.id == videoId } + 1)?.takeIf { videos.any { it.id == videoId } }
@@ -3743,6 +3900,7 @@ class MainActivity : Screen() {
     }
 
     private fun openDetails(item: Item) {
+        releasePreview()
         main.removeCallbacks(titleTask) // ChadFlix: the title page asks for its pictures itself now
         startActivity(Intent(this, DetailsActivity::class.java)
             .putExtra("type", item.type).putExtra("id", item.id).putExtra("name", item.name)
@@ -3755,6 +3913,8 @@ class MainActivity : Screen() {
     /** Shows the focused row in the row band. */
     private fun snapTo(focused: View) {
         val rowView = rows.firstOrNull { isInside(focused, it.view) }?.view ?: return
+        browseAnchor = rowView.takeIf { page.isBrowse && page != Page.LIBRARY }
+        if (browseAnchor != null) return slideRows(browseRowTarget(rowView))
         val top = offsetIn(rowView)
         if (page == Page.LIBRARY) {
             val bottom = top + rowView.height
@@ -3768,12 +3928,15 @@ class MainActivity : Screen() {
         if (page.isGrid) scroller.smoothScrollTo(0, target) else slideRows(target)
     }
 
+    private var browseAnchor: View? = null
+    private fun browseRowTarget(row: View) = offsetIn(row).coerceIn(0, (content.height - scroller.height).coerceAtLeast(0))
+
     private var slideAnim: android.animation.ValueAnimator? = null
     private var slideTarget = -1
 
     /** ChadFlix: the info line fades back in once the rows have stopped. */
     private fun showInfo() {
-        if (heroItem != null && mode == Mode.BROWSE && slideAnim == null)
+        if (heroItem != null && mode == Mode.BROWSE && slideAnim == null && !held)
             browseInfo.animate().alpha(1f).setDuration(INFO_IN_MS).setInterpolator(EASE_OUT).start()
     }
 
@@ -3800,20 +3963,22 @@ class MainActivity : Screen() {
                     showInfo()
                 }
             })
-            start()
         }
+        slideAnim?.start()
     }
 
     private fun libraryPosterWidth() = (artW - dp(2 * PAD + LIST_GAP * (LIST_COLUMNS - 1))) / LIST_COLUMNS
 
     // ---------- memory: pictures only near the screen ----------
 
-    private fun updateImages() {
+    private fun updateImages(refreshNear: Boolean = false) {
         val top = scroller.scrollY
         // ChadFlix: home rows go by one row's height, not the taller scroller's.
         val height = if (!page.isGrid && page != Page.LIBRARY) browseRowBlock else scroller.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
         // Requests run newest first, so the bottom rows are asked for first and the top row last: it loads first.
-        for (r in rows.filter { it.view.isAttachedToWindow }.sortedByDescending { offsetIn(it.view) }) {
+        val ordered = if (verticalHeld) rows else rows.filter { it.view.isAttachedToWindow }.sortedByDescending { offsetIn(it.view) }
+        for (r in ordered) {
+            if (verticalHeld && !r.view.isAttachedToWindow) continue
             val y = offsetIn(r.view)
             val near = r.view.hasFocus() || y < top + height * 3 && y + r.view.height > top - height
             val far = !r.view.hasFocus() && (y > top + height * 5 || y + r.view.height < top - height * 3)
@@ -3822,9 +3987,9 @@ class MainActivity : Screen() {
             r.view.visibility = if (r.view.hasFocus() || y < top + height * (if (page.isGrid) 3 else 2) && y + r.view.height > top - height) View.VISIBLE else View.INVISIBLE
             // An old row stays out of the title area after a genre jump; the focused row remains visible while it slides in.
             r.view.alpha = if (!r.view.hasFocus() && !page.isGrid && y + r.view.height <= top + dp(2)) 0f else 1f
-            if (near && !r.loaded) {
+            if (near && (!r.loaded || refreshNear)) {
                 r.loaded = true
-                loadRest(r)
+                loadRest(r, postersAhead = verticalHeld && r.homeRow)
             } else if (far && r.loaded) {
                 r.loaded = false
                 r.cards.forEach { it.unload() }
@@ -3833,15 +3998,20 @@ class MainActivity : Screen() {
     }
 
     /** A row scrolled sideways: its cards near the screen load, and cards far away let pictures go. */
-    private fun loadRest(r: Row) {
-        if (!r.loaded) return
+    private fun loadRest(r: Row, postersAhead: Boolean = false) {
+        if (!r.loaded || (r.homeRow && r.rail.held && !postersAhead)) return
         val step = r.cardStep
         val w = if (r.scroller.width > 0) r.scroller.width else resources.displayMetrics.widthPixels
         val window = cardLoadWindow(r.scroller.scrollX, w, step, r.cards.size)
         for (i in 0 until window.farLeftEnd) {
             if (i != r.selected) r.cards[i].unload()
         }
-        cardLoadOrder(window).forEach { r.cards[it].load() }
+        if (postersAhead) {
+            for (i in window.loadStart until window.loadEnd) r.cards[i].bufferPoster()
+        } else if (verticalHeld) {
+            // Live rows still need their channel logos as they pass. The rest of the window waits for key-up.
+            for (i in window.visibleFirst until window.visibleLast) r.cards[i].load()
+        } else cardLoadOrder(window).forEach { r.cards[it].load() }
         for (i in window.farRightStart until r.cards.size) {
             if (i != r.selected) r.cards[i].unload()
         }

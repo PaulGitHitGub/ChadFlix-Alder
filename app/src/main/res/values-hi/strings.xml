@@ -599,4 +599,6 @@
     <string name="like_remove">पसंदीदा से हटाएँ</string>
     <string name="watchlist_add">वॉचलिस्ट में जोड़ें</string>
     <string name="watchlist_in">वॉचलिस्ट · %1$s में</string>
+    <string name="trailer_previews">ट्रेलर प्रीव्यू</string>
+    <string name="trailer_previews_hint">किसी टाइटल पर रुकने पर आवाज़ के साथ ट्रेलर चलाता है।</string>
 </resources>

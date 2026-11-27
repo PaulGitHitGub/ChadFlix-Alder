@@ -140,6 +140,7 @@ object Settings {
     /** Settings › Video player: null plays in Alder, else the package of the video app each source goes to. */
     fun externalPlayer(c: Context) = prefs(c).getString("videoPlayer", "").orEmpty().ifEmpty { null }
     fun clearDialogue(c: Context) = prefs(c).getBoolean("clearDialogue", false)
+    fun trailerPreviews(c: Context) = prefs(c).getBoolean("trailerPreviews", false)
     /** ChadFlix: Settings › Picture & Sound › Show FPS, for this TV: a frame counter in Home's top-left corner. */
     fun showFps(c: Context) = prefs(c).getBoolean("showFps", false)
     /** ChadFlix: Settings › Picture & Sound › Background wash, for this TV: Home's soft wash behind the rows, or black. */
@@ -585,6 +586,8 @@ class SettingsActivity : Screen() {
                 languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
+                choiceRow(Choice("trailerPreviews", getString(R.string.trailer_previews), getString(R.string.trailer_previews_hint),
+                    listOf(false to off, true to on)))
             }
             Group.SUBTITLES -> {
                 subtitles.forEach(::choiceRow)

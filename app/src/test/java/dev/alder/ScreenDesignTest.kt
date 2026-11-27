@@ -1,5 +1,6 @@
 package dev.alder
 
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import androidx.media3.common.MimeTypes
@@ -552,6 +553,78 @@ class ScreenDesignTest {
             listOf("Official Trailer (1080p)", "Official Trailer", "Official Trailer (480p)"),
             ordered.map { it.title }
         )
+    }
+
+    @Test fun homePreviewPrefers720pMp4Then480pThenSdAndSkipsYoutube() {
+        val sd = "https://cdn.example/sd.mp4"
+        val small = "https://cdn.example/480.MP4?Expires=123"
+        val hd = "https://cdn.example/720.mp4"
+        val streams = orderTrailerStreams("Trailer", listOf("1080p" to "https://cdn.example/1080.mp4", "SD" to sd,
+            "720p" to "https://cdn.example/master.m3u8", "480p" to small, "720p" to hd))
+        assertEquals(hd, imdbPreviewUrl(streams))
+        val withoutHd = streams.filter { it.url != hd }
+        assertEquals(small, imdbPreviewUrl(withoutHd))
+        assertEquals(sd, imdbPreviewUrl(withoutHd.filter { it.url != small }))
+        assertNull(imdbPreviewUrl(withoutHd.filter { it.url != small && it.url != sd }))
+
+        fun addon(vararg urls: String) = orderTrailerStreams("Trailer", urls.map { "" to it })
+        val indirect = arrayOf("https://m.youtube.com/watch?v=abc", "https://youtu.be/abc",
+            "https://YouTube-NoCookie.com./embed/abc", "https://r1.googlevideo.com/videoplayback",
+            "magnet:?xt=urn:btih:abc", "file:///sdcard/movie.mp4", "//cdn.example/relative.mp4")
+        assertNull(addonPreviewUrl(addon(*indirect)))
+        assertEquals(sd, addonPreviewUrl(addon(*indirect, sd)))
+        val blocked = addon("https://m.youtube.com/watch?v=1", "https://youtu.be/clip", "https://www.youtube-nocookie.com/embed/id",
+            "https://r1.googlevideo.com/videoplayback", "file:///video.mp4", "youtube://id", "broken")
+        assertNull(addonPreviewUrl(blocked))
+        val direct = "https://cdn.example/trailer?id=1"
+        assertEquals(direct, addonPreviewUrl(blocked + addon(direct)))
+    }
+
+    @Test fun homeTrailerAudioAllowsOnlyKnownMonoOrStereoAacAndPcm() {
+        for (mime in listOf(MimeTypes.AUDIO_AAC, MimeTypes.AUDIO_RAW)) {
+            for (channels in listOf(-1, 0, 1, 2, 3, 6, 8)) {
+                assertEquals(channels in 1..2, previewAudioAllowed(mime, channels))
+            }
+        }
+        for (mime in listOf(null, MimeTypes.AUDIO_AC3, MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC,
+                MimeTypes.AUDIO_DTS, MimeTypes.AUDIO_DTS_HD, MimeTypes.AUDIO_MPEG)) {
+            assertEquals(false, previewAudioAllowed(mime, 2))
+        }
+    }
+
+    @Test fun homeTrailerSkipsIntroOnlyForLongOrUnknownDurations() {
+        assertEquals(6_000L, previewStartMs(androidx.media3.common.C.TIME_UNSET))
+        for (duration in listOf(0L, 4_000L, 59_999L, 60_000L)) assertEquals(0L, previewStartMs(duration))
+        assertEquals(6_000L, previewStartMs(60_001L))
+    }
+
+    @Test fun trailerTextureCenterCropsWithoutStretching() {
+        assertEquals(1f to 1f, previewCrop(640, 360, 1f, 960, 540, movie = false))
+        assertEquals(1.35f to 1.35f, previewCrop(640, 360, 1f, 960, 540, movie = true))
+        val narrow = previewCrop(640, 480, 1f, 960, 540, movie = false)!!
+        assertEquals(1f, narrow.first, 0.0001f)
+        assertEquals(4f / 3f, narrow.second, 0.0001f)
+        val scope = previewCrop(800, 400, 1.2f, 960, 540, movie = false)!!
+        assertEquals(1.35f, scope.first, 0.0001f)
+        assertEquals(1f, scope.second, 0.0001f)
+        val movie = previewCrop(800, 400, 1.2f, 960, 540, movie = true)!!
+        assertEquals(scope.first * 1.35f, movie.first, 0.0001f)
+        assertEquals(scope.second * 1.35f, movie.second, 0.0001f)
+        assertNull(previewCrop(0, 0, 1f, 960, 540, movie = true))
+    }
+
+    @Test fun homeTrailerCacheDistinguishesMissesFromKnownEmptyResults() {
+        assertNull(cachedImdbTrailerStreams("tt-absent-from-test-cache"))
+        assertEquals(emptyList<Stream>(), cachedImdbTrailerStreams("addon:123"))
+        assertEquals(emptyList<Stream>(), CachedTrailers(100L, emptyList()).fresh(101L))
+    }
+
+    @Test fun cachedTrailerLinksExpireAtTwelveHours() {
+        val streams = orderTrailerStreams("Trailer", listOf("SD" to "https://cdn.example/trailer.mp4"))
+        val cached = CachedTrailers(500L, streams)
+        val expiry = 500L + 12 * 60 * 60 * 1_000L
+        assertEquals(streams, cached.fresh(expiry - 1))
+        assertNull(cached.fresh(expiry))
     }
 
     @Test fun contentRatingParsesFromImdbAndMeta() {

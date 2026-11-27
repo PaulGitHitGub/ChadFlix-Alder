@@ -602,4 +602,6 @@
     <string name="like_remove">Retirer des favoris</string>
     <string name="watchlist_add">Ajouter à une liste</string>
     <string name="watchlist_in">Liste · Dans %1$s</string>
+    <string name="trailer_previews">Aperçu des bandes-annonces</string>
+    <string name="trailer_previews_hint">Lance une bande-annonce avec le son quand vous restez sur un titre.</string>
 </resources>

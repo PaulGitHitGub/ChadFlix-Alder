@@ -623,4 +623,6 @@
     <string name="like_remove">إزالة من المفضلة</string>
     <string name="watchlist_add">إضافة إلى قائمة مشاهدة</string>
     <string name="watchlist_in">قائمة المشاهدة · في %1$s</string>
+    <string name="trailer_previews">معاينة الإعلانات التشويقية</string>
+    <string name="trailer_previews_hint">يشغّل إعلانًا تشويقيًا مع الصوت عند التوقف على عنوان.</string>
 </resources>
