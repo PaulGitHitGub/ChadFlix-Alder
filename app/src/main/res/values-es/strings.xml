@@ -273,9 +273,6 @@
     <string name="shared_by_hint">%1$s comparte estos complementos de streaming con todos los perfiles de este TV. Tu historial sigue siendo tuyo.</string>
     <string name="no_stream_addons">Sin complementos de streaming</string>
     <string name="load_failed">No se pudo cargar</string>
-    <string name="more_filters">Más filtros</string>
-    <string name="more_filters_hint">Los grupos de versiones, códecs y más se configuran en tu complemento de streaming.</string>
-    <string name="more_filters_desc">Los grupos de versiones, códecs, idiomas y más se configuran en tu complemento de streaming desde tu teléfono o en web.stremio.com. Este TV sigue su orden.</string>
     <string name="audio_language">Idioma de audio</string>
     <string name="audio_language_hint">El doblaje con el que empezar cuando un archivo tiene varios. Se puede cambiar mientras miras.</string>
     <string name="subtitle_language">Idioma de subtítulos</string>

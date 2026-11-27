@@ -272,9 +272,6 @@
     <string name="shared_by_hint">%1$s ये स्ट्रीम ऐड-ऑन इस टीवी की हर प्रोफ़ाइल के साथ शेयर करते हैं। आपका इतिहास आपका ही रहता है।</string>
     <string name="no_stream_addons">कोई स्ट्रीम ऐड-ऑन नहीं</string>
     <string name="load_failed">लोड नहीं हो सका</string>
-    <string name="more_filters">और फ़िल्टर</string>
-    <string name="more_filters_hint">रिलीज़ ग्रुप, कोडेक और बाकी आपके स्ट्रीमिंग ऐड-ऑन में सेट होते हैं।</string>
-    <string name="more_filters_desc">रिलीज़ ग्रुप, कोडेक, भाषाएँ और बाकी आपके फ़ोन से या web.stremio.com पर आपके स्ट्रीमिंग ऐड-ऑन में सेट होते हैं। यह टीवी उसी क्रम का पालन करता है।</string>
     <string name="audio_language">ऑडियो भाषा</string>
     <string name="audio_language_hint">जब फ़ाइल में कई डब हों तो किससे शुरू करें। देखते समय बदली जा सकती है।</string>
     <string name="subtitle_language">सबटाइटल भाषा</string>

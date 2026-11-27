@@ -305,9 +305,6 @@
     <string name="shared_by_hint">%1$s shares these stream add-ons with every profile on this TV. Your history stays yours.</string>
     <string name="no_stream_addons">No stream add-ons</string>
     <string name="load_failed">Couldn\'t load</string>
-    <string name="more_filters">More filters</string>
-    <string name="more_filters_hint">Release groups, codecs and more are set in your streaming add-on.</string>
-    <string name="more_filters_desc">Release groups, codecs, languages and more are set in your streaming add-on on your phone or at web.stremio.com. This TV follows its order.</string>
     <string name="audio_language">Audio language</string>
     <string name="audio_language_hint">The dub to start with when a file has several. Changeable while watching.</string>
     <string name="audio_fallback">Fallback audio language</string>

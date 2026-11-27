@@ -273,9 +273,6 @@
     <string name="shared_by_hint">%1$s partage ces extensions de streaming avec tous les profils de ce téléviseur. Votre historique reste le vôtre.</string>
     <string name="no_stream_addons">Aucune extension de streaming</string>
     <string name="load_failed">Chargement impossible</string>
-    <string name="more_filters">Plus de filtres</string>
-    <string name="more_filters_hint">Les groupes de release, codecs et autres se règlent dans votre extension de streaming.</string>
-    <string name="more_filters_desc">Les groupes de release, codecs, langues et autres se règlent dans votre extension de streaming, depuis votre téléphone ou sur web.stremio.com. Ce téléviseur suit son ordre.</string>
     <string name="audio_language">Langue audio</string>
     <string name="audio_language_hint">Le doublage par lequel commencer quand un fichier en a plusieurs. Modifiable pendant la lecture.</string>
     <string name="subtitle_language">Langue des sous-titres</string>

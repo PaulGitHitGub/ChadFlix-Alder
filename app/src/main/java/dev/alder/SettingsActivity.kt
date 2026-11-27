@@ -562,9 +562,6 @@ class SettingsActivity : Screen() {
             Group.STREAMS -> {
                 presetRow()
                 streaming.forEach(::choiceRow)
-                actionRow(getString(R.string.more_filters), "", getString(R.string.more_filters_hint)) {
-                    choose(getString(R.string.more_filters), listOf(getString(R.string.action_ok)), getString(R.string.more_filters_desc)) {}
-                }
             }
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)

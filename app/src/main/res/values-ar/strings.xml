@@ -289,9 +289,6 @@
     <string name="shared_by_hint">يشارك %1$s إضافات البث هذه مع كل الملفات الشخصية على هذا التلفزيون. يظل سجلّ مشاهداتك خاصًا بك.</string>
     <string name="no_stream_addons">لا توجد إضافات بث</string>
     <string name="load_failed">تعذّر التحميل</string>
-    <string name="more_filters">مزيد من عوامل التصفية</string>
-    <string name="more_filters_hint">تُضبط مجموعات الإصدار والترميزات وغيرها في إضافة البث.</string>
-    <string name="more_filters_desc">اضبط مجموعات الإصدار والترميزات واللغات وغيرها في إضافة البث على هاتفك أو على web.stremio.com. يتّبع التلفزيون الترتيب الذي تحدّده الإضافة.</string>
     <string name="audio_language">لغة الصوت</string>
     <string name="audio_language_hint">لغة الدبلجة التي يبدأ بها التشغيل عند توفّر عدة لغات في الملف. يمكنك تغييرها أثناء المشاهدة.</string>
     <string name="subtitle_language">لغة الترجمة</string>

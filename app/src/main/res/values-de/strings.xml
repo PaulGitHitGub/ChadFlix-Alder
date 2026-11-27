@@ -272,9 +272,6 @@
     <string name="shared_by_hint">%1$s teilt diese Stream-Add-ons mit allen Profilen auf diesem Fernseher. Dein Verlauf bleibt deiner.</string>
     <string name="no_stream_addons">Keine Stream-Add-ons</string>
     <string name="load_failed">Konnte nicht geladen werden</string>
-    <string name="more_filters">Weitere Filter</string>
-    <string name="more_filters_hint">Release-Gruppen, Codecs und mehr stellst du in deinem Streaming-Add-on ein.</string>
-    <string name="more_filters_desc">Release-Gruppen, Codecs, Sprachen und mehr stellst du in deinem Streaming-Add-on ein, am Handy oder unter web.stremio.com. Dieser Fernseher folgt dessen Reihenfolge.</string>
     <string name="audio_language">Audiosprache</string>
     <string name="audio_language_hint">Die Synchronfassung, mit der begonnen wird, wenn eine Datei mehrere hat. Beim Schauen änderbar.</string>
     <string name="subtitle_language">Untertitelsprache</string>
