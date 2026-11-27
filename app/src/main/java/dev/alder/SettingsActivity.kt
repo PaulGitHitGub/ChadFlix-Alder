@@ -881,7 +881,7 @@ class SettingsActivity : Screen() {
         val columns = LinearLayout(this).apply {
             listOf(onScroll, offScroll).forEachIndexed { i, sc ->
                 addView(column(Gravity.START,
-                    text(sc.tag as String, SMALL, bold = true, color = TEXT_3).apply {
+                    text(sc.tag as String, SMALL, bold = true, color = TEXT).apply {
                         gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(12), 0, dp(12), dp(4))
                         layoutParams = LinearLayout.LayoutParams(-1, -2) // the column's full width, so the header centres over it
                     },
