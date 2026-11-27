@@ -114,7 +114,10 @@ internal class MediaCardView(
     private val face = object : FrameLayout(screen) { override fun hasOverlappingRendering() = false }.apply { alpha = 0f }
     // Darkens the cards beside the focused one. A shade, not transparency: a see-through card would let the
     // art behind it show through and look like it was floating on the poster.
-    private val shade = View(screen).apply { setBackgroundColor(Color.BLACK); alpha = 0f }
+    private val shade = object : View(screen) {
+        // Only the black background draws. Its alpha can be applied directly, even for the rounded Home shade.
+        override fun hasOverlappingRendering() = false
+    }.apply { setBackgroundColor(Color.BLACK); alpha = 0f }
     private val ring = if (home) HomeStyle.ring(screen) else null
     private var bar: View? = null // ChadFlix: Continue Watching's red bar along the card's foot
     val hasBar: Boolean get() = bar != null
