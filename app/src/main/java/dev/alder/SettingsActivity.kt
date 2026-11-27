@@ -276,9 +276,9 @@ class SettingsActivity : Screen() {
         STREAMS(R.string.group_streams, R.drawable.ic_play),
         PICTURE(R.string.group_picture, R.drawable.ic_tv),
         SUBTITLES(R.string.group_subtitles, R.drawable.ic_subtitles),
-        ADDONS(R.string.group_addons, R.drawable.ic_layers),
         CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix
-        PROFILE(R.string.group_profile, R.drawable.ic_person),
+        HOME_DISPLAY(R.string.group_home_display, R.drawable.ic_layers), // ChadFlix: everything else that changes Home
+        PROFILE(R.string.group_profile_addons, R.drawable.ic_person), // ChadFlix: who's watching and their add-ons
         LANGUAGE(R.string.group_language, R.drawable.ic_language),
         ADVANCED(R.string.group_advanced, R.drawable.ic_settings), // ChadFlix: what most people never need to change
         ABOUT(R.string.group_about, R.drawable.ic_info),
@@ -551,9 +551,9 @@ class SettingsActivity : Screen() {
             Group.STREAMS -> R.string.hint_streams
             Group.PICTURE -> R.string.hint_picture
             Group.SUBTITLES -> R.string.hint_subtitles
-            Group.ADDONS -> R.string.hint_addons
             Group.CUSTOMIZE -> R.string.hint_customize
-            Group.PROFILE -> R.string.hint_profile
+            Group.HOME_DISPLAY -> R.string.hint_home_display
+            Group.PROFILE -> R.string.hint_profile_addons
             Group.LANGUAGE -> R.string.hint_language
             Group.ADVANCED -> R.string.hint_advanced
             Group.ABOUT -> R.string.hint_about
@@ -562,23 +562,6 @@ class SettingsActivity : Screen() {
             Group.STREAMS -> {
                 presetRow()
                 streaming.forEach(::choiceRow)
-                Profiles.active(this)?.let { me ->
-                    lateinit var value: TextView
-                    value = actionRow(getString(R.string.share_streams), if (Profiles.sharesStreams(this, me.id)) on else off,
-                        getString(R.string.share_streams_hint)) {
-                        val shares = !Profiles.sharesStreams(this, me.id)
-                        Profiles.setSharesStreams(this, me.id, shares)
-                        value.text = (if (shares) on else off) + "  ›"
-                    }
-                }
-                Profiles.streamLenders(this).forEach { lender ->
-                    val value = actionRow(getString(R.string.shared_by, lender.name), "…",
-                        getString(R.string.shared_by_hint, lender.name)) {}
-                    background({ (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable } }) { result ->
-                        value.text = result.getOrNull()?.map { addonShortName(it.name) }?.ifEmpty { null }?.joinToString(", ")
-                            ?: getString(if (result.isSuccess) R.string.no_stream_addons else R.string.load_failed)
-                    }
-                }
                 actionRow(getString(R.string.more_filters), "", getString(R.string.more_filters_hint)) {
                     choose(getString(R.string.more_filters), listOf(getString(R.string.action_ok)), getString(R.string.more_filters_desc)) {}
                 }
@@ -595,25 +578,8 @@ class SettingsActivity : Screen() {
                 languageRow("subLang", getString(R.string.subtitle_language), getString(R.string.subtitle_language_hint))
                 subtitleLooks.forEach(::choiceRow)
             }
-            Group.ADDONS -> {
-                actionRow(getString(R.string.my_addons), "…", getString(R.string.my_addons_hint)) {
-                    if (authKey != null) startActivity(Intent(this, AddonsActivity::class.java))
-                }.also { addonValue = it }
-                val key = authKey
-                if (key != null) background({ Stremio.addons(key).size }) { result ->
-                    addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
-                }
-            }
             Group.CUSTOMIZE -> customizeHome()
-            Group.PROFILE -> {
-                actionRow(getString(R.string.menu_switch_profile), "", getString(R.string.switch_profile_hint)) {
-                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-                }
-                actionRow(getString(R.string.manage_profiles), "", getString(R.string.manage_profiles_hint)) {
-                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-                }
+            Group.HOME_DISPLAY -> {
                 var hiddenValue: TextView? = null
                 fun count() { hiddenValue?.text = "${Settings.hidden(this).length()}  ›" }
                 hiddenValue = actionRow(getString(R.string.hidden_continue), "", getString(R.string.hidden_continue_hint)) {
@@ -642,6 +608,36 @@ class SettingsActivity : Screen() {
                     listOf("imdb" to "IMDb", "letterboxd" to LETTERBOXD, "both" to getString(R.string.ratings_both))))
                 choiceRow(Choice("episodeBadges", getString(R.string.episode_badges), getString(R.string.episode_badges_hint),
                     listOf("aired" to getString(R.string.episode_badges_aired), "season" to getString(R.string.episode_badges_season), "off" to off)))
+            }
+            Group.PROFILE -> {
+                actionRow(getString(R.string.menu_switch_profile), "", getString(R.string.switch_profile_hint)) {
+                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                }
+                actionRow(getString(R.string.my_addons), "…", getString(R.string.my_addons_hint)) {
+                    if (authKey != null) startActivity(Intent(this, AddonsActivity::class.java))
+                }.also { addonValue = it }
+                val key = authKey
+                if (key != null) background({ Stremio.addons(key).size }) { result ->
+                    addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
+                }
+                Profiles.active(this)?.let { me ->
+                    lateinit var value: TextView
+                    value = actionRow(getString(R.string.share_streams), if (Profiles.sharesStreams(this, me.id)) on else off,
+                        getString(R.string.share_streams_hint)) {
+                        val shares = !Profiles.sharesStreams(this, me.id)
+                        Profiles.setSharesStreams(this, me.id, shares)
+                        value.text = (if (shares) on else off) + "  ›"
+                    }
+                }
+                Profiles.streamLenders(this).forEach { lender ->
+                    val value = actionRow(getString(R.string.shared_by, lender.name), "…",
+                        getString(R.string.shared_by_hint, lender.name)) {}
+                    background({ (Stremio.savedAddons(lender.authKey) ?: Stremio.addons(lender.authKey)).filter { it.shareable } }) { result ->
+                        value.text = result.getOrNull()?.map { addonShortName(it.name) }?.ifEmpty { null }?.joinToString(", ")
+                            ?: getString(if (result.isSuccess) R.string.no_stream_addons else R.string.load_failed)
+                    }
+                }
             }
             Group.LANGUAGE -> appLanguageRow()
             Group.ADVANCED -> {

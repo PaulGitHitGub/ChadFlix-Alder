@@ -209,15 +209,11 @@
     <string name="group_streams">Sources</string>
     <string name="group_picture">Image et son</string>
     <string name="group_subtitles">Sous-titres</string>
-    <string name="group_addons">Extensions</string>
-    <string name="group_profile">Profil</string>
     <string name="group_language">Langue</string>
     <string name="group_about">À propos</string>
     <string name="hint_streams">Choisissez comment Alder trouve et lance une source.</string>
     <string name="hint_picture">Choisissez l’image et le son que ce téléviseur peut lire.</string>
     <string name="hint_subtitles">Réglez le démarrage et l’apparence des sous-titres.</string>
-    <string name="hint_addons">Gérez les extensions liées à ce profil.</string>
-    <string name="hint_profile">Les choix du profil restent propres à la personne qui regarde.</string>
     <string name="hint_language">Choisissez la langue d’Alder.</string>
     <string name="hint_about">À propos d’Alder.</string>
     <string name="play_press">Quand j’appuie sur Lecture</string>
@@ -292,7 +288,6 @@
     <string name="reload_failed">Échec du rechargement</string>
     <string name="switch_profile_hint">Choisissez qui regarde.</string>
     <string name="manage_profiles">Gérer les profils</string>
-    <string name="manage_profiles_hint">Renommez les profils, changez les codes PIN ou ajoutez une personne.</string>
     <string name="hidden_continue">Masqués de Reprendre</string>
     <string name="hidden_continue_hint">Remettez un titre que vous avez retiré de Reprendre.</string>
     <string name="hidden_rows">Rangées masquées</string>

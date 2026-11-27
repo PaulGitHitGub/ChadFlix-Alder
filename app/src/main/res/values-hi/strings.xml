@@ -208,15 +208,11 @@
     <string name="group_streams">स्रोत</string>
     <string name="group_picture">तस्वीर और आवाज़</string>
     <string name="group_subtitles">सबटाइटल</string>
-    <string name="group_addons">ऐड-ऑन</string>
-    <string name="group_profile">प्रोफ़ाइल</string>
     <string name="group_language">भाषा</string>
     <string name="group_about">जानकारी</string>
     <string name="hint_streams">चुनें कि Alder स्रोत कैसे ढूँढे और शुरू करे।</string>
     <string name="hint_picture">वह तस्वीर और आवाज़ चुनें जो यह टीवी चला सकता है।</string>
     <string name="hint_subtitles">तय करें कि सबटाइटल कैसे शुरू हों और दिखें।</string>
-    <string name="hint_addons">इस प्रोफ़ाइल से जुड़े ऐड-ऑन मैनेज करें।</string>
-    <string name="hint_profile">प्रोफ़ाइल की पसंद देखने वाले व्यक्ति की रहती है।</string>
     <string name="hint_language">वह भाषा चुनें जिसमें Alder दिखे।</string>
     <string name="hint_about">Alder के बारे में।</string>
     <string name="play_press">जब मैं चलाएँ दबाऊँ</string>
@@ -291,7 +287,6 @@
     <string name="reload_failed">फिर से लोड नहीं हो सका</string>
     <string name="switch_profile_hint">चुनें कि कौन देख रहा है।</string>
     <string name="manage_profiles">प्रोफ़ाइलें मैनेज करें</string>
-    <string name="manage_profiles_hint">प्रोफ़ाइल का नाम बदलें, PIN बदलें या किसी और को जोड़ें।</string>
     <string name="hidden_continue">देखना जारी रखें से छिपाए गए</string>
     <string name="hidden_continue_hint">देखना जारी रखें से हटाया गया टाइटल वापस लाएँ।</string>
     <string name="hidden_rows">छिपी हुई पंक्तियाँ</string>

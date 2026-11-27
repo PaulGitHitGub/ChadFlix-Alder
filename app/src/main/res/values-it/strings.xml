@@ -209,15 +209,11 @@
     <string name="group_streams">Fonti</string>
     <string name="group_picture">Immagine e suono</string>
     <string name="group_subtitles">Sottotitoli</string>
-    <string name="group_addons">Add-on</string>
-    <string name="group_profile">Profilo</string>
     <string name="group_language">Lingua</string>
     <string name="group_about">Informazioni</string>
     <string name="hint_streams">Scegli come Alder trova e avvia una fonte.</string>
     <string name="hint_picture">Scegli l’immagine e il suono che questa TV può riprodurre.</string>
     <string name="hint_subtitles">Imposta come partono e appaiono i sottotitoli.</string>
-    <string name="hint_addons">Gestisci gli add-on collegati a questo profilo.</string>
-    <string name="hint_profile">Le scelte del profilo restano alla persona che guarda.</string>
     <string name="hint_language">Scegli la lingua in cui appare Alder.</string>
     <string name="hint_about">Informazioni su Alder.</string>
     <string name="play_press">Quando premo Riproduci</string>
@@ -292,7 +288,6 @@
     <string name="reload_failed">Ricaricamento non riuscito</string>
     <string name="switch_profile_hint">Scegli chi sta guardando.</string>
     <string name="manage_profiles">Gestisci profili</string>
-    <string name="manage_profiles_hint">Rinomina profili, cambia PIN o aggiungi un’altra persona.</string>
     <string name="hidden_continue">Nascosti da Continua a guardare</string>
     <string name="hidden_continue_hint">Ripristina un titolo che hai rimosso da Continua a guardare.</string>
     <string name="hidden_rows">Righe nascoste</string>

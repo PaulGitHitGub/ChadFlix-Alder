@@ -208,15 +208,11 @@
     <string name="group_streams">Quellen</string>
     <string name="group_picture">Bild und Ton</string>
     <string name="group_subtitles">Untertitel</string>
-    <string name="group_addons">Add-ons</string>
-    <string name="group_profile">Profil</string>
     <string name="group_language">Sprache</string>
     <string name="group_about">Info</string>
     <string name="hint_streams">Lege fest, wie Alder eine Quelle findet und startet.</string>
     <string name="hint_picture">Wähle Bild und Ton, die dieser Fernseher wiedergeben kann.</string>
     <string name="hint_subtitles">Lege fest, wie Untertitel starten und aussehen.</string>
-    <string name="hint_addons">Verwalte die mit diesem Profil verbundenen Add-ons.</string>
-    <string name="hint_profile">Profileinstellungen gehören der Person, die schaut.</string>
     <string name="hint_language">Wähle die Sprache, in der Alder angezeigt wird.</string>
     <string name="hint_about">Über Alder.</string>
     <string name="play_press">Wenn ich Abspielen drücke</string>
@@ -291,7 +287,6 @@
     <string name="reload_failed">Neu laden fehlgeschlagen</string>
     <string name="switch_profile_hint">Wähle, wer schaut.</string>
     <string name="manage_profiles">Profile verwalten</string>
-    <string name="manage_profiles_hint">Profile umbenennen, PINs ändern oder eine weitere Person hinzufügen.</string>
     <string name="hidden_continue">Aus Weiterschauen ausgeblendet</string>
     <string name="hidden_continue_hint">Hol einen Titel zurück, den du aus Weiterschauen entfernt hast.</string>
     <string name="hidden_rows">Ausgeblendete Reihen</string>
