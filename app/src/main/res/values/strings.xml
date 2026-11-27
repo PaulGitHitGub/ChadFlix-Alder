@@ -119,7 +119,7 @@
     <string name="background_wash_hint" translatable="false">A soft, dimmed blur of the focused title behind the home rows. Off: plain black.</string>
     <string name="show_fps_hint" translatable="false">A frames-per-second counter in the top-left corner of the home pages.</string>
     <string name="customize_home" translatable="false">Customize Home</string>
-    <string name="customize_home_sub" translatable="false">Show, Hide and Reorder Your Rows</string>
+    <string name="customize_general" translatable="false">General</string>
     <string name="always_first" translatable="false">Always First</string>
     <string name="hint_customize" translatable="false">The rows Movies, Shows and Services show, and their order, for this profile.</string>
     <string name="showing_default" translatable="false">(Default)</string>
@@ -243,7 +243,6 @@
     <string name="hint_language">Choose the languages for menus, audio and dubbing.</string>
     <string name="group_advanced" translatable="false">Advanced</string>
     <string name="hint_advanced" translatable="false">Settings most people never need to change.</string>
-    <string name="group_home_display" translatable="false">Home &amp; Display</string>
     <string name="hint_home_display" translatable="false">How Home looks for this profile.</string>
     <string name="group_profile_addons" translatable="false">Profile &amp; Add-ons</string>
     <string name="hint_profile_addons" translatable="false">Who\'s watching, and the add-ons connected to this profile.</string>
