@@ -240,7 +240,7 @@
     <string name="hint_streams">Choose how ChadFlix finds and starts a source.</string>
     <string name="hint_picture">Choose the picture and sound this TV can play.</string>
     <string name="hint_subtitles">Set how subtitles start and appear.</string>
-    <string name="hint_language">Choose the language ChadFlix shows.</string>
+    <string name="hint_language">Choose the languages for menus, audio and dubbing.</string>
     <string name="group_advanced" translatable="false">Advanced</string>
     <string name="hint_advanced" translatable="false">Settings most people never need to change.</string>
     <string name="group_home_display" translatable="false">Home &amp; Display</string>

@@ -276,10 +276,10 @@ class SettingsActivity : Screen() {
         STREAMS(R.string.group_streams, R.drawable.ic_play),
         PICTURE(R.string.group_picture, R.drawable.ic_tv),
         SUBTITLES(R.string.group_subtitles, R.drawable.ic_subtitles),
+        LANGUAGE(R.string.group_language, R.drawable.ic_language), // ChadFlix: app, audio and dubbing languages together
         CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix
         HOME_DISPLAY(R.string.group_home_display, R.drawable.ic_layers), // ChadFlix: everything else that changes Home
         PROFILE(R.string.group_profile_addons, R.drawable.ic_person), // ChadFlix: who's watching and their add-ons
-        LANGUAGE(R.string.group_language, R.drawable.ic_language),
         ADVANCED(R.string.group_advanced, R.drawable.ic_settings), // ChadFlix: what most people never need to change
         ABOUT(R.string.group_about, R.drawable.ic_info),
     }
@@ -569,9 +569,6 @@ class SettingsActivity : Screen() {
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)
                 choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
-                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
-                languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
-                dubbed.forEach(::choiceRow)
             }
             Group.SUBTITLES -> {
                 subtitles.forEach(::choiceRow)
@@ -639,7 +636,12 @@ class SettingsActivity : Screen() {
                     }
                 }
             }
-            Group.LANGUAGE -> appLanguageRow()
+            Group.LANGUAGE -> {
+                appLanguageRow()
+                languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
+                languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
+                dubbed.forEach(::choiceRow)
+            }
             Group.ADVANCED -> {
                 advanced.forEach(::choiceRow)
                 lateinit var keyValue: TextView
