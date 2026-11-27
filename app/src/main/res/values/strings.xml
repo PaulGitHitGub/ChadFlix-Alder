@@ -238,7 +238,6 @@
     <string name="group_addons">Add-ons</string>
     <string name="group_profile">Profile</string>
     <string name="group_language">Language</string>
-    <string name="group_storage">Storage</string>
     <string name="group_about">About</string>
     <string name="hint_streams">Choose how ChadFlix finds and starts a source.</string>
     <string name="hint_picture">Choose the picture and sound this TV can play.</string>
@@ -246,7 +245,6 @@
     <string name="hint_addons">Manage the add-ons connected to this profile.</string>
     <string name="hint_profile">Profile choices stay with the person watching.</string>
     <string name="hint_language">Choose the language ChadFlix shows.</string>
-    <string name="hint_storage">Storage on this TV only.</string>
     <string name="group_advanced" translatable="false">Advanced</string>
     <string name="hint_advanced" translatable="false">Settings most people never need to change.</string>
     <string name="hint_about">About ChadFlix.</string>

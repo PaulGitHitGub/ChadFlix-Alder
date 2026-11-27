@@ -280,7 +280,6 @@ class SettingsActivity : Screen() {
         CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix
         PROFILE(R.string.group_profile, R.drawable.ic_person),
         LANGUAGE(R.string.group_language, R.drawable.ic_language),
-        STORAGE(R.string.group_storage, R.drawable.ic_storage),
         ADVANCED(R.string.group_advanced, R.drawable.ic_settings), // ChadFlix: what most people never need to change
         ABOUT(R.string.group_about, R.drawable.ic_info),
     }
@@ -293,14 +292,12 @@ class SettingsActivity : Screen() {
     private val streaming by lazy { listOf(
         Choice("alwaysList", getString(R.string.play_press), getString(R.string.play_press_hint),
             listOf(false to getString(R.string.play_best_source), true to getString(R.string.play_show_sources))),
-        Choice("addonText", getString(R.string.source_list), getString(R.string.source_list_hint),
-            listOf(false to getString(R.string.source_list_clean), true to getString(R.string.source_list_addon))),
         Choice("maxHeight", getString(R.string.max_quality), getString(R.string.max_quality_hint),
             listOf(0 to getString(R.string.no_limit), 2160 to "4K", 1080 to "1080p", 720 to "720p")),
         Choice("maxSizeGb", getString(R.string.max_size), getString(R.string.max_size_hint),
             listOf(0 to getString(R.string.no_limit), 40 to "40 GB", 30 to "30 GB", 20 to "20 GB", 10 to "10 GB", 5 to "5 GB")),
     ) }
-    // ChadFlix: Advanced. The Source Choice presets still set Release Type (see choice()).
+    // ChadFlix: Advanced. The Source Choice presets still set Release Type and HDR (see choice()).
     private val advanced by lazy { listOf(
         // Alder, then each video app on this TV by its own name.
         Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
@@ -308,6 +305,13 @@ class SettingsActivity : Screen() {
         Choice("release", getString(R.string.release_type), getString(R.string.release_type_hint),
             listOf("" to getString(R.string.no_preference), "remux" to getString(R.string.release_remux),
                 "encode" to getString(R.string.release_encode), "web" to getString(R.string.release_web)), true),
+        Choice("addonText", getString(R.string.source_list), getString(R.string.source_list_hint),
+            listOf(false to getString(R.string.source_list_clean), true to getString(R.string.source_list_addon))),
+        Choice("hdrPref", getString(R.string.hdr_choice), getString(R.string.hdr_choice_hint),
+            listOf("" to on, "dv" to getString(R.string.hdr_dv_first), "hdr10" to getString(R.string.hdr_hdr10_first), "off" to off)),
+        Choice("matchFrameRate", getString(R.string.frame_rate), getString(R.string.frame_rate_hint), onOff()),
+        Choice("decodeAudio", getString(R.string.audio_output), getString(R.string.audio_output_hint),
+            listOf(false to getString(R.string.streams_auto), true to "PCM")),
         Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on)),
     ) }
     private val pictureAndSound by lazy { listOf(
@@ -316,11 +320,6 @@ class SettingsActivity : Screen() {
         Choice("uiScale", getString(R.string.ui_size), getString(R.string.ui_size_hint),
             // ponytail: two steps; 130% pushed Home's title logo into the top bar on a 1080p TV.
             listOf(100 to getString(R.string.ui_size_normal), 115 to getString(R.string.size_large))),
-        Choice("hdrPref", getString(R.string.hdr_choice), getString(R.string.hdr_choice_hint),
-            listOf("" to on, "dv" to getString(R.string.hdr_dv_first), "hdr10" to getString(R.string.hdr_hdr10_first), "off" to off)),
-        Choice("matchFrameRate", getString(R.string.frame_rate), getString(R.string.frame_rate_hint), onOff()),
-        Choice("decodeAudio", getString(R.string.audio_output), getString(R.string.audio_output_hint),
-            listOf(false to getString(R.string.streams_auto), true to "PCM")),
         Choice("clearDialogue", getString(R.string.clear_dialogue), getString(R.string.clear_dialogue_setting_hint),
             listOf(false to off, true to on)),
     ) }
@@ -398,7 +397,7 @@ class SettingsActivity : Screen() {
             background = glassOver(this, 14)
         }
         Group.entries.forEach { group ->
-            if (group == Group.STORAGE) groups.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) },
+            if (group == Group.ADVANCED) groups.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) },
                 LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(6), dp(8), dp(6), dp(8)) })
             addGroup(group)
         }
@@ -537,7 +536,7 @@ class SettingsActivity : Screen() {
         selectedGroup = group
         groupViews.forEach { (item, view) ->
             groupDots[item]?.visibility = if (item == group) View.VISIBLE else View.INVISIBLE
-            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.STORAGE || item == Group.ADVANCED || item == Group.ABOUT) TEXT_3 else TEXT_2)
+            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.ADVANCED || item == Group.ABOUT) TEXT_3 else TEXT_2)
             if (!view.hasFocus()) view.background = if (item == group) tile(8) else null
         }
         detailTitle.text = getString(group.words)
@@ -556,7 +555,6 @@ class SettingsActivity : Screen() {
             Group.CUSTOMIZE -> R.string.hint_customize
             Group.PROFILE -> R.string.hint_profile
             Group.LANGUAGE -> R.string.hint_language
-            Group.STORAGE -> R.string.hint_storage
             Group.ADVANCED -> R.string.hint_advanced
             Group.ABOUT -> R.string.hint_about
         })
@@ -601,13 +599,6 @@ class SettingsActivity : Screen() {
                 actionRow(getString(R.string.my_addons), "…", getString(R.string.my_addons_hint)) {
                     if (authKey != null) startActivity(Intent(this, AddonsActivity::class.java))
                 }.also { addonValue = it }
-                actionRow(getString(R.string.reload_addons), "", getString(R.string.reload_addons_hint)) {
-                    val key = authKey ?: return@actionRow
-                    addonValue?.text = getString(R.string.reloading)
-                    background({ Stremio.addons(key, refresh = true).size }) { result ->
-                        addonValue?.text = installed(result.getOrNull(), R.string.reload_failed)
-                    }
-                }
                 val key = authKey
                 if (key != null) background({ Stremio.addons(key).size }) { result ->
                     addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
@@ -651,6 +642,10 @@ class SettingsActivity : Screen() {
                     listOf("imdb" to "IMDb", "letterboxd" to LETTERBOXD, "both" to getString(R.string.ratings_both))))
                 choiceRow(Choice("episodeBadges", getString(R.string.episode_badges), getString(R.string.episode_badges_hint),
                     listOf("aired" to getString(R.string.episode_badges_aired), "season" to getString(R.string.episode_badges_season), "off" to off)))
+            }
+            Group.LANGUAGE -> appLanguageRow()
+            Group.ADVANCED -> {
+                advanced.forEach(::choiceRow)
                 lateinit var keyValue: TextView
                 fun keyState() = getString(if (Settings.mdblistKey(this).isEmpty()) R.string.key_not_set else R.string.key_set)
                 keyValue = actionRow(getString(R.string.mdblist_key), keyState(), getString(R.string.mdblist_key_hint)) {
@@ -660,15 +655,21 @@ class SettingsActivity : Screen() {
                         keyValue.text = keyState() + "  ›"
                     }
                 }
-            }
-            Group.LANGUAGE -> appLanguageRow()
-            Group.ADVANCED -> advanced.forEach(::choiceRow)
-            Group.STORAGE -> actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
-                choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
-                    getString(R.string.clear_storage_desc)) { choice ->
-                    if (choice != 1) return@choose
-                    // Clearing removes every profile, so a PIN-locked one asks for its PIN first, as removing it does.
-                    if (Profiles.all(this).none { it.pin != null }) clearStorage() else askPinToClear()
+                lateinit var reloadValue: TextView
+                reloadValue = actionRow(getString(R.string.reload_addons), "", getString(R.string.reload_addons_hint)) {
+                    val key = authKey ?: return@actionRow
+                    reloadValue.text = getString(R.string.reloading)
+                    background({ Stremio.addons(key, refresh = true).size }) { result ->
+                        reloadValue.text = installed(result.getOrNull(), R.string.reload_failed)
+                    }
+                }
+                actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
+                    choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
+                        getString(R.string.clear_storage_desc)) { choice ->
+                        if (choice != 1) return@choose
+                        // Clearing removes every profile, so a PIN-locked one asks for its PIN first, as removing it does.
+                        if (Profiles.all(this).none { it.pin != null }) clearStorage() else askPinToClear()
+                    }
                 }
             }
             Group.ABOUT -> {

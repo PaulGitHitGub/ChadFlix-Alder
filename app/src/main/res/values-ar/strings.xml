@@ -228,7 +228,6 @@
     <string name="group_addons">الإضافات</string>
     <string name="group_profile">الملف الشخصي</string>
     <string name="group_language">اللغة</string>
-    <string name="group_storage">التخزين</string>
     <string name="group_about">حول</string>
     <string name="hint_streams">اختر كيف يعثر Alder على مصدر ويبدأ تشغيله.</string>
     <string name="hint_picture">اختر إعدادات الصورة والصوت التي يدعمها التلفزيون.</string>
@@ -236,7 +235,6 @@
     <string name="hint_addons">أدر الإضافات المرتبطة بهذا الملف الشخصي.</string>
     <string name="hint_profile">يحتفظ كل ملف شخصي بخياراته الخاصة.</string>
     <string name="hint_language">اختر لغة واجهة Alder.</string>
-    <string name="hint_storage">التخزين على هذا التلفزيون فقط.</string>
     <string name="hint_about">حول Alder.</string>
     <string name="play_press">عند الضغط على تشغيل</string>
     <string name="play_press_hint">ما يحدث عند اختيار تشغيل أو متابعة. اضغط مطولًا على موافق لعرض كل المصادر.</string>
