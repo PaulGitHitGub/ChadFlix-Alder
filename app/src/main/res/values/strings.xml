@@ -247,7 +247,7 @@
     <string name="hint_profile">Profile choices stay with the person watching.</string>
     <string name="hint_language">Choose the language ChadFlix shows.</string>
     <string name="hint_storage">Storage on this TV only.</string>
-    <string name="group_advanced" translatable="false">Advanced Options</string>
+    <string name="group_advanced" translatable="false">Advanced</string>
     <string name="hint_advanced" translatable="false">Settings most people never need to change.</string>
     <string name="hint_about">About ChadFlix.</string>
     <string name="play_press">When I press Play</string>

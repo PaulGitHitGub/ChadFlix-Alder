@@ -300,7 +300,7 @@ class SettingsActivity : Screen() {
         Choice("maxSizeGb", getString(R.string.max_size), getString(R.string.max_size_hint),
             listOf(0 to getString(R.string.no_limit), 40 to "40 GB", 30 to "30 GB", 20 to "20 GB", 10 to "10 GB", 5 to "5 GB")),
     ) }
-    // ChadFlix: Advanced Options. The Source Choice presets still set Release Type (see choice()).
+    // ChadFlix: Advanced. The Source Choice presets still set Release Type (see choice()).
     private val advanced by lazy { listOf(
         // Alder, then each video app on this TV by its own name.
         Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
