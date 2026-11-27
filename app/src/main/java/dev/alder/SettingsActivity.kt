@@ -281,6 +281,7 @@ class SettingsActivity : Screen() {
         PROFILE(R.string.group_profile, R.drawable.ic_person),
         LANGUAGE(R.string.group_language, R.drawable.ic_language),
         STORAGE(R.string.group_storage, R.drawable.ic_storage),
+        ADVANCED(R.string.group_advanced, R.drawable.ic_settings), // ChadFlix: what most people never need to change
         ABOUT(R.string.group_about, R.drawable.ic_info),
     }
 
@@ -294,16 +295,20 @@ class SettingsActivity : Screen() {
             listOf(false to getString(R.string.play_best_source), true to getString(R.string.play_show_sources))),
         Choice("addonText", getString(R.string.source_list), getString(R.string.source_list_hint),
             listOf(false to getString(R.string.source_list_clean), true to getString(R.string.source_list_addon))),
-        // Alder, then each video app on this TV by its own name.
-        Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
-            listOf("" to getString(R.string.video_player_alder)) + ExternalPlayer.installed(this)),
         Choice("maxHeight", getString(R.string.max_quality), getString(R.string.max_quality_hint),
             listOf(0 to getString(R.string.no_limit), 2160 to "4K", 1080 to "1080p", 720 to "720p")),
         Choice("maxSizeGb", getString(R.string.max_size), getString(R.string.max_size_hint),
             listOf(0 to getString(R.string.no_limit), 40 to "40 GB", 30 to "30 GB", 20 to "20 GB", 10 to "10 GB", 5 to "5 GB")),
+    ) }
+    // ChadFlix: Advanced Options. The Source Choice presets still set Release Type (see choice()).
+    private val advanced by lazy { listOf(
+        // Alder, then each video app on this TV by its own name.
+        Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
+            listOf("" to getString(R.string.video_player_alder)) + ExternalPlayer.installed(this)),
         Choice("release", getString(R.string.release_type), getString(R.string.release_type_hint),
             listOf("" to getString(R.string.no_preference), "remux" to getString(R.string.release_remux),
                 "encode" to getString(R.string.release_encode), "web" to getString(R.string.release_web)), true),
+        Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on)),
     ) }
     private val pictureAndSound by lazy { listOf(
         Choice("displayHeight", getString(R.string.display_resolution), getString(R.string.display_resolution_hint),
@@ -532,7 +537,7 @@ class SettingsActivity : Screen() {
         selectedGroup = group
         groupViews.forEach { (item, view) ->
             groupDots[item]?.visibility = if (item == group) View.VISIBLE else View.INVISIBLE
-            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.STORAGE || item == Group.ABOUT) TEXT_3 else TEXT_2)
+            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.STORAGE || item == Group.ADVANCED || item == Group.ABOUT) TEXT_3 else TEXT_2)
             if (!view.hasFocus()) view.background = if (item == group) tile(8) else null
         }
         detailTitle.text = getString(group.words)
@@ -552,6 +557,7 @@ class SettingsActivity : Screen() {
             Group.PROFILE -> R.string.hint_profile
             Group.LANGUAGE -> R.string.hint_language
             Group.STORAGE -> R.string.hint_storage
+            Group.ADVANCED -> R.string.hint_advanced
             Group.ABOUT -> R.string.hint_about
         })
         when (group) {
@@ -582,7 +588,6 @@ class SettingsActivity : Screen() {
             Group.PICTURE -> {
                 pictureAndSound.forEach(::choiceRow)
                 choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
-                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
                 languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
@@ -657,6 +662,7 @@ class SettingsActivity : Screen() {
                 }
             }
             Group.LANGUAGE -> appLanguageRow()
+            Group.ADVANCED -> advanced.forEach(::choiceRow)
             Group.STORAGE -> actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
                 choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
                     getString(R.string.clear_storage_desc)) { choice ->
@@ -1080,7 +1086,7 @@ class SettingsActivity : Screen() {
             else -> putInt(key(c), value as Int)
         }
     }.apply().also { if (c.key == "uiScale") { reopenGroup = selectedGroup; main.post { recreate() } } } // the new size shows at once
-    private fun choice(key: String) = (streaming + pictureAndSound).first { it.key == key }
+    private fun choice(key: String) = (streaming + pictureAndSound + advanced).first { it.key == key }
 
     private fun View.clickOnRight() {
         setOnKeyListener { row, code, event ->
