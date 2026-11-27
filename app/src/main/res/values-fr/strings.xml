@@ -209,18 +209,12 @@
     <string name="group_streams">Sources</string>
     <string name="group_picture">Image et son</string>
     <string name="group_subtitles">Sous-titres</string>
-    <string name="group_addons">Extensions</string>
-    <string name="group_profile">Profil</string>
     <string name="group_language">Langue</string>
-    <string name="group_storage">Stockage</string>
     <string name="group_about">À propos</string>
     <string name="hint_streams">Choisissez comment Alder trouve et lance une source.</string>
     <string name="hint_picture">Choisissez l’image et le son que ce téléviseur peut lire.</string>
     <string name="hint_subtitles">Réglez le démarrage et l’apparence des sous-titres.</string>
-    <string name="hint_addons">Gérez les extensions liées à ce profil.</string>
-    <string name="hint_profile">Les choix du profil restent propres à la personne qui regarde.</string>
     <string name="hint_language">Choisissez la langue d’Alder.</string>
-    <string name="hint_storage">Stockage sur ce téléviseur uniquement.</string>
     <string name="hint_about">À propos d’Alder.</string>
     <string name="play_press">Quand j’appuie sur Lecture</string>
     <string name="play_press_hint">Ce que font Lecture et Reprendre. Maintenir OK affiche toujours toutes les sources.</string>
@@ -279,9 +273,6 @@
     <string name="shared_by_hint">%1$s partage ces extensions de streaming avec tous les profils de ce téléviseur. Votre historique reste le vôtre.</string>
     <string name="no_stream_addons">Aucune extension de streaming</string>
     <string name="load_failed">Chargement impossible</string>
-    <string name="more_filters">Plus de filtres</string>
-    <string name="more_filters_hint">Les groupes de release, codecs et autres se règlent dans votre extension de streaming.</string>
-    <string name="more_filters_desc">Les groupes de release, codecs, langues et autres se règlent dans votre extension de streaming, depuis votre téléphone ou sur web.stremio.com. Ce téléviseur suit son ordre.</string>
     <string name="audio_language">Langue audio</string>
     <string name="audio_language_hint">Le doublage par lequel commencer quand un fichier en a plusieurs. Modifiable pendant la lecture.</string>
     <string name="subtitle_language">Langue des sous-titres</string>
@@ -294,7 +285,6 @@
     <string name="reload_failed">Échec du rechargement</string>
     <string name="switch_profile_hint">Choisissez qui regarde.</string>
     <string name="manage_profiles">Gérer les profils</string>
-    <string name="manage_profiles_hint">Renommez les profils, changez les codes PIN ou ajoutez une personne.</string>
     <string name="hidden_continue">Masqués de Reprendre</string>
     <string name="hidden_continue_hint">Remettez un titre que vous avez retiré de Reprendre.</string>
     <string name="hidden_rows">Rangées masquées</string>

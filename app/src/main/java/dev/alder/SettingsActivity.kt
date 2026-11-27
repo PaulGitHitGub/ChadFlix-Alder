@@ -277,11 +277,10 @@ class SettingsActivity : Screen() {
         STREAMS(R.string.group_streams, R.drawable.ic_play),
         PICTURE(R.string.group_picture, R.drawable.ic_tv),
         SUBTITLES(R.string.group_subtitles, R.drawable.ic_subtitles),
-        ADDONS(R.string.group_addons, R.drawable.ic_layers),
-        CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix
-        PROFILE(R.string.group_profile, R.drawable.ic_person),
-        LANGUAGE(R.string.group_language, R.drawable.ic_language),
-        STORAGE(R.string.group_storage, R.drawable.ic_storage),
+        LANGUAGE(R.string.group_language, R.drawable.ic_language), // ChadFlix: app, audio and dubbing languages together
+        CUSTOMIZE(R.string.customize_home, R.drawable.ic_home), // ChadFlix: General (Home's settings), then each page's rows
+        PROFILE(R.string.group_profile_addons, R.drawable.ic_person), // ChadFlix: who's watching and their add-ons
+        ADVANCED(R.string.group_advanced, R.drawable.ic_settings), // ChadFlix: what most people never need to change
         ABOUT(R.string.group_about, R.drawable.ic_info),
     }
 
@@ -293,18 +292,27 @@ class SettingsActivity : Screen() {
     private val streaming by lazy { listOf(
         Choice("alwaysList", getString(R.string.play_press), getString(R.string.play_press_hint),
             listOf(false to getString(R.string.play_best_source), true to getString(R.string.play_show_sources))),
-        Choice("addonText", getString(R.string.source_list), getString(R.string.source_list_hint),
-            listOf(false to getString(R.string.source_list_clean), true to getString(R.string.source_list_addon))),
-        // Alder, then each video app on this TV by its own name.
-        Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
-            listOf("" to getString(R.string.video_player_alder)) + ExternalPlayer.installed(this)),
         Choice("maxHeight", getString(R.string.max_quality), getString(R.string.max_quality_hint),
             listOf(0 to getString(R.string.no_limit), 2160 to "4K", 1080 to "1080p", 720 to "720p")),
         Choice("maxSizeGb", getString(R.string.max_size), getString(R.string.max_size_hint),
             listOf(0 to getString(R.string.no_limit), 40 to "40 GB", 30 to "30 GB", 20 to "20 GB", 10 to "10 GB", 5 to "5 GB")),
+    ) }
+    // ChadFlix: Advanced. The Source Choice presets still set Release Type and HDR (see choice()).
+    private val advanced by lazy { listOf(
+        // Alder, then each video app on this TV by its own name.
+        Choice("videoPlayer", getString(R.string.video_player), getString(R.string.video_player_hint),
+            listOf("" to getString(R.string.video_player_alder)) + ExternalPlayer.installed(this)),
         Choice("release", getString(R.string.release_type), getString(R.string.release_type_hint),
             listOf("" to getString(R.string.no_preference), "remux" to getString(R.string.release_remux),
                 "encode" to getString(R.string.release_encode), "web" to getString(R.string.release_web)), true),
+        Choice("addonText", getString(R.string.source_list), getString(R.string.source_list_hint),
+            listOf(false to getString(R.string.source_list_clean), true to getString(R.string.source_list_addon))),
+        Choice("hdrPref", getString(R.string.hdr_choice), getString(R.string.hdr_choice_hint),
+            listOf("" to on, "dv" to getString(R.string.hdr_dv_first), "hdr10" to getString(R.string.hdr_hdr10_first), "off" to off)),
+        Choice("matchFrameRate", getString(R.string.frame_rate), getString(R.string.frame_rate_hint), onOff()),
+        Choice("decodeAudio", getString(R.string.audio_output), getString(R.string.audio_output_hint),
+            listOf(false to getString(R.string.streams_auto), true to "PCM")),
+        Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on)),
     ) }
     private val pictureAndSound by lazy { listOf(
         Choice("displayHeight", getString(R.string.display_resolution), getString(R.string.display_resolution_hint),
@@ -312,11 +320,6 @@ class SettingsActivity : Screen() {
         Choice("uiScale", getString(R.string.ui_size), getString(R.string.ui_size_hint),
             // ponytail: two steps; 130% pushed Home's title logo into the top bar on a 1080p TV.
             listOf(100 to getString(R.string.ui_size_normal), 115 to getString(R.string.size_large))),
-        Choice("hdrPref", getString(R.string.hdr_choice), getString(R.string.hdr_choice_hint),
-            listOf("" to on, "dv" to getString(R.string.hdr_dv_first), "hdr10" to getString(R.string.hdr_hdr10_first), "off" to off)),
-        Choice("matchFrameRate", getString(R.string.frame_rate), getString(R.string.frame_rate_hint), onOff()),
-        Choice("decodeAudio", getString(R.string.audio_output), getString(R.string.audio_output_hint),
-            listOf(false to getString(R.string.streams_auto), true to "PCM")),
         Choice("clearDialogue", getString(R.string.clear_dialogue), getString(R.string.clear_dialogue_setting_hint),
             listOf(false to off, true to on)),
     ) }
@@ -394,7 +397,7 @@ class SettingsActivity : Screen() {
             background = glassOver(this, 14)
         }
         Group.entries.forEach { group ->
-            if (group == Group.STORAGE) groups.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) },
+            if (group == Group.ADVANCED) groups.addView(View(this).apply { setBackgroundColor(GLASS_EDGE) },
                 LinearLayout.LayoutParams(-1, dp(1)).apply { setMargins(dp(6), dp(8), dp(6), dp(8)) })
             addGroup(group)
         }
@@ -402,7 +405,8 @@ class SettingsActivity : Screen() {
             leftMargin = dp(48); topMargin = dp(88)
         })
 
-        detailTitle = text("", BODY, bold = true).apply { setPadding(dp(12), 0, 0, 0) }
+        // ChadFlix: centred and heavier than the rows, so the group's name reads as a heading, not an option.
+        detailTitle = text("", BODY, bold = true).apply { typeface = heavyFace; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(12), 0, dp(12), 0) }
         detailRows = column(Gravity.START)
         // A long group (Profile) scrolls in its own space: drawn past it, rows ran over the group's title and pushed the
         // help off the screen. The padding keeps room for the focused row's glow inside that space.
@@ -532,7 +536,7 @@ class SettingsActivity : Screen() {
         selectedGroup = group
         groupViews.forEach { (item, view) ->
             groupDots[item]?.visibility = if (item == group) View.VISIBLE else View.INVISIBLE
-            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.STORAGE || item == Group.ABOUT) TEXT_3 else TEXT_2)
+            groupLabels[item]?.setTextColor(if (item == group) TEXT else if (item == Group.ADVANCED || item == Group.ABOUT) TEXT_3 else TEXT_2)
             if (!view.hasFocus()) view.background = if (item == group) tile(8) else null
         }
         detailTitle.text = getString(group.words)
@@ -547,17 +551,41 @@ class SettingsActivity : Screen() {
             Group.STREAMS -> R.string.hint_streams
             Group.PICTURE -> R.string.hint_picture
             Group.SUBTITLES -> R.string.hint_subtitles
-            Group.ADDONS -> R.string.hint_addons
-            Group.CUSTOMIZE -> R.string.hint_customize
-            Group.PROFILE -> R.string.hint_profile
+            Group.CUSTOMIZE -> R.string.hint_home_display // General opens first
+            Group.PROFILE -> R.string.hint_profile_addons
             Group.LANGUAGE -> R.string.hint_language
-            Group.STORAGE -> R.string.hint_storage
+            Group.ADVANCED -> R.string.hint_advanced
             Group.ABOUT -> R.string.hint_about
         })
         when (group) {
             Group.STREAMS -> {
                 presetRow()
                 streaming.forEach(::choiceRow)
+            }
+            Group.PICTURE -> {
+                pictureAndSound.forEach(::choiceRow)
+                choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
+                choiceRow(Choice("trailerPreviews", getString(R.string.trailer_previews), getString(R.string.trailer_previews_hint),
+                    listOf(false to off, true to on)))
+            }
+            Group.SUBTITLES -> {
+                subtitles.forEach(::choiceRow)
+                languageRow("subLang", getString(R.string.subtitle_language), getString(R.string.subtitle_language_hint))
+                subtitleLooks.forEach(::choiceRow)
+            }
+            Group.CUSTOMIZE -> customizeHome()
+            Group.PROFILE -> {
+                actionRow(getString(R.string.menu_switch_profile), "", getString(R.string.switch_profile_hint)) {
+                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
+                }
+                actionRow(getString(R.string.my_addons), "…", getString(R.string.my_addons_hint)) {
+                    if (authKey != null) startActivity(Intent(this, AddonsActivity::class.java))
+                }.also { addonValue = it }
+                val key = authKey
+                if (key != null) background({ Stremio.addons(key).size }) { result ->
+                    addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
+                }
                 Profiles.active(this)?.let { me ->
                     lateinit var value: TextView
                     value = actionRow(getString(R.string.share_streams), if (Profiles.sharesStreams(this, me.id)) on else off,
@@ -575,79 +603,15 @@ class SettingsActivity : Screen() {
                             ?: getString(if (result.isSuccess) R.string.no_stream_addons else R.string.load_failed)
                     }
                 }
-                actionRow(getString(R.string.more_filters), "", getString(R.string.more_filters_hint)) {
-                    choose(getString(R.string.more_filters), listOf(getString(R.string.action_ok)), getString(R.string.more_filters_desc)) {}
-                }
             }
-            Group.PICTURE -> {
-                pictureAndSound.forEach(::choiceRow)
-                choiceRow(Choice("wash", getString(R.string.background_wash), getString(R.string.background_wash_hint), listOf(true to on, false to off))) // ChadFlix
-                choiceRow(Choice("showFps", getString(R.string.show_fps), getString(R.string.show_fps_hint), listOf(false to off, true to on))) // ChadFlix
+            Group.LANGUAGE -> {
+                appLanguageRow()
                 languageRow("audioLang", getString(R.string.audio_language), getString(R.string.audio_language_hint))
                 languageRow("audioFallback", getString(R.string.audio_fallback), getString(R.string.audio_fallback_hint), R.string.state_off)
                 dubbed.forEach(::choiceRow)
-                choiceRow(Choice("trailerPreviews", getString(R.string.trailer_previews), getString(R.string.trailer_previews_hint),
-                    listOf(false to off, true to on)))
             }
-            Group.SUBTITLES -> {
-                subtitles.forEach(::choiceRow)
-                languageRow("subLang", getString(R.string.subtitle_language), getString(R.string.subtitle_language_hint))
-                subtitleLooks.forEach(::choiceRow)
-            }
-            Group.ADDONS -> {
-                actionRow(getString(R.string.my_addons), "…", getString(R.string.my_addons_hint)) {
-                    if (authKey != null) startActivity(Intent(this, AddonsActivity::class.java))
-                }.also { addonValue = it }
-                actionRow(getString(R.string.reload_addons), "", getString(R.string.reload_addons_hint)) {
-                    val key = authKey ?: return@actionRow
-                    addonValue?.text = getString(R.string.reloading)
-                    background({ Stremio.addons(key, refresh = true).size }) { result ->
-                        addonValue?.text = installed(result.getOrNull(), R.string.reload_failed)
-                    }
-                }
-                val key = authKey
-                if (key != null) background({ Stremio.addons(key).size }) { result ->
-                    addonValue?.text = installed(result.getOrNull(), R.string.addons_unavailable)
-                }
-            }
-            Group.CUSTOMIZE -> customizeHome()
-            Group.PROFILE -> {
-                actionRow(getString(R.string.menu_switch_profile), "", getString(R.string.switch_profile_hint)) {
-                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-                }
-                actionRow(getString(R.string.manage_profiles), "", getString(R.string.manage_profiles_hint)) {
-                    startActivity(Intent(this, ProfilesActivity::class.java).putExtra("pick", true)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
-                }
-                var hiddenValue: TextView? = null
-                fun count() { hiddenValue?.text = "${Settings.hidden(this).length()}  ›" }
-                hiddenValue = actionRow(getString(R.string.hidden_continue), "", getString(R.string.hidden_continue_hint)) {
-                    unhideMenu(::count)
-                }
-                count()
-                var hiddenRowsValue: TextView? = null
-                fun countRows() { hiddenRowsValue?.text = "${Settings.hiddenRows(this).size}  ›" }
-                hiddenRowsValue = actionRow(getString(R.string.hidden_rows), "", getString(R.string.hidden_rows_hint)) {
-                    unhideRowsMenu(::countRows)
-                }
-                countRows()
-                choiceRow(Choice("startTab", getString(R.string.default_tab), getString(R.string.default_tab_hint),
-                    listOf("movies" to getString(R.string.tab_movies), "home" to getString(R.string.tab_home), // ChadFlix: Movies first, the default
-                        "shows" to getString(R.string.tab_shows), "library" to getString(R.string.tab_my_list)), perProfile = true))
-                lateinit var tabsValue: TextView
-                tabsValue = actionRow(getString(R.string.tabs), "…", getString(R.string.tabs_hint), perProfile = true) {
-                    tabsMenu { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
-                }
-                withTabs { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
-                choiceRow(Choice("featuredHome", getString(R.string.featured_home), getString(R.string.featured_home_hint),
-                    listOf(false to off, true to on), perProfile = true))
-                choiceRow(Choice("blurThumbnails", getString(R.string.blur_thumbnails), getString(R.string.blur_thumbnails_hint),
-                    listOf(false to off, true to on), perProfile = true))
-                choiceRow(Choice("ratings", getString(R.string.ratings_source), getString(R.string.ratings_source_hint),
-                    listOf("imdb" to "IMDb", "letterboxd" to LETTERBOXD, "both" to getString(R.string.ratings_both))))
-                choiceRow(Choice("episodeBadges", getString(R.string.episode_badges), getString(R.string.episode_badges_hint),
-                    listOf("aired" to getString(R.string.episode_badges_aired), "season" to getString(R.string.episode_badges_season), "off" to off)))
+            Group.ADVANCED -> {
+                advanced.forEach(::choiceRow)
                 lateinit var keyValue: TextView
                 fun keyState() = getString(if (Settings.mdblistKey(this).isEmpty()) R.string.key_not_set else R.string.key_set)
                 keyValue = actionRow(getString(R.string.mdblist_key), keyState(), getString(R.string.mdblist_key_hint)) {
@@ -657,14 +621,21 @@ class SettingsActivity : Screen() {
                         keyValue.text = keyState() + "  ›"
                     }
                 }
-            }
-            Group.LANGUAGE -> appLanguageRow()
-            Group.STORAGE -> actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
-                choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
-                    getString(R.string.clear_storage_desc)) { choice ->
-                    if (choice != 1) return@choose
-                    // Clearing removes every profile, so a PIN-locked one asks for its PIN first, as removing it does.
-                    if (Profiles.all(this).none { it.pin != null }) clearStorage() else askPinToClear()
+                lateinit var reloadValue: TextView
+                reloadValue = actionRow(getString(R.string.reload_addons), "", getString(R.string.reload_addons_hint)) {
+                    val key = authKey ?: return@actionRow
+                    reloadValue.text = getString(R.string.reloading)
+                    background({ Stremio.addons(key, refresh = true).size }) { result ->
+                        reloadValue.text = installed(result.getOrNull(), R.string.reload_failed)
+                    }
+                }
+                actionRow(getString(R.string.clear_storage), "", getString(R.string.clear_storage_hint)) {
+                    choose(getString(R.string.clear_storage_title), listOf(getString(R.string.action_cancel), getString(R.string.action_clear)),
+                        getString(R.string.clear_storage_desc)) { choice ->
+                        if (choice != 1) return@choose
+                        // Clearing removes every profile, so a PIN-locked one asks for its PIN first, as removing it does.
+                        if (Profiles.all(this).none { it.pin != null }) clearStorage() else askPinToClear()
+                    }
                 }
             }
             Group.ABOUT -> {
@@ -840,17 +811,48 @@ class SettingsActivity : Screen() {
         }
     }
 
+    /** Customize Home › General: what Home & Display held. Its rows go straight into [detailRows], under the pills. */
+    private fun generalRows() {
+        choiceRow(Choice("startTab", getString(R.string.default_tab), getString(R.string.default_tab_hint),
+            listOf("movies" to getString(R.string.tab_movies), "home" to getString(R.string.tab_home), // ChadFlix: Movies first, the default
+                "shows" to getString(R.string.tab_shows), "library" to getString(R.string.tab_my_list)), perProfile = true))
+        lateinit var tabsValue: TextView
+        tabsValue = actionRow(getString(R.string.tabs), "…", getString(R.string.tabs_hint), perProfile = true) {
+            tabsMenu { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
+        }
+        withTabs { tabs -> tabsValue.text = tabsSummary(tabs) + "  ›" }
+        choiceRow(Choice("featuredHome", getString(R.string.featured_home), getString(R.string.featured_home_hint),
+            listOf(false to off, true to on), perProfile = true))
+        choiceRow(Choice("ratings", getString(R.string.ratings_source), getString(R.string.ratings_source_hint),
+            listOf("imdb" to "IMDb", "letterboxd" to LETTERBOXD, "both" to getString(R.string.ratings_both))))
+        choiceRow(Choice("episodeBadges", getString(R.string.episode_badges), getString(R.string.episode_badges_hint),
+            listOf("aired" to getString(R.string.episode_badges_aired), "season" to getString(R.string.episode_badges_season), "off" to off)))
+        choiceRow(Choice("blurThumbnails", getString(R.string.blur_thumbnails), getString(R.string.blur_thumbnails_hint),
+            listOf(false to off, true to on), perProfile = true))
+        var hiddenRowsValue: TextView? = null
+        fun countRows() { hiddenRowsValue?.text = "${Settings.hiddenRows(this).size}  ›" }
+        hiddenRowsValue = actionRow(getString(R.string.hidden_rows), "", getString(R.string.hidden_rows_hint)) {
+            unhideRowsMenu(::countRows)
+        }
+        countRows()
+        var hiddenValue: TextView? = null
+        fun count() { hiddenValue?.text = "${Settings.hidden(this).length()}  ›" }
+        hiddenValue = actionRow(getString(R.string.hidden_continue), "", getString(R.string.hidden_continue_hint)) {
+            unhideMenu(::count)
+        }
+        count()
+    }
+
     /**
-     * Movies | Shows | Services pills, then two columns. On: "Continue Watching · Always First", then the page's rows in their order,
+     * General | Movies | Shows | Services pills, focus opening each. General: [generalRows], straight under the pills.
+     * The others: two columns. On: "Continue Watching · Always First", then the page's rows in their order,
      * each with a grip. Off: every other row it could show (genres, then add-on rows), A to Z. OK moves a row to the other
      * column (turned on, it goes to the bottom of On); Left / Right switch columns. Hold OK in On: edit mode, every On row
      * wobbles; OK picks one up (red outline) and drops it, Up / Down move it; hold OK again or Back leaves (Back drops a
      * picked-up row first). Saved at once, in the order and on/off the home rows' hold-OK menu uses too.
      */
     private fun customizeHome() {
-        detailRows.addView(text(R.string.customize_home_sub, SMALL, color = TEXT_2),
-            LinearLayout.LayoutParams(-1, -2).apply { marginStart = dp(12); bottomMargin = dp(12) })
-        var tab = 0 // 0 Movies, 1 Shows, 2 Services
+        var tab = 0 // 0 General, 1 Movies, 2 Shows, 3 Services
         var movie = true
         var edit = false
         var picked = -1 // the On row picked up in edit mode
@@ -861,8 +863,8 @@ class SettingsActivity : Screen() {
         val jiggles = HashMap<View, android.animation.ValueAnimator>()
         val still = android.provider.Settings.Global.getFloat(contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         val tabs = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        // Room for a third pill (Services) later: the pills are a list.
-        val tabViews = listOf(R.string.tab_movies, R.string.tab_shows, R.string.tab_services).map { words ->
+        // General, then one pill per page.
+        val tabViews = listOf(R.string.customize_general, R.string.tab_movies, R.string.tab_shows, R.string.tab_services).map { words ->
             text(words, BODY, bold = true).apply { id = View.generateViewId(); gravity = Gravity.CENTER; isFocusable = true; setPadding(dp(18), 0, dp(18), 0) }
         }
         fun openPill() = tabViews[tab]
@@ -871,7 +873,7 @@ class SettingsActivity : Screen() {
             t.background = if (t.isFocused) HomeStyle.pill(HomeStyle.WHITE) else if (open) HomeStyle.pill(0x40FFFFFF) else null
             t.setTextColor(if (t.isFocused) HomeStyle.BLACK else if (open) HomeStyle.WHITE else 0xB0FFFFFF.toInt())
         }
-        val colH = rowsMaxPx - dp(96)
+        val colH = rowsMaxPx - dp(80) // under the pills (38 dp), the On / Off labels (22 dp) and the list's padding (18 dp)
         fun column(header: String): Pair<LinearLayout, BarScroll> {
             val list = column(Gravity.START).apply { clipChildren = false }
             val scroll = BarScroll(clipRows = true).apply { isVerticalScrollBarEnabled = false; clipToPadding = false; setPadding(0, dp(4), dp(12), dp(4)); addView(list) }
@@ -882,13 +884,16 @@ class SettingsActivity : Screen() {
         val columns = LinearLayout(this).apply {
             listOf(onScroll, offScroll).forEachIndexed { i, sc ->
                 addView(column(Gravity.START,
-                    text(sc.tag as String, SMALL, bold = true, color = TEXT_3).apply { setPadding(dp(12), 0, 0, dp(4)) },
+                    text(sc.tag as String, SMALL, bold = true, color = TEXT).apply {
+                        gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(12), 0, dp(12), dp(4))
+                        layoutParams = LinearLayout.LayoutParams(-1, -2) // the column's full width, so the header centres over it
+                    },
                 ).apply { addView(sc, LinearLayout.LayoutParams(-1, colH)) },
                     LinearLayout.LayoutParams(0, -2, 1f).apply { if (i == 1) marginStart = dp(8) })
             }
         }
-        fun page() = listOf("Movies", "Shows", HomeStyle.SERVICES)[tab] // the page's label in MainActivity
-        fun shown(t: String) = HomeStyle.isOn(HomeStyle.rowsOn(this, page()), t, movie, services = tab == 2) && t !in Settings.hiddenRows(this)
+        fun page() = listOf("Movies", "Shows", HomeStyle.SERVICES)[tab - 1] // the page's label in MainActivity
+        fun shown(t: String) = HomeStyle.isOn(HomeStyle.rowsOn(this, page()), t, movie, services = tab == 3) && t !in Settings.hiddenRows(this)
         fun save() = HomeStyle.saveRowOrder(this, page(), onRows + offRows)
         fun jiggle() = onViews.forEachIndexed { i, v -> // the visible On rows only; transforms on the render thread, no layout
             val visible = v.bottom > onScroll.scrollY && v.top < onScroll.scrollY + onScroll.height
@@ -1001,7 +1006,7 @@ class SettingsActivity : Screen() {
             if (refocus) openPill().requestFocus() // focus waits on the panel's own pill while the lists are rebuilt
             stopJiggle()
             onList.removeAllViews(); offList.removeAllViews(); onViews.clear(); offViews.clear(); restyles.clear()
-            if (tab < 2) onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off (not on Services)
+            if (tab < 3) onList.addView(LinearLayout(this).apply { // Continue Watching: always first, can't move or turn off (not on Services)
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), 0, dp(14), 0)
                 addView(ImageView(context).apply { setImageResource(R.drawable.ic_lock); imageTintList = ColorStateList.valueOf(0x80FFFFFF.toInt()) },
@@ -1025,19 +1030,41 @@ class SettingsActivity : Screen() {
             edit = false; picked = -1
             render(true, 0, false) // the remote stays where it is (a pill, or the menu)
         }
+        /** The open pill's content under the pills: General's rows, or the On and Off columns. Focus stays on the pill. */
+        fun showTab() {
+            edit = false; picked = -1; stopJiggle()
+            detailRows.removeViews(1, detailRows.childCount - 1) // everything under the pills
+            refresh.clear() // the rows that just went don't redraw on resume
+            rowsScroll.scrollTo(0, 0)
+            firstDetail = openPill() // Right from the menu comes back to this pill
+            if (tab == 0) {
+                generalRows()
+                detailRows.getChildAt(1)?.nextFocusUpId = tabViews[0].id // Up: General, not the pill nearest the row's middle
+            } else {
+                detailRows.addView(columns, LinearLayout.LayoutParams(-1, -2))
+                load()
+            }
+        }
         onScroll.setOnScrollChangeListener { _, _, _, _, _ -> if (edit) jiggle() }
         tabViews.forEachIndexed { i, t ->
             t.setOnFocusChangeListener { _, has ->
-                if (has && tab != i) { tab = i; movie = i == 0; load() }
-                if (has) hint.text = getString(R.string.hint_customize)
+                if (has && tab != i) { tab = i; movie = i == 1; showTab() }
+                if (has) hint.text = getString(if (i == 0) R.string.hint_home_display else R.string.hint_customize)
                 styleTabs()
             }
-            t.setOnClickListener { (onViews.firstOrNull() ?: offViews.firstOrNull())?.requestFocus() }
+            // OK or Down: the open pill's first row (General's first; else On's first, or Off's when On is empty).
+            t.setOnClickListener { (if (tab == 0) detailRows.getChildAt(1) else onViews.firstOrNull() ?: offViews.firstOrNull())?.requestFocus() }
+            t.setOnKeyListener { _, code, event ->
+                event.action == android.view.KeyEvent.ACTION_DOWN && when (code) {
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> t.callOnClick()
+                    android.view.KeyEvent.KEYCODE_DPAD_UP -> true // nothing above the pills (Android would pick a menu page and open it)
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> i == tabViews.lastIndex // Services: no diagonal jump into Off
+                    else -> false
+                }
+            }
             tabs.addView(t, LinearLayout.LayoutParams(-2, dp(30)).apply { marginEnd = dp(8) })
         }
         detailRows.addView(tabs, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(12); bottomMargin = dp(8) })
-        detailRows.addView(columns, LinearLayout.LayoutParams(-1, -2))
-        firstDetail = tabViews[0]
         customOwnsLeft = { v -> (v in tabViews && v !== tabViews[0]) || v in offViews || (edit && v in onViews) }
         customBack = {
             when {
@@ -1047,7 +1074,7 @@ class SettingsActivity : Screen() {
             }
         }
         customStop = { edit = false; picked = -1; stopJiggle(); restyles.forEach { it() } } // no picked-up style left either
-        load()
+        showTab()
         styleTabs()
     }
 
@@ -1082,7 +1109,7 @@ class SettingsActivity : Screen() {
             else -> putInt(key(c), value as Int)
         }
     }.apply().also { if (c.key == "uiScale") { reopenGroup = selectedGroup; main.post { recreate() } } } // the new size shows at once
-    private fun choice(key: String) = (streaming + pictureAndSound).first { it.key == key }
+    private fun choice(key: String) = (streaming + pictureAndSound + advanced).first { it.key == key }
 
     private fun View.clickOnRight() {
         setOnKeyListener { row, code, event ->

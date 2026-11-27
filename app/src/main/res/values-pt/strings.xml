@@ -209,18 +209,12 @@
     <string name="group_streams">Fontes</string>
     <string name="group_picture">Imagem e som</string>
     <string name="group_subtitles">Legendas</string>
-    <string name="group_addons">Complementos</string>
-    <string name="group_profile">Perfil</string>
     <string name="group_language">Idioma</string>
-    <string name="group_storage">Armazenamento</string>
     <string name="group_about">Sobre</string>
     <string name="hint_streams">Escolha como o Alder encontra e inicia uma fonte.</string>
     <string name="hint_picture">Escolha a imagem e o som que esta TV consegue reproduzir.</string>
     <string name="hint_subtitles">Defina como as legendas começam e aparecem.</string>
-    <string name="hint_addons">Gerencie os complementos conectados a este perfil.</string>
-    <string name="hint_profile">As opções do perfil ficam com quem está assistindo.</string>
     <string name="hint_language">Escolha o idioma em que o Alder aparece.</string>
-    <string name="hint_storage">Armazenamento apenas nesta TV.</string>
     <string name="hint_about">Sobre o Alder.</string>
     <string name="play_press">Quando eu aperto Assistir</string>
     <string name="play_press_hint">O que Assistir e Continuar fazem. Segurar OK sempre mostra todas as fontes.</string>
@@ -279,9 +273,6 @@
     <string name="shared_by_hint">%1$s compartilha estes complementos de streaming com todos os perfis desta TV. Seu histórico continua sendo seu.</string>
     <string name="no_stream_addons">Nenhum complemento de streaming</string>
     <string name="load_failed">Não foi possível carregar</string>
-    <string name="more_filters">Mais filtros</string>
-    <string name="more_filters_hint">Grupos de versão, codecs e mais são definidos no seu complemento de streaming.</string>
-    <string name="more_filters_desc">Grupos de versão, codecs, idiomas e mais são definidos no seu complemento de streaming pelo celular ou em web.stremio.com. Esta TV segue a ordem dele.</string>
     <string name="audio_language">Idioma do áudio</string>
     <string name="audio_language_hint">A dublagem para começar quando um arquivo tem várias. Pode ser trocada enquanto você assiste.</string>
     <string name="subtitle_language">Idioma das legendas</string>
@@ -294,7 +285,6 @@
     <string name="reload_failed">Falha ao recarregar</string>
     <string name="switch_profile_hint">Escolha quem está assistindo.</string>
     <string name="manage_profiles">Gerenciar perfis</string>
-    <string name="manage_profiles_hint">Renomeie perfis, troque PINs ou adicione outra pessoa.</string>
     <string name="hidden_continue">Ocultos de Continuar assistindo</string>
     <string name="hidden_continue_hint">Traga de volta um título que você removeu de Continuar assistindo.</string>
     <string name="hidden_rows">Fileiras ocultas</string>

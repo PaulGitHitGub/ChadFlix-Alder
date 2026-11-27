@@ -22,7 +22,7 @@
     <string name="updates_download_failed_desc">Check the TV\'s connection and try again from Settings › About.</string>
 
     <!-- What's new -->
-    <string name="whats_new">What\'s new</string>
+    <string name="whats_new">What\'s New</string>
     <string name="whats_new_no_notes">There are no notes for version %1$s.</string>
     <string name="whats_new_version">Version %1$s</string>
     <string name="whats_new_preview">Release preview</string>
@@ -58,7 +58,7 @@
     <string name="action_later">Later</string>
     <string name="action_install">Install</string>
     <string name="menu_install_update">Install update (%1$s)</string>
-    <string name="menu_switch_profile">Switch profile</string>
+    <string name="menu_switch_profile">Switch Profile</string>
     <string name="menu_settings">Settings</string>
     <string name="action_play">Play</string>
     <string name="action_resume">Resume</string>
@@ -115,11 +115,11 @@
     <string name="tab_services" translatable="false">Services</string>
     <string name="fps" translatable="false">%1$d fps</string>
     <string name="show_fps" translatable="false">Show FPS</string>
-    <string name="background_wash" translatable="false">Background wash</string>
+    <string name="background_wash" translatable="false">Blurred Background</string>
     <string name="background_wash_hint" translatable="false">A soft, dimmed blur of the focused title behind the home rows. Off: plain black.</string>
     <string name="show_fps_hint" translatable="false">A frames-per-second counter in the top-left corner of the home pages.</string>
     <string name="customize_home" translatable="false">Customize Home</string>
-    <string name="customize_home_sub" translatable="false">Show, Hide and Reorder Your Rows</string>
+    <string name="customize_general" translatable="false">General</string>
     <string name="always_first" translatable="false">Always First</string>
     <string name="hint_customize" translatable="false">The rows Movies, Shows and Services show, and their order, for this profile.</string>
     <string name="showing_default" translatable="false">(Default)</string>
@@ -210,9 +210,9 @@
     <string name="color_cyan">Cyan</string>
     <string name="color_cream">Cream</string>
     <string name="color_warm_white">Warm White</string>
-    <string name="subtitle_color">Subtitle color</string>
-    <string name="clear_dialogue">Clear dialogue</string>
-    <string name="subtitle_size">Size</string>
+    <string name="subtitle_color">Subtitle Color</string>
+    <string name="clear_dialogue">Clear Dialogue</string>
+    <string name="subtitle_size">Subtitle Size</string>
     <string name="size_small">Small</string>
     <string name="size_medium">Medium</string>
     <string name="size_large">Large</string>
@@ -235,133 +235,128 @@
     <string name="group_streams">Streams</string>
     <string name="group_picture">Picture &amp; Sound</string>
     <string name="group_subtitles">Subtitles</string>
-    <string name="group_addons">Add-ons</string>
-    <string name="group_profile">Profile</string>
     <string name="group_language">Language</string>
-    <string name="group_storage">Storage</string>
     <string name="group_about">About</string>
     <string name="hint_streams">Choose how ChadFlix finds and starts a source.</string>
     <string name="hint_picture">Choose the picture and sound this TV can play.</string>
     <string name="hint_subtitles">Set how subtitles start and appear.</string>
-    <string name="hint_addons">Manage the add-ons connected to this profile.</string>
-    <string name="hint_profile">Profile choices stay with the person watching.</string>
-    <string name="hint_language">Choose the language ChadFlix shows.</string>
-    <string name="hint_storage">Storage on this TV only.</string>
+    <string name="hint_language">Choose the languages for menus, audio and dubbing.</string>
+    <string name="group_advanced" translatable="false">Advanced</string>
+    <string name="hint_advanced" translatable="false">Settings most people never need to change.</string>
+    <string name="hint_home_display" translatable="false">How Home looks for this profile.</string>
+    <string name="group_profile_addons" translatable="false">Profile &amp; Add-ons</string>
+    <string name="hint_profile_addons" translatable="false">Who\'s watching, and the add-ons connected to this profile.</string>
     <string name="hint_about">About ChadFlix.</string>
-    <string name="play_press">When I press Play</string>
+    <string name="play_press">When I Press Play</string>
     <string name="play_press_hint">What Play and Resume do. Holding OK always shows every source.</string>
-    <string name="play_best_source">Best source</string>
-    <string name="play_show_sources">Show sources</string>
-    <string name="source_list">Source list</string>
+    <string name="play_best_source">Best Source</string>
+    <string name="play_show_sources">Show Sources</string>
+    <string name="source_list">Source List</string>
     <string name="source_list_hint">How each source reads. The add-on\'s text shows what your add-on wrote, in a wider list, as in Stremio.</string>
     <string name="source_list_clean">Clean</string>
-    <string name="source_list_addon">As the add-on writes it</string>
-    <string name="max_quality">Highest quality</string>
+    <string name="source_list_addon">As the Add-on Writes It</string>
+    <string name="max_quality">Highest Resolution</string>
     <string name="max_quality_hint">Releases above this are skipped when picking a source.</string>
-    <string name="no_limit">No limit</string>
-    <string name="max_size">Largest file</string>
+    <string name="no_limit">No Limit</string>
+    <string name="max_size">Largest File</string>
     <string name="max_size_hint">For slow connections: big files take longer to start.</string>
-    <string name="release_type">Release type</string>
+    <string name="release_type">Release Type</string>
     <string name="release_type_hint">Which kind of file is tried first for this profile. REMUX is the full Blu-ray.</string>
-    <string name="no_preference">No preference</string>
+    <string name="no_preference">No Preference</string>
     <string name="release_remux">Full Blu-ray (REMUX)</string>
-    <string name="release_encode">Smaller encodes</string>
-    <string name="release_web">Web releases</string>
+    <string name="release_encode">Smaller Encodes</string>
+    <string name="release_web">Web Releases</string>
     <string name="hdr_choice">HDR and Dolby Vision</string>
     <string name="hdr_choice_hint">Which goes first when a title has both. Off picks plain releases.</string>
-    <string name="hdr_dv_first">Dolby Vision first</string>
-    <string name="hdr_hdr10_first">HDR10 first</string>
-    <string name="frame_rate">Match frame rate</string>
+    <string name="hdr_dv_first">Dolby Vision First</string>
+    <string name="hdr_hdr10_first">HDR10 First</string>
+    <string name="frame_rate">Match Frame Rate</string>
     <string name="frame_rate_hint">The TV switches to the film\'s rate so pans don\'t judder.</string>
-    <string name="audio_output">Audio output</string>
+    <string name="audio_output">Audio Output</string>
     <string name="audio_output_hint">Auto sends supported formats to your audio device. PCM decodes the sound in ChadFlix.</string>
-    <string name="ui_size">Text and poster size</string>
+    <string name="ui_size">Text and Poster Size</string>
     <string name="ui_size_hint">Makes text, posters and buttons bigger on every screen, for a TV far from your seat.</string>
     <string name="ui_size_normal">Normal</string>
-    <string name="video_player">Video player</string>
+    <string name="video_player">Video Player</string>
     <string name="video_player_hint">Choose the app that plays your videos. With another app, ChadFlix still picks the source and saves where you stop.</string>
     <string name="video_player_alder">ChadFlix</string>
     <string name="player_other_app">Plays in another app. Press Back there to return.</string>
     <string name="player_no_other_app">No other video player is on this TV. ChadFlix plays the video.</string>
     <string name="clear_dialogue_setting_hint">Lifts voices above music and loud effects when using TV speakers.</string>
-    <string name="dubbed">Dubbed releases</string>
+    <string name="dubbed">Dubbed Releases</string>
     <string name="dubbed_hint">Original first puts dubbed releases last. My language first uses ChadFlix’s player to check the audio before automatic playback. You can still choose any source.</string>
-    <string name="dubbed_original">Original first</string>
-    <string name="dubbed_mine">My language first</string>
-    <string name="subs_default">Subtitles by default</string>
+    <string name="dubbed_original">Original First</string>
+    <string name="dubbed_mine">My Language First</string>
+    <string name="subs_default">Subtitles by Default</string>
     <string name="subs_default_hint">Subtitles in your subtitle language start with the video when available.</string>
-    <string name="subs_always">Always on</string>
-    <string name="subs_foreign">Foreign audio only</string>
+    <string name="subs_always">Always On</string>
+    <string name="subs_foreign">Foreign Audio Only</string>
     <string name="subtitle_size_hint">How big subtitles are on screen.</string>
     <string name="subtitle_color_hint">The color of subtitle text.</string>
-    <string name="subtitle_background">Subtitle background</string>
+    <string name="subtitle_background">Subtitle Background</string>
     <string name="subtitle_background_hint">A dark box behind subtitles keeps them readable in bright scenes.</string>
     <string name="settings_profile_name">Profile %1$s</string>
-    <string name="addons_installed">%1$d installed</string>
+    <string name="addons_installed">%1$d Installed</string>
     <string name="addons_unavailable">Unavailable</string>
-    <string name="share_streams">Share my streaming sources</string>
+    <string name="share_streams">Share My Streaming Sources</string>
     <string name="share_streams_hint">Other profiles on this TV can find sources with this profile\'s stream add-ons. Your add-on\'s provider may see what they play.</string>
     <string name="shared_by">Shared by %1$s</string>
     <string name="shared_by_hint">%1$s shares these stream add-ons with every profile on this TV. Your history stays yours.</string>
-    <string name="no_stream_addons">No stream add-ons</string>
-    <string name="load_failed">Couldn\'t load</string>
-    <string name="more_filters">More filters</string>
-    <string name="more_filters_hint">Release groups, codecs and more are set in your streaming add-on.</string>
-    <string name="more_filters_desc">Release groups, codecs, languages and more are set in your streaming add-on on your phone or at web.stremio.com. This TV follows its order.</string>
-    <string name="audio_language">Audio language</string>
+    <string name="no_stream_addons">No Stream Add-ons</string>
+    <string name="load_failed">Couldn\'t Load</string>
+    <string name="audio_language">Audio Language</string>
     <string name="audio_language_hint">The dub to start with when a file has several. Changeable while watching.</string>
-    <string name="audio_fallback">Fallback audio language</string>
+    <string name="audio_fallback">Fallback Audio Language</string>
     <string name="audio_fallback_hint">With My language first, ChadFlix tries your chosen language, this fallback, then English. Select Off to use only your chosen language.</string>
-    <string name="subtitle_language">Subtitle language</string>
+    <string name="subtitle_language">Subtitle Language</string>
     <string name="subtitle_language_hint">Which subtitles start with the video, and which come first in the list while watching.</string>
-    <string name="my_addons">My add-ons</string>
+    <string name="my_addons">My Add-ons</string>
     <string name="my_addons_hint">Add by URL, reorder or remove this profile\'s add-ons.</string>
-    <string name="reload_addons">Reload add-ons from Stremio</string>
+    <string name="reload_addons">Reload Add-ons from Stremio</string>
     <string name="reload_addons_hint">Fetch this profile\'s add-ons after installing some elsewhere.</string>
     <string name="reloading">Reloading…</string>
-    <string name="reload_failed">Reload failed</string>
+    <string name="reload_failed">Reload Failed</string>
     <string name="switch_profile_hint">Choose who is watching.</string>
     <string name="manage_profiles">Manage profiles</string>
-    <string name="manage_profiles_hint">Rename profiles, change PINs or add another person.</string>
     <string name="hidden_continue">Hidden from Continue Watching</string>
     <string name="hidden_continue_hint">Put back a title you removed from Continue Watching.</string>
-    <string name="hidden_rows">Hidden rows</string>
+    <string name="hidden_rows">Hidden Rows</string>
     <string name="hidden_rows_hint">Put back a catalog row you hid.</string>
-    <string name="default_tab">Default tab</string>
+    <string name="default_tab">Default Tab</string>
     <string name="default_tab_hint">Which tab opens when starting the app.</string>
     <string name="tabs">Tabs</string>
     <string name="tabs_hint">Choose which tabs the top bar shows, and in what order. Home always comes first.</string>
     <string name="tabs_desc">Left to right, as in the top bar. Select a tab to show, hide or move it.</string>
-    <string name="tabs_count">%1$d of %2$d shown</string>
+    <string name="tabs_count">%1$d of %2$d Shown</string>
     <string name="tab_show">Show</string>
     <string name="tab_hide">Hide</string>
     <string name="tab_move_left">Move left</string>
     <string name="tab_move_right">Move right</string>
     <string name="featured_home">Featured on Home</string>
     <string name="featured_home_hint">Show top recommendations and trending rows below Continue Watching.</string>
-    <string name="blur_thumbnails">Blur episode thumbnails</string>
+    <string name="blur_thumbnails">Blur Episode Thumbnails</string>
     <string name="blur_thumbnails_hint">Blur pictures of unwatched episodes in show guides to avoid spoilers.</string>
     <string name="ratings_source">Ratings</string>
     <string name="ratings_source_hint">Choose the ratings on title pages and Home. Letterboxd is for films only and needs an MDBList key. Shows always use IMDb.</string>
     <string name="ratings_both">Both</string>
-    <string name="episode_badges">New episode badges</string>
+    <string name="episode_badges">New Episode Badges</string>
     <string name="episode_badges_hint">Choose the number on series posters. Newly aired counts episodes that came out after you last watched. Current season counts the episodes left in the season you watch.</string>
-    <string name="episode_badges_aired">Newly aired</string>
-    <string name="episode_badges_season">Current season</string>
-    <string name="mdblist_key">MDBList key</string>
+    <string name="episode_badges_aired">Newly Aired</string>
+    <string name="episode_badges_season">Current Season</string>
+    <string name="mdblist_key">MDBList Key</string>
     <string name="mdblist_key_hint">Your free API key from mdblist.com/preferences. ChadFlix uses it only to get Letterboxd ratings.</string>
-    <string name="key_not_set">Not set</string>
+    <string name="key_not_set">Not Set</string>
     <string name="key_set">Set</string>
     <string name="phone_entry_scan">Scan with a phone on the same Wi-Fi as this TV, then paste the key there.</string>
     <string name="phone_entry_type">Type it instead</string>
     <string name="phone_page_label">Paste the key</string>
     <string name="phone_page_send">Send to TV</string>
     <string name="phone_page_saved">Saved on the TV. You can close this page.</string>
-    <string name="app_language">App language</string>
+    <string name="app_language">App Language</string>
     <string name="app_language_hint">Menus, buttons and settings show in this language. Titles and descriptions come from your add-ons.</string>
-    <string name="tv_language">TV language</string>
-    <string name="tv_language_named">TV language (%1$s)</string>
-    <string name="clear_storage">Clear local storage</string>
+    <string name="tv_language">TV Language</string>
+    <string name="tv_language_named">TV Language (%1$s)</string>
+    <string name="clear_storage">Clear Local Storage</string>
     <string name="clear_storage_hint">Removes profiles, settings and saved data from this TV. Stremio accounts stay as they are.</string>
     <string name="clear_storage_title">Clear local storage?</string>
     <string name="clear_storage_desc">This removes saved profiles, settings and cached data from this TV. It does not cancel your Stremio account.</string>
@@ -377,9 +372,9 @@
     <string name="updates_checking">Checking…</string>
     <string name="updates_hint">New versions come from ChadFlix\'s releases on GitHub.</string>
     <string name="updates_install">Install %1$s  ›</string>
-    <string name="updates_check_failed">Couldn\'t check · Try again  ›</string>
-    <string name="updates_up_to_date">Up to date</string>
-    <string name="report_send">Send report</string>
+    <string name="updates_check_failed">Couldn\'t Check · Try Again  ›</string>
+    <string name="updates_up_to_date">Up to Date</string>
+    <string name="report_send">Send Report</string>
     <string name="report_no">No</string>
     <string name="report_send_hint">Sends the last crash, recent error types and retry results, the ChadFlix version, and the TV model. It has no account details.</string>
     <string name="report_crashed_title">ChadFlix stopped last time</string>
@@ -397,12 +392,12 @@
     <string name="no_hidden_rows_desc">Catalog rows you hide appear here.</string>
     <string name="unhide_row_hint">Select a row to put it back.</string>
     <string name="custom">Custom</string>
-    <string name="source_choice">Source choice</string>
+    <string name="source_choice">Source Choice</string>
     <string name="source_choice_hint">Best picture: full Blu-ray and Dolby Vision first. Balanced: smaller files. Fast start: web releases. Any release: the sharpest copy, whatever the release.</string>
-    <string name="preset_addon_order">Any release</string>
-    <string name="preset_best_picture">Best picture</string>
+    <string name="preset_addon_order">Any Release</string>
+    <string name="preset_best_picture">Best Picture</string>
     <string name="preset_balanced">Balanced</string>
-    <string name="preset_fast_start">Fast start</string>
+    <string name="preset_fast_start">Fast Start</string>
 
     <!-- Search -->
     <string name="search_clear">Clear search</string>
@@ -567,7 +562,7 @@
     <string name="profiles_watchly_steps">"1.  Scan with %1$s's phone to open Watchly\n2.  Connect %1$s's Stremio account there\n3.  Install it to %1$s's Stremio account\n\n%1$s's own \"Top Picks\" then show up on Home. You can finish this later."</string>
     <string name="profiles_all_set">You\'re all set</string>
     <string name="profiles_ready">%1$s\'s profile is ready. You can add more add-ons later in Settings.</string>
-    <string name="display_resolution">Display resolution</string>
+    <string name="display_resolution">Display Resolution</string>
     <string name="display_resolution_hint">Choose the TV resolution ChadFlix uses to pick a source. Use 4K if your box reports 1080p but outputs 4K.</string>
     <string name="error_sign_in">sign in to Stremio again</string>
     <string name="error_response">invalid response</string>

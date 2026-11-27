@@ -247,6 +247,7 @@ abstract class Screen : Activity() {
 
     // Read once for the whole app, not per screen: Inter alone is 870 KB, read twice, on the main thread.
     private val fonts get() = loadedFonts ?: Fonts(applicationContext.assets).also { loadedFonts = it }
+    internal val heavyFace get() = fonts.bold
 
     /** Shared House Lights typography. */
     internal fun text(value: String, sp: Float, bold: Boolean = false, color: Int = TEXT, serif: Boolean = false) =
@@ -1366,6 +1367,9 @@ abstract class Screen : Activity() {
         else Typeface.createFromAsset(assets, "fonts/inter.ttf")
         val semiBold: Typeface = if (android.os.Build.VERSION.SDK_INT >= 26)
             Typeface.Builder(assets, "fonts/inter.ttf").setFontVariationSettings("'wght' 600").setWeight(600).build()
+        else Typeface.create(medium, Typeface.BOLD)
+        val bold: Typeface = if (android.os.Build.VERSION.SDK_INT >= 26) // ChadFlix: headings that must not read as rows
+            Typeface.Builder(assets, "fonts/inter.ttf").setFontVariationSettings("'wght' 700").setWeight(700).build()
         else Typeface.create(medium, Typeface.BOLD)
     }
 
