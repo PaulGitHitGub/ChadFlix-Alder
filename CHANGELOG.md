@@ -17,6 +17,30 @@ Put changes that are not released under `## Unreleased`. Before each release, re
 each entry that does not follow these rules. Then rename that heading to the version number.
 
 <!-- ChadFlix: give each release its own section here, named as versionName. Do not rename Unreleased: it is Alder's. -->
+## 1.4-chadflix.4
+
+### New
+<!-- Spotlight -->
+- **Trailer previews on Home.** Rest on a movie or show and its trailer plays inside the card, with sound. Move on and the poster is back at once. **Settings → Picture & Sound → Trailer Previews**
+<!-- Spotlight -->
+- **A tidier Settings.** Each section's name sits above its options. Rarely changed options moved to **Advanced**. Home options are in **Customize Home → General**, and **Profile & Add-ons** holds your profiles and add-ons.
+<!-- Spotlight -->
+- **Like and Watchlist on the title page.** The title page shows **Like** and **Watchlist** buttons, and the cast with their portraits.
+- **Directors & Cast in a pop-up.** In **Search**, **Directors & Cast** opens over the posters, two rows for directors and two for cast.
+
+### Easier to use
+<!-- Spotlight -->
+- **Smoother scrolling.** Moving up and down the rows is smoother on SHIELD. Holding a direction moves through the posters without the title and story flashing past, and the card you stop on is always fully on screen.
+- **Calmer title page.** The title page fades in once, without the cast or buttons jumping, and **Resume** is selected first.
+- **Better Back in Search.** **Back** from filtered posters reopens the menu you used. **Back** from the top row goes to the top bar.
+- **One font everywhere.** Every screen uses the same typeface.
+- **Even buttons.** Buttons in the same column or row are the same size.
+- **Clearer names in Settings.** Labels and values are in Title Case, and **Highest Resolution**, **Subtitle Size** and **Blurred Background** have clearer names.
+
+### Fixes
+- **Small fixes for Settings:** **More Filters**, which only showed a message, is gone. **Up** from the first option goes back to its section.
+- **Small fixes for the title page:** long show pages fit without scrolling, and the art's shade is only as dark as it needs to be.
+
 ## 1.4-chadflix.3
 
 ### New
