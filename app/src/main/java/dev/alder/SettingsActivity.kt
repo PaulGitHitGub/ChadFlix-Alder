@@ -513,6 +513,7 @@ class SettingsActivity : Screen() {
             visibility = if (group == Group.ABOUT && Updates.hasUpdate(this@SettingsActivity)) View.VISIBLE else View.GONE
         }
         val row = LinearLayout(this).apply {
+            id = View.generateViewId()
             gravity = Gravity.CENTER_VERTICAL
             addView(dot, LinearLayout.LayoutParams(dp(10), -1))
             addView(icon, LinearLayout.LayoutParams(dp(14), dp(14)).apply { marginStart = dp(4) })
@@ -669,6 +670,7 @@ class SettingsActivity : Screen() {
                 }
             }
         }
+        if (group != Group.CUSTOMIZE) firstDetail?.nextFocusUpId = groupViews.getValue(group).id
     }
 
     private fun settingRow(label: String, value: View, help: String, perProfile: Boolean = false,
